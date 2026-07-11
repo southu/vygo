@@ -130,6 +130,7 @@ CI runs the full verify path (`pnpm install --frozen-lockfile`, secret scan, lin
 | `GET`  | `/healthz`                | Process liveness (no dependency checks)                               |
 | `GET`  | `/readyz`                 | Ready when Postgres is up and required Drizzle migrations are applied |
 | `GET`  | `/v1/public/availability` | Public availability JSON + cache/ETag headers (neutral fallback)      |
+| `POST` | `/v1/waitlist`            | Secure waitlist intake (Turnstile, rate limits, atomic outbox)        |
 
 See [docs/api.md](docs/api.md) for the full contract (request IDs, CORS, neutral responses).
 

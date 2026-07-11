@@ -107,6 +107,137 @@ HTTP 413:
 }
 ```
 
+## `POST /v1/waitlist`
+
+Secure waitlist intake. Requires an allowed `Origin`, `Content-Type: application/json`,
+server-side Cloudflare Turnstile verification, privacy consent, and normalized fields.
+
+### Success (new or duplicate email)
+
+HTTP 200 — identical generic body in both cases (no existence disclosure):
+
+```json
+{
+  "data": {
+    "accepted": true,
+    "message": "Your application has been received."
+  }
+}
+```
+
+### Validation error
+
+HTTP 400:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Please review the highlighted fields.",
+    "fields": {
+      "email": "Enter a valid work email."
+    }
+  }
+}
+```
+
+### Rate limited
+
+HTTP 429:
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Too many attempts. Please try again later or email hello@vygo.ai."
+  }
+}
+```
+
+### Other documented errors
+
+| Status | Code                     | When                                          |
+| ------ | ------------------------ | --------------------------------------------- |
+| 403    | `FORBIDDEN_ORIGIN`       | Missing or disallowed `Origin`                |
+| 405    | `METHOD_NOT_ALLOWED`     | Non-POST methods                              |
+| 409    | `IDEMPOTENCY_CONFLICT`   | Idempotency key reused with different payload |
+| 413    | `PAYLOAD_TOO_LARGE`      | Body exceeds `BODY_LIMIT_BYTES`               |
+| 415    | `UNSUPPORTED_MEDIA_TYPE` | Content-Type is not JSON                      |
+| 400    | `TURNSTILE_FAILED`       | Missing/invalid/failed Turnstile token        |
+| 500    | `INTERNAL_ERROR`         | Persistence failure (generic; no PII)         |
+
+### Processing order
+
+1. Payload-size limit
+2. Content-Type check
+3. Origin allowlist
+4. Honeypot / min completion time (abuse → generic 200, no persistence)
+5. IP- and email-aware Redis (or memory) rate limits
+6. Server-side Turnstile verification (no request-level bypass)
+7. Zod validate + normalize (email lower/trim, HTTPS URL)
+8. Idempotency lookup / conflict
+9. Atomic lead upsert + confirmation outbox insert
+10. Generic success response
+
+### Request fields (strict)
+
+| Field                | Required | Notes                                                                               |
+| -------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `fullName`           | yes      | trim, max 120                                                                       |
+| `email`              | yes      | trim + lowercase, max 254                                                           |
+| `companyName`        | yes      | trim, max 160                                                                       |
+| `productUrl`         | yes      | HTTPS (http only for localhost)                                                     |
+| `stage`              | yes      | `prototype` \| `private_beta` \| `live_users` \| `revenue` \| `enterprise_pipeline` |
+| `primaryBlocker`     | yes      | enum per schema                                                                     |
+| `desiredStartWindow` | yes      | `asap` \| `within_30_days` \| `within_60_days` \| `this_quarter` \| `later`         |
+| `message`            | yes      | short description, max 4000                                                         |
+| `privacyAccepted`    | yes      | must be `true`                                                                      |
+| `turnstileToken`     | yes      | verified server-side only                                                           |
+| `role`               | no       |                                                                                     |
+| `prototypePlatform`  | no       |                                                                                     |
+| `budgetRange`        | no       | `under_25k` … `300k_plus` \| `not_determined`                                       |
+| `commercialDeadline` | no       | boolean                                                                             |
+| `marketingConsent`   | no       | boolean; separate from privacy                                                      |
+| `idempotencyKey`     | no       | UUID; also accepted via `Idempotency-Key` header                                    |
+| `utm`                | no       | `{ source, medium, campaign, content, term }` each max 128 chars                    |
+| `landingPage`        | no       |                                                                                     |
+| `referrer`           | no       |                                                                                     |
+| `website`            | no       | **honeypot** — must be empty                                                        |
+| `formStartedAt`      | no       | ms epoch or ISO; too-quick is an abuse signal                                       |
+
+Duplicate emails update mutable fields and last-seen metadata, preserve first-seen
+timestamps and original UTM/landing/referrer attribution, and return the same success body.
+
+### Lead scoring (internal)
+
+Deterministic weights (never returned on public success responses):
+
+- Stage: private_beta +1, live_users +2, revenue +3, enterprise_pipeline +4
+- Commercial deadline +3
+- Desired start asap / within_30_days +2
+- Budget 75k+ +2
+- Security / security_compliance blocker +2
+
+### Non-production test surface
+
+When `ENABLE_TEST_SURFACE=true`, non-production `NODE_ENV`, or Cloudflare test
+Turnstile secrets are configured:
+
+| Method | Path                               | Purpose                                                   |
+| ------ | ---------------------------------- | --------------------------------------------------------- |
+| `GET`  | `/v1/test/waitlist/inspect?email=` | PII-safe lead inspection (score, UTM, versioned `ipHash`) |
+| `GET`  | `/v1/test/ip-hash?ip=`             | Versioned salted hash + rotation window                   |
+| `POST` | `/v1/test/score`                   | Deterministic score preview                               |
+| `GET`  | `/v1/test/integration-report`      | Live coverage report for intake scenarios                 |
+
+Strict production (real Turnstile secret, `ENABLE_TEST_SURFACE=false`) does not
+register these routes. Request fields/headers/query can never activate a Turnstile bypass.
+
+### Turnstile (local / CI)
+
+Use Cloudflare official test secrets via `TURNSTILE_SECRET_KEY`, or inject a
+`TurnstileVerifier` adapter in process tests. Production must use real secrets.
+
 ## Operations
 
 ```bash
@@ -120,4 +251,7 @@ DATABASE_URL=… pnpm seed:local
 DATABASE_URL=… pnpm availability:set --status waitlist --date 2026-08-17 --type audit --note "…" --updated-by ops --dry-run
 DATABASE_URL=… pnpm availability:set --status open --date 2026-08-17 --updated-by ops
 # Production writes require --confirm-production
+
+# API integration tests (requires Postgres)
+DATABASE_URL_TEST=postgresql://vygo:vygo@localhost:5432/vygo_test pnpm test:integration
 ```

@@ -17,6 +17,21 @@ export const webEnvSchema = z.object({
   VERCEL_GIT_COMMIT_SHA: z.preprocess(emptyToUndefined, z.string().optional()),
 });
 
+/**
+ * Cloudflare Turnstile official test secret keys (always-pass / always-fail / already-spent).
+ * Safe for local development and CI only — never a request-level bypass.
+ */
+export const CLOUDFLARE_TURNSTILE_TEST_SECRETS = {
+  alwaysPasses: "1x0000000000000000000000000000000AA",
+  alwaysBlocks: "2x0000000000000000000000000000000AA",
+  alreadySpent: "3x0000000000000000000000000000000AA",
+} as const;
+
+export const CLOUDFLARE_TURNSTILE_TEST_TOKENS = {
+  alwaysPasses: "XXXX.DUMMY.TOKEN.XXXX",
+  alwaysBlocks: "XXXX.DUMMY.TOKEN.XXXX",
+} as const;
+
 export const apiEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -36,6 +51,39 @@ export const apiEnvSchema = z.object({
     .positive()
     .default(64 * 1024),
   REQUEST_ID_HEADER: z.string().default("x-request-id"),
+  /** Current IP hash salt (required for production waitlist). */
+  IP_HASH_SALT: z.preprocess(emptyToUndefined, z.string().min(8).optional()),
+  /** Previous salt retained during rotation window. */
+  IP_HASH_SALT_PREVIOUS: z.preprocess(emptyToUndefined, z.string().min(8).optional()),
+  /** Version tag for the current salt (stored with hash as `v{N}:hex`). */
+  IP_HASH_SALT_VERSION: z.coerce.number().int().positive().default(1),
+  /** Previous salt version during rotation. Defaults to version - 1 when previous salt set. */
+  IP_HASH_SALT_PREVIOUS_VERSION: z.coerce.number().int().positive().optional(),
+  RATE_LIMIT_IP_MAX: z.coerce.number().int().positive().default(20),
+  RATE_LIMIT_IP_WINDOW_SECONDS: z.coerce.number().int().positive().default(3600),
+  RATE_LIMIT_EMAIL_MAX: z.coerce.number().int().positive().default(5),
+  RATE_LIMIT_EMAIL_WINDOW_SECONDS: z.coerce.number().int().positive().default(3600),
+  /** Minimum form completion time in ms before submission is accepted. */
+  MIN_FORM_COMPLETION_MS: z.coerce.number().int().nonnegative().default(2000),
+  UTM_MAX_LENGTH: z.coerce.number().int().positive().default(128),
+  LEAD_NOTIFICATION_EMAIL: z.preprocess(
+    emptyToUndefined,
+    z.string().email().optional().default("hello@vygo.ai"),
+  ),
+  /**
+   * When true, expose non-production inspection + integration-report surfaces.
+   * Defaults on for non-production, or when Turnstile uses a Cloudflare test secret.
+   */
+  ENABLE_TEST_SURFACE: z.preprocess(emptyToUndefined, z.enum(["true", "false"]).optional()),
+  /**
+   * Integration fault injection (non-production only): `none` | `lead` | `outbox`.
+   * Never activatable via request fields/headers/query in production.
+   */
+  TEST_FAULT_MODE: z
+    .preprocess(emptyToUndefined, z.enum(["none", "lead", "outbox"]).optional())
+    .default("none"),
+  /** High-score alert threshold for optional internal notification (not public). */
+  LEAD_SCORE_ALERT_THRESHOLD: z.coerce.number().int().default(8),
 });
 
 export const workerEnvSchema = z.object({
@@ -76,4 +124,27 @@ export function parseCorsOrigins(env: ApiEnv): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/** Whether non-production test inspection / report routes may be registered. */
+export function isTestSurfaceEnabled(env: ApiEnv): boolean {
+  if (env.ENABLE_TEST_SURFACE === "true") return true;
+  if (env.ENABLE_TEST_SURFACE === "false") return false;
+  if (env.NODE_ENV !== "production") return true;
+  // Ratchet / local production-like deploys often use Cloudflare test secrets.
+  const secret = env.TURNSTILE_SECRET_KEY ?? "";
+  if (
+    secret === CLOUDFLARE_TURNSTILE_TEST_SECRETS.alwaysPasses ||
+    secret === CLOUDFLARE_TURNSTILE_TEST_SECRETS.alwaysBlocks ||
+    secret === CLOUDFLARE_TURNSTILE_TEST_SECRETS.alreadySpent
+  ) {
+    return true;
+  }
+  // No real Turnstile secret configured → not a locked-down production edge.
+  if (!secret) return true;
+  return false;
+}
+
+export function isProductionStrict(env: ApiEnv): boolean {
+  return env.NODE_ENV === "production" && !isTestSurfaceEnabled(env);
 }

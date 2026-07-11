@@ -1,11 +1,26 @@
 import Fastify from "fastify";
 import { checkDatabaseReadiness, createDatabase, type DatabaseHandle } from "@vygo/db";
-import { loadApiEnv, parseCorsOrigins, type ApiEnv } from "@vygo/config";
+import {
+  CLOUDFLARE_TURNSTILE_TEST_SECRETS,
+  isTestSurfaceEnabled,
+  loadApiEnv,
+  parseCorsOrigins,
+  type ApiEnv,
+} from "@vygo/config";
 import { registerCors } from "./cors.js";
 import { errorHandler } from "./errors.js";
 import { buildLoggerOptions } from "./logging.js";
 import { resolveRequestId } from "./request-id.js";
 import { registerAvailabilityRoutes } from "./routes/availability.js";
+import { registerTestSurfaceRoutes } from "./routes/test-surface.js";
+import { registerWaitlistRoutes } from "./routes/waitlist.js";
+import {
+  createRateLimitStore,
+  MemoryRateLimitStore,
+  type RateLimitStore,
+} from "./services/rate-limit.js";
+import { createTurnstileVerifier, type TurnstileVerifier } from "./services/turnstile.js";
+import type { WaitlistRepositoryOptions } from "@vygo/db";
 
 export type BuildAppOptions = {
   env?: ApiEnv;
@@ -13,17 +28,44 @@ export type BuildAppOptions = {
   database?: DatabaseHandle | null;
   /** Skip opening a real DB connection (unit tests). */
   skipDatabase?: boolean;
+  /** Dependency-injected rate limit store (tests). */
+  rateLimitStore?: RateLimitStore;
+  /** Dependency-injected Turnstile verifier (tests). */
+  turnstile?: TurnstileVerifier;
 };
 
 export type AppContext = {
   app: ReturnType<typeof Fastify>;
   env: ApiEnv;
   database: DatabaseHandle | null;
+  rateLimitStore: RateLimitStore;
   close: () => Promise<void>;
 };
 
+function resolveLocalDevDefaults(env: ApiEnv): ApiEnv {
+  let next = env;
+  // Non-strict environments get a stable local salt so IP hashing works out of the box.
+  if (!next.IP_HASH_SALT && isTestSurfaceEnabled(next)) {
+    next = {
+      ...next,
+      IP_HASH_SALT: "vygo-local-dev-ip-hash-salt-v1",
+      IP_HASH_SALT_VERSION: next.IP_HASH_SALT_VERSION || 1,
+    };
+  }
+  // Local/CI/ratchet: use Cloudflare official always-pass secret when unset.
+  // Production with a real secret is unchanged; request fields can never select this.
+  if (!next.TURNSTILE_SECRET_KEY && isTestSurfaceEnabled(next)) {
+    next = {
+      ...next,
+      TURNSTILE_SECRET_KEY: CLOUDFLARE_TURNSTILE_TEST_SECRETS.alwaysPasses,
+    };
+  }
+  return next;
+}
+
 export async function buildApp(options: BuildAppOptions = {}): Promise<AppContext> {
-  const env = options.env ?? loadApiEnv();
+  let env = options.env ?? loadApiEnv();
+  env = resolveLocalDevDefaults(env);
   const requestIdHeader = env.REQUEST_ID_HEADER.toLowerCase();
 
   let database: DatabaseHandle | null = options.database === undefined ? null : options.database;
@@ -31,6 +73,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
   if (!options.skipDatabase && options.database === undefined && env.DATABASE_URL) {
     database = createDatabase(env.DATABASE_URL);
   }
+
+  const rateLimitStore =
+    options.rateLimitStore ?? (await createRateLimitStore(env.REDIS_URL ?? null));
+
+  const turnstile = createTurnstileVerifier(env, options.turnstile);
 
   const app = Fastify({
     logger: buildLoggerOptions(env.LOG_LEVEL),
@@ -88,29 +135,42 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
 
   registerAvailabilityRoutes(app, getDb);
 
-  /**
-   * Placeholder waitlist route so body-size limits and safe error handling are
-   * exercised before the full waitlist mission lands. Always returns 501 for
-   * valid-sized JSON bodies.
-   */
-  app.post("/v1/waitlist", async (_request, reply) => {
-    return reply.status(501).send({
-      error: {
-        code: "NOT_IMPLEMENTED",
-        message: "Waitlist submissions are not enabled yet.",
-      },
-    });
+  const getFaultOptions = (): WaitlistRepositoryOptions => {
+    if (!isTestSurfaceEnabled(env)) return {};
+    if (env.TEST_FAULT_MODE === "lead") return { faultLead: true };
+    if (env.TEST_FAULT_MODE === "outbox") return { faultOutbox: true };
+    return {};
+  };
+
+  registerWaitlistRoutes(app, {
+    env,
+    getDb,
+    rateLimitStore,
+    turnstile,
+    getFaultOptions,
+  });
+
+  registerTestSurfaceRoutes(app, {
+    env,
+    getDb,
+    rateLimitStore,
+    turnstile,
   });
 
   const close = async () => {
     try {
       await app.close();
     } finally {
+      if (rateLimitStore.close) {
+        await rateLimitStore.close();
+      }
       if (database && options.database === undefined) {
         await database.close();
       }
     }
   };
 
-  return { app, env, database, close };
+  return { app, env, database, rateLimitStore, close };
 }
+
+export { MemoryRateLimitStore };

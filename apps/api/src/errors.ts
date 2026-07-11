@@ -29,7 +29,17 @@ export async function errorHandler(
   }
 
   if (error.statusCode === 400 && error.code === "FST_ERR_CTP_INVALID_MEDIA_TYPE") {
-    await reply.status(400).send(safeError("BAD_REQUEST", "Unsupported media type."));
+    await reply.status(415).send(safeError("UNSUPPORTED_MEDIA_TYPE", "Unsupported media type."));
+    return;
+  }
+
+  // Malformed JSON body
+  if (
+    error.code === "FST_ERR_CTP_INVALID_JSON_BODY" ||
+    error.code === "FST_ERR_CTP_EMPTY_JSON_BODY" ||
+    (error.statusCode === 400 && /json/i.test(error.message || ""))
+  ) {
+    await reply.status(400).send(safeError("BAD_REQUEST", "Request body must be valid JSON."));
     return;
   }
 

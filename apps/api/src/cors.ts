@@ -15,7 +15,7 @@ export function registerCors(app: FastifyInstance, allowedOrigins: string[]): vo
       void reply.header("Access-Control-Allow-Credentials", "true");
       void reply.header(
         "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, X-Request-Id, If-None-Match",
+        "Content-Type, Authorization, X-Request-Id, If-None-Match, Idempotency-Key",
       );
       void reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD");
       void reply.header("Access-Control-Expose-Headers", "ETag, X-Request-Id, Cache-Control");

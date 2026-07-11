@@ -20,6 +20,18 @@ export {
   seedLocalAvailability,
   type AvailabilitySetInput,
 } from "./availability.js";
+export {
+  hashWaitlistRequest,
+  findIdempotency,
+  saveIdempotency,
+  findWaitlistByEmail,
+  countOutboxForEntry,
+  persistWaitlistIntake,
+  type WaitlistPersistInput,
+  type WaitlistPersistResult,
+  type IdempotencyRecord,
+  type WaitlistRepositoryOptions,
+} from "./waitlist.js";
 export * from "./schema.js";
 
 export const dbPackageName = "@vygo/db" as const;
