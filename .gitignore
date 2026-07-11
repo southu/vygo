@@ -27,3 +27,6 @@ coverage/
 
 # Vercel
 .vercel
+
+# Next static export output
+apps/web/out/
