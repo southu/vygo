@@ -1,69 +1,147 @@
 @import "@vygo/ui/tokens.css";
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-open-sans), "Open Sans", system-ui, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body {
+    /* Room for sticky mobile CTA */
+    padding-bottom: 4.5rem;
+  }
+
+  @media (min-width: 1024px) {
+    body {
+      padding-bottom: 0;
+    }
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-montserrat), "Montserrat", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--color-ink);
+  }
+
+  a {
+    color: inherit;
+  }
+
+  :focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
+
+  ::selection {
+    background: var(--color-purple-soft);
+    color: var(--color-ink);
+  }
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  min-height: 100%;
-  font-family:
-    "IBM Plex Sans",
-    "Segoe UI",
-    system-ui,
-    -apple-system,
-    sans-serif;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  line-height: 1.55;
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-content px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-pad {
+    @apply py-14 sm:py-16 lg:py-20;
+  }
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.08em] text-green-dark;
+  }
+
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors duration-200;
+  }
+
+  .btn-primary {
+    @apply btn bg-purple text-white hover:bg-purple-dark;
+  }
+
+  .btn-secondary {
+    @apply btn border border-border bg-surface text-ink hover:border-purple hover:text-purple;
+  }
+
+  .btn-on-dark {
+    @apply btn bg-green text-white hover:bg-green-dark;
+  }
+
+  .btn-ghost-on-dark {
+    @apply btn border border-white/25 bg-transparent text-white hover:border-white/50;
+  }
+
+  .card {
+    @apply rounded-card border border-border bg-surface p-6 shadow-card;
+  }
+
+  .rail {
+    @apply border-l-[3px] border-purple pl-5;
+  }
+
+  .heading-underline {
+    @apply relative inline-block;
+  }
+
+  .heading-underline::after {
+    content: "";
+    @apply absolute -bottom-1 left-0 h-0.5 w-12 rounded-full bg-green;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-ink-soft;
+  }
+
+  .prose-page {
+    @apply max-w-prose text-ink-soft;
+  }
+
+  .prose-page p + p {
+    @apply mt-4;
+  }
+
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-purple focus:px-4 focus:py-2 focus:text-white;
+  }
 }
 
-a {
-  color: var(--color-purple);
-}
+/* Reduced motion: disable / materially shorten animations and transitions */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 
-main {
-  max-width: 48rem;
-  margin: 0 auto;
-  padding: 4rem 1.5rem 6rem;
-}
-
-h1 {
-  font-size: clamp(2rem, 4vw, 2.75rem);
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-  margin: 0 0 1rem;
-}
-
-.lede {
-  font-size: 1.125rem;
-  color: var(--color-muted);
-  margin: 0 0 2rem;
-}
-
-.badge {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-green);
-  margin-bottom: 1rem;
-}
-
-.panel {
-  background: var(--color-surface);
-  border: 1px solid rgba(20, 20, 26, 0.08);
-  border-radius: 12px;
-  padding: 1.25rem 1.5rem;
-  margin-top: 2rem;
-}
-
-.panel code {
-  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.9em;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

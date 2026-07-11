@@ -1,0 +1,28 @@
+/**
+ * Approved CTA vocabulary — use these labels consistently.
+ * Avoid generic alternatives like “Book”, “Schedule”, “Get started”, or “Reserve”
+ * unless a real booking calendar is added later.
+ */
+export const ctas = {
+  applyNextOpening: "Apply for the next opening",
+  joinWaitlist: "Join the waitlist",
+  startWithAudit: "Start with the audit",
+  seeHowRebuildWorks: "See how the rebuild works",
+  reviewSecurityControls: "Review security controls",
+  applyNextAuditOpening: "Apply for the next audit opening",
+  viewFullMethod: "View the full method",
+  reviewEngagementDetails: "Review engagement details",
+  reviewSecurityApproach: "Review our security approach",
+  insightContextual:
+    "Have a working product and a production deadline? Apply for the next audit opening.",
+} as const;
+
+export type CtaKey = keyof typeof ctas;
+
+export const ctaHrefs = {
+  waitlist: "/waitlist",
+  audit: "/audit",
+  method: "/method",
+  security: "/security",
+  pricing: "/pricing",
+} as const;
