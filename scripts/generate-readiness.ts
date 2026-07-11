@@ -362,7 +362,8 @@ function main() {
   const publicApiDir = path.join(publicDir, "api");
   mkdirSync(publicApiDir, { recursive: true });
   const sha = report.gitSha || "unknown";
-  writeFileSync(path.join(publicDir, "version"), `${sha}\n`, "utf8");
+  // No trailing newline: GET /version body must be 7–40 hex characters.
+  writeFileSync(path.join(publicDir, "version"), sha, "utf8");
   writeFileSync(
     path.join(publicApiDir, "readiness.json"),
     `${JSON.stringify(report, null, 2)}\n`,
