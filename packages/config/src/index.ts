@@ -25,8 +25,17 @@ export const apiEnvSchema = z.object({
   RESEND_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   RESEND_WEBHOOK_SECRET: z.preprocess(emptyToUndefined, z.string().optional()),
   TURNSTILE_SECRET_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  /** Comma-separated allowlist. Also accepts ALLOWED_ORIGINS as an alias. */
   CORS_ORIGINS: z.preprocess(emptyToUndefined, z.string().optional()),
+  ALLOWED_ORIGINS: z.preprocess(emptyToUndefined, z.string().optional()),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+  /** Max request body size in bytes (default 64 KiB). */
+  BODY_LIMIT_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(64 * 1024),
+  REQUEST_ID_HEADER: z.string().default("x-request-id"),
 });
 
 export const workerEnvSchema = z.object({
@@ -58,4 +67,13 @@ export function getDeployedGitSha(env: NodeJS.ProcessEnv = process.env): string 
   const sha =
     env.VERCEL_GIT_COMMIT_SHA || env.COMMIT_SHA || env.GIT_COMMIT_SHA || env.GITHUB_SHA || "";
   return sha.trim();
+}
+
+/** Parse CORS / allowed origin allowlist from API env. */
+export function parseCorsOrigins(env: ApiEnv): string[] {
+  const raw = env.CORS_ORIGINS || env.ALLOWED_ORIGINS || "";
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }

@@ -23,6 +23,9 @@
     "secret-scan": "tsx scripts/secret-scan.ts",
     "seed:local": "tsx scripts/seed-local.ts",
     "availability:set": "tsx scripts/set-availability.ts",
+    "db:migrate": "tsx packages/db/src/cli-migrate.ts",
+    "test": "pnpm --filter @vygo/api test",
+    "test:integration": "pnpm --filter @vygo/api test",
     "ci:verify": "pnpm secret-scan && pnpm lint && pnpm format:check && pnpm typecheck && pnpm readiness && pnpm build",
     "clean": "pnpm -r --if-present run clean && rm -rf node_modules"
   },

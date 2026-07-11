@@ -11,12 +11,17 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "migrate": "tsx src/cli-migrate.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.7"
+    "@vygo/validation": "workspace:*",
+    "drizzle-orm": "^0.44.7",
+    "postgres": "^3.4.7"
   },
   "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

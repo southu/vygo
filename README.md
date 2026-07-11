@@ -123,17 +123,31 @@ CI runs the full verify path (`pnpm install --frozen-lockfile`, secret scan, lin
 | `GET`  | `/version`       | Deployed git SHA (plain text; from Vercel/CI env — not `version.txt`) |
 | `GET`  | `/api/readiness` | JSON readiness report (`ready`, workspace structure, check results)   |
 
+## Machine endpoints (API)
+
+| Method | Path                      | Purpose                                                               |
+| ------ | ------------------------- | --------------------------------------------------------------------- |
+| `GET`  | `/healthz`                | Process liveness (no dependency checks)                               |
+| `GET`  | `/readyz`                 | Ready when Postgres is up and required Drizzle migrations are applied |
+| `GET`  | `/v1/public/availability` | Public availability JSON + cache/ETag headers (neutral fallback)      |
+
+See [docs/api.md](docs/api.md) for the full contract (request IDs, CORS, neutral responses).
+
 ## Scripts
 
 ```bash
+# Requires PostgreSQL and DATABASE_URL (see .env.example)
+pnpm db:migrate
 pnpm seed:local
-pnpm availability:set --status waitlist --label "Next cohort" --dry-run
+pnpm availability:set --status waitlist --date 2026-08-17 --type audit --dry-run
+pnpm test:integration
 pnpm secret-scan
 pnpm readiness
 ```
 
 ## Documentation
 
+- [API contracts](docs/api.md)
 - [Deployment](docs/deployment.md)
 - [Content operations](docs/content-operations.md)
 - [Incident response](docs/incident-response.md)

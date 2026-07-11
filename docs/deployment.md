@@ -27,7 +27,12 @@
 
 ## API & worker (Railway)
 
-Documented for later missions. Provide `DATABASE_URL`, `REDIS_URL`, and Resend credentials via Railway variables. Never commit secrets.
+- Deploy `apps/api` (Fastify) with `DATABASE_URL`, `CORS_ORIGINS` / `ALLOWED_ORIGINS`, and optional Redis/Resend credentials.
+- Pre-deploy: `DATABASE_URL=… pnpm db:migrate` (checked-in SQL under `packages/db/migrations`).
+- Health check path: `GET /healthz` (liveness). Readiness: `GET /readyz` (Postgres + migrations).
+- Public availability: `GET /v1/public/availability` (see [API contracts](./api.md)).
+- Worker (`apps/worker`) drains the email outbox in a later mission.
+- Never commit secrets.
 
 ## CI
 
