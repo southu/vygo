@@ -1,6 +1,28 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "READINESS_ASSUME_CHECKS=passed pnpm --filter @vygo/web build"
+  "buildCommand": "pnpm --filter @vygo/web build",
+  "outputDirectory": "apps/web/out",
+  "framework": null,
+  "rewrites": [{ "source": "/api/readiness", "destination": "/api/readiness.json" }],
+  "headers": [
+    {
+      "source": "/version",
+      "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }]
+    },
+    {
+      "source": "/api/readiness",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
+      "source": "/api/readiness.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ]
 }

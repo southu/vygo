@@ -357,13 +357,26 @@ function main() {
   const outFile = path.join(outDir, "readiness.json");
   writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
-  // Ensure the directory is a module for TS resolution of JSON
+  // Static export public endpoints (served as /version and /api/readiness)
+  const publicDir = path.join(root, "apps/web/public");
+  const publicApiDir = path.join(publicDir, "api");
+  mkdirSync(publicApiDir, { recursive: true });
+  const sha = report.gitSha || "unknown";
+  writeFileSync(path.join(publicDir, "version"), `${sha}\n`, "utf8");
+  writeFileSync(
+    path.join(publicApiDir, "readiness.json"),
+    `${JSON.stringify(report, null, 2)}\n`,
+    "utf8",
+  );
+
+  // Ensure the directory is present for git
   const barrel = path.join(outDir, ".gitkeep");
   if (!existsSync(barrel)) {
     writeFileSync(barrel, "", "utf8");
   }
 
   console.log(`Wrote ${path.relative(root, outFile)} (ready=${report.ready})`);
+  console.log(`Wrote apps/web/public/version and apps/web/public/api/readiness.json`);
   if (!report.ready) {
     console.error("Readiness report is not ready=true; inspect checks above.");
     // Still write the file so the endpoint can surface details; fail only when --strict
