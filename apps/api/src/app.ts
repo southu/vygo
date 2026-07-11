@@ -8,7 +8,7 @@ import {
   type ApiEnv,
 } from "@vygo/config";
 import { registerCors } from "./cors.js";
-import { errorHandler } from "./errors.js";
+import { errorHandler, safeError } from "./errors.js";
 import { buildLoggerOptions } from "./logging.js";
 import { resolveRequestId } from "./request-id.js";
 import { registerAvailabilityRoutes } from "./routes/availability.js";
@@ -82,6 +82,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
   const app = Fastify({
     logger: buildLoggerOptions(env.LOG_LEVEL),
     bodyLimit: env.BODY_LIMIT_BYTES,
+    // Honor X-Forwarded-For from the local live reverse proxy for IP hashing / limits.
+    trustProxy: true,
     requestIdHeader,
     genReqId: (req) => {
       const inbound = req.headers[requestIdHeader] ?? req.headers["x-request-id"];
@@ -95,6 +97,19 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
   app.addHook("onSend", async (request, reply, payload) => {
     void reply.header("X-Request-Id", request.id);
     return payload;
+  });
+
+  // Reject oversized bodies via Content-Length before the parser streams them,
+  // so clients (and reverse proxies) receive a clean 413 instead of a reset.
+  app.addHook("onRequest", async (request, reply) => {
+    const raw = request.headers["content-length"];
+    if (raw == null) return;
+    const length = Number(Array.isArray(raw) ? raw[0] : raw);
+    if (Number.isFinite(length) && length > env.BODY_LIMIT_BYTES) {
+      return reply
+        .status(413)
+        .send(safeError("PAYLOAD_TOO_LARGE", "Request payload is too large."));
+    }
   });
 
   registerCors(app, parseCorsOrigins(env));

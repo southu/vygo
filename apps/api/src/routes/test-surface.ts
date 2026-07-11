@@ -301,6 +301,74 @@ export function registerTestSurfaceRoutes(app: FastifyInstance, deps: TestSurfac
       record("rate_limiting", limited);
     }
 
+    // --- origin / payload controls (content-type, method) ---
+    {
+      const plain = await app.inject({
+        method: "POST",
+        url: "/v1/waitlist",
+        headers: { "content-type": "text/plain", origin },
+        payload: "{}",
+      });
+      const put = await app.inject({
+        method: "PUT",
+        url: "/v1/waitlist",
+        headers: { "content-type": "application/json", origin },
+        payload: {},
+      });
+      record("origin_payload_controls", plain.statusCode === 415 && put.statusCode === 405);
+    }
+
+    // --- abuse signals (honeypot silent accept) ---
+    {
+      const payload = { ...basePayload(), website: "http://spam.example" };
+      const res = await post(payload);
+      const pass =
+        res.statusCode === 200 &&
+        res.json()?.data?.accepted === true &&
+        !res.body.toLowerCase().includes("honeypot") &&
+        !res.body.toLowerCase().includes("spam");
+      let noPersist = true;
+      if (db && pass) {
+        const entry = await findWaitlistByEmail(db.db, payload.email.trim().toLowerCase());
+        noPersist = entry == null;
+      }
+      record("abuse_signals", pass && noPersist);
+    }
+
+    // --- salted IP handling ---
+    {
+      const hashed = hashIpAddress("203.0.113.99", deps.env);
+      record(
+        "salted_ip_handling",
+        Boolean(
+          hashed &&
+          isVersionedIpHash(hashed.hash) &&
+          !looksLikeRawIp(hashed.hash) &&
+          hashed.rotationHashes.length >= 1,
+        ),
+      );
+    }
+
+    // --- UTM limits ---
+    {
+      const over = "x".repeat(UTM_MAX_LENGTH + 1);
+      const res = await post({
+        ...basePayload(),
+        utm: { source: over, medium: null, campaign: null, content: null, term: null },
+      });
+      const okLimit = await post({
+        ...basePayload(),
+        utm: {
+          source: "s".repeat(UTM_MAX_LENGTH),
+          medium: null,
+          campaign: null,
+          content: null,
+          term: null,
+        },
+      });
+      record("utm_limits", res.statusCode === 400 && okLimit.statusCode === 200);
+    }
+
     // --- idempotency ---
     {
       const payload = basePayload();
@@ -463,20 +531,30 @@ export function registerTestSurfaceRoutes(app: FastifyInstance, deps: TestSurfac
         results,
         coverage: {
           valid_intake: results.find((r) => r.name === "valid_intake")?.pass ?? false,
+          normalization: results.find((r) => r.name === "normalization")?.pass ?? false,
           invalid_fields: results.find((r) => r.name === "invalid_fields")?.pass ?? false,
           privacy_rejection: results.find((r) => r.name === "privacy_rejection")?.pass ?? false,
           invalid_urls: results.find((r) => r.name === "invalid_urls")?.pass ?? false,
           turnstile_failure: results.find((r) => r.name === "turnstile_failure")?.pass ?? false,
+          origin_payload_controls:
+            results.find((r) => r.name === "origin_payload_controls")?.pass ?? false,
           rate_limiting: results.find((r) => r.name === "rate_limiting")?.pass ?? false,
+          abuse_signals: results.find((r) => r.name === "abuse_signals")?.pass ?? false,
+          salted_ip_handling: results.find((r) => r.name === "salted_ip_handling")?.pass ?? false,
           idempotency: results.find((r) => r.name === "idempotency")?.pass ?? false,
           duplicate_upserts: results.find((r) => r.name === "duplicate_upserts")?.pass ?? false,
           transaction_rollback:
             results.find((r) => r.name === "transaction_rollback")?.pass ?? false,
           outbox_creation: results.find((r) => r.name === "outbox_creation")?.pass ?? false,
           scoring: results.find((r) => r.name === "scoring")?.pass ?? false,
+          utm_limits: results.find((r) => r.name === "utm_limits")?.pass ?? false,
           pii_safe_structured_logging:
             results.find((r) => r.name === "pii_safe_structured_logging")?.pass ?? false,
         },
+        reportPath: "/v1/test/integration-report",
+        inspectPath: "/v1/test/waitlist/inspect",
+        ipHashPath: "/v1/test/ip-hash",
+        scorePath: "/v1/test/score",
       },
     });
   });
