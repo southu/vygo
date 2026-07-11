@@ -114,6 +114,8 @@ export const pricingContent = {
     ],
     note: "Month-to-month after the initial commitment. Everything remains documented so another qualified team can take over.",
   },
+  // Editorial: exact equity % / cash premiums stay behind commercialFlags.showExactEquityTerms
+  // (and showCashOnlyPremium). Keep this note visitor-facing; do not add author instructions.
   equityNote:
     "Standard engagements can include an equity-aligned structure. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
   cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },

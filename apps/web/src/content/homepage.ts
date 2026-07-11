@@ -167,7 +167,9 @@ export const homepage = {
   },
   pricingPreview: {
     heading: "Simple engagements. Fixed prices.",
-    note: "Standard engagements can include an equity-aligned structure. Cash-only pricing is available. Exact equity language should remain controlled by a content flag until legal counsel approves the public wording.",
+    // Editorial: exact equity % / cash premiums stay behind commercialFlags.showExactEquityTerms
+    // (and showCashOnlyPremium). Do not put author instructions in rendered note copy.
+    note: "Standard engagements can include an equity-aligned structure. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
     cta: { label: ctas.reviewEngagementDetails, href: ctaHrefs.pricing },
   },
   securityPreview: {

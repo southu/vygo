@@ -46,8 +46,10 @@ export const faqItems: FaqItem[] = [
   },
   {
     question: "Can we pay cash and keep all of our equity?",
+    // Editorial: do not publish numeric premiums/equity % until counsel approves;
+    // gate numbers via commercialFlags.showExactEquityTerms / showCashOnlyPremium.
     answer:
-      "A cash-only option is available. Publish exact premiums or equity percentages only after legal and commercial review.",
+      "A cash-only option is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
   },
   {
     question: "What if we only need a small bug fix?",
