@@ -12,13 +12,14 @@ import { errorHandler, safeError } from "./errors.js";
 import { buildLoggerOptions } from "./logging.js";
 import { resolveRequestId } from "./request-id.js";
 import { registerAvailabilityRoutes } from "./routes/availability.js";
-import { registerTestSurfaceRoutes } from "./routes/test-surface.js";
+import { registerTestSurfaceRoutes, TEST_SUPPORT_ROUTES } from "./routes/test-surface.js";
 import { registerWaitlistRoutes } from "./routes/waitlist.js";
 import {
   createRateLimitStore,
   MemoryRateLimitStore,
   type RateLimitStore,
 } from "./services/rate-limit.js";
+import { consumeTestFault } from "./services/test-fault.js";
 import { createTurnstileVerifier, type TurnstileVerifier } from "./services/turnstile.js";
 import type { WaitlistRepositoryOptions } from "@vygo/db";
 
@@ -145,6 +146,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
     if (!result.ready) {
       return reply.status(503).send(result);
     }
+    // Advertise discoverable test surface base path only when enabled (non-prod).
+    // Existing readiness fields are preserved; production-strict omits testSupport.
+    if (isTestSurfaceEnabled(env)) {
+      return reply.status(200).send({
+        ...result,
+        testSupport: TEST_SUPPORT_ROUTES.index,
+      });
+    }
     return reply.status(200).send(result);
   });
 
@@ -152,6 +161,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
 
   const getFaultOptions = (): WaitlistRepositoryOptions => {
     if (!isTestSurfaceEnabled(env)) return {};
+    // Prefer in-process armed fault (HTTP test-support control) over static env.
+    const armed = consumeTestFault();
+    if (armed.faultLead || armed.faultOutbox) return armed;
     if (env.TEST_FAULT_MODE === "lead") return { faultLead: true };
     if (env.TEST_FAULT_MODE === "outbox") return { faultOutbox: true };
     return {};

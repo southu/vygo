@@ -133,6 +133,51 @@ export async function countOutboxForEntry(db: Db, entryId: string): Promise<numb
   return Number(rows[0]?.c ?? 0);
 }
 
+/** Outbox rows for an entry (recipient redacted for inspection surfaces). */
+export async function listOutboxForEntry(
+  db: Db,
+  entryId: string,
+): Promise<
+  Array<{
+    id: string;
+    kind: string;
+    status: string;
+    attemptCount: number;
+    hasRecipient: boolean;
+    recipientDomain: string | null;
+    createdAt: Date;
+    sentAt: Date | null;
+  }>
+> {
+  const rows = await db
+    .select({
+      id: emailOutbox.id,
+      kind: emailOutbox.kind,
+      status: emailOutbox.status,
+      attemptCount: emailOutbox.attemptCount,
+      recipient: emailOutbox.recipient,
+      createdAt: emailOutbox.createdAt,
+      sentAt: emailOutbox.sentAt,
+    })
+    .from(emailOutbox)
+    .where(eq(emailOutbox.waitlistEntryId, entryId));
+
+  return rows.map((row) => {
+    const recipient = row.recipient ?? "";
+    const at = recipient.indexOf("@");
+    return {
+      id: row.id,
+      kind: row.kind,
+      status: row.status,
+      attemptCount: row.attemptCount,
+      hasRecipient: Boolean(recipient),
+      recipientDomain: at >= 0 ? recipient.slice(at + 1) : null,
+      createdAt: row.createdAt,
+      sentAt: row.sentAt,
+    };
+  });
+}
+
 /**
  * Atomically upsert a waitlist lead and create a confirmation outbox job for new leads.
  * On duplicate email: update mutable fields + last-seen; preserve first-seen and original UTMs.

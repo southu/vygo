@@ -1,45 +1,113 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { waitlistContent } from "@/content/waitlist";
 
+/**
+ * Cloudflare official always-pass test sitekey (public).
+ * Used when NEXT_PUBLIC_TURNSTILE_SITE_KEY is unset so non-prod deploys work.
+ * Production must set a real site key via env.
+ */
+const TURNSTILE_TEST_SITE_KEY = "1x0000000000000000000000000000000AA";
+
 type FormState = {
   fullName: string;
-  workEmail: string;
+  email: string;
   companyName: string;
   productUrl: string;
   role: string;
   stage: string;
-  blocker: string;
-  startWindow: string;
-  description: string;
-  stack: string;
-  budget: string;
-  enterpriseDeadline: boolean;
+  primaryBlocker: string;
+  desiredStartWindow: string;
+  message: string;
+  prototypePlatform: string;
+  budgetRange: string;
+  commercialDeadline: boolean;
   privacyAccepted: boolean;
   marketingConsent: boolean;
+  /** Honeypot — must stay empty. */
+  website: string;
 };
 
 const initial: FormState = {
   fullName: "",
-  workEmail: "",
+  email: "",
   companyName: "",
   productUrl: "",
   role: "",
   stage: "",
-  blocker: "",
-  startWindow: "",
-  description: "",
-  stack: "",
-  budget: "",
-  enterpriseDeadline: false,
+  primaryBlocker: "",
+  desiredStartWindow: "",
+  message: "",
+  prototypePlatform: "",
+  budgetRange: "",
+  commercialDeadline: false,
   privacyAccepted: false,
   marketingConsent: false,
+  website: "",
 };
+
+type ApiErrorBody = {
+  error?: {
+    code?: string;
+    message?: string;
+    fields?: Record<string, string>;
+  };
+};
+
+type ApiSuccessBody = {
+  data?: {
+    accepted?: boolean;
+    message?: string;
+  };
+};
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        el: HTMLElement,
+        opts: {
+          sitekey: string;
+          callback: (token: string) => void;
+          "error-callback"?: () => void;
+          "expired-callback"?: () => void;
+          theme?: "light" | "dark" | "auto";
+        },
+      ) => string;
+      reset: (widgetId?: string) => void;
+      remove: (widgetId?: string) => void;
+    };
+  }
+}
 
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function resolveApiBase(): string {
+  // Same-origin under the live reverse proxy (http://127.0.0.1:8380/v1/...).
+  // Optional absolute override for local split dev servers.
+  const fromEnv = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (fromEnv && typeof window !== "undefined") {
+    try {
+      const envUrl = new URL(fromEnv);
+      const pageOrigin = window.location.origin;
+      // Prefer same-origin when the page is already the live proxy.
+      if (envUrl.origin === pageOrigin) return "";
+      // If page is on the proxy port and API env points elsewhere, still use same-origin.
+      if (window.location.port === "8380") return "";
+      return fromEnv.replace(/\/$/, "");
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
+function resolveTurnstileSiteKey(): string {
+  return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || TURNSTILE_TEST_SITE_KEY;
 }
 
 export function WaitlistForm() {
@@ -47,9 +115,14 @@ export function WaitlistForm() {
   const { form } = waitlistContent;
   const [step, setStep] = useState<1 | 2>(1);
   const [values, setValues] = useState<FormState>(initial);
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const formStartedAtRef = useRef<number>(Date.now());
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
+  const turnstileWidgetIdRef = useRef<string | null>(null);
+  const siteKey = resolveTurnstileSiteKey();
 
   const fieldClass =
     "mt-1.5 w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink shadow-sm focus-visible:border-purple";
@@ -58,19 +131,75 @@ export function WaitlistForm() {
     setValues((prev) => ({ ...prev, [key]: value }));
   };
 
+  // Load Turnstile script once; render widget when step 2 is shown.
+  useEffect(() => {
+    formStartedAtRef.current = Date.now();
+  }, []);
+
+  useEffect(() => {
+    if (step !== 2) return;
+
+    const renderWidget = () => {
+      if (!turnstileContainerRef.current || !window.turnstile) return;
+      if (turnstileWidgetIdRef.current) {
+        try {
+          window.turnstile.remove(turnstileWidgetIdRef.current);
+        } catch {
+          // ignore
+        }
+        turnstileWidgetIdRef.current = null;
+      }
+      turnstileContainerRef.current.innerHTML = "";
+      turnstileWidgetIdRef.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: siteKey,
+        callback: (token: string) => setTurnstileToken(token),
+        "error-callback": () => setTurnstileToken(""),
+        "expired-callback": () => setTurnstileToken(""),
+        theme: "light",
+      });
+    };
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src="https://challenges.cloudflare.com/turnstile/v0/api.js"]',
+    );
+    if (window.turnstile) {
+      renderWidget();
+      return;
+    }
+    if (existing) {
+      existing.addEventListener("load", renderWidget);
+      return () => existing.removeEventListener("load", renderWidget);
+    }
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    script.async = true;
+    script.onload = () => renderWidget();
+    document.head.appendChild(script);
+    return () => {
+      if (turnstileWidgetIdRef.current && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidgetIdRef.current);
+        } catch {
+          // ignore
+        }
+        turnstileWidgetIdRef.current = null;
+      }
+    };
+  }, [step, siteKey]);
+
   const step1Valid = useMemo(() => {
     return (
       values.fullName.trim().length > 1 &&
-      isEmail(values.workEmail.trim()) &&
+      isEmail(values.email.trim()) &&
       values.companyName.trim().length > 1 &&
       values.productUrl.trim().length > 3
     );
   }, [values]);
 
   const validateStep1 = () => {
-    const next: Partial<Record<keyof FormState, string>> = {};
+    const next: Partial<Record<string, string>> = {};
     if (values.fullName.trim().length < 2) next.fullName = "Enter your full name.";
-    if (!isEmail(values.workEmail.trim())) next.workEmail = "Enter a valid work email.";
+    if (!isEmail(values.email.trim())) next.email = "Enter a valid work email.";
     if (values.companyName.trim().length < 2) next.companyName = "Enter your company name.";
     if (values.productUrl.trim().length < 4) next.productUrl = "Enter a product or company URL.";
     setErrors(next);
@@ -78,15 +207,18 @@ export function WaitlistForm() {
   };
 
   const validateStep2 = () => {
-    const next: Partial<Record<keyof FormState, string>> = {};
+    const next: Partial<Record<string, string>> = {};
     if (!values.stage) next.stage = "Select a stage.";
-    if (!values.blocker) next.blocker = "Select a primary blocker.";
-    if (!values.startWindow) next.startWindow = "Select a start window.";
-    if (values.description.trim().length < 10) {
-      next.description = "Add a short description (at least a sentence).";
+    if (!values.primaryBlocker) next.primaryBlocker = "Select a primary blocker.";
+    if (!values.desiredStartWindow) next.desiredStartWindow = "Select a start window.";
+    if (values.message.trim().length < 10) {
+      next.message = "Add a short description (at least a sentence).";
     }
     if (!values.privacyAccepted) {
       next.privacyAccepted = "Privacy acceptance is required.";
+    }
+    if (!turnstileToken) {
+      next.turnstileToken = "Please complete the verification challenge.";
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -99,17 +231,109 @@ export function WaitlistForm() {
     }
   };
 
+  const resetTurnstile = () => {
+    setTurnstileToken("");
+    if (turnstileWidgetIdRef.current && window.turnstile) {
+      try {
+        window.turnstile.reset(turnstileWidgetIdRef.current);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!validateStep2()) return;
 
     setStatus("submitting");
     setStatusMessage("Submitting your application…");
+    setErrors({});
 
-    // API integration lands in a later mission. For this frontend mission,
-    // validated applications proceed to the thank-you confirmation route.
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    router.push("/thank-you");
+    const utmParams =
+      typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const utm = {
+      source: utmParams?.get("utm_source") || null,
+      medium: utmParams?.get("utm_medium") || null,
+      campaign: utmParams?.get("utm_campaign") || null,
+      content: utmParams?.get("utm_content") || null,
+      term: utmParams?.get("utm_term") || null,
+    };
+
+    const payload: Record<string, unknown> = {
+      fullName: values.fullName,
+      email: values.email,
+      companyName: values.companyName,
+      productUrl: values.productUrl,
+      role: values.role.trim() || null,
+      stage: values.stage,
+      primaryBlocker: values.primaryBlocker,
+      desiredStartWindow: values.desiredStartWindow,
+      message: values.message,
+      prototypePlatform: values.prototypePlatform.trim() || null,
+      budgetRange: values.budgetRange || null,
+      commercialDeadline: values.commercialDeadline,
+      privacyAccepted: values.privacyAccepted,
+      marketingConsent: values.marketingConsent,
+      turnstileToken,
+      website: values.website,
+      formStartedAt: formStartedAtRef.current,
+      landingPage: typeof window !== "undefined" ? window.location.pathname : "/waitlist",
+      referrer: typeof document !== "undefined" ? document.referrer || null : null,
+      utm,
+    };
+
+    try {
+      const base = resolveApiBase();
+      const res = await fetch(`${base}/v1/waitlist`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+        credentials: "same-origin",
+      });
+
+      let body: ApiErrorBody & ApiSuccessBody = {};
+      try {
+        body = (await res.json()) as ApiErrorBody & ApiSuccessBody;
+      } catch {
+        body = {};
+      }
+
+      if (res.ok && body?.data?.accepted === true) {
+        setStatus("idle");
+        setStatusMessage(body.data.message || "Your application has been received.");
+        router.push("/thank-you");
+        return;
+      }
+
+      const code = body?.error?.code;
+      const message =
+        body?.error?.message ||
+        (res.status === 429
+          ? "Too many attempts. Please try again later or email hello@vygo.ai."
+          : "Something went wrong. Please try again.");
+
+      if (body?.error?.fields) {
+        setErrors(body.error.fields);
+      }
+
+      if (code === "TURNSTILE_FAILED") {
+        setErrors((prev) => ({
+          ...prev,
+          turnstileToken: "Verification failed. Please try again.",
+        }));
+        resetTurnstile();
+      }
+
+      setStatus("error");
+      setStatusMessage(message);
+    } catch {
+      setStatus("error");
+      setStatusMessage("Network error. Please check your connection and try again.");
+    }
   };
 
   return (
@@ -125,6 +349,30 @@ export function WaitlistForm() {
         >
           2. {form.step2Title}
         </span>
+      </div>
+
+      {/* Honeypot — hidden from users, bots may fill it */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          left: "-10000px",
+          top: "auto",
+          width: "1px",
+          height: "1px",
+          overflow: "hidden",
+        }}
+      >
+        <label htmlFor="website">Website</label>
+        <input
+          id="website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={values.website}
+          onChange={(e) => update("website", e.target.value)}
+        />
       </div>
 
       {step === 1 ? (
@@ -152,24 +400,24 @@ export function WaitlistForm() {
           </div>
 
           <div>
-            <label htmlFor="workEmail" className="text-sm font-medium text-ink">
+            <label htmlFor="email" className="text-sm font-medium text-ink">
               Work email <span className="text-red">*</span>
             </label>
             <input
-              id="workEmail"
-              name="workEmail"
+              id="email"
+              name="email"
               type="email"
               autoComplete="email"
               className={fieldClass}
-              value={values.workEmail}
-              onChange={(e) => update("workEmail", e.target.value)}
-              aria-invalid={Boolean(errors.workEmail)}
-              aria-describedby={errors.workEmail ? "workEmail-error" : undefined}
+              value={values.email}
+              onChange={(e) => update("email", e.target.value)}
+              aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? "email-error" : undefined}
               required
             />
-            {errors.workEmail ? (
-              <p id="workEmail-error" className="mt-1 text-xs text-red">
-                {errors.workEmail}
+            {errors.email ? (
+              <p id="email-error" className="mt-1 text-xs text-red">
+                {errors.email}
               </p>
             ) : null}
           </div>
@@ -244,8 +492,8 @@ export function WaitlistForm() {
             >
               <option value="">Select…</option>
               {form.stages.map((option) => (
-                <option key={option} value={option}>
-                  {option}
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -253,97 +501,97 @@ export function WaitlistForm() {
           </div>
 
           <div>
-            <label htmlFor="blocker" className="text-sm font-medium text-ink">
+            <label htmlFor="primaryBlocker" className="text-sm font-medium text-ink">
               Primary blocker <span className="text-red">*</span>
             </label>
             <select
-              id="blocker"
-              name="blocker"
+              id="primaryBlocker"
+              name="primaryBlocker"
               className={fieldClass}
-              value={values.blocker}
-              onChange={(e) => update("blocker", e.target.value)}
+              value={values.primaryBlocker}
+              onChange={(e) => update("primaryBlocker", e.target.value)}
               required
             >
               <option value="">Select…</option>
               {form.blockers.map((option) => (
-                <option key={option} value={option}>
-                  {option}
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
-            {errors.blocker ? <p className="mt-1 text-xs text-red">{errors.blocker}</p> : null}
+            {errors.primaryBlocker ? (
+              <p className="mt-1 text-xs text-red">{errors.primaryBlocker}</p>
+            ) : null}
           </div>
 
           <div>
-            <label htmlFor="startWindow" className="text-sm font-medium text-ink">
+            <label htmlFor="desiredStartWindow" className="text-sm font-medium text-ink">
               Desired start window <span className="text-red">*</span>
             </label>
             <select
-              id="startWindow"
-              name="startWindow"
+              id="desiredStartWindow"
+              name="desiredStartWindow"
               className={fieldClass}
-              value={values.startWindow}
-              onChange={(e) => update("startWindow", e.target.value)}
+              value={values.desiredStartWindow}
+              onChange={(e) => update("desiredStartWindow", e.target.value)}
               required
             >
               <option value="">Select…</option>
               {form.startWindows.map((option) => (
-                <option key={option} value={option}>
-                  {option}
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
-            {errors.startWindow ? (
-              <p className="mt-1 text-xs text-red">{errors.startWindow}</p>
+            {errors.desiredStartWindow ? (
+              <p className="mt-1 text-xs text-red">{errors.desiredStartWindow}</p>
             ) : null}
           </div>
 
           <div>
-            <label htmlFor="description" className="text-sm font-medium text-ink">
+            <label htmlFor="message" className="text-sm font-medium text-ink">
               Short description <span className="text-red">*</span>
             </label>
             <textarea
-              id="description"
-              name="description"
+              id="message"
+              name="message"
               rows={4}
               className={fieldClass}
-              value={values.description}
-              onChange={(e) => update("description", e.target.value)}
+              value={values.message}
+              onChange={(e) => update("message", e.target.value)}
               required
             />
-            {errors.description ? (
-              <p className="mt-1 text-xs text-red">{errors.description}</p>
-            ) : null}
+            {errors.message ? <p className="mt-1 text-xs text-red">{errors.message}</p> : null}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="stack" className="text-sm font-medium text-ink">
+              <label htmlFor="prototypePlatform" className="text-sm font-medium text-ink">
                 Build tool / stack <span className="text-muted">(optional)</span>
               </label>
               <input
-                id="stack"
-                name="stack"
+                id="prototypePlatform"
+                name="prototypePlatform"
                 className={fieldClass}
-                value={values.stack}
-                onChange={(e) => update("stack", e.target.value)}
+                value={values.prototypePlatform}
+                onChange={(e) => update("prototypePlatform", e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="budget" className="text-sm font-medium text-ink">
+              <label htmlFor="budgetRange" className="text-sm font-medium text-ink">
                 Budget range <span className="text-muted">(optional)</span>
               </label>
               <select
-                id="budget"
-                name="budget"
+                id="budgetRange"
+                name="budgetRange"
                 className={fieldClass}
-                value={values.budget}
-                onChange={(e) => update("budget", e.target.value)}
+                value={values.budgetRange}
+                onChange={(e) => update("budgetRange", e.target.value)}
               >
                 <option value="">Select…</option>
                 {form.budgets.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -354,8 +602,8 @@ export function WaitlistForm() {
             <input
               type="checkbox"
               className="mt-1"
-              checked={values.enterpriseDeadline}
-              onChange={(e) => update("enterpriseDeadline", e.target.checked)}
+              checked={values.commercialDeadline}
+              onChange={(e) => update("commercialDeadline", e.target.checked)}
             />
             An enterprise or customer deadline is involved
           </label>
@@ -389,17 +637,23 @@ export function WaitlistForm() {
             />
             Send me optional product and capacity updates (separate from application processing)
           </label>
+
+          <div>
+            <div ref={turnstileContainerRef} className="mt-2" />
+            {errors.turnstileToken ? (
+              <p className="mt-1 text-xs text-red">{errors.turnstileToken}</p>
+            ) : null}
+          </div>
         </div>
       )}
 
       <div
         id="waitlist-status"
-        className="mt-4 text-sm text-muted"
+        className={`mt-4 text-sm ${status === "error" ? "text-red" : "text-muted"}`}
         role="status"
         aria-live="polite"
       >
         {statusMessage}
-        {status === "error" ? <span className="text-red"> {statusMessage}</span> : null}
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">

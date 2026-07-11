@@ -221,14 +221,35 @@ Deterministic weights (never returned on public success responses):
 ### Non-production test surface
 
 When `ENABLE_TEST_SURFACE=true`, non-production `NODE_ENV`, or Cloudflare test
-Turnstile secrets are configured:
+Turnstile secrets are configured. **Discoverability:** black-box testers should
+start at `GET /v1/test-support` (also advertised as `testSupport` on `/readyz`
+when enabled). In production-strict mode every path below returns 404.
 
-| Method | Path                               | Purpose                                                   |
-| ------ | ---------------------------------- | --------------------------------------------------------- |
-| `GET`  | `/v1/test/waitlist/inspect?email=` | PII-safe lead inspection (score, UTM, versioned `ipHash`) |
-| `GET`  | `/v1/test/ip-hash?ip=`             | Versioned salted hash + rotation window                   |
-| `POST` | `/v1/test/score`                   | Deterministic score preview                               |
-| `GET`  | `/v1/test/integration-report`      | Live coverage report for intake scenarios                 |
+| Method      | Path                                  | Purpose                                                                   |
+| ----------- | ------------------------------------- | ------------------------------------------------------------------------- |
+| `GET`       | `/v1/test-support`                    | Catalog of all test-support routes                                        |
+| `GET`       | `/v1/test-support/report`             | Live integration-test report (coverage for intake scenarios)              |
+| `GET`       | `/v1/test-support/leads?email=`       | PII-safe lead inspection (score, UTM, versioned `ipHash`, timestamps)     |
+| `GET`       | `/v1/test-support/outbox?email=`      | Transactional outbox inspection (count/kind/status; no raw email)         |
+| `GET`/`POST`| `/v1/test-support/fault`              | Arm lead/outbox persistence fault for next N intakes (`{mode,count}`)     |
+| `POST`      | `/v1/test-support/score`              | Deterministic score preview (non-persisting)                              |
+| `GET`       | `/v1/test-support/ip-hash?ip=`        | Versioned salted hash + rotation window                                   |
+| `GET`       | `/v1/test/waitlist/inspect?email=`    | Legacy alias of leads inspection                                          |
+| `GET`       | `/v1/test/ip-hash?ip=`                | Legacy alias of IP hash                                                   |
+| `POST`      | `/v1/test/score`                      | Legacy alias of score                                                     |
+| `GET`       | `/v1/test/integration-report`         | Legacy alias of report                                                    |
+
+Fault injection example (non-production only):
+
+```http
+POST /v1/test-support/fault
+Content-Type: application/json
+
+{"mode":"outbox","count":1}
+```
+
+The next `POST /v1/waitlist` then returns a generic `500 INTERNAL_ERROR` and neither
+lead nor outbox remains committed. Modes: `lead`, `outbox`, `none`.
 
 Strict production (real Turnstile secret, `ENABLE_TEST_SURFACE=false`) does not
 register these routes. Request fields/headers/query can never activate a Turnstile bypass.

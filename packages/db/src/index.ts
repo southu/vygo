@@ -26,6 +26,7 @@ export {
   saveIdempotency,
   findWaitlistByEmail,
   countOutboxForEntry,
+  listOutboxForEntry,
   persistWaitlistIntake,
   type WaitlistPersistInput,
   type WaitlistPersistResult,

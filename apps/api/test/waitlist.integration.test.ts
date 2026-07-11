@@ -701,7 +701,44 @@ describe("test surface + integration report", () => {
     assert.equal(res.body.includes(email), false);
     assert.ok(data.entry.utm.source);
 
-    const report = await ctx.app.inject({ method: "GET", url: "/v1/test/integration-report" });
+    const catalog = await ctx.app.inject({ method: "GET", url: "/v1/test-support" });
+    assert.equal(catalog.statusCode, 200);
+    assert.equal(catalog.json().data.enabled, true);
+    assert.ok(catalog.json().data.routes.report.path);
+
+    const leads = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/test-support/leads?email=${encodeURIComponent(email)}`,
+    });
+    assert.equal(leads.statusCode, 200);
+    assert.equal(leads.json().data.outboxCount, 1);
+
+    const outbox = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/test-support/outbox?email=${encodeURIComponent(email)}`,
+    });
+    assert.equal(outbox.statusCode, 200);
+    assert.equal(outbox.json().data.outboxCount, 1);
+    assert.equal(outbox.json().data.items[0]?.kind, "waitlist_confirmation");
+    assert.equal(outbox.body.includes(email), false);
+
+    const faultArm = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/test-support/fault",
+      headers: { "content-type": "application/json" },
+      payload: { mode: "outbox", count: 1 },
+    });
+    assert.equal(faultArm.statusCode, 200);
+    assert.equal(faultArm.json().data.mode, "outbox");
+
+    const faultEmail = `fault-arm-${randomUUID().slice(0, 8)}@example.com`;
+    const faulted = await postWaitlist(
+      validPayload({ email: faultEmail, idempotencyKey: randomUUID() }),
+    );
+    assert.equal(faulted.statusCode, 500);
+    assert.equal(await findWaitlistByEmail(handle.db, faultEmail), null);
+
+    const report = await ctx.app.inject({ method: "GET", url: "/v1/test-support/report" });
     assert.equal(report.statusCode, 200);
     const reportBody = report.json().data;
     assert.equal(typeof reportBody.ready, "boolean");
@@ -711,6 +748,7 @@ describe("test surface + integration report", () => {
     assert.ok(reportBody.coverage.outbox_creation);
     assert.ok(reportBody.coverage.scoring);
     assert.ok(reportBody.coverage.pii_safe_structured_logging);
+    assert.ok(reportBody.coverage.transaction_rollback);
   });
 
   it("availability and health still work", async () => {
