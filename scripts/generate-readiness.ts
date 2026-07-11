@@ -216,6 +216,9 @@ function main() {
   const externalDocsCommitted = countCommittedExternalDocs();
   const major = configuredNodeMajor();
   const runtimeMajor = runtimeNodeMajor();
+  // lts is truthful about the *runtime* that produced this artifact (odd majors are never LTS).
+  const runtimeIsLts = runtimeMajor === ACTIVE_LTS_MAJOR;
+  const configuredIsLts = major === ACTIVE_LTS_MAJOR;
 
   // Pipeline flags: set by CI after each step, or assume passed when invoked from
   // successful prebuild / local verify (READINESS_ASSUME_CHECKS=passed).
@@ -247,6 +250,7 @@ function main() {
     directories.docs.present &&
     directories.ci.present;
 
+  // Tooling requires configured *and* runtime active LTS (Node 24).
   const toolingOk =
     pnpmWorkspace &&
     strictTs &&
@@ -254,7 +258,8 @@ function main() {
     formatting &&
     rootScripts &&
     lockfileCommitted &&
-    major === ACTIVE_LTS_MAJOR;
+    configuredIsLts &&
+    runtimeIsLts;
 
   const checksOk =
     cleanInstall === "passed" &&
@@ -303,8 +308,9 @@ function main() {
         version: process.versions.node,
         runtimeMajor,
         activeLtsMajor: ACTIVE_LTS_MAJOR,
-        lts: major === ACTIVE_LTS_MAJOR,
-        configured: major === ACTIVE_LTS_MAJOR,
+        // Truthful: only claim LTS when this process is running active LTS Node.
+        lts: runtimeIsLts,
+        configured: configuredIsLts,
         source: exists(".nvmrc") ? ".nvmrc" : "runtime",
       },
       pnpmWorkspace: {

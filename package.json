@@ -5,7 +5,7 @@
   "description": "vygo.ai production monorepo — marketing web, API, worker, and shared packages",
   "packageManager": "pnpm@9.15.9",
   "engines": {
-    "node": ">=24"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "pnpm --filter @vygo/web dev",

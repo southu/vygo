@@ -2,8 +2,8 @@
   "ready": true,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "60dfc7821aa57701cf35b4e228b942c8a3577165",
-  "generatedAt": "2026-07-11T22:09:03.655Z",
+  "gitSha": "019fec2b44a4519cc7173936aa5b2aab7cd0b13c",
+  "generatedAt": "2026-07-11T22:18:12.207Z",
   "workspace": {
     "apps": {
       "web": {
@@ -59,8 +59,8 @@
   "tooling": {
     "node": {
       "major": 24,
-      "version": "25.8.1",
-      "runtimeMajor": 25,
+      "version": "24.18.0",
+      "runtimeMajor": 24,
       "activeLtsMajor": 24,
       "lts": true,
       "configured": true,
