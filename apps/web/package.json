@@ -1,0 +1,28 @@
+{
+  "name": "@vygo/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "prebuild": "tsx ../../scripts/generate-readiness.ts",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "clean": "rm -rf .next dist"
+  },
+  "dependencies": {
+    "@vygo/config": "workspace:*",
+    "@vygo/ui": "workspace:*",
+    "@vygo/validation": "workspace:*",
+    "next": "^15.5.7",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
