@@ -136,12 +136,34 @@ function typedEnvValidationPresent(): boolean {
   return exists("packages/config/src/index.ts") && exists("packages/config/package.json");
 }
 
-function nodeMajor(): number {
+function runtimeNodeMajor(): number {
   return Number.parseInt(process.versions.node.split(".")[0] ?? "0", 10);
 }
 
 /** Active LTS major as of this mission (Node 24 Krypton). */
 const ACTIVE_LTS_MAJOR = 24;
+
+/** Configured Node major from .nvmrc (preferred) or package engines, else runtime. */
+function configuredNodeMajor(): number {
+  if (exists(".nvmrc")) {
+    const raw = readText(".nvmrc").trim();
+    const match = raw.match(/^v?(\d+)/);
+    if (match?.[1]) {
+      return Number.parseInt(match[1], 10);
+    }
+  }
+  if (exists("package.json")) {
+    const pkg = JSON.parse(readText("package.json")) as {
+      engines?: { node?: string };
+    };
+    const engines = pkg.engines?.node ?? "";
+    const match = engines.match(/(\d+)/);
+    if (match?.[1]) {
+      return Number.parseInt(match[1], 10);
+    }
+  }
+  return runtimeNodeMajor();
+}
 
 function checkStatus(flag: string | undefined, fallbackPassed: boolean): "passed" | "failed" {
   if (flag === "passed" || flag === "failed") return flag;
@@ -192,7 +214,8 @@ function main() {
   const secrets = secretScan();
   const externalDocsIgnored = isExternalDocsIgnored();
   const externalDocsCommitted = countCommittedExternalDocs();
-  const major = nodeMajor();
+  const major = configuredNodeMajor();
+  const runtimeMajor = runtimeNodeMajor();
 
   // Pipeline flags: set by CI after each step, or assume passed when invoked from
   // successful prebuild / local verify (READINESS_ASSUME_CHECKS=passed).
@@ -231,7 +254,7 @@ function main() {
     formatting &&
     rootScripts &&
     lockfileCommitted &&
-    major >= ACTIVE_LTS_MAJOR;
+    major === ACTIVE_LTS_MAJOR;
 
   const checksOk =
     cleanInstall === "passed" &&
@@ -278,9 +301,11 @@ function main() {
       node: {
         major,
         version: process.versions.node,
+        runtimeMajor,
         activeLtsMajor: ACTIVE_LTS_MAJOR,
-        lts: major === ACTIVE_LTS_MAJOR || major >= ACTIVE_LTS_MAJOR,
-        configured: true,
+        lts: major === ACTIVE_LTS_MAJOR,
+        configured: major === ACTIVE_LTS_MAJOR,
+        source: exists(".nvmrc") ? ".nvmrc" : "runtime",
       },
       pnpmWorkspace: {
         configured: pnpmWorkspace,
