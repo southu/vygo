@@ -1,0 +1,25 @@
+# Private planning / agent brief (never commit)
+external-docs/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Build / tooling
+dist/
+build/
+.next/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
