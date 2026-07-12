@@ -110,7 +110,35 @@ export const budgetRangeSchema = z.enum([
 
 export type BudgetRange = z.infer<typeof budgetRangeSchema>;
 
-const trimmedString = (max: number) => z.string().trim().max(max);
+/**
+ * Detect Unicode C0/C1 control characters (and DEL) that must not be stored.
+ *
+ * - Single-line free text: reject all C0 (U+0000–U+001F), DEL (U+007F), and C1 (U+0080–U+009F).
+ * - Multiline (`message`): allow tab (U+0009), LF (U+000A), and CR (U+000D) only among C0.
+ *
+ * NUL and other controls otherwise pass length/type checks but break Postgres text
+ * or pollute stored leads — reject at the shared Zod layer for every consumer.
+ */
+export function hasDisallowedControlChars(
+  value: string,
+  options?: { allowMultilineWhitespace?: boolean },
+): boolean {
+  if (options?.allowMultilineWhitespace) {
+    // Allow \t \n \r; reject remaining C0, DEL, and C1.
+    return /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/.test(value);
+  }
+  return /[\u0000-\u001F\u007F-\u009F]/.test(value);
+}
+
+/** Trimmed free-text string with max length and control-character rejection. */
+const freeTextString = (max: number, options?: { allowMultilineWhitespace?: boolean }) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .refine((value) => !hasDisallowedControlChars(value, options), {
+      message: "Please review this field.",
+    });
 
 /**
  * HTTPS-only product URL. Rejects non-http(s), javascript:, data:, and empty hosts.
@@ -119,6 +147,7 @@ const trimmedString = (max: number) => z.string().trim().max(max);
 export function normalizeAndValidateHttpsUrl(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
+  if (hasDisallowedControlChars(trimmed)) return null;
   let parsed: URL;
   try {
     parsed = new URL(trimmed);
@@ -162,6 +191,9 @@ export const emailSchema = z
   .trim()
   .min(3)
   .max(WAITLIST_LIMITS.email)
+  .refine((value) => !hasDisallowedControlChars(value), {
+    message: "Enter a valid work email.",
+  })
   .email({ message: "Enter a valid work email." })
   .transform((value) => value.toLowerCase());
 
@@ -169,6 +201,9 @@ export const utmValueSchema = z
   .string()
   .trim()
   .max(UTM_MAX_LENGTH)
+  .refine((value) => !hasDisallowedControlChars(value), {
+    message: "Please review this field.",
+  })
   .nullable()
   .optional()
   .transform((v) => (v == null || v === "" ? null : v));
@@ -198,29 +233,45 @@ export const utmObjectSchema = z
  */
 export const waitlistRequestSchema = z
   .object({
-    fullName: trimmedString(WAITLIST_LIMITS.fullName).min(1, "Enter your full name."),
+    fullName: freeTextString(WAITLIST_LIMITS.fullName).min(1, "Enter your full name."),
     email: emailSchema,
-    companyName: trimmedString(WAITLIST_LIMITS.companyName).min(1, "Enter your company name."),
-    role: trimmedString(WAITLIST_LIMITS.role).optional().nullable(),
+    companyName: freeTextString(WAITLIST_LIMITS.companyName).min(1, "Enter your company name."),
+    role: freeTextString(WAITLIST_LIMITS.role).optional().nullable(),
     productUrl: httpsUrlSchema,
-    prototypePlatform: trimmedString(WAITLIST_LIMITS.prototypePlatform).optional().nullable(),
+    prototypePlatform: freeTextString(WAITLIST_LIMITS.prototypePlatform).optional().nullable(),
     stage: leadStageSchema,
     primaryBlocker: leadBlockerSchema,
     desiredStartWindow: desiredStartWindowSchema,
     budgetRange: budgetRangeSchema.optional().nullable(),
     commercialDeadline: z.boolean().optional().default(false),
-    message: trimmedString(WAITLIST_LIMITS.message).min(1, "Add a short description."),
+    // Multiline free text: allow tab/newline/CR only among control characters.
+    message: freeTextString(WAITLIST_LIMITS.message, { allowMultilineWhitespace: true }).min(
+      1,
+      "Add a short description.",
+    ),
     privacyAccepted: z.boolean().refine((v) => v === true, {
       message: "Privacy acceptance is required.",
     }),
     marketingConsent: z.boolean().optional().default(false),
-    turnstileToken: z.string().min(1).max(WAITLIST_LIMITS.turnstileToken),
+    turnstileToken: z
+      .string()
+      .min(1)
+      .max(WAITLIST_LIMITS.turnstileToken)
+      .refine((value) => !hasDisallowedControlChars(value), {
+        message: "Please review this field.",
+      }),
     idempotencyKey: z.string().uuid().optional(),
     utm: utmObjectSchema,
-    landingPage: trimmedString(WAITLIST_LIMITS.landingPage).optional().nullable(),
-    referrer: trimmedString(WAITLIST_LIMITS.referrer).optional().nullable(),
+    landingPage: freeTextString(WAITLIST_LIMITS.landingPage).optional().nullable(),
+    referrer: freeTextString(WAITLIST_LIMITS.referrer).optional().nullable(),
     /** Honeypot — must be empty / absent. Non-empty is an abuse signal (handled by route). */
-    website: z.string().max(WAITLIST_LIMITS.honeypot).optional(),
+    website: z
+      .string()
+      .max(WAITLIST_LIMITS.honeypot)
+      .refine((value) => !hasDisallowedControlChars(value), {
+        message: "Please review this field.",
+      })
+      .optional(),
     /** Client form open time for minimum completion signal. */
     formStartedAt: z.union([z.number().int().positive(), z.string().min(1)]).optional(),
   })

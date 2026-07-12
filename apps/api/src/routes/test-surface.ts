@@ -355,16 +355,47 @@ async function handleIntegrationReport(
     record("normalization", pass, `status=${res.statusCode}`);
   }
 
-  // --- invalid fields ---
+  // --- invalid fields (malformed email + control characters must be 400, never 500) ---
   {
-    const payload = { ...basePayload(), email: "not-an-email" };
-    const res = await post(payload);
-    const body = res.json();
-    const pass =
-      res.statusCode === 400 &&
-      body?.error?.code === "VALIDATION_ERROR" &&
-      !res.body.includes("not-an-email");
-    record("invalid_fields", pass);
+    const badEmail = await post({ ...basePayload(), email: "not-an-email" });
+    const badEmailBody = badEmail.json();
+    const emailOk =
+      badEmail.statusCode === 400 &&
+      badEmailBody?.error?.code === "VALIDATION_ERROR" &&
+      !badEmail.body.includes("not-an-email");
+
+    const nulPayload = {
+      ...basePayload(),
+      email: `nul-ctrl-${randomUUID().slice(0, 8)}@example.com`,
+      fullName: `A${"\u0000"}B`,
+    };
+    const nulRes = await post(nulPayload);
+    const nulBody = nulRes.json();
+    let nulOk =
+      nulRes.statusCode === 400 &&
+      nulBody?.error?.code === "VALIDATION_ERROR" &&
+      nulBody?.error?.fields?.fullName === "Please review this field." &&
+      !nulRes.body.includes("\u0000") &&
+      !nulRes.body.includes(nulPayload.email);
+
+    if (nulOk && db) {
+      const entry = await findWaitlistByEmail(db.db, nulPayload.email.trim().toLowerCase());
+      nulOk = entry == null;
+    }
+
+    const c0Payload = {
+      ...basePayload(),
+      email: `c0-ctrl-${randomUUID().slice(0, 8)}@example.com`,
+      fullName: `Ada${"\u0001"}Lovelace`,
+    };
+    const c0Res = await post(c0Payload);
+    let c0Ok = c0Res.statusCode === 400 && c0Res.json()?.error?.code === "VALIDATION_ERROR";
+    if (c0Ok && db) {
+      const entry = await findWaitlistByEmail(db.db, c0Payload.email.trim().toLowerCase());
+      c0Ok = entry == null;
+    }
+
+    record("invalid_fields", emailOk && nulOk && c0Ok);
   }
 
   // --- privacy rejection ---

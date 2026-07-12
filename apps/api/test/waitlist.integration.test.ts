@@ -199,6 +199,67 @@ describe("POST /v1/waitlist — validation and controls", () => {
   it("rejects over-limit fields", async () => {
     const res = await postWaitlist(validPayload({ fullName: "x".repeat(200) }));
     assert.equal(res.statusCode, 400);
+    const body = res.json();
+    assert.equal(body.error.code, "VALIDATION_ERROR");
+    assert.equal(body.error.fields?.fullName, "Value exceeds the maximum allowed length.");
+  });
+
+  it("rejects control characters (NUL/C0) in free-text fields with 400, never 500", async () => {
+    for (const field of ["fullName", "companyName", "message"] as const) {
+      const email = `nul-${field}-${randomUUID().slice(0, 8)}@example.com`;
+      const res = await postWaitlist(
+        validPayload({
+          email,
+          [field]: field === "message" ? `hello${"\u0000"}world` : `A${"\u0000"}B`,
+        }),
+      );
+      assert.equal(res.statusCode, 400, `expected 400 for NUL in ${field}, got ${res.statusCode}`);
+      const body = res.json();
+      assert.equal(body.error.code, "VALIDATION_ERROR");
+      assert.equal(body.error.fields?.[field], "Please review this field.");
+      // PII-safe: never echo the submitted control-laden value or email
+      assert.equal(res.body.includes("\u0000"), false);
+      assert.equal(res.body.includes(email), false);
+      const entry = await findWaitlistByEmail(handle.db, email);
+      assert.equal(entry, null, `NUL in ${field} must not persist a lead`);
+    }
+  });
+
+  it("rejects other C0 control characters in fullName and does not persist them", async () => {
+    for (const ch of ["\u0001", "\u001B"] as const) {
+      const email = `ctrl-${ch.charCodeAt(0)}-${randomUUID().slice(0, 8)}@example.com`;
+      const res = await postWaitlist(validPayload({ email, fullName: `Ada${ch}Lovelace` }));
+      assert.equal(res.statusCode, 400, `expected 400 for U+${ch.charCodeAt(0).toString(16)}`);
+      assert.equal(res.json().error.code, "VALIDATION_ERROR");
+      assert.equal(res.json().error.fields?.fullName, "Please review this field.");
+      const entry = await findWaitlistByEmail(handle.db, email);
+      assert.equal(entry, null);
+    }
+  });
+
+  it("accepts unicode letters/emoji in free-text and newlines only in message", async () => {
+    const email = `unicode-${randomUUID().slice(0, 8)}@example.com`;
+    const res = await postWaitlist(
+      validPayload({
+        email,
+        fullName: "José García 日本語 🚀",
+        message: "Line one\nLine two\twith tab",
+      }),
+    );
+    assert.equal(res.statusCode, 200);
+    const entry = await findWaitlistByEmail(handle.db, email);
+    assert.ok(entry);
+    assert.equal(entry?.fullName, "José García 日本語 🚀");
+    assert.equal(entry?.message, "Line one\nLine two\twith tab");
+
+    // Tab/newline remain disallowed in single-line fullName
+    const badName = await postWaitlist(
+      validPayload({
+        email: `tabname-${randomUUID().slice(0, 8)}@example.com`,
+        fullName: "Ada\tLovelace",
+      }),
+    );
+    assert.equal(badName.statusCode, 400);
   });
 
   it("rejects malformed JSON with generic 400", async () => {
