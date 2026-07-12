@@ -21,7 +21,8 @@ export default defineConfig({
     {
       name: "mobile",
       testMatch: /site-behavior\.spec\.ts/,
-      use: { ...devices["iPhone 13"] },
+      // Chromium + mobile viewport (avoids requiring WebKit browser binaries).
+      use: { ...devices["Pixel 5"] },
     },
   ],
 });
