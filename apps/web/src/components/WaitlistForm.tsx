@@ -187,6 +187,10 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
   }, [step, mode]);
 
   // Modal: Escape + focus trap
+  // Only wrap at the edges of the tabbable list. Programmatic focus targets with
+  // tabindex=-1 (heading, error summary) are not in that list — Tab/Shift+Tab from
+  // them must use natural DOM order (or wrap only when no tabbable lies in that
+  // direction), otherwise Tab from the error summary jumps to the dismiss button.
   useEffect(() => {
     if (mode !== "modal" || !open) return;
 
@@ -197,8 +201,9 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
         return;
       }
       if (event.key !== "Tab" || !dialogRef.current) return;
+      const root = dialogRef.current;
       const focusable = Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(
+        root.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), textarea, input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
         ),
       ).filter((el) => !el.hasAttribute("disabled") && el.tabIndex !== -1);
@@ -207,14 +212,40 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
       const last = focusable[focusable.length - 1]!;
       const active = document.activeElement as HTMLElement | null;
       const activeInList = active != null && focusable.includes(active);
-      // Heading/container/other non-listed elements (e.g. tabindex=-1 heading) are
-      // outside the tabbable list; wrap so focus never escapes the dialog.
+      const activeInDialog = active != null && root.contains(active);
+
       if (event.shiftKey) {
-        if (!activeInList || active === first) {
+        // Wrap first → last, or tabindex=-1 sentinel with no tabbable before it (heading).
+        if (active === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (activeInDialog && !activeInList) {
+          const hasTabbableBefore = focusable.some(
+            (el) => (active!.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING) !== 0,
+          );
+          if (!hasTabbableBefore) {
+            event.preventDefault();
+            last.focus();
+          }
+          // else: natural order (e.g. error summary → previous control)
+        } else if (!activeInDialog) {
           event.preventDefault();
           last.focus();
         }
-      } else if (!activeInList || active === last) {
+      } else if (active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (activeInDialog && !activeInList) {
+        // tabindex=-1 in the middle (error summary): let browser Tab to the next
+        // tabbable after it (first error-summary link). Only wrap if nothing follows.
+        const hasTabbableAfter = focusable.some(
+          (el) => (active!.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+        );
+        if (!hasTabbableAfter) {
+          event.preventDefault();
+          first.focus();
+        }
+      } else if (!activeInDialog) {
         event.preventDefault();
         first.focus();
       }
@@ -228,6 +259,16 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
       document.body.style.overflow = previousOverflow;
     };
   }, [mode, open, onDismiss]);
+
+  // After success/duplicate replaces the form, move focus to the success heading
+  // so it does not fall to document.body when the submit control unmounts.
+  useEffect(() => {
+    if (status !== "success" && status !== "duplicate") return;
+    const t = window.requestAnimationFrame(() => {
+      headingRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(t);
+  }, [status]);
 
   // Turnstile on step 2
   useEffect(() => {

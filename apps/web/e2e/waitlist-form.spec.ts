@@ -403,4 +403,96 @@ test.describe("WaitlistForm", () => {
       expect(inside).toBe(true);
     }
   });
+
+  test("Tab from focused error summary reaches the first summary link", async ({ page }) => {
+    await page.goto("/");
+    const invoker = page.getByTestId("availability-bar-cta");
+    await invoker.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("waitlist-modal")).toBeVisible();
+
+    // Empty step 1 → error summary receives programmatic focus (tabindex=-1).
+    await page.getByTestId("waitlist-continue").click();
+    const summary = page.getByTestId("waitlist-error-summary");
+    await expect(summary).toBeVisible();
+    // Focus is applied in an effect / rAF — settle on document.activeElement.
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const el = document.activeElement;
+          return el?.getAttribute("data-testid") ?? el?.tagName ?? null;
+        }),
+      )
+      .toBe("waitlist-error-summary");
+
+    await page.keyboard.press("Tab");
+
+    const activeIsFirstLink = await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (!active || active.tagName !== "A") return false;
+      if (!active.hasAttribute("data-error-summary-link")) return false;
+      const links = document.querySelectorAll("a[data-error-summary-link]");
+      return links[0] === active;
+    });
+    expect(activeIsFirstLink).toBe(true);
+
+    // Enter on the first summary link moves focus to the corresponding field.
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#fullName")).toBeFocused();
+  });
+
+  test("focus is inside the modal after the success card renders", async ({ page }) => {
+    await page.goto("/");
+    const invoker = page.getByTestId("availability-bar-cta");
+    await invoker.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("waitlist-modal")).toBeVisible();
+
+    // Server enforces a formStartedAt anti-bot dwell window; wait before submit.
+    await page.waitForTimeout(3100);
+
+    await fillStep1(page, { email: `focus-success-${Date.now()}@example.com` });
+    await page.getByTestId("waitlist-continue").click();
+    await expect(page.locator('[data-waitlist-step="2"]')).toBeVisible();
+    await fillStep2(page);
+
+    await page.route("**/v1/waitlist", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { accepted: true, message: "Your application has been received." },
+        }),
+      });
+    });
+
+    await page.getByTestId("waitlist-submit").click();
+    await expect(page.getByTestId("waitlist-success-card")).toBeVisible();
+
+    // Focus must land on the success heading (or another element inside the modal),
+    // never document.body after the submit control unmounts.
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const modal = document.querySelector("[data-testid=waitlist-modal]");
+          const active = document.activeElement;
+          if (!modal || !active || active === document.body) return "body-or-outside";
+          if (!modal.contains(active)) return "outside-modal";
+          if (active.id === "waitlist-form-heading" || active.closest("[data-testid=waitlist-success-card]")) {
+            return "inside-success";
+          }
+          return modal.contains(active) ? "inside-modal" : "outside-modal";
+        }),
+      )
+      .toMatch(/inside/);
+
+    // Escape still dismisses and returns focus to the invoking CTA.
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("waitlist-modal")).toHaveCount(0);
+    await expect(invoker).toBeFocused();
+  });
 });
