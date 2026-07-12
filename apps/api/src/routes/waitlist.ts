@@ -10,9 +10,11 @@ import {
 } from "@vygo/db";
 import {
   WAITLIST_SUCCESS_BODY,
+  buildWaitlistSuccessBody,
   waitlistRequestSchema,
   zodIssuesToFieldErrors,
   type WaitlistRequest,
+  type WaitlistSuccessBody,
 } from "@vygo/validation";
 import { safeError } from "../errors.js";
 import { resolveClientIp } from "../services/client-ip.js";
@@ -258,8 +260,12 @@ export function registerWaitlistRoutes(app: FastifyInstance, deps: WaitlistRoute
                 ),
               );
           }
-          // JSONB may reorder keys; success replays always use the canonical body.
+          // Replay stored success body (includes durable applicationId when present).
           if (existing.responseCode === 200) {
+            const body = existing.responseBody as WaitlistSuccessBody;
+            if (body?.data?.accepted === true) {
+              return reply.status(200).send(body);
+            }
             return reply.status(200).send(WAITLIST_SUCCESS_BODY);
           }
           return reply.status(existing.responseCode).send(existing.responseBody);
@@ -289,14 +295,16 @@ export function registerWaitlistRoutes(app: FastifyInstance, deps: WaitlistRoute
     // Production-configured envs never honor TEST_FAULT_MODE from env if strict.
     // getFaultOptions is wired from env only when test surface is enabled.
 
+    let persistResult;
     try {
-      await persistWaitlistIntake(
+      persistResult = await persistWaitlistIntake(
         dbHandle.db,
         {
           application,
           ipHash,
           userAgent,
           priorityScore: score.total,
+          leadNotificationEmail: deps.env.LEAD_NOTIFICATION_EMAIL,
         },
         faultOptions,
       );
@@ -311,7 +319,14 @@ export function registerWaitlistRoutes(app: FastifyInstance, deps: WaitlistRoute
         .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
     }
 
-    const successBody = WAITLIST_SUCCESS_BODY;
+    // Return durable application id before any provider delivery completes.
+    // Marketing consent is reported separately from transactional email queue state.
+    const successBody = buildWaitlistSuccessBody({
+      applicationId: persistResult.entry.id,
+      marketingConsent: persistResult.entry.marketingConsent,
+      emailJobCount: persistResult.outboxJobs.length,
+      emailKinds: persistResult.outboxJobs.map((j) => j.kind),
+    });
 
     if (idempotencyKey) {
       try {
@@ -331,6 +346,9 @@ export function registerWaitlistRoutes(app: FastifyInstance, deps: WaitlistRoute
         event: "waitlist_accepted",
         score: score.total,
         hasIpHash: Boolean(ipHash),
+        applicationId: persistResult.entry.id,
+        emailJobCount: persistResult.outboxJobs.length,
+        marketingConsent: persistResult.entry.marketingConsent,
       },
       "waitlist accepted",
     );

@@ -16,6 +16,8 @@ const SENSITIVE_KEYS = new Set([
   "cookie",
   "email",
   "resend_api_key",
+  "resend_webhook_secret",
+  "webhook_secret",
   "database_url",
   "redis_url",
   "turnstile_secret_key",
@@ -23,6 +25,10 @@ const SENSITIVE_KEYS = new Set([
   "ip_hash",
   "full_name",
   "fullname",
+  "html",
+  "text",
+  "message",
+  "body",
 ]);
 
 export function redactString(input: string): string {

@@ -14,6 +14,26 @@ routes onto the same origin as the marketing site.
 | Response  | Every response includes `X-Request-Id` with the effective id          |
 | Logs      | Request id is attached to structured logs (PII-redacted)              |
 
+## `GET /health`
+
+Composite readiness for live verification. HTTP 200 only when the API process,
+PostgreSQL (with migrations), and the email worker heartbeat are ready.
+Never includes credentials, signing secrets, authorization headers, email
+bodies, or applicant data.
+
+```json
+{
+  "ready": true,
+  "service": "vygo",
+  "commit": "abc123…",
+  "checks": {
+    "api": { "ready": true, "service": "vygo-api" },
+    "database": { "ready": true, "status": "ok" },
+    "emailWorker": { "ready": true, "status": "ok", "inline": true }
+  }
+}
+```
+
 ## `GET /healthz`
 
 Process liveness. No dependency checks.
@@ -114,16 +134,31 @@ server-side Cloudflare Turnstile verification, privacy consent, and normalized f
 
 ### Success (new or duplicate email)
 
-HTTP 200 — identical generic body in both cases (no existence disclosure):
+HTTP 200 — returned **before** provider delivery. New applications include a
+durable `applicationId` and a transactional email queue summary. Marketing
+consent is reported separately from email job state. Abuse silent-accepts omit
+identifiers. Email addresses and bodies are never returned.
 
 ```json
 {
   "data": {
     "accepted": true,
-    "message": "Your application has been received."
+    "message": "Your application has been received.",
+    "applicationId": "8f3c…",
+    "marketingConsent": false,
+    "email": {
+      "queued": true,
+      "jobCount": 2,
+      "kinds": ["applicant_confirmation", "internal_lead_notification"]
+    }
   }
 }
 ```
+
+New leads enqueue **two** transactional outbox jobs with stable non-secret
+provider idempotency keys (`applicant-confirmation:{id}`,
+`internal-lead-notification:{id}`). Duplicate email updates and idempotent
+retries do not create additional deliveries.
 
 ### Validation error
 
@@ -176,8 +211,16 @@ HTTP 429:
 6. Server-side Turnstile verification (no request-level bypass)
 7. Zod validate + normalize (email lower/trim, HTTPS URL)
 8. Idempotency lookup / conflict
-9. Atomic lead upsert + confirmation outbox insert
-10. Generic success response
+9. Atomic lead upsert + dual transactional outbox insert (applicant + internal)
+10. Success response with durable application id (no provider wait)
+
+## `POST /v1/webhooks/resend`
+
+Idempotent Resend webhook (Svix signatures). Missing/invalid signature → 4xx
+and **no** event persistence. Valid signature → 2xx and one row per
+`provider_event_id` (duplicates still 2xx).
+
+Safe event inspection (test surface): `GET /v1/test-support/events?providerEventId=`.
 
 ### Request fields (strict)
 
@@ -225,19 +268,22 @@ Turnstile secrets are configured. **Discoverability:** black-box testers should
 start at `GET /v1/test-support` (also advertised as `testSupport` on `/readyz`
 when enabled). In production-strict mode every path below returns 404.
 
-| Method      | Path                                  | Purpose                                                                   |
-| ----------- | ------------------------------------- | ------------------------------------------------------------------------- |
-| `GET`       | `/v1/test-support`                    | Catalog of all test-support routes                                        |
-| `GET`       | `/v1/test-support/report`             | Live integration-test report (coverage for intake scenarios)              |
-| `GET`       | `/v1/test-support/leads?email=`       | PII-safe lead inspection (score, UTM, versioned `ipHash`, timestamps)     |
-| `GET`       | `/v1/test-support/outbox?email=`      | Transactional outbox inspection (count/kind/status; no raw email)         |
-| `GET`/`POST`| `/v1/test-support/fault`              | Arm lead/outbox persistence fault for next N intakes (`{mode,count}`)     |
-| `POST`      | `/v1/test-support/score`              | Deterministic score preview (non-persisting)                              |
-| `GET`       | `/v1/test-support/ip-hash?ip=`        | Versioned salted hash + rotation window                                   |
-| `GET`       | `/v1/test/waitlist/inspect?email=`    | Legacy alias of leads inspection                                          |
-| `GET`       | `/v1/test/ip-hash?ip=`                | Legacy alias of IP hash                                                   |
-| `POST`      | `/v1/test/score`                      | Legacy alias of score                                                     |
-| `GET`       | `/v1/test/integration-report`         | Legacy alias of report                                                    |
+| Method       | Path                                       | Purpose                                                               |
+| ------------ | ------------------------------------------ | --------------------------------------------------------------------- |
+| `GET`        | `/v1/test-support`                         | Catalog of all test-support routes                                    |
+| `GET`        | `/v1/test-support/report`                  | Live integration-test report (coverage for intake scenarios)          |
+| `GET`        | `/v1/test-support/email-report`            | React Email render, worker, webhook, shutdown, redaction suites       |
+| `GET`        | `/v1/test-support/leads?email=`            | PII-safe lead inspection (score, UTM, versioned `ipHash`, timestamps) |
+| `GET`        | `/v1/test-support/outbox?email=`           | Transactional outbox inspection (count/kind/status; no raw email)     |
+| `GET`        | `/v1/test-support/jobs?applicationId=`     | Safe job status (kinds, statuses, provider idempotency keys)          |
+| `GET`        | `/v1/test-support/events?providerEventId=` | Safe webhook event status / dedup count                               |
+| `GET`/`POST` | `/v1/test-support/fault`                   | Arm lead/outbox persistence fault for next N intakes (`{mode,count}`) |
+| `POST`       | `/v1/test-support/score`                   | Deterministic score preview (non-persisting)                          |
+| `GET`        | `/v1/test-support/ip-hash?ip=`             | Versioned salted hash + rotation window                               |
+| `GET`        | `/v1/test/waitlist/inspect?email=`         | Legacy alias of leads inspection                                      |
+| `GET`        | `/v1/test/ip-hash?ip=`                     | Legacy alias of IP hash                                               |
+| `POST`       | `/v1/test/score`                           | Legacy alias of score                                                 |
+| `GET`        | `/v1/test/integration-report`              | Legacy alias of report                                                |
 
 Fault injection example (non-production only):
 

@@ -125,12 +125,14 @@ CI runs the full verify path (`pnpm install --frozen-lockfile`, secret scan, lin
 
 ## Machine endpoints (API)
 
-| Method | Path                      | Purpose                                                               |
-| ------ | ------------------------- | --------------------------------------------------------------------- |
-| `GET`  | `/healthz`                | Process liveness (no dependency checks)                               |
-| `GET`  | `/readyz`                 | Ready when Postgres is up and required Drizzle migrations are applied |
-| `GET`  | `/v1/public/availability` | Public availability JSON + cache/ETag headers (neutral fallback)      |
-| `POST` | `/v1/waitlist`            | Secure waitlist intake (Turnstile, rate limits, atomic outbox)        |
+| Method | Path                      | Purpose                                                                                |
+| ------ | ------------------------- | -------------------------------------------------------------------------------------- |
+| `GET`  | `/health`                 | Composite readiness: API + database + email worker (no secrets or applicant data)      |
+| `GET`  | `/healthz`                | Process liveness (no dependency checks)                                                |
+| `GET`  | `/readyz`                 | Ready when Postgres is up and required Drizzle migrations are applied                  |
+| `GET`  | `/v1/public/availability` | Public availability JSON + cache/ETag headers (neutral fallback)                       |
+| `POST` | `/v1/waitlist`            | Secure waitlist intake (Turnstile, rate limits, atomic dual transactional outbox jobs) |
+| `POST` | `/v1/webhooks/resend`     | Idempotent Resend/Svix webhook (signature required; provider events deduplicated)      |
 
 See [docs/api.md](docs/api.md) for the full contract (request IDs, CORS, neutral responses).
 

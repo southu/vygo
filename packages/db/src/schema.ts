@@ -194,9 +194,18 @@ export const emailEvents = pgTable(
   (table) => [uniqueIndex("email_events_provider_event_uidx").on(table.providerEventId)],
 );
 
+/** Worker liveness heartbeats for composite /health readiness. */
+export const workerHeartbeats = pgTable("worker_heartbeats", {
+  workerName: text("worker_name").primaryKey(),
+  status: text("status").notNull().default("ready"),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  details: jsonb("details").notNull().default({}),
+});
+
 export type SiteAvailability = typeof siteAvailability.$inferSelect;
 export type NewSiteAvailability = typeof siteAvailability.$inferInsert;
 export type WaitlistEntry = typeof waitlistEntries.$inferSelect;
 export type EmailOutboxJob = typeof emailOutbox.$inferSelect;
 export type EmailEvent = typeof emailEvents.$inferSelect;
 export type SubmissionIdempotency = typeof submissionIdempotency.$inferSelect;
+export type WorkerHeartbeatRow = typeof workerHeartbeats.$inferSelect;

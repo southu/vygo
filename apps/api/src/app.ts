@@ -1,12 +1,20 @@
 import Fastify from "fastify";
-import { checkDatabaseReadiness, createDatabase, type DatabaseHandle } from "@vygo/db";
+import {
+  checkDatabaseReadiness,
+  createDatabase,
+  getWorkerHeartbeat,
+  isWorkerHeartbeatFresh,
+  type DatabaseHandle,
+} from "@vygo/db";
 import {
   CLOUDFLARE_TURNSTILE_TEST_SECRETS,
+  getDeployedGitSha,
   isTestSurfaceEnabled,
   loadApiEnv,
   parseCorsOrigins,
   type ApiEnv,
 } from "@vygo/config";
+import { createEmailWorker, type EmailWorkerHandle } from "@vygo/worker";
 import { registerCors } from "./cors.js";
 import { errorHandler, safeError } from "./errors.js";
 import { buildLoggerOptions } from "./logging.js";
@@ -14,6 +22,7 @@ import { resolveRequestId } from "./request-id.js";
 import { registerAvailabilityRoutes } from "./routes/availability.js";
 import { registerTestSurfaceRoutes, TEST_SUPPORT_ROUTES } from "./routes/test-surface.js";
 import { registerWaitlistRoutes } from "./routes/waitlist.js";
+import { registerResendWebhookRoutes } from "./routes/webhooks-resend.js";
 import {
   createRateLimitStore,
   MemoryRateLimitStore,
@@ -33,6 +42,8 @@ export type BuildAppOptions = {
   rateLimitStore?: RateLimitStore;
   /** Dependency-injected Turnstile verifier (tests). */
   turnstile?: TurnstileVerifier;
+  /** Disable in-process email worker (tests). */
+  skipInlineWorker?: boolean;
 };
 
 export type AppContext = {
@@ -40,6 +51,7 @@ export type AppContext = {
   env: ApiEnv;
   database: DatabaseHandle | null;
   rateLimitStore: RateLimitStore;
+  emailWorker: EmailWorkerHandle | null;
   close: () => Promise<void>;
 };
 
@@ -62,6 +74,16 @@ function resolveLocalDevDefaults(env: ApiEnv): ApiEnv {
     };
   }
   return next;
+}
+
+function shouldRunInlineWorker(env: ApiEnv, options: BuildAppOptions): boolean {
+  if (options.skipInlineWorker) return false;
+  if (env.INLINE_EMAIL_WORKER === "false") return false;
+  if (env.INLINE_EMAIL_WORKER === "true") return true;
+  // Never auto-start during unit/integration test process (keeps node:test from hanging).
+  if (env.NODE_ENV === "test") return false;
+  // Default on for test surface / local live harness so GET /health can report worker ready.
+  return isTestSurfaceEnabled(env);
 }
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<AppContext> {
@@ -117,12 +139,96 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
 
   const getDb = () => database;
 
+  let emailWorker: EmailWorkerHandle | null = null;
+  if (database && shouldRunInlineWorker(env, options)) {
+    emailWorker = createEmailWorker({
+      database,
+      resendApiKey: env.RESEND_API_KEY,
+      emailFrom: env.EMAIL_FROM ?? "Vygo <hello@vygo.ai>",
+      pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,
+      batchSize: env.WORKER_BATCH_SIZE,
+      maxAttempts: env.WORKER_MAX_ATTEMPTS,
+      workerName: "email-worker",
+    });
+    // Fire-and-forget; errors are logged inside the worker.
+    void emailWorker.start().catch((error) => {
+      app.log.error(
+        { event: "inline_worker_start_failed" },
+        error instanceof Error ? error.message : "inline worker start failed",
+      );
+    });
+  }
+
   /** Process liveness — no dependency checks. */
   app.get("/healthz", async () => ({
     ok: true,
     healthy: true,
     service: "vygo-api",
   }));
+
+  /**
+   * Composite readiness for live verification: API process + database + email worker.
+   * Never exposes credentials, signing secrets, authorization headers, email bodies, or applicant data.
+   */
+  app.get("/health", async (_request, reply) => {
+    const sha = getDeployedGitSha() || undefined;
+    const api = { ready: true as const, service: "vygo-api" };
+
+    let databaseStatus: { ready: boolean; status: string } = {
+      ready: false,
+      status: "unavailable",
+    };
+    if (database) {
+      const result = await checkDatabaseReadiness(database.sql, "vygo-api");
+      databaseStatus = {
+        ready: result.ready,
+        status: result.ready ? "ok" : "not_ready",
+      };
+    } else if (!env.DATABASE_URL) {
+      databaseStatus = { ready: false, status: "not_configured" };
+    }
+
+    let workerStatus: {
+      ready: boolean;
+      status: string;
+      inline: boolean;
+      lastSeenAt?: string;
+    } = {
+      ready: false,
+      status: "unavailable",
+      inline: Boolean(emailWorker),
+    };
+
+    if (database) {
+      const heartbeat = await getWorkerHeartbeat(database.db, "email-worker");
+      const fresh = isWorkerHeartbeatFresh(heartbeat, {
+        maxAgeMs: env.WORKER_HEARTBEAT_MAX_AGE_MS,
+      });
+      // Also treat a running in-process worker as ready even if the first heartbeat
+      // has not landed yet (startup race with /health probes).
+      const inlineRunning = Boolean(emailWorker?.isRunning());
+      workerStatus = {
+        ready: fresh || inlineRunning,
+        status: fresh ? "ok" : inlineRunning ? "starting" : "stale_or_missing",
+        inline: Boolean(emailWorker),
+        lastSeenAt: heartbeat?.lastSeenAt?.toISOString(),
+      };
+    }
+
+    const ready = api.ready && databaseStatus.ready && workerStatus.ready;
+    const body = {
+      ready,
+      service: "vygo",
+      commit: sha,
+      checks: {
+        api,
+        database: databaseStatus,
+        emailWorker: workerStatus,
+      },
+    };
+
+    return reply.status(ready ? 200 : 503).send(body);
+  });
 
   /** Dependency-aware readiness: PostgreSQL + required migrations/schema. */
   app.get("/readyz", async (_request, reply) => {
@@ -177,6 +283,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
     getFaultOptions,
   });
 
+  registerResendWebhookRoutes(app, {
+    env,
+    getDb,
+  });
+
   registerTestSurfaceRoutes(app, {
     env,
     getDb,
@@ -186,6 +297,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
 
   const close = async () => {
     try {
+      if (emailWorker) {
+        await emailWorker.stop();
+      }
       await app.close();
     } finally {
       if (rateLimitStore.close) {
@@ -197,7 +311,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
     }
   };
 
-  return { app, env, database, rateLimitStore, close };
+  return { app, env, database, rateLimitStore, emailWorker, close };
 }
 
 export { MemoryRateLimitStore };

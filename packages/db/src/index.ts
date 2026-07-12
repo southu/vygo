@@ -25,6 +25,7 @@ export {
   findIdempotency,
   saveIdempotency,
   findWaitlistByEmail,
+  findWaitlistById,
   countOutboxForEntry,
   listOutboxForEntry,
   persistWaitlistIntake,
@@ -33,6 +34,51 @@ export {
   type IdempotencyRecord,
   type WaitlistRepositoryOptions,
 } from "./waitlist.js";
+export {
+  OUTBOX_KINDS,
+  applicantConfirmationIdempotencyKey,
+  internalLeadNotificationIdempotencyKey,
+  claimOutboxJobs,
+  markOutboxSent,
+  markOutboxRetry,
+  markOutboxDeadLetter,
+  stampWaitlistEmailSent,
+  toSafeOutboxJobView,
+  type ClaimOutboxOptions,
+  type OutboxClaimRow,
+  type SafeOutboxJobView,
+  type OutboxKind,
+} from "./outbox.js";
+export {
+  persistEmailEvent,
+  countEmailEventsByProviderId,
+  findEmailEventByProviderId,
+  toSafeEmailEventView,
+  type PersistEmailEventInput,
+  type PersistEmailEventResult,
+  type SafeEmailEventView,
+} from "./events.js";
+export {
+  upsertWorkerHeartbeat,
+  getWorkerHeartbeat,
+  isWorkerHeartbeatFresh,
+  type WorkerHeartbeat,
+} from "./heartbeat.js";
+export {
+  computeRetryDelayMs,
+  retryDelayBoundsMs,
+  shouldDeadLetter,
+  DEFAULT_BACKOFF_BASE_MS,
+  DEFAULT_BACKOFF_MAX_MS,
+  DEFAULT_BACKOFF_JITTER_RATIO,
+  DEFAULT_MAX_ATTEMPTS,
+  type BackoffOptions,
+} from "./retry.js";
+export {
+  insertTestOutboxJobs,
+  insertProcessingOutboxJob,
+  getOutboxStatus,
+} from "./test-helpers.js";
 export * from "./schema.js";
 
 export const dbPackageName = "@vygo/db" as const;

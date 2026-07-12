@@ -37,6 +37,8 @@ export default tseslint.config(
         "error",
         { prefer: "type-imports", fixStyle: "inline-type-imports" },
       ],
+      // Shared Zod free-text validation intentionally rejects C0/C1 control chars.
+      "no-control-regex": "off",
     },
   },
 );

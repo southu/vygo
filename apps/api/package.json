@@ -14,7 +14,9 @@
   "dependencies": {
     "@vygo/config": "workspace:*",
     "@vygo/db": "workspace:*",
+    "@vygo/email": "workspace:*",
     "@vygo/validation": "workspace:*",
+    "@vygo/worker": "workspace:*",
     "fastify": "^5.6.1"
   },
   "devDependencies": {

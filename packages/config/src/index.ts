@@ -84,6 +84,17 @@ export const apiEnvSchema = z.object({
     .default("none"),
   /** High-score alert threshold for optional internal notification (not public). */
   LEAD_SCORE_ALERT_THRESHOLD: z.coerce.number().int().default(8),
+  EMAIL_FROM: z.preprocess(emptyToUndefined, z.string().optional()),
+  /**
+   * When true, the API process runs an in-process email worker (local live harness).
+   * Production Railway should run `apps/worker` separately and leave this unset/false.
+   */
+  INLINE_EMAIL_WORKER: z.preprocess(emptyToUndefined, z.enum(["true", "false"]).optional()),
+  WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  WORKER_BATCH_SIZE: z.coerce.number().int().positive().default(10),
+  WORKER_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  /** Max age of worker heartbeat for GET /health (ms). */
+  WORKER_HEARTBEAT_MAX_AGE_MS: z.coerce.number().int().positive().default(60_000),
 });
 
 export const workerEnvSchema = z.object({
@@ -91,8 +102,21 @@ export const workerEnvSchema = z.object({
   DATABASE_URL: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   REDIS_URL: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
   RESEND_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  RESEND_WEBHOOK_SECRET: z.preprocess(emptyToUndefined, z.string().optional()),
   EMAIL_FROM: z.preprocess(emptyToUndefined, z.string().optional()),
+  LEAD_NOTIFICATION_EMAIL: z.preprocess(
+    emptyToUndefined,
+    z.string().email().optional().default("hello@vygo.ai"),
+  ),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+  WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  WORKER_BATCH_SIZE: z.coerce.number().int().positive().default(10),
+  WORKER_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  /**
+   * When true, the API process runs an in-process email worker (local live harness).
+   * Production Railway should run `apps/worker` separately and leave this unset/false.
+   */
+  INLINE_EMAIL_WORKER: z.preprocess(emptyToUndefined, z.enum(["true", "false"]).optional()),
 });
 
 export type WebEnv = z.infer<typeof webEnvSchema>;

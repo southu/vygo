@@ -3,6 +3,11 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import type { WaitlistRequest } from "@vygo/validation";
 import type { Db } from "./client.js";
 import {
+  applicantConfirmationIdempotencyKey,
+  internalLeadNotificationIdempotencyKey,
+  OUTBOX_KINDS,
+} from "./outbox.js";
+import {
   emailOutbox,
   submissionIdempotency,
   waitlistEntries,
@@ -15,13 +20,17 @@ export type WaitlistPersistInput = {
   ipHash: string | null;
   userAgent: string | null;
   priorityScore: number;
+  /** Internal lead notification recipient (never the applicant). */
+  leadNotificationEmail?: string;
   now?: Date;
 };
 
 export type WaitlistPersistResult = {
   entry: WaitlistEntry;
   created: boolean;
+  /** @deprecated Prefer `outboxJobs` — first job if any. */
   outbox: EmailOutboxJob | null;
+  outboxJobs: EmailOutboxJob[];
 };
 
 export type IdempotencyRecord = {
@@ -143,8 +152,11 @@ export async function listOutboxForEntry(
     kind: string;
     status: string;
     attemptCount: number;
+    /** Stable non-secret provider idempotency key. */
+    providerIdempotencyKey: string;
     hasRecipient: boolean;
     recipientDomain: string | null;
+    nextAttemptAt: Date | null;
     createdAt: Date;
     sentAt: Date | null;
   }>
@@ -155,7 +167,9 @@ export async function listOutboxForEntry(
       kind: emailOutbox.kind,
       status: emailOutbox.status,
       attemptCount: emailOutbox.attemptCount,
+      idempotencyKey: emailOutbox.idempotencyKey,
       recipient: emailOutbox.recipient,
+      nextAttemptAt: emailOutbox.nextAttemptAt,
       createdAt: emailOutbox.createdAt,
       sentAt: emailOutbox.sentAt,
     })
@@ -170,12 +184,23 @@ export async function listOutboxForEntry(
       kind: row.kind,
       status: row.status,
       attemptCount: row.attemptCount,
+      providerIdempotencyKey: row.idempotencyKey,
       hasRecipient: Boolean(recipient),
       recipientDomain: at >= 0 ? recipient.slice(at + 1) : null,
+      nextAttemptAt: row.nextAttemptAt,
       createdAt: row.createdAt,
       sentAt: row.sentAt,
     };
   });
+}
+
+export async function findWaitlistById(db: Db, id: string): Promise<WaitlistEntry | null> {
+  const rows = await db
+    .select()
+    .from(waitlistEntries)
+    .where(and(eq(waitlistEntries.id, id), isNull(waitlistEntries.deletedAt)))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 /**
@@ -248,7 +273,9 @@ export async function persistWaitlistIntake(
         .where(eq(waitlistEntries.id, existing.id))
         .returning();
 
-      return { entry: updated!, created: false, outbox: null };
+      // Duplicate email update: never enqueue additional transactional jobs.
+      // Marketing consent is updated on the lead but does not gate prior/future transactional mail.
+      return { entry: updated!, created: false, outbox: null, outboxJobs: [] };
     }
 
     const [inserted] = await tx
@@ -293,25 +320,60 @@ export async function persistWaitlistIntake(
       throw new Error("FAULT_OUTBOX_PERSISTENCE");
     }
 
-    const outboxKey = `waitlist-confirmation:${entry.id}`;
-    const [outboxRow] = await tx
+    // Transactional application emails — always queued regardless of marketing consent.
+    const leadRecipient = (input.leadNotificationEmail ?? "hello@vygo.ai").trim().toLowerCase();
+    const applicantPayload = {
+      kind: OUTBOX_KINDS.applicantConfirmation,
+      fullName: app.fullName,
+      companyName: app.companyName,
+      message: app.message,
+      marketingConsent: app.marketingConsent ?? false,
+    };
+    const internalPayload = {
+      kind: OUTBOX_KINDS.internalLeadNotification,
+      fullName: app.fullName,
+      companyName: app.companyName,
+      productUrl: app.productUrl,
+      stage: app.stage,
+      primaryBlocker: app.primaryBlocker,
+      desiredStart: app.desiredStartWindow,
+      message: app.message,
+      priorityScore: input.priorityScore,
+      marketingConsent: app.marketingConsent ?? false,
+      applicationId: entry.id,
+    };
+
+    const [applicantJob] = await tx
       .insert(emailOutbox)
       .values({
         waitlistEntryId: entry.id,
-        kind: "waitlist_confirmation",
+        kind: OUTBOX_KINDS.applicantConfirmation,
         recipient: email,
-        payload: {
-          kind: "waitlist_confirmation",
-          fullName: app.fullName,
-          companyName: app.companyName,
-        },
-        idempotencyKey: outboxKey,
+        payload: applicantPayload,
+        idempotencyKey: applicantConfirmationIdempotencyKey(entry.id),
         status: "pending",
         createdAt: now,
         updatedAt: now,
       })
+      .onConflictDoNothing()
       .returning();
 
-    return { entry, created: true, outbox: outboxRow ?? null };
+    const [internalJob] = await tx
+      .insert(emailOutbox)
+      .values({
+        waitlistEntryId: entry.id,
+        kind: OUTBOX_KINDS.internalLeadNotification,
+        recipient: leadRecipient,
+        payload: internalPayload,
+        idempotencyKey: internalLeadNotificationIdempotencyKey(entry.id),
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    const outboxJobs = [applicantJob, internalJob].filter(Boolean) as EmailOutboxJob[];
+    return { entry, created: true, outbox: outboxJobs[0] ?? null, outboxJobs };
   });
 }

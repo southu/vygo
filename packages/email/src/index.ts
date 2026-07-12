@@ -1,8 +1,45 @@
 /**
- * Shared email package scaffold (React Email templates added later).
+ * Shared React Email package — transactional application templates + render helpers.
  */
 
 export const emailPackageName = "@vygo/email" as const;
+
+export {
+  EMAIL_KINDS,
+  HTML_MESSAGE_PREVIEW_CHARS,
+  TEXT_MESSAGE_MAX_CHARS,
+  type EmailKind,
+  type ApplicantConfirmationPayload,
+  type InternalLeadNotificationPayload,
+  type RenderedEmail,
+} from "./types.js";
+
+export { escapeHtml, prepareMessage, safeDisplayName } from "./sanitize.js";
+
+export {
+  ApplicantConfirmationEmail,
+  buildApplicantConfirmationSubject,
+  buildApplicantConfirmationText,
+  buildApplicantConfirmationHtmlFallback,
+} from "./templates/applicant-confirmation.js";
+
+export {
+  InternalLeadNotificationEmail,
+  buildInternalLeadNotificationSubject,
+  buildInternalLeadNotificationText,
+  buildInternalLeadNotificationHtmlFallback,
+} from "./templates/internal-lead-notification.js";
+
+export {
+  renderApplicantConfirmation,
+  renderInternalLeadNotification,
+  runEmailRenderSuite,
+} from "./render.js";
+
+/** @deprecated Prefer buildApplicantConfirmationSubject */
+export { buildApplicantConfirmationSubject as buildWaitlistConfirmationSubject } from "./templates/applicant-confirmation.js";
+/** @deprecated Prefer buildApplicantConfirmationText */
+export { buildApplicantConfirmationText as buildWaitlistConfirmationText } from "./templates/applicant-confirmation.js";
 
 export type EmailMessage = {
   to: string;
@@ -15,18 +52,3 @@ export type WaitlistConfirmationPayload = {
   fullName: string;
   email: string;
 };
-
-export function buildWaitlistConfirmationSubject(): string {
-  return "You're on the vygo waitlist";
-}
-
-export function buildWaitlistConfirmationText(payload: WaitlistConfirmationPayload): string {
-  return [
-    `Hi ${payload.fullName},`,
-    "",
-    "Thanks for applying to the next vygo production opening.",
-    "We'll review your application and follow up by email.",
-    "",
-    "— the vygo team",
-  ].join("\n");
-}

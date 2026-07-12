@@ -16,7 +16,10 @@ type ArmedFault = {
 
 let armed: ArmedFault | null = null;
 
-export function setTestFault(mode: TestFaultMode, count = 1): {
+export function setTestFault(
+  mode: TestFaultMode,
+  count = 1,
+): {
   mode: TestFaultMode;
   remaining: number;
 } {

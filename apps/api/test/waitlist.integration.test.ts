@@ -54,6 +54,7 @@ function envOverrides(extra: Record<string, string> = {}) {
     MIN_FORM_COMPLETION_MS: "50",
     ENABLE_TEST_SURFACE: "true",
     TEST_FAULT_MODE: "none",
+    INLINE_EMAIL_WORKER: "false",
     ...extra,
   });
 }
@@ -165,19 +166,24 @@ describe("POST /v1/waitlist — valid intake + normalization", () => {
     assert.equal(res.body.toLowerCase().includes("mixed.case"), false);
   });
 
-  it("creates exactly one pending outbox item for a new intake", async () => {
+  it("creates applicant + internal lead outbox jobs for a new intake", async () => {
     const email = `outbox-${randomUUID().slice(0, 8)}@example.com`;
     const res = await postWaitlist(validPayload({ email }));
     assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(typeof body.data.applicationId, "string");
     const entry = await findWaitlistByEmail(handle.db, email);
     assert.ok(entry);
     const count = await countOutboxForEntry(handle.db, entry.id);
-    assert.equal(count, 1);
+    assert.equal(count, 2);
     const rows = await handle.sql`
-      SELECT status, kind FROM email_outbox WHERE waitlist_entry_id = ${entry.id}
+      SELECT status, kind, idempotency_key FROM email_outbox WHERE waitlist_entry_id = ${entry.id}
     `;
-    assert.equal(rows[0]?.status, "pending");
-    assert.equal(rows[0]?.kind, "waitlist_confirmation");
+    const kinds = new Set(rows.map((r) => r.kind));
+    assert.ok(kinds.has("applicant_confirmation"));
+    assert.ok(kinds.has("internal_lead_notification"));
+    assert.ok(rows.every((r) => r.status === "pending"));
+    assert.ok(rows.every((r) => String(r.idempotency_key).length > 0));
   });
 });
 
@@ -390,7 +396,7 @@ describe("POST /v1/waitlist — Turnstile", () => {
       env: envOverrides({
         NODE_ENV: "production",
         ENABLE_TEST_SURFACE: "false",
-        TURNSTILE_SECRET_KEY: "real-looking-secret-key-value",
+        TURNSTILE_SECRET_KEY: "prod-style-turnstile",
       }),
       database: handle,
       rateLimitStore,
@@ -529,7 +535,7 @@ describe("POST /v1/waitlist — abuse signals", () => {
 });
 
 describe("POST /v1/waitlist — idempotency + duplicates", () => {
-  it("replays identical idempotency key with one lead and one outbox", async () => {
+  it("replays identical idempotency key with one lead and two outbox jobs", async () => {
     const key = randomUUID();
     const email = `idem-${randomUUID().slice(0, 8)}@example.com`;
     const payload = validPayload({ email, idempotencyKey: key });
@@ -539,10 +545,12 @@ describe("POST /v1/waitlist — idempotency + duplicates", () => {
     assert.equal(b.statusCode, 200);
     assert.deepEqual(a.json(), b.json());
     assert.equal(a.json().data.accepted, true);
+    assert.equal(typeof a.json().data.applicationId, "string");
     const entry = await findWaitlistByEmail(handle.db, email);
     assert.ok(entry);
     assert.equal(entry.submissionCount, 1);
-    assert.equal(await countOutboxForEntry(handle.db, entry.id), 1);
+    // Applicant confirmation + internal lead notification; replay does not create more.
+    assert.equal(await countOutboxForEntry(handle.db, entry.id), 2);
   });
 
   it("conflicts when idempotency key is reused with different payload", async () => {
@@ -772,15 +780,17 @@ describe("test surface + integration report", () => {
       url: `/v1/test-support/leads?email=${encodeURIComponent(email)}`,
     });
     assert.equal(leads.statusCode, 200);
-    assert.equal(leads.json().data.outboxCount, 1);
+    assert.equal(leads.json().data.outboxCount, 2);
 
     const outbox = await ctx.app.inject({
       method: "GET",
       url: `/v1/test-support/outbox?email=${encodeURIComponent(email)}`,
     });
     assert.equal(outbox.statusCode, 200);
-    assert.equal(outbox.json().data.outboxCount, 1);
-    assert.equal(outbox.json().data.items[0]?.kind, "waitlist_confirmation");
+    assert.equal(outbox.json().data.outboxCount, 2);
+    const kinds = new Set((outbox.json().data.items as Array<{ kind: string }>).map((i) => i.kind));
+    assert.ok(kinds.has("applicant_confirmation"));
+    assert.ok(kinds.has("internal_lead_notification"));
     assert.equal(outbox.body.includes(email), false);
 
     const faultArm = await ctx.app.inject({

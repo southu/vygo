@@ -2,13 +2,19 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { CLOUDFLARE_TURNSTILE_TEST_SECRETS, isTestSurfaceEnabled, type ApiEnv } from "@vygo/config";
 import {
+  countEmailEventsByProviderId,
   countOutboxForEntry,
+  findEmailEventByProviderId,
   findWaitlistByEmail,
+  findWaitlistById,
   listOutboxForEntry,
+  toSafeEmailEventView,
   type DatabaseHandle,
   type WaitlistEntry,
 } from "@vygo/db";
+import { runEmailRenderSuite } from "@vygo/email";
 import { UTM_MAX_LENGTH, WAITLIST_SUCCESS_BODY } from "@vygo/validation";
+import { runWorkerLogicSuite } from "@vygo/worker";
 import { safeError } from "../errors.js";
 import { isVersionedIpHash, looksLikeRawIp, hashIpAddress } from "../services/ip-hash.js";
 import { MemoryRateLimitStore, type RateLimitStore } from "../services/rate-limit.js";
@@ -19,6 +25,11 @@ import {
   type TurnstileVerifier,
 } from "../services/turnstile.js";
 import { peekTestFault, setTestFault, type TestFaultMode } from "../services/test-fault.js";
+import {
+  signResendWebhook,
+  TEST_RESEND_WEBHOOK_SECRET,
+  verifyResendSignature,
+} from "../services/resend-webhook.js";
 import type { WaitlistRouteDeps } from "./waitlist.js";
 
 export type TestSurfaceDeps = {
@@ -34,8 +45,12 @@ export type TestSurfaceDeps = {
 export const TEST_SUPPORT_ROUTES = {
   index: "/v1/test-support",
   report: "/v1/test-support/report",
+  emailReport: "/v1/test-support/email-report",
   leads: "/v1/test-support/leads",
   outbox: "/v1/test-support/outbox",
+  jobs: "/v1/test-support/jobs",
+  application: "/v1/test-support/application",
+  events: "/v1/test-support/events",
   fault: "/v1/test-support/fault",
   score: "/v1/test-support/score",
   ipHash: "/v1/test-support/ip-hash",
@@ -114,12 +129,15 @@ async function handleLeadInspect(
   return reply.status(200).send({
     data: {
       entry: sanitizeEntry(entry),
+      applicationId: entry.id,
+      marketingConsent: entry.marketingConsent,
       outboxCount,
       outbox: outbox.map((row) => ({
         id: row.id,
         kind: row.kind,
         status: row.status,
         attemptCount: row.attemptCount,
+        providerIdempotencyKey: row.providerIdempotencyKey,
         hasRecipient: row.hasRecipient,
         recipientDomain: row.recipientDomain,
         createdAt: row.createdAt?.toISOString?.() ?? row.createdAt,
@@ -153,6 +171,7 @@ async function handleOutboxInspect(
   return reply.status(200).send({
     data: {
       entryId: entry.id,
+      applicationId: entry.id,
       outboxCount: outbox.length,
       pendingCount: outbox.filter((r) => r.status === "pending").length,
       items: outbox.map((row) => ({
@@ -160,11 +179,109 @@ async function handleOutboxInspect(
         kind: row.kind,
         status: row.status,
         attemptCount: row.attemptCount,
+        providerIdempotencyKey: row.providerIdempotencyKey,
         hasRecipient: row.hasRecipient,
         recipientDomain: row.recipientDomain,
         createdAt: row.createdAt?.toISOString?.() ?? row.createdAt,
         sentAt: row.sentAt?.toISOString?.() ?? row.sentAt,
       })),
+    },
+  });
+}
+
+/** Safe job status for an application (no secrets, bodies, or raw emails). */
+async function handleJobStatus(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: TestSurfaceDeps,
+) {
+  const q = request.query as Record<string, unknown>;
+  const applicationId =
+    (typeof q.applicationId === "string" && q.applicationId.trim()) ||
+    (typeof q.id === "string" && q.id.trim()) ||
+    "";
+  const email = typeof q.email === "string" ? q.email.trim().toLowerCase() : "";
+
+  const db = deps.getDb();
+  if (!db) {
+    return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+  }
+
+  let entry: WaitlistEntry | null = null;
+  if (applicationId) {
+    entry = await findWaitlistById(db.db, applicationId);
+  } else if (email && email.includes("@")) {
+    entry = await findWaitlistByEmail(db.db, email);
+  } else {
+    return reply
+      .status(400)
+      .send(safeError("BAD_REQUEST", "Provide applicationId or email query parameter."));
+  }
+
+  if (!entry) {
+    return reply.status(404).send(safeError("NOT_FOUND", "No record found."));
+  }
+
+  const outbox = await listOutboxForEntry(db.db, entry.id);
+  const kinds = outbox.map((r) => r.kind);
+  const uniqueKeys = new Set(outbox.map((r) => r.providerIdempotencyKey));
+
+  return reply.status(200).send({
+    data: {
+      applicationId: entry.id,
+      marketingConsent: entry.marketingConsent,
+      transactionalEmail: {
+        jobCount: outbox.length,
+        kinds,
+        uniqueProviderIdempotencyKeys: uniqueKeys.size,
+        jobs: outbox.map((row) => ({
+          id: row.id,
+          kind: row.kind,
+          status: row.status,
+          attemptCount: row.attemptCount,
+          providerIdempotencyKey: row.providerIdempotencyKey,
+          hasRecipient: row.hasRecipient,
+          recipientDomain: row.recipientDomain,
+          createdAt: row.createdAt?.toISOString?.() ?? row.createdAt,
+          sentAt: row.sentAt?.toISOString?.() ?? row.sentAt,
+        })),
+      },
+      // Consent is intentionally separate from email job state.
+      consent: {
+        marketingConsent: entry.marketingConsent,
+        privacyAccepted: entry.privacyAccepted,
+      },
+    },
+  });
+}
+
+/** Safe webhook event status (dedup verification). */
+async function handleEventStatus(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: TestSurfaceDeps,
+) {
+  const q = request.query as Record<string, unknown>;
+  const providerEventId =
+    (typeof q.providerEventId === "string" && q.providerEventId.trim()) ||
+    (typeof q.id === "string" && q.id.trim()) ||
+    "";
+  if (!providerEventId) {
+    return reply
+      .status(400)
+      .send(safeError("BAD_REQUEST", "Provide providerEventId query parameter."));
+  }
+  const db = deps.getDb();
+  if (!db) {
+    return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+  }
+  const count = await countEmailEventsByProviderId(db.db, providerEventId);
+  const event = await findEmailEventByProviderId(db.db, providerEventId);
+  return reply.status(200).send({
+    data: {
+      providerEventId,
+      count,
+      event: event ? toSafeEmailEventView(event) : null,
     },
   });
 }
@@ -476,9 +593,9 @@ async function handleIntegrationReport(
       "salted_ip_handling",
       Boolean(
         hashed &&
-          isVersionedIpHash(hashed.hash) &&
-          !looksLikeRawIp(hashed.hash) &&
-          hashed.rotationHashes.length >= 1,
+        isVersionedIpHash(hashed.hash) &&
+        !looksLikeRawIp(hashed.hash) &&
+        hashed.rotationHashes.length >= 1,
       ),
     );
   }
@@ -530,9 +647,9 @@ async function handleIntegrationReport(
       const entry = await findWaitlistByEmail(db.db, email);
       pass = Boolean(
         entry &&
-          entry.fullName === "Second Name" &&
-          entry.submissionCount >= 2 &&
-          entry.createdAt <= entry.lastSubmittedAt,
+        entry.fullName === "Second Name" &&
+        entry.submissionCount >= 2 &&
+        entry.createdAt <= entry.lastSubmittedAt,
       );
     }
     record("duplicate_upserts", pass);
@@ -601,7 +718,7 @@ async function handleIntegrationReport(
     record("transaction_rollback", pass);
   }
 
-  // --- outbox creation ---
+  // --- outbox creation (applicant confirmation + internal lead notification) ---
   {
     const email = `outbox+${randomUUID().slice(0, 8)}@example.com`;
     const payload = { ...basePayload(), email, idempotencyKey: randomUUID() };
@@ -611,11 +728,68 @@ async function handleIntegrationReport(
       const entry = await findWaitlistByEmail(db.db, email);
       if (!entry) pass = false;
       else {
-        const c = await countOutboxForEntry(db.db, entry.id);
-        pass = c === 1;
+        const rows = await listOutboxForEntry(db.db, entry.id);
+        const kinds = new Set(rows.map((r) => r.kind));
+        pass =
+          rows.length === 2 &&
+          kinds.has("applicant_confirmation") &&
+          kinds.has("internal_lead_notification") &&
+          rows.every((r) => Boolean(r.providerIdempotencyKey));
       }
     }
     record("outbox_creation", pass);
+  }
+
+  // --- marketing consent independent of transactional email ---
+  {
+    let pass = true;
+    for (const consent of [true, false, undefined] as const) {
+      const email = `consent+${consent === undefined ? "omit" : consent}-${randomUUID().slice(0, 8)}@example.com`;
+      const payload = {
+        ...basePayload(),
+        email,
+        idempotencyKey: randomUUID(),
+        ...(consent === undefined ? {} : { marketingConsent: consent }),
+      };
+      const res = await post(payload);
+      if (res.statusCode !== 200) {
+        pass = false;
+        break;
+      }
+      const body = res.json();
+      if (body?.data?.applicationId == null) {
+        pass = false;
+        break;
+      }
+      // Consent is reported separately from email queue state.
+      if (typeof body.data.marketingConsent !== "boolean") {
+        pass = false;
+        break;
+      }
+      if (db) {
+        const entry = await findWaitlistByEmail(db.db, email);
+        const jobs = entry ? await listOutboxForEntry(db.db, entry.id) : [];
+        if (!entry || jobs.length !== 2) {
+          pass = false;
+          break;
+        }
+      }
+    }
+    record("marketing_consent_independent", pass);
+  }
+
+  // --- async response includes durable application id before delivery ---
+  {
+    const email = `async+${randomUUID().slice(0, 8)}@example.com`;
+    const res = await post({ ...basePayload(), email, idempotencyKey: randomUUID() });
+    const body = res.json();
+    const pass =
+      res.statusCode === 200 &&
+      typeof body?.data?.applicationId === "string" &&
+      body.data.applicationId.length > 10 &&
+      body?.data?.email?.queued === true &&
+      (body?.data?.email?.jobCount ?? 0) === 2;
+    record("async_application_id", pass);
   }
 
   // --- scoring ---
@@ -695,6 +869,9 @@ async function handleIntegrationReport(
         duplicate_upserts: results.find((r) => r.name === "duplicate_upserts")?.pass ?? false,
         transaction_rollback: results.find((r) => r.name === "transaction_rollback")?.pass ?? false,
         outbox_creation: results.find((r) => r.name === "outbox_creation")?.pass ?? false,
+        marketing_consent_independent:
+          results.find((r) => r.name === "marketing_consent_independent")?.pass ?? false,
+        async_application_id: results.find((r) => r.name === "async_application_id")?.pass ?? false,
         scoring: results.find((r) => r.name === "scoring")?.pass ?? false,
         utm_limits: results.find((r) => r.name === "utm_limits")?.pass ?? false,
         pii_safe_structured_logging:
@@ -702,11 +879,186 @@ async function handleIntegrationReport(
       },
       routes: TEST_SUPPORT_ROUTES,
       reportPath: TEST_SUPPORT_ROUTES.report,
+      emailReportPath: TEST_SUPPORT_ROUTES.emailReport,
       inspectPath: TEST_SUPPORT_ROUTES.leads,
       outboxPath: TEST_SUPPORT_ROUTES.outbox,
+      jobsPath: TEST_SUPPORT_ROUTES.jobs,
+      eventsPath: TEST_SUPPORT_ROUTES.events,
       faultPath: TEST_SUPPORT_ROUTES.fault,
       ipHashPath: TEST_SUPPORT_ROUTES.ipHash,
       scorePath: TEST_SUPPORT_ROUTES.score,
+    },
+  });
+}
+
+/**
+ * Live report for React Email rendering, worker, webhook, graceful shutdown, and redaction.
+ */
+async function handleEmailReport(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: TestSurfaceDeps,
+) {
+  const results: Array<{ name: string; pass: boolean; detail?: string }> = [];
+  const record = (name: string, pass: boolean, detail?: string) => {
+    results.push({ name, pass, detail });
+  };
+
+  // Rendering suite
+  try {
+    const renderSuite = await runEmailRenderSuite();
+    for (const r of renderSuite.results) {
+      record(`render:${r.name}`, r.pass, r.detail);
+    }
+    record("react_email_rendering", renderSuite.ready);
+  } catch (e) {
+    record("react_email_rendering", false, e instanceof Error ? e.message : "error");
+  }
+
+  // Worker suite (SKIP LOCKED / retry / dead-letter / redaction / shutdown)
+  try {
+    const db = deps.getDb();
+    const workerSuite = await runWorkerLogicSuite({ db: db?.db });
+    for (const r of workerSuite.results) {
+      record(`worker:${r.name}`, r.pass, r.detail);
+    }
+    record("worker_tests", workerSuite.ready);
+  } catch (e) {
+    record("worker_tests", false, e instanceof Error ? e.message : "error");
+  }
+
+  // Webhook signature + persistence + dedup via inject
+  {
+    const app = request.server;
+    const secret = deps.env.RESEND_WEBHOOK_SECRET || TEST_RESEND_WEBHOOK_SECRET;
+    const eventId = `evt_test_${randomUUID()}`;
+    const bodyObj = {
+      type: "email.sent",
+      id: eventId,
+      data: { email_id: eventId, to: ["redacted@example.com"] },
+    };
+    const rawBody = JSON.stringify(bodyObj);
+    const ts = Math.floor(Date.now() / 1000);
+    const svixId = `msg_${randomUUID()}`;
+    const signature = signResendWebhook({
+      secret,
+      id: svixId,
+      timestamp: ts,
+      rawBody,
+    });
+
+    // Invalid signature
+    const bad = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/resend",
+      headers: {
+        "content-type": "application/json",
+        "svix-id": svixId,
+        "svix-timestamp": String(ts),
+        "svix-signature": "v1,notavalidsignature====",
+      },
+      payload: rawBody,
+    });
+    const badOk = bad.statusCode >= 400 && bad.statusCode < 500;
+    record("webhook_invalid_signature", badOk, `status=${bad.statusCode}`);
+
+    // Missing signature
+    const missing = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/resend",
+      headers: { "content-type": "application/json" },
+      payload: rawBody,
+    });
+    record(
+      "webhook_missing_signature",
+      missing.statusCode >= 400 && missing.statusCode < 500,
+      `status=${missing.statusCode}`,
+    );
+
+    // Valid signature
+    const good = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/resend",
+      headers: {
+        "content-type": "application/json",
+        "svix-id": svixId,
+        "svix-timestamp": String(ts),
+        "svix-signature": signature,
+      },
+      payload: rawBody,
+    });
+    const goodBody = good.json();
+    const goodOk =
+      good.statusCode >= 200 &&
+      good.statusCode < 300 &&
+      goodBody?.data?.accepted === true &&
+      !good.body.toLowerCase().includes("whsec_") &&
+      !good.body.includes(secret);
+    record("webhook_valid_signature_persist", goodOk, `status=${good.statusCode}`);
+
+    // Duplicate delivery
+    const dup = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/resend",
+      headers: {
+        "content-type": "application/json",
+        "svix-id": svixId,
+        "svix-timestamp": String(ts),
+        "svix-signature": signature,
+      },
+      payload: rawBody,
+    });
+    let dedupOk = dup.statusCode >= 200 && dup.statusCode < 300;
+    const db = deps.getDb();
+    if (db && dedupOk) {
+      const count = await countEmailEventsByProviderId(db.db, eventId);
+      dedupOk = count === 1;
+    }
+    record("webhook_deduplication", dedupOk, `status=${dup.statusCode}`);
+
+    // Pure verify helper
+    const verifyOk = verifyResendSignature({
+      secret,
+      headers: { id: svixId, timestamp: String(ts), signature },
+      rawBody,
+    });
+    record("webhook_signature_helper", verifyOk.ok === true);
+  }
+
+  // Ensure invalid webhook did not persist a fake id
+  {
+    const db = deps.getDb();
+    if (db) {
+      const count = await countEmailEventsByProviderId(db.db, "should-never-exist-invalid-sig");
+      record("webhook_invalid_not_persisted", count === 0);
+    } else {
+      record("webhook_invalid_not_persisted", true, "no_db");
+    }
+  }
+
+  const passed = results.filter((r) => r.pass).length;
+  const failed = results.filter((r) => !r.pass);
+  return reply.status(200).send({
+    data: {
+      ready: failed.length === 0,
+      passed,
+      total: results.length,
+      results,
+      coverage: {
+        react_email_rendering:
+          results.find((r) => r.name === "react_email_rendering")?.pass ?? false,
+        worker_tests: results.find((r) => r.name === "worker_tests")?.pass ?? false,
+        webhook_invalid_signature:
+          results.find((r) => r.name === "webhook_invalid_signature")?.pass ?? false,
+        webhook_valid_signature_persist:
+          results.find((r) => r.name === "webhook_valid_signature_persist")?.pass ?? false,
+        webhook_deduplication:
+          results.find((r) => r.name === "webhook_deduplication")?.pass ?? false,
+        graceful_shutdown:
+          results.find((r) => r.name === "worker:graceful_shutdown")?.pass ?? false,
+        secret_redaction: results.find((r) => r.name === "worker:secret_redaction")?.pass ?? false,
+      },
+      routes: TEST_SUPPORT_ROUTES,
     },
   });
 }
@@ -727,7 +1079,7 @@ export function registerTestSurfaceRoutes(app: FastifyInstance, deps: TestSurfac
       data: {
         enabled: true,
         description:
-          "Non-production waitlist test support. Production-configured deployments return 404 for these routes.",
+          "Non-production waitlist + email-worker test support. Production-configured deployments return 404 for these routes.",
         routes: {
           index: {
             method: "GET",
@@ -738,7 +1090,13 @@ export function registerTestSurfaceRoutes(app: FastifyInstance, deps: TestSurfac
             method: "GET",
             path: TEST_SUPPORT_ROUTES.report,
             purpose:
-              "Live integration-test report (valid intake, validation, turnstile, rate limits, idempotency, upserts, rollback, outbox, scoring, PII-safe logs)",
+              "Live integration-test report (valid intake, validation, turnstile, rate limits, idempotency, upserts, rollback, dual outbox, scoring, PII-safe logs)",
+          },
+          emailReport: {
+            method: "GET",
+            path: TEST_SUPPORT_ROUTES.emailReport,
+            purpose:
+              "React Email render, worker (SKIP LOCKED, retry, dead-letter), webhook signature/dedup, graceful shutdown, secret redaction",
           },
           leads: {
             method: "GET",
@@ -749,7 +1107,24 @@ export function registerTestSurfaceRoutes(app: FastifyInstance, deps: TestSurfac
           outbox: {
             method: "GET",
             path: `${TEST_SUPPORT_ROUTES.outbox}?email=`,
-            purpose: "Transactional outbox inspection for a lead (count, kind, status; no raw email)",
+            purpose:
+              "Transactional outbox inspection for a lead (count, kind, status, providerIdempotencyKey; no raw email)",
+          },
+          jobs: {
+            method: "GET",
+            path: `${TEST_SUPPORT_ROUTES.jobs}?applicationId=`,
+            purpose:
+              "Safe job status for an application (kinds, statuses, stable provider idempotency keys; consent separate)",
+          },
+          application: {
+            method: "GET",
+            path: `${TEST_SUPPORT_ROUTES.application}?applicationId=`,
+            purpose: "Alias of jobs status",
+          },
+          events: {
+            method: "GET",
+            path: `${TEST_SUPPORT_ROUTES.events}?providerEventId=`,
+            purpose: "Safe webhook event status / dedup count (no secrets)",
           },
           fault: {
             method: "GET|POST",
@@ -775,13 +1150,19 @@ export function registerTestSurfaceRoutes(app: FastifyInstance, deps: TestSurfac
           score: TEST_SUPPORT_ROUTES.legacyScore,
         },
         fault: fault,
+        webhookTestSecretHint:
+          "Non-production uses RESEND_WEBHOOK_SECRET or the stable test secret (whsec_ base64 of 'vygo-local-test-webhook-secret-v1'). Sign with Svix: HMAC-SHA256 of `${svix-id}.${svix-timestamp}.${rawBody}`.",
       },
     });
   });
 
   app.get(TEST_SUPPORT_ROUTES.report, (req, rep) => handleIntegrationReport(req, rep, deps));
+  app.get(TEST_SUPPORT_ROUTES.emailReport, (req, rep) => handleEmailReport(req, rep, deps));
   app.get(TEST_SUPPORT_ROUTES.leads, (req, rep) => handleLeadInspect(req, rep, deps));
   app.get(TEST_SUPPORT_ROUTES.outbox, (req, rep) => handleOutboxInspect(req, rep, deps));
+  app.get(TEST_SUPPORT_ROUTES.jobs, (req, rep) => handleJobStatus(req, rep, deps));
+  app.get(TEST_SUPPORT_ROUTES.application, (req, rep) => handleJobStatus(req, rep, deps));
+  app.get(TEST_SUPPORT_ROUTES.events, (req, rep) => handleEventStatus(req, rep, deps));
   app.get(TEST_SUPPORT_ROUTES.fault, handleFaultGet);
   app.post(TEST_SUPPORT_ROUTES.fault, handleFaultPost);
   app.post(TEST_SUPPORT_ROUTES.score, handleScore);

@@ -29,9 +29,10 @@
 
 - Deploy `apps/api` (Fastify) with `DATABASE_URL`, `CORS_ORIGINS` / `ALLOWED_ORIGINS`, and optional Redis/Resend credentials.
 - Pre-deploy: `DATABASE_URL=… pnpm db:migrate` (checked-in SQL under `packages/db/migrations`).
-- Health check path: `GET /healthz` (liveness). Readiness: `GET /readyz` (Postgres + migrations).
+- Health check path: `GET /health` (API + database + email worker). Liveness: `GET /healthz`. Readiness: `GET /readyz` (Postgres + migrations).
 - Public availability: `GET /v1/public/availability` (see [API contracts](./api.md)).
-- Worker (`apps/worker`) drains the email outbox in a later mission.
+- Worker (`apps/worker`) drains the email outbox with `SELECT … FOR UPDATE SKIP LOCKED`, exponential retry + jitter, dead-letter, and graceful shutdown. Local live harness may set `INLINE_EMAIL_WORKER=true` so the API process runs the worker in-process.
+- Resend webhooks: `POST /v1/webhooks/resend` (Svix signature required; `RESEND_WEBHOOK_SECRET`).
 - Never commit secrets.
 
 ## CI

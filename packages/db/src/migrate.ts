@@ -10,7 +10,7 @@ const packageDir = dirname(fileURLToPath(import.meta.url));
 export const MIGRATIONS_FOLDER = join(packageDir, "..", "migrations");
 
 /** Tags from migrations/meta/_journal.json that must be applied for readiness. */
-export const REQUIRED_MIGRATION_TAGS = ["0000_init"] as const;
+export const REQUIRED_MIGRATION_TAGS = ["0000_init", "0001_email_worker"] as const;
 
 export async function runMigrations(databaseUrl: string): Promise<void> {
   const url = assertDatabaseUrl(databaseUrl);

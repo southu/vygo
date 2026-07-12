@@ -290,17 +290,51 @@ export const waitlistSuccessSchema = z.object({
   data: z.object({
     accepted: z.literal(true),
     message: z.string(),
+    /** Durable application identifier (waitlist entry id). */
+    applicationId: z.string().uuid().optional(),
+    /** Marketing consent as stored — separate from transactional email state. */
+    marketingConsent: z.boolean().optional(),
+    /** Transactional email queue summary (never includes bodies or secrets). */
+    email: z
+      .object({
+        queued: z.boolean(),
+        jobCount: z.number().int().nonnegative(),
+        kinds: z.array(z.string()).optional(),
+      })
+      .optional(),
   }),
 });
 
 export type WaitlistSuccessBody = z.infer<typeof waitlistSuccessSchema>;
 
+/** Generic success without identifiers (abuse silent accept / legacy). */
 export const WAITLIST_SUCCESS_BODY: WaitlistSuccessBody = {
   data: {
     accepted: true,
     message: "Your application has been received.",
   },
 };
+
+export function buildWaitlistSuccessBody(input: {
+  applicationId: string;
+  marketingConsent: boolean;
+  emailJobCount: number;
+  emailKinds?: string[];
+}): WaitlistSuccessBody {
+  return {
+    data: {
+      accepted: true,
+      message: "Your application has been received.",
+      applicationId: input.applicationId,
+      marketingConsent: input.marketingConsent,
+      email: {
+        queued: input.emailJobCount > 0,
+        jobCount: input.emailJobCount,
+        kinds: input.emailKinds,
+      },
+    },
+  };
+}
 
 export const apiErrorSchema = z.object({
   error: z.object({
