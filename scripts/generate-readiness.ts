@@ -170,6 +170,53 @@ function checkStatus(flag: string | undefined, fallbackPassed: boolean): "passed
   return fallbackPassed ? "passed" : "failed";
 }
 
+/**
+ * Compact pointer to the Railway backend foundation status artifact so the
+ * provision outcome + deploy-gate verdict are discoverable in one hop from
+ * GET /api/readiness. Derived from the generated foundation artifact (single
+ * source of truth); falls back to a static pointer if it has not been written
+ * yet in this build (scripts/generate-foundation-status.ts runs first).
+ */
+function readFoundationPointer(): {
+  statusUrl: string;
+  project: string;
+  provision: { outcome: string; code: string | null };
+  gate: { verdict: string; forHumanAttachOn: string };
+  docs: string;
+} {
+  const fallback = {
+    statusUrl: "/api/railway-foundation",
+    project: "vygo",
+    provision: { outcome: "failed_closed", code: "consumer_not_armed" },
+    gate: { verdict: "go", forHumanAttachOn: "vygo" },
+    docs: "docs/railway-backend-readiness.md",
+  };
+  const rel = "apps/web/public/api/railway-foundation.json";
+  if (!exists(rel)) return fallback;
+  try {
+    const parsed = JSON.parse(readText(rel)) as {
+      project?: string;
+      provision?: { outcome?: string; code?: string | null };
+      gate?: { verdict?: string; forHumanAttachOn?: string };
+    };
+    return {
+      statusUrl: "/api/railway-foundation",
+      project: parsed.project ?? "vygo",
+      provision: {
+        outcome: parsed.provision?.outcome ?? fallback.provision.outcome,
+        code: parsed.provision?.code ?? null,
+      },
+      gate: {
+        verdict: parsed.gate?.verdict ?? fallback.gate.verdict,
+        forHumanAttachOn: parsed.gate?.forHumanAttachOn ?? "vygo",
+      },
+      docs: "docs/railway-backend-readiness.md",
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 function main() {
   const apps = {
     web: { present: exists("apps/web/package.json"), path: "apps/web" },
@@ -283,6 +330,7 @@ function main() {
     service: "vygo-web",
     gitSha: gitSha(),
     generatedAt: new Date().toISOString(),
+    railwayFoundation: readFoundationPointer(),
     workspace: {
       apps: {
         web: apps.web,

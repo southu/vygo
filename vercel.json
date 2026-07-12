@@ -5,7 +5,10 @@
   "outputDirectory": "apps/web/out",
   "framework": null,
   "cleanUrls": true,
-  "rewrites": [{ "source": "/api/readiness", "destination": "/api/readiness.json" }],
+  "rewrites": [
+    { "source": "/api/readiness", "destination": "/api/readiness.json" },
+    { "source": "/api/railway-foundation", "destination": "/api/railway-foundation.json" }
+  ],
   "headers": [
     {
       "source": "/version",
@@ -20,6 +23,20 @@
     },
     {
       "source": "/api/readiness.json",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
+      "source": "/api/railway-foundation",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
+      "source": "/api/railway-foundation.json",
       "headers": [
         { "key": "Content-Type", "value": "application/json; charset=utf-8" },
         { "key": "Cache-Control", "value": "no-store" }

@@ -49,6 +49,12 @@ jobs:
       - name: Unit tests (email package)
         run: pnpm test:email
 
+      - name: Generate Railway foundation status
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: pnpm foundation-status
+
       - name: Generate readiness report
         env:
           READINESS_ASSUME_CHECKS: passed

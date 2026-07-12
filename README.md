@@ -191,15 +191,17 @@ pnpm ci:verify
 Recorded results for this readiness pass: [docs/verification-report.md](docs/verification-report.md).
 
 CI (`.github/workflows/ci.yml`) runs frozen-lockfile install, secret scan, lint,
-format check, typecheck, email tests, readiness generation, and baseline build.
+format check, typecheck, email tests, Railway foundation status + readiness
+generation, and baseline build.
 
 ## Machine endpoints (web)
 
-| Method | Path             | Purpose                                                               |
-| ------ | ---------------- | --------------------------------------------------------------------- |
-| `GET`  | `/`              | Marketing home (identifies the Vygo application)                      |
-| `GET`  | `/version`       | Deployed git SHA (plain text; from Vercel/CI env — not `version.txt`) |
-| `GET`  | `/api/readiness` | JSON readiness report (`ready`, workspace structure, check results)   |
+| Method | Path                      | Purpose                                                                            |
+| ------ | ------------------------- | ---------------------------------------------------------------------------------- |
+| `GET`  | `/`                       | Marketing home (identifies the Vygo application)                                   |
+| `GET`  | `/version`                | Deployed git SHA (plain text; from Vercel/CI env — not `version.txt`)              |
+| `GET`  | `/api/readiness`          | JSON readiness report (`ready`, workspace structure, check results)                |
+| `GET`  | `/api/railway-foundation` | Railway backend foundation status: provision outcome + go/no-go gate (secret-free) |
 
 ## Machine endpoints (API)
 
@@ -252,6 +254,14 @@ pnpm readiness
   [docs/railway-backend-readiness.md](docs/railway-backend-readiness.md) and the
   secret-free stubs in [deploy/railway/](deploy/railway/). Provisioning was not
   run, so no `project_id` was emitted — fill it from the Railway dashboard.
+- **Foundation deploy gate (machine-readable, secret-free):** the live site
+  serves the provision outcome + go/no-go verdict at `GET /api/railway-foundation`
+  (compact pointer on `GET /api/readiness`). Current state: provision
+  `failed_closed` / `consumer_not_armed` (an explicit closed failure, never a
+  silent partial), secrets self-scan clean, verdict **GO** for human Railway
+  service attach on `vygo`. Live production API smoke is skipped until a service
+  exists. See
+  [Provision outcome & deploy gate](docs/railway-backend-readiness.md#provision-outcome--deploy-gate-machine-readable).
 - Do not treat marketing claims (availability dates, pricing, U.S.-based /
   senior-only language, SLA, equity terms) as verified — see the
   [decision inventory](docs/credentials-and-decisions.md).

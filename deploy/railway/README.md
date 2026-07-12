@@ -8,6 +8,13 @@ Full walkthrough and next steps:
 [`../../docs/railway-backend-readiness.md`](../../docs/railway-backend-readiness.md).
 Exact deploy procedure: [`../../docs/deployment.md`](../../docs/deployment.md).
 
+**Machine-readable status:** the live site publishes the foundation provision
+outcome + go/no-go deploy-gate verdict (secret-free) at `GET /api/railway-foundation`
+(compact pointer also on `GET /api/readiness`). Current verdict: **GO** for human
+attach — provision `failed_closed` / `consumer_not_armed` (clear stub), secrets
+self-scan clean. See
+[Provision outcome & deploy gate](../../docs/railway-backend-readiness.md#provision-outcome--deploy-gate-machine-readable).
+
 ## Hosting split
 
 **Site → Vercel. API / DB / Redis / worker → Railway (project `vygo`).** The

@@ -7,6 +7,7 @@ pnpm-lock.yaml
 apps/web/out
 apps/web/src/generated
 apps/web/public/api/readiness.json
+apps/web/public/api/railway-foundation.json
 apps/web/public/version
 apps/web/public/docs
 *.tsbuildinfo

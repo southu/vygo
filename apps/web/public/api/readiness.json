@@ -4,6 +4,19 @@
   "service": "vygo-web",
   "gitSha": "5f07fc5d819d0fcfad32bb90e099fc90abe71902",
   "generatedAt": "2026-07-12T04:59:58.830Z",
+  "railwayFoundation": {
+    "statusUrl": "/api/railway-foundation",
+    "project": "vygo",
+    "provision": {
+      "outcome": "failed_closed",
+      "code": "consumer_not_armed"
+    },
+    "gate": {
+      "verdict": "go",
+      "forHumanAttachOn": "vygo"
+    },
+    "docs": "docs/railway-backend-readiness.md"
+  },
   "workspace": {
     "apps": {
       "web": {

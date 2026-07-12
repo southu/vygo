@@ -1,0 +1,134 @@
+{
+  "artifact": "railway-backend-foundation",
+  "app": "vygo",
+  "project": "vygo",
+  "gitSha": "54b4645cbe6a851a26bef8d29c2f8f487257bd77",
+  "generatedAt": "2026-07-12T17:45:00.292Z",
+  "hosting": {
+    "summary": "Site → Vercel. API / DB / Redis / worker → Railway (project vygo).",
+    "site": {
+      "component": "apps/web",
+      "platform": "vercel",
+      "retargetedToRailway": false
+    },
+    "api": {
+      "component": "apps/api",
+      "platform": "railway",
+      "project": "vygo"
+    },
+    "worker": {
+      "component": "apps/worker",
+      "platform": "railway",
+      "project": "vygo"
+    },
+    "postgres": {
+      "component": "postgres",
+      "platform": "railway",
+      "project": "vygo"
+    },
+    "redis": {
+      "component": "redis",
+      "platform": "railway",
+      "project": "vygo"
+    }
+  },
+  "provision": {
+    "outcome": "failed_closed",
+    "code": "consumer_not_armed",
+    "project_id": null,
+    "dashboardUrl": null,
+    "detail": "Auto-provisioning was not armed for this foundation pass: no Railway services were auto-created and no project_id was emitted. This is an explicit closed failure (`consumer_not_armed`), not a silent partial success. A human operator attaches services using the stubs and next steps referenced below.",
+    "closedFailureCodes": [
+      "vault_locked",
+      "consumer_not_armed",
+      "vault_access_denied"
+    ]
+  },
+  "servicesAutoCreated": {
+    "postgres": false,
+    "redis": false,
+    "api": false,
+    "worker": false
+  },
+  "humanNextSteps": {
+    "required": true,
+    "doc": "docs/railway-backend-readiness.md#next-steps-project-vygo--services-not-yet-running",
+    "stubs": [
+      "deploy/railway/README.md",
+      "deploy/railway/api/.env.example",
+      "deploy/railway/worker/.env.example"
+    ],
+    "stubsPresent": true
+  },
+  "env": {
+    "note": "Names only. No values. Backend secrets come from the owner's vault; DATABASE_URL / REDIS_URL come from the Railway plugins. NEXT_PUBLIC_* are public browser values.",
+    "backend": {
+      "api": [
+        "NODE_ENV",
+        "PORT",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "CORS_ORIGINS",
+        "RESEND_API_KEY",
+        "RESEND_WEBHOOK_SECRET",
+        "TURNSTILE_SECRET_KEY",
+        "IP_HASH_SALT",
+        "IP_HASH_SALT_VERSION",
+        "EMAIL_FROM",
+        "LEAD_NOTIFICATION_EMAIL",
+        "RATE_LIMIT_IP_MAX",
+        "RATE_LIMIT_IP_WINDOW_SECONDS",
+        "RATE_LIMIT_EMAIL_MAX",
+        "RATE_LIMIT_EMAIL_WINDOW_SECONDS",
+        "MIN_FORM_COMPLETION_MS",
+        "LOG_LEVEL",
+        "INLINE_EMAIL_WORKER",
+        "ENABLE_TEST_SURFACE"
+      ],
+      "worker": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "RESEND_API_KEY",
+        "EMAIL_FROM",
+        "LEAD_NOTIFICATION_EMAIL",
+        "LOG_LEVEL",
+        "WORKER_POLL_INTERVAL_MS",
+        "WORKER_BATCH_SIZE",
+        "WORKER_MAX_ATTEMPTS",
+        "INLINE_EMAIL_WORKER"
+      ]
+    },
+    "webPublic": [
+      "NEXT_PUBLIC_APP_URL",
+      "NEXT_PUBLIC_API_URL",
+      "NEXT_PUBLIC_TURNSTILE_SITE_KEY"
+    ]
+  },
+  "apiSmoke": {
+    "required": false,
+    "status": "skipped",
+    "reason": "No non-secret-testable Railway API service exists yet (services not auto-created). Live production Fastify API smoke is not required for the foundation gate; it is deferred to human attach + health-check verification (GET /healthz, /readyz, /health)."
+  },
+  "docs": {
+    "readiness": "docs/railway-backend-readiness.md",
+    "deployment": "docs/deployment.md",
+    "credentials": "docs/credentials-and-decisions.md",
+    "stubs": "deploy/railway/README.md"
+  },
+  "secretsScan": {
+    "policy": "names-only",
+    "artifactSelfScan": "passed",
+    "detectedSecrets": 0,
+    "enforcedBy": "pnpm secret-scan (CI, scripts/secret-scan.ts)"
+  },
+  "gate": {
+    "verdict": "go",
+    "forHumanAttachOn": "vygo",
+    "reason": "Provision failed closed with an explicit code (`consumer_not_armed`) AND config stubs + human next steps are present and linked (clear-stub) AND the secrets policy self-scan is clean. Foundation is go for human Railway service attach on vygo.",
+    "conditions": {
+      "provisionSuccessOrClearStub": true,
+      "secretsClean": true
+    }
+  }
+}
