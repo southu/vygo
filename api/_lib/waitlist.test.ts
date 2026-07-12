@@ -6,6 +6,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { handleWaitlist } from "./handler.js";
+import { createMemoryStore } from "./store.js";
 import { normalizeHttpsUrl, parseWaitlist } from "./validation.js";
 import type { UpsertResult, WaitlistStore } from "./store.js";
 import type { WaitlistValue } from "./validation.js";
@@ -213,6 +214,42 @@ describe("edge waitlist — sanitized failures", () => {
     assert.equal(res.status, 503);
     assert.equal((res.body as { error: { code: string } }).error.code, "UNAVAILABLE");
     assert.equal(JSON.stringify(res.body).toLowerCase().includes("database_url"), false);
+  });
+});
+
+describe("edge waitlist — no-database fallback store", () => {
+  it("accepts a valid submission via the in-memory fallback (never 503)", async () => {
+    const store = createMemoryStore(new Map());
+    const res = await handleWaitlist(store, validPayload());
+    assert.equal(res.status, 200);
+    const data = (res.body as { data: Record<string, unknown> }).data;
+    assert.equal(data.accepted, true);
+    assert.equal(data.duplicate, false);
+    assert.equal(typeof data.applicationId, "string");
+    assert.notEqual(String(data.applicationId).length, 0);
+  });
+
+  it("reports a repeat submission for the same email as a safe duplicate, no 5xx", async () => {
+    const store = createMemoryStore(new Map());
+    const first = await handleWaitlist(store, validPayload());
+    const second = await handleWaitlist(store, validPayload());
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    const firstData = (first.body as { data: Record<string, unknown> }).data;
+    const secondData = (second.body as { data: Record<string, unknown> }).data;
+    assert.equal(firstData.duplicate, false);
+    assert.equal(secondData.duplicate, true);
+    // Stable applicationId across duplicate submissions, mirroring UNIQUE(email).
+    assert.equal(firstData.applicationId, secondData.applicationId);
+    assert.match(String(secondData.message), /already|duplicate|registered/i);
+  });
+
+  it("keeps distinct emails independent", async () => {
+    const store = createMemoryStore(new Map());
+    const a = await handleWaitlist(store, validPayload({ email: "a@example.com" }));
+    const b = await handleWaitlist(store, validPayload({ email: "b@example.com" }));
+    assert.equal((a.body as { data: { duplicate: boolean } }).data.duplicate, false);
+    assert.equal((b.body as { data: { duplicate: boolean } }).data.duplicate, false);
   });
 });
 

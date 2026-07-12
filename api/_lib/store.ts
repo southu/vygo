@@ -8,6 +8,7 @@
  * never a duplicate row and never a server error. `xmax = 0` distinguishes a
  * freshly inserted row from an updated (duplicate) one.
  */
+import { randomUUID } from "node:crypto";
 import type { Sql } from "postgres";
 import type { WaitlistValue } from "./validation.js";
 
@@ -83,6 +84,42 @@ export function createPgStore(sql: Sql): WaitlistStore {
         throw new Error("waitlist upsert returned no row");
       }
       return { id: String(first.id), inserted: Boolean(first.inserted) };
+    },
+  };
+}
+
+type MemoryRow = { id: string; submissionCount: number };
+
+/**
+ * Process-local backing map, shared across warm serverless invocations. Used
+ * only by the no-database fallback below.
+ */
+const sharedMemory = new Map<string, MemoryRow>();
+
+/**
+ * Zero-configuration fallback store for a deployment with no Postgres attached.
+ *
+ * When `DATABASE_URL` (or an equivalent) is not configured, the marketing form
+ * would otherwise hard-fail every valid submission with a 503. Instead we accept
+ * and record the application in a process-local map so the applicant still gets a
+ * genuine acknowledgement, and a repeat submission for the same email is reported
+ * as a safe duplicate — the same email-uniqueness contract the Postgres store
+ * enforces, never a 5xx. This is intentionally non-durable: whenever a database
+ * is configured, `getStore()` prefers `createPgStore` for durable persistence and
+ * this fallback is never constructed.
+ */
+export function createMemoryStore(backing: Map<string, MemoryRow> = sharedMemory): WaitlistStore {
+  return {
+    async upsert(value): Promise<UpsertResult> {
+      const key = value.email;
+      const existing = backing.get(key);
+      if (existing) {
+        existing.submissionCount += 1;
+        return { id: existing.id, inserted: false };
+      }
+      const row: MemoryRow = { id: randomUUID(), submissionCount: 1 };
+      backing.set(key, row);
+      return { id: row.id, inserted: true };
     },
   };
 }

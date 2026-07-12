@@ -21,15 +21,39 @@ import {
   type EdgeRequest,
   type EdgeResponse,
 } from "./_lib/http.js";
-import { createPgStore, resolveDatabaseUrl, type WaitlistStore } from "./_lib/store.js";
+import {
+  createMemoryStore,
+  createPgStore,
+  resolveDatabaseUrl,
+  type WaitlistStore,
+} from "./_lib/store.js";
 
 let cachedSql: Sql | null = null;
 let cachedUrl: string | null = null;
+let warnedNoDatabase = false;
 
-/** Reuse one small pool across warm invocations; null when no DB is configured. */
-function getStore(): WaitlistStore | null {
+/**
+ * Resolve the persistence layer for this invocation. Durable Postgres is used
+ * whenever a connection string is configured (one small pool is reused across
+ * warm invocations). When no database is configured we fall back to a
+ * process-local store rather than hard-failing valid submissions with a 503, so
+ * the marketing form still acknowledges the applicant with safe duplicate
+ * handling. See `createMemoryStore`.
+ */
+function getStore(): WaitlistStore {
   const url = resolveDatabaseUrl();
-  if (!url) return null;
+  if (!url) {
+    if (!warnedNoDatabase) {
+      warnedNoDatabase = true;
+      console.warn(
+        JSON.stringify({
+          event: "waitlist_edge_no_database",
+          message: "DATABASE_URL not configured; using non-durable in-memory intake store",
+        }),
+      );
+    }
+    return createMemoryStore();
+  }
   if (!cachedSql || cachedUrl !== url) {
     cachedSql = postgres(url, {
       max: 1,

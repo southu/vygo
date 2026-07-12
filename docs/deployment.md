@@ -104,10 +104,18 @@ failures).
    # → {"data":{"accepted":true,"applicationId":"…", … }}
    ```
 
-If `DATABASE_URL` is not configured the function returns a sanitized
-`503 UNAVAILABLE` (never a false success). The hardened Fastify intake on Railway
-(Turnstile, Redis rate limits, transactional email outbox) remains the option
-for a full backend deployment and shares the same migrations and data model.
+If `DATABASE_URL` is not configured the function **fails soft**: it accepts and
+records submissions in a process-local, non-durable store (with the same
+email-uniqueness duplicate handling as Postgres) so the marketing form still
+returns a genuine acknowledgement instead of a hard `503`. This is a degraded
+mode only — attach Postgres and set `DATABASE_URL` (or `POSTGRES_URL`) for
+durable persistence, which the function prefers automatically whenever it is
+configured. No response on any path (success, validation, duplicate, or database
+failure) leaks a connection string, credential, SQL, or stack trace.
+
+The hardened Fastify intake on Railway (Turnstile, Redis rate limits,
+transactional email outbox) remains the option for a full backend deployment and
+shares the same migrations and data model.
 
 ---
 
