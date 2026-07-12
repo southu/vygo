@@ -60,6 +60,9 @@ export async function claimOutboxJobs(
   const staleLockMs = options.staleLockMs ?? 5 * 60 * 1000;
   const staleBefore = new Date(now.getTime() - staleLockMs);
 
+  const nowIso = now.toISOString();
+  const staleIso = staleBefore.toISOString();
+
   // Release stale processing locks back to pending so they can be reclaimed.
   await db.execute(sql`
     UPDATE email_outbox
@@ -67,25 +70,25 @@ export async function claimOutboxJobs(
       status = 'pending',
       locked_at = NULL,
       locked_by = NULL,
-      updated_at = ${now}
+      updated_at = ${nowIso}::timestamptz
     WHERE status = 'processing'
       AND locked_at IS NOT NULL
-      AND locked_at < ${staleBefore}
+      AND locked_at < ${staleIso}::timestamptz
   `);
 
   const result = await db.execute(sql`
     UPDATE email_outbox AS o
     SET
       status = 'processing',
-      locked_at = ${now},
+      locked_at = ${nowIso}::timestamptz,
       locked_by = ${workerId},
       attempt_count = o.attempt_count + 1,
-      updated_at = ${now}
+      updated_at = ${nowIso}::timestamptz
     WHERE o.id IN (
       SELECT id
       FROM email_outbox
       WHERE status IN ('pending', 'failed')
-        AND next_attempt_at <= ${now}
+        AND next_attempt_at <= ${nowIso}::timestamptz
       ORDER BY next_attempt_at ASC, created_at ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED

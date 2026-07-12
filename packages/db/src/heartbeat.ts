@@ -17,12 +17,12 @@ export async function upsertWorkerHeartbeat(
     now?: Date;
   },
 ): Promise<void> {
-  const now = input.now ?? new Date();
+  const nowIso = (input.now ?? new Date()).toISOString();
   const status = input.status ?? "ready";
   const details = JSON.stringify(input.details ?? {});
   await db.execute(sql`
     INSERT INTO worker_heartbeats (worker_name, status, last_seen_at, details)
-    VALUES (${input.workerName}, ${status}, ${now}, ${details}::jsonb)
+    VALUES (${input.workerName}, ${status}, ${nowIso}::timestamptz, ${details}::jsonb)
     ON CONFLICT (worker_name) DO UPDATE SET
       status = EXCLUDED.status,
       last_seen_at = EXCLUDED.last_seen_at,
