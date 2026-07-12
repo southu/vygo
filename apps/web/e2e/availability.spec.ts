@@ -33,6 +33,21 @@ test.describe("Availability UI states", () => {
     await expect(card.locator('[data-availability-action="none"]')).toBeVisible();
     await expect(card.locator('[data-availability-action="open-waitlist"]')).toHaveCount(0);
     await expect(card.locator('[data-availability-action="open-access"]')).toHaveCount(0);
+
+    // AC7: /waitlist page must not expose an enabled application form while paused.
+    const pageForm = page.getByTestId("waitlist-page-form");
+    await expect(pageForm).toHaveAttribute("data-form-gated", "paused");
+    await expect(pageForm.locator("[data-paused-explanation]")).toBeVisible();
+    await expect(pageForm.getByText(/Enrollment paused|not accepting new applications/i)).toBeVisible();
+    await expect(page.getByTestId("waitlist-form")).toHaveCount(0);
+    await expect(page.getByTestId("waitlist-continue")).toHaveCount(0);
+    await expect(page.getByTestId("waitlist-submit")).toHaveCount(0);
+    await expect(page.getByTestId("waitlist-page-paused-cta")).toBeDisabled();
+    // No enabled submit/continue controls anywhere on the page.
+    const enabledSubmitControls = page.locator(
+      'button:enabled[type="submit"], button:enabled[data-testid="waitlist-continue"], button:enabled[data-testid="waitlist-submit"]',
+    );
+    await expect(enabledSubmitControls).toHaveCount(0);
   });
 
   test("loading state is busy and not incorrectly actionable", async ({ page }) => {

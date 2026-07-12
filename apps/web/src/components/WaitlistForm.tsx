@@ -15,6 +15,7 @@ import { waitlistContent } from "@/content/waitlist";
 import { apiUrl } from "@/lib/api";
 import { trackAnalytics } from "@/lib/analytics";
 import { captureAttribution, type WaitlistAttribution } from "@/lib/attribution";
+import { useAvailability } from "./AvailabilityProvider";
 
 /**
  * Cloudflare official always-pass test sitekey (public).
@@ -133,6 +134,7 @@ type WaitlistFormProps = {
 
 export function WaitlistForm({ mode = "page", open = true, onDismiss }: WaitlistFormProps) {
   const { form, success } = waitlistContent;
+  const { uiState, copy: availabilityCopy } = useAvailability();
   const formId = useId();
   const headingId = `${formId}-heading`;
   const errorSummaryId = `${formId}-error-summary`;
@@ -1162,8 +1164,69 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
     );
   }
 
+  // Page mode: gate application when enrollment is paused or still loading (AC7).
+  // Open/waitlist keep the operable form; stale/error fail-open (form remains).
+  if (uiState === "paused") {
+    return (
+      <div
+        className="card relative"
+        data-testid="waitlist-page-form"
+        data-form-gated="paused"
+        data-availability-state="paused"
+      >
+        <h2 className="font-display text-2xl font-bold text-ink">Enrollment paused</h2>
+        <p className="mt-3 text-muted" data-paused-explanation>
+          {availabilityCopy.message}
+        </p>
+        <p className="mt-2 text-sm text-ink-soft">
+          Submission is not available until openings resume. Check back later or email hello@vygo.ai.
+        </p>
+        <div className="mt-6">
+          <button
+            type="button"
+            className="btn-primary opacity-70"
+            disabled
+            aria-disabled="true"
+            data-cta-mode="paused"
+            data-testid="waitlist-page-paused-cta"
+          >
+            Enrollment paused
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (uiState === "loading") {
+    return (
+      <div
+        className="card relative"
+        data-testid="waitlist-page-form"
+        data-form-gated="loading"
+        data-availability-state="loading"
+        aria-busy="true"
+        role="status"
+      >
+        <h2 className="font-display text-2xl font-bold text-ink">Checking availability</h2>
+        <p className="mt-3 text-muted">Loading current availability…</p>
+        <div className="mt-6">
+          <button
+            type="button"
+            className="btn-primary opacity-70"
+            disabled
+            aria-busy="true"
+            data-cta-mode="loading"
+            data-testid="waitlist-page-loading-cta"
+          >
+            Loading
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="card relative" data-testid="waitlist-page-form">
+    <div className="card relative" data-testid="waitlist-page-form" data-form-gated="open">
       {content}
     </div>
   );
