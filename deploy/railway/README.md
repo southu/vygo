@@ -19,9 +19,14 @@ self-scan clean. See
 
 **Site → Vercel. API / DB / Redis / worker → Railway (project `vygo`).** The
 Vercel frontend **and** marketing site are not retargeted here and are **not**
-Railway services; only the web app's public `NEXT_PUBLIC_API_BASE_URL`
-(`https://api.vygo.ai`, a public `https://` URL — never a secret) points at the
-Railway API.
+Railway services. The web app's public `NEXT_PUBLIC_API_BASE_URL` (a public
+`https://` URL — never a secret) advertises the **reachable API origin today**:
+until the Railway API service is provisioned, the API's `/health` and `/version`
+are mirrored on the Vercel edge (`https://www.vygo.ai`), so that is the origin
+the frontend targets. The documented Railway cut-over target is
+`https://api.vygo.ai`; on cut-over an operator sets `NEXT_PUBLIC_API_BASE_URL` to
+the Railway API's public HTTPS origin. Live topology + exact remaining actions:
+**`GET /provisioning-status`** (secret-free).
 
 ## Services in project `vygo`
 

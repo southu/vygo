@@ -364,10 +364,14 @@ function main() {
       isRailwayService: false,
       retargetedToRailway: false,
       apiBaseUrlEnv: "NEXT_PUBLIC_API_BASE_URL",
-      apiBaseUrl: "https://api.vygo.ai",
+      // Reachable API origin today (Vercel edge mirror of /health + /version)
+      // until the Railway API is provisioned; api.vygo.ai is the cut-over target.
+      apiBaseUrl: "https://www.vygo.ai",
+      apiOriginMode: "vercel-edge-mirror",
+      railwayApiTargetOrigin: "https://api.vygo.ai",
     },
     remainingActionsStatus:
-      "/api/railway-foundation (limitation.remainingActions + limitation.verificationCommands)",
+      "/provisioning-status and /api/railway-foundation (limitation.remainingActions + limitation.verificationCommands)",
     env: {
       note:
         "Names only. No values. Backend secrets come from the owner's vault; DATABASE_URL / " +

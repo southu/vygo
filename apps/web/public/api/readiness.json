@@ -1,9 +1,9 @@
 {
-  "ready": true,
+  "ready": false,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "5f07fc5d819d0fcfad32bb90e099fc90abe71902",
-  "generatedAt": "2026-07-12T04:59:58.830Z",
+  "gitSha": "59e545489db39aae1fd4c6571e13299a2a0380c3",
+  "generatedAt": "2026-07-12T21:48:41.631Z",
   "railwayFoundation": {
     "statusUrl": "/api/railway-foundation",
     "project": "vygo",
@@ -16,6 +16,23 @@
       "forHumanAttachOn": "vygo"
     },
     "docs": "docs/railway-backend-readiness.md"
+  },
+  "frontend": {
+    "platform": "vercel",
+    "isRailwayService": false,
+    "apiBaseUrlEnv": "NEXT_PUBLIC_API_BASE_URL",
+    "apiBaseUrl": "https://www.vygo.ai",
+    "apiOriginMode": "vercel-edge-mirror",
+    "railwayApiTargetOrigin": "https://api.vygo.ai",
+    "provisioningStatus": "/provisioning-status"
+  },
+  "cors": {
+    "productionOrigins": [
+      "https://www.vygo.ai",
+      "https://vygo.ai"
+    ],
+    "previewOriginPattern": "^https://vygo(-[a-z0-9-]+)?\\.vercel\\.app$",
+    "unrestrictedProductionWildcard": false
   },
   "workspace": {
     "apps": {
@@ -72,10 +89,10 @@
   "tooling": {
     "node": {
       "major": 24,
-      "version": "24.18.0",
-      "runtimeMajor": 24,
+      "version": "25.8.1",
+      "runtimeMajor": 25,
       "activeLtsMajor": 24,
-      "lts": true,
+      "lts": false,
       "configured": true,
       "source": ".nvmrc"
     },

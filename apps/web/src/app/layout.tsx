@@ -36,11 +36,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${montserrat.variable} ${openSans.variable}`}>
       <head>
-        {/* Non-secret public config: identifies the Railway API origin the Vercel
-            frontend targets (NEXT_PUBLIC_API_BASE_URL) for black-box verification. */}
+        {/* Non-secret public config: the reachable API origin the Vercel frontend
+            targets (NEXT_PUBLIC_API_BASE_URL) + the Railway cut-over target, for
+            black-box verification. Live topology: GET /provisioning-status. */}
         <meta name="vygo:api-base-url" content={publicConfig.apiBaseUrl} />
-        <meta name="vygo:api-platform" content="railway" />
+        <meta name="vygo:api-platform" content={publicConfig.apiPlatform} />
+        <meta name="vygo:api-origin-mode" content={publicConfig.apiOriginMode} />
+        <meta name="vygo:railway-api-target-origin" content={publicConfig.railwayApiTargetOrigin} />
         <meta name="vygo:frontend-platform" content="vercel" />
+        <meta name="vygo:provisioning-status" content={publicConfig.provisioningStatusEndpoint} />
       </head>
       <body className="min-h-screen bg-canvas font-body text-ink antialiased">
         <script

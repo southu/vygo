@@ -2,8 +2,8 @@
   "artifact": "railway-backend-foundation",
   "app": "vygo",
   "project": "vygo",
-  "gitSha": "15e7badda8acccb4c1512b2d786485d1c2b8e5ff",
-  "generatedAt": "2026-07-12T21:30:45.235Z",
+  "gitSha": "59e545489db39aae1fd4c6571e13299a2a0380c3",
+  "generatedAt": "2026-07-12T21:48:41.058Z",
   "hosting": {
     "summary": "Site → Vercel. API / DB / Redis / worker → Railway (project vygo).",
     "site": {
@@ -102,8 +102,12 @@
     "isRailwayService": false,
     "retargetedToRailway": false,
     "apiBaseUrlEnv": "NEXT_PUBLIC_API_BASE_URL",
-    "apiBaseUrl": "https://api.vygo.ai",
-    "note": "The Vercel frontend targets the Railway API via NEXT_PUBLIC_API_BASE_URL; it is not deployed to Railway."
+    "apiBaseUrl": "https://www.vygo.ai",
+    "apiOriginMode": "vercel-edge-mirror",
+    "railwayApiLive": false,
+    "railwayApiTargetOrigin": "https://api.vygo.ai",
+    "provisioningStatus": "/provisioning-status",
+    "note": "The Vercel frontend targets the reachable API origin via NEXT_PUBLIC_API_BASE_URL and is not deployed to Railway. The Railway API's /health and /version are mirrored on the Vercel edge until the Railway services are provisioned; on cut-over, NEXT_PUBLIC_API_BASE_URL points at the Railway API's public HTTPS origin."
   },
   "marketingSite": {
     "component": "apps/web",

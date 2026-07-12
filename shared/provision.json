@@ -55,9 +55,11 @@
     "isRailwayService": false,
     "retargetedToRailway": false,
     "apiBaseUrlEnv": "NEXT_PUBLIC_API_BASE_URL",
-    "apiBaseUrl": "https://api.vygo.ai"
+    "apiBaseUrl": "https://www.vygo.ai",
+    "apiOriginMode": "vercel-edge-mirror",
+    "railwayApiTargetOrigin": "https://api.vygo.ai"
   },
-  "remainingActionsStatus": "/api/railway-foundation (limitation.remainingActions + limitation.verificationCommands)",
+  "remainingActionsStatus": "/provisioning-status and /api/railway-foundation (limitation.remainingActions + limitation.verificationCommands)",
   "env": {
     "note": "Names only. No values. Backend secrets come from the owner's vault; DATABASE_URL / REDIS_URL come from the Railway plugins. NEXT_PUBLIC_* are public browser values.",
     "backend": {
@@ -103,8 +105,8 @@
       "NEXT_PUBLIC_TURNSTILE_SITE_KEY"
     ]
   },
-  "gitSha": "15e7badda8acccb4c1512b2d786485d1c2b8e5ff",
-  "generatedAt": "2026-07-12T21:30:45.041Z",
+  "gitSha": "59e545489db39aae1fd4c6571e13299a2a0380c3",
+  "generatedAt": "2026-07-12T21:48:40.898Z",
   "secretsScan": {
     "policy": "names-only",
     "selfScan": "passed",

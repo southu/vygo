@@ -15,7 +15,9 @@
     { "source": "/api/worker", "destination": "/api/worker-status" },
     { "source": "/api/readiness", "destination": "/api/readiness.json" },
     { "source": "/api/railway-foundation", "destination": "/api/railway-foundation.json" },
-    { "source": "/api/provision", "destination": "/api/provision.json" }
+    { "source": "/api/provision", "destination": "/api/provision.json" },
+    { "source": "/provisioning-status", "destination": "/api/provisioning-status" },
+    { "source": "/provisioning", "destination": "/api/provisioning-status" }
   ],
   "headers": [
     {
@@ -81,6 +83,14 @@
         { "key": "Content-Type", "value": "application/json; charset=utf-8" },
         { "key": "Cache-Control", "value": "no-store" }
       ]
+    },
+    {
+      "source": "/provisioning-status",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
+      "source": "/provisioning",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     }
   ]
 }

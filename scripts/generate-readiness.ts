@@ -331,13 +331,18 @@ function main() {
     gitSha: gitSha(),
     generatedAt: new Date().toISOString(),
     railwayFoundation: readFoundationPointer(),
-    // The frontend + marketing site stay on Vercel and are not Railway services;
-    // NEXT_PUBLIC_API_BASE_URL identifies the Railway API origin they target.
+    // The frontend + marketing site stay on Vercel and are not Railway services.
+    // NEXT_PUBLIC_API_BASE_URL advertises the reachable API origin today (the
+    // Vercel edge mirror of /health + /version); api.vygo.ai is the documented
+    // Railway cut-over target. Live topology: /provisioning-status.
     frontend: {
       platform: "vercel",
       isRailwayService: false,
       apiBaseUrlEnv: "NEXT_PUBLIC_API_BASE_URL",
-      apiBaseUrl: "https://api.vygo.ai",
+      apiBaseUrl: "https://www.vygo.ai",
+      apiOriginMode: "vercel-edge-mirror",
+      railwayApiTargetOrigin: "https://api.vygo.ai",
+      provisioningStatus: "/provisioning-status",
     },
     cors: {
       productionOrigins: ["https://www.vygo.ai", "https://vygo.ai"],

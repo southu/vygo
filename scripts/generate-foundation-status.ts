@@ -211,8 +211,10 @@ const STUBS = [
   "deploy/railway/worker/.env.example",
 ];
 
-/** Public Railway API custom domain (non-secret identifier). */
-const RAILWAY_API_BASE_URL = "https://api.vygo.ai";
+/** Documented Railway API cut-over target — public identifier, never a secret. */
+const RAILWAY_API_TARGET_ORIGIN = "https://api.vygo.ai";
+/** Reachable API origin today: the Vercel edge mirror of /health + /version. */
+const EDGE_API_MIRROR_ORIGIN = "https://www.vygo.ai";
 
 /**
  * The four in-project services + two managed plugins, with the Railway/Vault
@@ -408,8 +410,15 @@ function main() {
       isRailwayService: false,
       retargetedToRailway: false,
       apiBaseUrlEnv: "NEXT_PUBLIC_API_BASE_URL",
-      apiBaseUrl: RAILWAY_API_BASE_URL,
-      note: "The Vercel frontend targets the Railway API via NEXT_PUBLIC_API_BASE_URL; it is not deployed to Railway.",
+      // Reachable API origin today (the Vercel edge mirror of /health + /version)
+      // until the Railway API is provisioned; the documented cut-over target is
+      // railwayApiTargetOrigin. Neither is a secret; the frontend stays on Vercel.
+      apiBaseUrl: EDGE_API_MIRROR_ORIGIN,
+      apiOriginMode: "vercel-edge-mirror",
+      railwayApiLive: false,
+      railwayApiTargetOrigin: RAILWAY_API_TARGET_ORIGIN,
+      provisioningStatus: "/provisioning-status",
+      note: "The Vercel frontend targets the reachable API origin via NEXT_PUBLIC_API_BASE_URL and is not deployed to Railway. The Railway API's /health and /version are mirrored on the Vercel edge until the Railway services are provisioned; on cut-over, NEXT_PUBLIC_API_BASE_URL points at the Railway API's public HTTPS origin.",
     },
     marketingSite: {
       component: "apps/web",
