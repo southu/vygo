@@ -36,6 +36,22 @@ importers:
         specifier: ^8.48.0
         version: 8.63.0(eslint@9.39.5(jiti@1.21.7))(typescript@5.9.3)
 
+  api:
+    dependencies:
+      postgres:
+        specifier: ^3.4.7
+        version: 3.4.9
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.13.3
+      tsx:
+        specifier: ^4.21.0
+        version: 4.23.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   apps/api:
     dependencies:
       '@vygo/config':

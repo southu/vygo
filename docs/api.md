@@ -157,6 +157,17 @@ HTTP 413:
 Secure waitlist intake. Requires an allowed `Origin`, `Content-Type: application/json`,
 server-side Cloudflare Turnstile verification, privacy consent, and normalized fields.
 
+> **Two deployments, one contract.** On the static marketing site
+> (`www.vygo.ai`) this path is served by the Vercel Serverless Function
+> [`api/waitlist.ts`](../api/waitlist.ts) (rewritten from `/v1/waitlist`). The
+> edge function validates, persists to `waitlist_entries` with an atomic
+> `ON CONFLICT (email)` upsert (safe duplicate handling), and returns sanitized
+> errors; it does not require Turnstile (the intake channel is recorded as
+> `source = 'web'`). The Fastify service below is the full-featured intake
+> (Turnstile, Redis rate limits, transactional email outbox) for a Railway
+> backend. Both share the same migrations and success/validation response
+> shapes. See [deployment.md](./deployment.md#waitlist-persistence-on-the-edge-vercel-serverless-function).
+
 ### Success (new or duplicate email)
 
 HTTP 200 — returned **before** provider delivery. New applications include a

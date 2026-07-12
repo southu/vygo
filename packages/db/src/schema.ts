@@ -120,6 +120,8 @@ export const waitlistEntries = pgTable(
     marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }),
     ipHash: text("ip_hash"),
     userAgent: text("user_agent"),
+    /** Intake channel for the lead (e.g. "web" for the public marketing edge form). */
+    source: text("source"),
     landingPage: text("landing_page"),
     referrer: text("referrer"),
     utmSource: text("utm_source"),

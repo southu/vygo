@@ -1,0 +1,19 @@
+{
+  "name": "@vygo/edge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Vercel serverless functions served on the marketing edge (www.vygo.ai)",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test _lib/**/*.test.ts"
+  },
+  "dependencies": {
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

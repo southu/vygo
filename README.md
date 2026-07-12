@@ -204,6 +204,7 @@ generation, and baseline build.
 | `GET`  | `/readyz`                 | Readiness JSON (`ready: true`); the static edge has no database dependency         |
 | `GET`  | `/api/readiness`          | JSON readiness report (`ready`, workspace structure, check results)                |
 | `GET`  | `/api/railway-foundation` | Railway backend foundation status: provision outcome + go/no-go gate (secret-free) |
+| `POST` | `/v1/waitlist`            | Waitlist intake (Vercel serverless `api/waitlist.ts`): validate + Postgres upsert  |
 
 ## Machine endpoints (API)
 

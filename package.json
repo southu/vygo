@@ -26,11 +26,12 @@
     "seed:local": "tsx scripts/seed-local.ts",
     "availability:set": "tsx scripts/set-availability.ts",
     "db:migrate": "tsx packages/db/src/cli-migrate.ts",
-    "test": "pnpm --filter @vygo/email test && pnpm --filter @vygo/api test",
+    "test": "pnpm --filter @vygo/email test && pnpm --filter @vygo/edge test && pnpm --filter @vygo/api test",
     "test:integration": "pnpm --filter @vygo/api test",
     "test:email": "pnpm --filter @vygo/email test",
+    "test:edge": "pnpm --filter @vygo/edge test",
     "test:e2e": "pnpm --filter @vygo/web test:e2e",
-    "ci:verify": "pnpm secret-scan && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:email && pnpm provision && pnpm foundation-status && pnpm readiness && pnpm build",
+    "ci:verify": "pnpm secret-scan && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:email && pnpm test:edge && pnpm provision && pnpm foundation-status && pnpm readiness && pnpm build",
     "clean": "pnpm -r --if-present run clean && rm -rf node_modules"
   },
   "devDependencies": {

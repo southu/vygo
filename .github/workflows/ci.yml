@@ -49,6 +49,9 @@ jobs:
       - name: Unit tests (email package)
         run: pnpm test:email
 
+      - name: Unit tests (edge waitlist function)
+        run: pnpm test:edge
+
       - name: Vault Provisioner (Railway project vygo, fail-closed)
         env:
           COMMIT_SHA: ${{ github.sha }}

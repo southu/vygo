@@ -60,6 +60,55 @@ Do **not** use `version.txt` for deploy identity. Web `GET /version` reads
 
 8. Confirm `/version` SHA matches the intended git commit before calling a release done.
 
+### Waitlist persistence on the edge (Vercel serverless function)
+
+The marketing site is a static export, so the public waitlist submit path is
+served by a Vercel Serverless Function committed at
+[`api/waitlist.ts`](../api/waitlist.ts) (workspace package `@vygo/edge`). The
+root [`vercel.json`](../vercel.json) rewrites the documented `POST /v1/waitlist`
+onto `/api/waitlist`, so the browser form on `www.vygo.ai` persists directly to
+Postgres from the same origin — no separate API host is required for intake.
+
+The function validates input, performs an atomic
+`INSERT … ON CONFLICT (email) DO UPDATE` upsert into the shared
+`waitlist_entries` table (safe duplicate handling — never a duplicate row or a
+server error), and returns only PII- and secret-safe bodies (no connection
+string, SQL, stack trace, or credential on any path, including database
+failures).
+
+1. **Attach Postgres and set the connection string.** Add Vercel Postgres (or
+   any Postgres) to the project and set `DATABASE_URL` (Vercel Postgres also
+   exposes `POSTGRES_URL`, read as a fallback) as a **server-side** env var on
+   Production and Preview. Never expose it as `NEXT_PUBLIC_*`. See
+   [`api/.env.example`](../api/.env.example).
+2. **Run the production migration command once** against that database before
+   serving traffic (fresh, empty database supported):
+
+   ```bash
+   DATABASE_URL="$DATABASE_URL" pnpm db:migrate
+   ```
+
+   Output includes `{"ok":true,"action":"migrate"}`. This applies the checked-in
+   ordered migrations under `packages/db/migrations/` (`0000_init` →
+   `0001_email_worker` → `0002_waitlist_source`).
+
+3. **Verify** after deploy:
+
+   ```bash
+   curl -sS -X POST "https://www.vygo.ai/v1/waitlist" \
+     -H 'content-type: application/json' \
+     -d '{"fullName":"Test User","email":"test@example.com","companyName":"Example",
+          "productUrl":"https://example.com","stage":"prototype",
+          "primaryBlocker":"reliability_scale","desiredStartWindow":"asap",
+          "message":"Testing the intake flow.","privacyAccepted":true}'
+   # → {"data":{"accepted":true,"applicationId":"…", … }}
+   ```
+
+If `DATABASE_URL` is not configured the function returns a sanitized
+`503 UNAVAILABLE` (never a false success). The hardened Fastify intake on Railway
+(Turnstile, Redis rate limits, transactional email outbox) remains the option
+for a full backend deployment and shares the same migrations and data model.
+
 ---
 
 ## API, worker, PostgreSQL, Redis — exact Railway setup

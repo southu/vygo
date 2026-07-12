@@ -6,6 +6,7 @@
   "framework": null,
   "cleanUrls": true,
   "rewrites": [
+    { "source": "/v1/waitlist", "destination": "/api/waitlist" },
     { "source": "/api/readiness", "destination": "/api/readiness.json" },
     { "source": "/api/railway-foundation", "destination": "/api/railway-foundation.json" },
     { "source": "/api/provision", "destination": "/api/provision.json" }
