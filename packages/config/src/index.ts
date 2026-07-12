@@ -12,10 +12,65 @@ export const webEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   NEXT_PUBLIC_APP_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   NEXT_PUBLIC_API_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  /**
+   * Public HTTPS origin of the Railway-hosted API the Vercel frontend targets.
+   * Browser-safe (NEXT_PUBLIC_*); never a secret. Defaults to the Railway API
+   * custom domain in the deployed build (see RAILWAY_API_BASE_URL).
+   */
+  NEXT_PUBLIC_API_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   COMMIT_SHA: z.preprocess(emptyToUndefined, z.string().optional()),
   VERCEL_GIT_COMMIT_SHA: z.preprocess(emptyToUndefined, z.string().optional()),
 });
+
+/**
+ * Canonical HTTPS origin of the Railway-hosted API service (project `vygo`).
+ * This custom domain is attached to the Railway API service; the Railway-issued
+ * default domain has the form `https://<service>.up.railway.app`. It is a public,
+ * non-secret identifier — safe to publish in the frontend and provisioning docs.
+ */
+export const RAILWAY_API_BASE_URL = "https://api.vygo.ai";
+
+/** Production marketing origins that always receive CORS (exact allowlist). */
+export const DEFAULT_MARKETING_ORIGINS = ["https://www.vygo.ai", "https://vygo.ai"] as const;
+
+/**
+ * Documented Vercel preview-origin policy for the `vygo` project.
+ *
+ * Vercel issues preview deployments on the project-scoped subdomain space
+ * `https://vygo-<deployment|git-branch>-<scope>.vercel.app`. Preview origins
+ * matching this host pattern are reflected individually in
+ * `Access-Control-Allow-Origin` (never a `*` wildcard). Any origin that is not an
+ * exact production origin and does not match this pattern receives no permissive
+ * ACAO — so unrelated origins (including arbitrary `*.vercel.app` that are not the
+ * vygo project) are never granted access.
+ */
+export const VERCEL_PREVIEW_ORIGIN_PATTERN = "^https://vygo(-[a-z0-9-]+)?\\.vercel\\.app$";
+const VERCEL_PREVIEW_HOST_RE = /^vygo(?:-[a-z0-9-]+)?\.vercel\.app$/i;
+
+/** True when `origin` is an HTTPS Vercel preview origin for the vygo project. */
+export function isVercelPreviewOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "https:") return false;
+    if (url.port) return false;
+    return VERCEL_PREVIEW_HOST_RE.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether `origin` may receive a reflected `Access-Control-Allow-Origin`: it is
+ * either on the exact allowlist (production/configured origins) or a documented
+ * vygo Vercel preview origin. Never authorizes a `*` wildcard.
+ */
+export function isAllowedApiOrigin(origin: string, allowlist: Iterable<string>): boolean {
+  for (const allowed of allowlist) {
+    if (allowed === origin) return true;
+  }
+  return isVercelPreviewOrigin(origin);
+}
 
 /**
  * Cloudflare Turnstile official test secret keys (always-pass / always-fail / already-spent).

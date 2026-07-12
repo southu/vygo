@@ -1,15 +1,20 @@
 import type { FastifyInstance } from "fastify";
+import { DEFAULT_MARKETING_ORIGINS, isAllowedApiOrigin } from "@vygo/config";
 
 /**
- * Strict origin validation: only configured origins receive
- * Access-Control-Allow-Origin. Unconfigured origins get no permissive ACAO.
+ * Strict origin validation: only the exact allowlist (production marketing
+ * origins + configured `CORS_ORIGINS`) and documented vygo Vercel preview
+ * origins receive a reflected `Access-Control-Allow-Origin`. Every other origin
+ * gets no permissive ACAO, and a `*` wildcard is never emitted.
  */
 export function registerCors(app: FastifyInstance, allowedOrigins: string[]): void {
-  const allowlist = new Set(allowedOrigins);
+  // Always include the production marketing origins so the deployed frontend is
+  // allowed even if CORS_ORIGINS is not explicitly configured on the service.
+  const allowlist = new Set<string>([...DEFAULT_MARKETING_ORIGINS, ...allowedOrigins]);
 
   app.addHook("onRequest", async (request, reply) => {
     const origin = request.headers.origin;
-    if (typeof origin === "string" && allowlist.has(origin)) {
+    if (typeof origin === "string" && isAllowedApiOrigin(origin, allowlist)) {
       void reply.header("Access-Control-Allow-Origin", origin);
       void reply.header("Vary", "Origin");
       void reply.header("Access-Control-Allow-Credentials", "true");

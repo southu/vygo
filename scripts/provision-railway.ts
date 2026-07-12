@@ -345,6 +345,29 @@ function main() {
         "worker services are NOT created by this step unless a real provisioning run reports them.",
       frontend: { platform: "vercel", retargetedToRailway: false },
     },
+    // Target topology + reference wiring (mirrors GET /api/railway-foundation).
+    services: ["Postgres", "Redis", "vygo-api", "vygo-worker"],
+    references: {
+      // DATABASE_URL / REDIS_URL come from the Railway plugins via reference
+      // expressions; secrets are Vault-backed by name. No values are ever emitted.
+      DATABASE_URL: "${{Postgres.DATABASE_URL}}",
+      REDIS_URL: "${{Redis.REDIS_URL}}",
+      vaultBacked: [
+        "RESEND_API_KEY",
+        "RESEND_WEBHOOK_SECRET",
+        "TURNSTILE_SECRET_KEY",
+        "IP_HASH_SALT",
+      ],
+    },
+    frontend: {
+      platform: "vercel",
+      isRailwayService: false,
+      retargetedToRailway: false,
+      apiBaseUrlEnv: "NEXT_PUBLIC_API_BASE_URL",
+      apiBaseUrl: "https://api.vygo.ai",
+    },
+    remainingActionsStatus:
+      "/api/railway-foundation (limitation.remainingActions + limitation.verificationCommands)",
     env: {
       note:
         "Names only. No values. Backend secrets come from the owner's vault; DATABASE_URL / " +

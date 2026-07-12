@@ -2,8 +2,8 @@
   "artifact": "railway-backend-foundation",
   "app": "vygo",
   "project": "vygo",
-  "gitSha": "54b4645cbe6a851a26bef8d29c2f8f487257bd77",
-  "generatedAt": "2026-07-12T17:45:00.292Z",
+  "gitSha": "15e7badda8acccb4c1512b2d786485d1c2b8e5ff",
+  "generatedAt": "2026-07-12T21:30:45.235Z",
   "hosting": {
     "summary": "Site → Vercel. API / DB / Redis / worker → Railway (project vygo).",
     "site": {
@@ -32,6 +32,101 @@
       "project": "vygo"
     }
   },
+  "services": [
+    {
+      "name": "Postgres",
+      "kind": "railway-plugin",
+      "managed": true,
+      "provides": [
+        "DATABASE_URL"
+      ],
+      "reference": "${{Postgres.DATABASE_URL}}"
+    },
+    {
+      "name": "Redis",
+      "kind": "railway-plugin",
+      "managed": true,
+      "provides": [
+        "REDIS_URL"
+      ],
+      "reference": "${{Redis.REDIS_URL}}"
+    },
+    {
+      "name": "vygo-api",
+      "kind": "railway-service",
+      "managed": false,
+      "source": "southu/vygo",
+      "dockerfile": "Dockerfile",
+      "config": "railway.toml",
+      "startCommand": "pnpm --filter @vygo/api start",
+      "healthcheckPath": "/healthz",
+      "references": {
+        "DATABASE_URL": "${{Postgres.DATABASE_URL}}",
+        "REDIS_URL": "${{Redis.REDIS_URL}}"
+      }
+    },
+    {
+      "name": "vygo-worker",
+      "kind": "railway-service",
+      "managed": false,
+      "source": "southu/vygo",
+      "dockerfile": "Dockerfile",
+      "config": "deploy/railway/worker/railway.toml",
+      "startCommand": "pnpm --filter @vygo/worker start",
+      "healthcheckPath": "/healthz",
+      "references": {
+        "DATABASE_URL": "${{Postgres.DATABASE_URL}}",
+        "REDIS_URL": "${{Redis.REDIS_URL}}"
+      }
+    }
+  ],
+  "envReferences": {
+    "railwayPlugins": {
+      "DATABASE_URL": "${{Postgres.DATABASE_URL}}",
+      "REDIS_URL": "${{Redis.REDIS_URL}}"
+    },
+    "vaultBacked": {
+      "note": "Secret VALUES are supplied from the owner's Vault at deploy time, referenced by name. Never copied, printed, or committed.",
+      "names": [
+        "RESEND_API_KEY",
+        "RESEND_WEBHOOK_SECRET",
+        "TURNSTILE_SECRET_KEY",
+        "IP_HASH_SALT",
+        "IP_HASH_SALT_VERSION"
+      ]
+    }
+  },
+  "frontend": {
+    "component": "apps/web",
+    "platform": "vercel",
+    "isRailwayService": false,
+    "retargetedToRailway": false,
+    "apiBaseUrlEnv": "NEXT_PUBLIC_API_BASE_URL",
+    "apiBaseUrl": "https://api.vygo.ai",
+    "note": "The Vercel frontend targets the Railway API via NEXT_PUBLIC_API_BASE_URL; it is not deployed to Railway."
+  },
+  "marketingSite": {
+    "component": "apps/web",
+    "platform": "vercel",
+    "isRailwayService": false,
+    "domains": [
+      "https://www.vygo.ai",
+      "https://vygo.ai"
+    ]
+  },
+  "cors": {
+    "productionOrigins": [
+      "https://www.vygo.ai",
+      "https://vygo.ai"
+    ],
+    "previewOriginPattern": "^https://vygo(-[a-z0-9-]+)?\\.vercel\\.app$",
+    "previewOriginExamples": [
+      "https://vygo-git-main-southu.vercel.app",
+      "https://vygo-preview.vercel.app"
+    ],
+    "unrestrictedProductionWildcard": false,
+    "note": "Exact production origins + documented vygo Vercel preview origins are reflected individually. Unrelated origins receive no Access-Control-Allow-Origin; a `*` wildcard is never emitted."
+  },
   "provision": {
     "outcome": "failed_closed",
     "code": "consumer_not_armed",
@@ -59,6 +154,68 @@
       "deploy/railway/worker/.env.example"
     ],
     "stubsPresent": true
+  },
+  "limitation": {
+    "blocked": true,
+    "kind": "project-shell-only-provisioner",
+    "reason": "The Railway provisioner failed closed (consumer_not_armed): this builder holds no Railway token or Vault consumer key, so it created only the project shell and could not add Postgres, Redis, the API service, the worker service, or their reference-wired environment this run.",
+    "blockedActions": [
+      "add-postgres",
+      "add-redis",
+      "add-api-service",
+      "add-worker-service",
+      "wire-railway-and-vault-references"
+    ],
+    "remainingActions": [
+      {
+        "step": "link",
+        "command": "railway login && railway link --project vygo"
+      },
+      {
+        "step": "add-postgres",
+        "command": "railway add --database postgres"
+      },
+      {
+        "step": "add-redis",
+        "command": "railway add --database redis"
+      },
+      {
+        "step": "add-api-service",
+        "command": "railway add --service vygo-api --repo southu/vygo"
+      },
+      {
+        "step": "add-worker-service",
+        "command": "railway add --service vygo-worker --repo southu/vygo"
+      },
+      {
+        "step": "wire-api-references",
+        "command": "railway variables --service vygo-api --set \"DATABASE_URL=${{Postgres.DATABASE_URL}}\" --set \"REDIS_URL=${{Redis.REDIS_URL}}\" --set \"NODE_ENV=production\" --set \"INLINE_EMAIL_WORKER=false\" --set \"ENABLE_TEST_SURFACE=false\" --set \"CORS_ORIGINS=https://www.vygo.ai,https://vygo.ai\""
+      },
+      {
+        "step": "wire-worker-references",
+        "command": "railway variables --service vygo-worker --set \"DATABASE_URL=${{Postgres.DATABASE_URL}}\" --set \"REDIS_URL=${{Redis.REDIS_URL}}\" --set \"NODE_ENV=production\" --set \"INLINE_EMAIL_WORKER=false\""
+      },
+      {
+        "step": "wire-vault-secrets",
+        "command": "railway variables --service vygo-api --set \"RESEND_API_KEY=${{shared.RESEND_API_KEY}}\" --set \"RESEND_WEBHOOK_SECRET=${{shared.RESEND_WEBHOOK_SECRET}}\" --set \"TURNSTILE_SECRET_KEY=${{shared.TURNSTILE_SECRET_KEY}}\" --set \"IP_HASH_SALT=${{shared.IP_HASH_SALT}}\""
+      },
+      {
+        "step": "migrate",
+        "command": "railway run --service vygo-api pnpm db:migrate"
+      },
+      {
+        "step": "set-frontend-api-base-url",
+        "command": "vercel env add NEXT_PUBLIC_API_BASE_URL production   # value: https://api.vygo.ai"
+      }
+    ],
+    "verificationCommands": [
+      "curl -fsS https://api.vygo.ai/healthz",
+      "curl -fsS https://api.vygo.ai/readyz",
+      "curl -fsS https://api.vygo.ai/health",
+      "railway status --service vygo-api",
+      "railway status --service vygo-worker",
+      "railway variables --service vygo-api   # confirm DATABASE_URL/REDIS_URL are reference-wired"
+    ]
   },
   "env": {
     "note": "Names only. No values. Backend secrets come from the owner's vault; DATABASE_URL / REDIS_URL come from the Railway plugins. NEXT_PUBLIC_* are public browser values.",

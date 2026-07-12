@@ -18,8 +18,10 @@ self-scan clean. See
 ## Hosting split
 
 **Site → Vercel. API / DB / Redis / worker → Railway (project `vygo`).** The
-Vercel frontend is not retargeted here; only the web app's `NEXT_PUBLIC_API_URL`
-(a public `https://` URL) points at the Railway API.
+Vercel frontend **and** marketing site are not retargeted here and are **not**
+Railway services; only the web app's public `NEXT_PUBLIC_API_BASE_URL`
+(`https://api.vygo.ai`, a public `https://` URL — never a secret) points at the
+Railway API.
 
 ## Services in project `vygo`
 

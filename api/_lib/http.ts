@@ -43,6 +43,27 @@ export function resolveAllowedOrigins(env: NodeJS.ProcessEnv = process.env): Set
   return new Set([...defaults, ...configured]);
 }
 
+/**
+ * Documented vygo Vercel preview-origin policy (mirrors
+ * `VERCEL_PREVIEW_ORIGIN_PATTERN` in @vygo/config). Preview deployments are
+ * issued on `https://vygo-<deployment|git-branch>-<scope>.vercel.app`. Matching
+ * origins are reflected individually — never as a `*` wildcard — while unrelated
+ * origins (including non-vygo `*.vercel.app`) receive no permissive ACAO.
+ */
+const VERCEL_PREVIEW_HOST_RE = /^vygo(?:-[a-z0-9-]+)?\.vercel\.app$/i;
+
+/** True when `origin` is an HTTPS Vercel preview origin for the vygo project. */
+export function isVercelPreviewOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "https:") return false;
+    if (url.port) return false;
+    return VERCEL_PREVIEW_HOST_RE.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export type OriginDecision = { allowed: boolean; origin: string | null };
 
 export function evaluateOrigin(
@@ -51,7 +72,8 @@ export function evaluateOrigin(
 ): OriginDecision {
   const origin = headerValue(headers["origin"]);
   if (!origin) return { allowed: true, origin: null };
-  return { allowed: allowed.has(origin), origin };
+  // Exact allowlist (production/configured) OR a documented vygo preview origin.
+  return { allowed: allowed.has(origin) || isVercelPreviewOrigin(origin), origin };
 }
 
 /**

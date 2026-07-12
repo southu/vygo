@@ -231,6 +231,40 @@ describe("request limits, CORS, request ids, safe errors", () => {
     assert.equal(denied.headers["access-control-allow-origin"], undefined);
   });
 
+  it("allows the production marketing origin and a vygo Vercel preview origin, never a wildcard", async () => {
+    const prod = await ctx.app.inject({
+      method: "OPTIONS",
+      url: "/healthz",
+      headers: { origin: "https://www.vygo.ai", "access-control-request-method": "GET" },
+    });
+    assert.equal(prod.headers["access-control-allow-origin"], "https://www.vygo.ai");
+
+    const preview = await ctx.app.inject({
+      method: "OPTIONS",
+      url: "/healthz",
+      headers: {
+        origin: "https://vygo-git-main-southu.vercel.app",
+        "access-control-request-method": "GET",
+      },
+    });
+    assert.equal(
+      preview.headers["access-control-allow-origin"],
+      "https://vygo-git-main-southu.vercel.app",
+    );
+
+    const unrelated = await ctx.app.inject({
+      method: "OPTIONS",
+      url: "/healthz",
+      headers: {
+        origin: "https://unrelated.vercel.app",
+        "access-control-request-method": "GET",
+      },
+    });
+    // Non-vygo *.vercel.app is unrelated: no reflected origin, and never `*`.
+    assert.equal(unrelated.headers["access-control-allow-origin"], undefined);
+    assert.notEqual(prod.headers["access-control-allow-origin"], "*");
+  });
+
   it("propagates valid inbound request ids and generates otherwise", async () => {
     const prop = await ctx.app.inject({
       method: "GET",

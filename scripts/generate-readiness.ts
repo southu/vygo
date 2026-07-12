@@ -331,6 +331,19 @@ function main() {
     gitSha: gitSha(),
     generatedAt: new Date().toISOString(),
     railwayFoundation: readFoundationPointer(),
+    // The frontend + marketing site stay on Vercel and are not Railway services;
+    // NEXT_PUBLIC_API_BASE_URL identifies the Railway API origin they target.
+    frontend: {
+      platform: "vercel",
+      isRailwayService: false,
+      apiBaseUrlEnv: "NEXT_PUBLIC_API_BASE_URL",
+      apiBaseUrl: "https://api.vygo.ai",
+    },
+    cors: {
+      productionOrigins: ["https://www.vygo.ai", "https://vygo.ai"],
+      previewOriginPattern: "^https://vygo(-[a-z0-9-]+)?\\.vercel\\.app$",
+      unrestrictedProductionWildcard: false,
+    },
     workspace: {
       apps: {
         web: apps.web,

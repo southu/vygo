@@ -19,9 +19,31 @@
 | Bot protection         | **Turnstile**        | Server-side secret; see [turnstile.md](./turnstile.md)        |
 
 - **Site → Vercel. API / DB / Redis / worker → Railway (project `vygo`).**
-- The Vercel frontend is **not** retargeted to Railway. Vercel hosting config
-  (`vercel.json`, `apps/web`) is unchanged. The only link from web → Railway is
-  the public API base URL env value (a public `https://` URL, never a secret).
+- The Vercel frontend **and** the marketing site are **not** retargeted to
+  Railway and are **not** Railway services. Vercel hosting config (`vercel.json`,
+  `apps/web`) is unchanged. The only link from web → Railway is the public API
+  base URL env value **`NEXT_PUBLIC_API_BASE_URL`** (public `https://api.vygo.ai`,
+  never a secret).
+
+### Reference wiring (Railway / Vault — no values in git)
+
+`DATABASE_URL` and `REDIS_URL` are wired **exclusively** through Railway plugin
+reference expressions; the remaining secrets are Vault-backed (referenced by
+name, values injected at deploy). No credential value is ever copied, printed, or
+committed.
+
+| Variable                | Source                  | Reference expression                |
+| ----------------------- | ----------------------- | ----------------------------------- |
+| `DATABASE_URL`          | Railway Postgres plugin | `${{Postgres.DATABASE_URL}}`        |
+| `REDIS_URL`             | Railway Redis plugin    | `${{Redis.REDIS_URL}}`              |
+| `RESEND_API_KEY`        | Owner's Vault (by name) | `${{shared.RESEND_API_KEY}}`        |
+| `RESEND_WEBHOOK_SECRET` | Owner's Vault (by name) | `${{shared.RESEND_WEBHOOK_SECRET}}` |
+| `TURNSTILE_SECRET_KEY`  | Owner's Vault (by name) | `${{shared.TURNSTILE_SECRET_KEY}}`  |
+| `IP_HASH_SALT`          | Owner's Vault (by name) | `${{shared.IP_HASH_SALT}}`          |
+
+Live, machine-readable copy of this topology + reference wiring:
+`GET /api/railway-foundation` (`services[]`, `envReferences`,
+`limitation.remainingActions`, `limitation.verificationCommands`).
 
 ## Provision outcome & deploy gate (machine-readable)
 
@@ -167,33 +189,62 @@ config for the operator:
 
 ## Next steps (project `vygo`) — services not yet running
 
-Provisioning did not auto-create services, so start here. Names/wiring only;
-paste no secrets into git at any step.
+The provisioner in this repo is **project-shell-only**: it holds no Railway token
+or Vault consumer key, so it fails closed (`consumer_not_armed`) and cannot create
+services. The exact, executable remaining actions below (also published live at
+`GET /api/railway-foundation` → `limitation.remainingActions`) complete the
+topology. Reference expressions carry **no** secret values.
 
-1. **Open/create the Railway project** named `vygo`; record its `project_id` and
-   dashboard URL in the table above (in your notes, not necessarily committed).
-2. **Add Postgres** — add the Railway Postgres plugin. It exposes a connection
-   URL; reference it as `DATABASE_URL` on the API and worker services (prefer the
-   private-networking URL).
-3. **Add Redis** — add the Railway Redis plugin; reference it as `REDIS_URL` on
-   the API service.
-4. **Add the API service** — deploy `apps/api` from `southu/vygo`
-   (root dir = repo root; build/start per [`deploy/railway/README.md`](../deploy/railway/README.md)).
-   Wire env names from the tables above; set `NODE_ENV=production`,
-   `INLINE_EMAIL_WORKER` unset/false, `ENABLE_TEST_SURFACE=false` for prod.
-5. **Add the worker service** — deploy `apps/worker` as a **separate** service
-   sharing the same `DATABASE_URL`.
-6. **Wire secrets from the vault by name** — populate `RESEND_API_KEY`,
-   `RESEND_WEBHOOK_SECRET`, `TURNSTILE_SECRET_KEY`, and IP-hash salts on the
-   Railway services from the owner's secret store. Never commit the values.
-7. **Set `NEXT_PUBLIC_API_URL` on Vercel** to the API's public `https://` origin
-   once the API domain exists. This is the only web→Railway change; do not
-   retarget the frontend itself.
-8. **Migrate + verify** — run `pnpm db:migrate` against the project's
-   `DATABASE_URL`, then probe the API's health endpoints (`GET /healthz`
-   liveness, `GET /readyz` readiness-after-migrations, `GET /health` composite)
-   before sending traffic. Full procedure:
-   [deployment.md → API/worker Railway setup](./deployment.md#api-worker-postgresql-redis--exact-railway-setup).
+```bash
+# 1. Link the project shell
+railway login && railway link --project vygo
+
+# 2. Add the managed data plugins
+railway add --database postgres
+railway add --database redis
+
+# 3. Add the two services from the repo (same Dockerfile, different start command)
+railway add --service vygo-api --repo southu/vygo
+railway add --service vygo-worker --repo southu/vygo
+#    Worker only: Service → Settings → Config-as-code → deploy/railway/worker/railway.toml
+
+# 4. Wire DATABASE_URL / REDIS_URL as Railway references (never raw values)
+railway variables --service vygo-api \
+  --set "DATABASE_URL=${{Postgres.DATABASE_URL}}" \
+  --set "REDIS_URL=${{Redis.REDIS_URL}}" \
+  --set "NODE_ENV=production" --set "INLINE_EMAIL_WORKER=false" \
+  --set "ENABLE_TEST_SURFACE=false" \
+  --set "CORS_ORIGINS=https://www.vygo.ai,https://vygo.ai"
+railway variables --service vygo-worker \
+  --set "DATABASE_URL=${{Postgres.DATABASE_URL}}" \
+  --set "REDIS_URL=${{Redis.REDIS_URL}}" \
+  --set "NODE_ENV=production" --set "INLINE_EMAIL_WORKER=false"
+
+# 5. Wire Vault-backed secrets by name (values injected at deploy; never committed)
+railway variables --service vygo-api \
+  --set "RESEND_API_KEY=${{shared.RESEND_API_KEY}}" \
+  --set "RESEND_WEBHOOK_SECRET=${{shared.RESEND_WEBHOOK_SECRET}}" \
+  --set "TURNSTILE_SECRET_KEY=${{shared.TURNSTILE_SECRET_KEY}}" \
+  --set "IP_HASH_SALT=${{shared.IP_HASH_SALT}}"
+
+# 6. Migrate, then point the Vercel frontend at the Railway API
+railway run --service vygo-api pnpm db:migrate
+vercel env add NEXT_PUBLIC_API_BASE_URL production   # value: https://api.vygo.ai
+```
+
+**Verify (no secrets in output):**
+
+```bash
+curl -fsS https://api.vygo.ai/healthz
+curl -fsS https://api.vygo.ai/readyz
+curl -fsS https://api.vygo.ai/health
+railway status --service vygo-api
+railway status --service vygo-worker
+railway variables --service vygo-api   # confirm DATABASE_URL/REDIS_URL are reference-wired
+```
+
+Full narrative procedure:
+[deployment.md → API/worker Railway setup](./deployment.md#api-worker-postgresql-redis--exact-railway-setup).
 
 ## Guarantees for this repo
 

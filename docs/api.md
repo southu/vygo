@@ -134,9 +134,22 @@ traces, or SQL.
 
 ## CORS
 
-`CORS_ORIGINS` / `ALLOWED_ORIGINS` is a comma-separated allowlist. Only listed
-origins receive `Access-Control-Allow-Origin`. Unlisted origins receive no
-permissive ACAO value.
+Two classes of origin receive a reflected `Access-Control-Allow-Origin`
+(never a `*` wildcard):
+
+1. **Exact allowlist** — the production marketing origins `https://www.vygo.ai`
+   and `https://vygo.ai` (always allowed), plus any origins configured via the
+   comma-separated `CORS_ORIGINS` / `ALLOWED_ORIGINS` env.
+2. **Vercel preview origins (documented policy)** — the `vygo` project's preview
+   deployments on `https://vygo-<deployment|git-branch>-<scope>.vercel.app`,
+   matched by the pattern `^https://vygo(-[a-z0-9-]+)?\.vercel\.app$`. Matching
+   origins are reflected individually.
+
+Every other origin — including arbitrary `*.vercel.app` domains that are not the
+vygo project, and any unrelated site — receives **no** permissive ACAO value. An
+unrestricted production `*` wildcard is never emitted. The same policy is applied
+by the Railway API (`apps/api/src/cors.ts`) and by the Vercel edge health/waitlist
+surfaces (`api/_lib/http.ts`).
 
 ## Payload limits
 
