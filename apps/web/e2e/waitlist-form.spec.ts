@@ -333,4 +333,74 @@ test.describe("WaitlistForm", () => {
     await expect(page.locator("#productUrl")).toHaveAttribute("autocomplete", "url");
     await expect(page.locator("#role")).toHaveAttribute("autocomplete", "organization-title");
   });
+
+  test("Continue with valid step 1 does not auto-submit or show step 2 errors (mouse)", async ({
+    page,
+  }) => {
+    await page.goto("/waitlist");
+    await fillStep1(page, { email: `cont-mouse-${Date.now()}@example.com` });
+    await page.getByTestId("waitlist-continue").click();
+
+    await expect(page.locator('[data-waitlist-step="2"]')).toBeVisible();
+    await expect(page.getByTestId("waitlist-error-summary")).toHaveCount(0);
+    await expect(page.getByTestId("waitlist-form-heading")).toBeFocused();
+
+    const assertive = page.getByTestId("waitlist-live-assertive");
+    const assertiveText = ((await assertive.textContent()) || "").trim();
+    expect(assertiveText).not.toMatch(/error/i);
+
+    const events = await page.evaluate(() => window.__vygoAnalytics ?? []);
+    const validationFailures = events.filter((e) => e.event === "waitlist_validation_failure");
+    expect(validationFailures).toEqual([]);
+  });
+
+  test("Continue with valid step 1 does not auto-submit or show step 2 errors (keyboard)", async ({
+    page,
+  }) => {
+    await page.goto("/waitlist");
+    await fillStep1(page, { email: `cont-kb-${Date.now()}@example.com` });
+    await page.getByTestId("waitlist-continue").focus();
+    await page.keyboard.press("Enter");
+
+    await expect(page.locator('[data-waitlist-step="2"]')).toBeVisible();
+    await expect(page.getByTestId("waitlist-error-summary")).toHaveCount(0);
+    await expect(page.getByTestId("waitlist-form-heading")).toBeFocused();
+
+    const assertive = page.getByTestId("waitlist-live-assertive");
+    const assertiveText = ((await assertive.textContent()) || "").trim();
+    expect(assertiveText).not.toMatch(/error/i);
+
+    const events = await page.evaluate(() => window.__vygoAnalytics ?? []);
+    const validationFailures = events.filter((e) => e.event === "waitlist_validation_failure");
+    expect(validationFailures).toEqual([]);
+  });
+
+  test("modal focus trap keeps Shift+Tab within dialog after open", async ({ page }) => {
+    await page.goto("/");
+    const invoker = page.getByTestId("availability-bar-cta");
+    await invoker.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("waitlist-modal")).toBeVisible();
+    await expect(page.getByTestId("waitlist-form-heading")).toBeFocused();
+
+    await page.keyboard.press("Shift+Tab");
+
+    const stillInside = await page.evaluate(() => {
+      const modal = document.querySelector("[data-testid=waitlist-modal]");
+      const active = document.activeElement;
+      return Boolean(modal && active && modal.contains(active));
+    });
+    expect(stillInside).toBe(true);
+
+    // Extra Tab cycles must also stay inside the modal.
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press(i % 2 === 0 ? "Tab" : "Shift+Tab");
+      const inside = await page.evaluate(() => {
+        const modal = document.querySelector("[data-testid=waitlist-modal]");
+        const active = document.activeElement;
+        return Boolean(modal && active && modal.contains(active));
+      });
+      expect(inside).toBe(true);
+    }
+  });
 });

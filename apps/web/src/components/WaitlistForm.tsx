@@ -8,6 +8,7 @@ import {
   useState,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from "react";
 import Link from "next/link";
 import { waitlistContent } from "@/content/waitlist";
@@ -205,10 +206,15 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
       const first = focusable[0]!;
       const last = focusable[focusable.length - 1]!;
       const active = document.activeElement as HTMLElement | null;
-      if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
+      const activeInList = active != null && focusable.includes(active);
+      // Heading/container/other non-listed elements (e.g. tabindex=-1 heading) are
+      // outside the tabbable list; wrap so focus never escapes the dialog.
+      if (event.shiftKey) {
+        if (!activeInList || active === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (!activeInList || active === last) {
         event.preventDefault();
         first.focus();
       }
@@ -381,7 +387,11 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
     return Object.keys(next).length === 0;
   };
 
-  const onContinue = () => {
+  const onContinue = (event?: ReactMouseEvent<HTMLButtonElement>) => {
+    // Prevent the still-dispatching click from activating a remounted submit
+    // button when React reuses the DOM node across step 1 → 2.
+    event?.preventDefault();
+    event?.stopPropagation();
     if (validateStep1()) {
       setStep(2);
       setShowErrorSummary(false);
@@ -1052,6 +1062,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
 
           {step === 1 ? (
             <button
+              key="continue"
               type="button"
               className="btn-primary"
               onClick={onContinue}
@@ -1061,6 +1072,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
             </button>
           ) : (
             <button
+              key="submit"
               type="submit"
               className="btn-primary"
               disabled={status === "submitting"}
