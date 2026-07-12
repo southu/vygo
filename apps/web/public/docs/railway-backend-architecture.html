@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Vygo backend architecture — Railway plane (project vygo)</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 60rem;
+        padding: 2rem 1.25rem 4rem;
+        font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: #111;
+        background: #fff;
+      }
+      h1 {
+        font-size: 1.7rem;
+        line-height: 1.25;
+      }
+      h2 {
+        margin-top: 2.2rem;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 0.3rem;
+      }
+      code {
+        background: #f2f2f2;
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+        font-size: 0.9em;
+      }
+      pre {
+        background: #f6f8fa;
+        padding: 1rem;
+        overflow-x: auto;
+        border-radius: 8px;
+        font-size: 0.82rem;
+        line-height: 1.4;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 1rem 0;
+        font-size: 0.92rem;
+      }
+      th,
+      td {
+        border: 1px solid #d0d0d0;
+        padding: 0.4rem 0.6rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #f2f2f2;
+      }
+      blockquote {
+        margin: 1rem 0;
+        padding: 0.5rem 1rem;
+        border-left: 4px solid #888;
+        background: #fafafa;
+        color: #333;
+      }
+      .note {
+        font-size: 0.9rem;
+        color: #555;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          color: #e6e6e6;
+          background: #0e0e10;
+        }
+        h2 {
+          border-color: #333;
+        }
+        code {
+          background: #1d1f24;
+        }
+        pre {
+          background: #16181d;
+        }
+        th {
+          background: #1d1f24;
+        }
+        th,
+        td {
+          border-color: #333;
+        }
+        blockquote {
+          background: #16181d;
+          color: #cfcfcf;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Vygo backend architecture — Railway plane (project <code>vygo</code>)</h1>
+
+    <p>
+      <strong>Architect-only plan.</strong> This document describes how the Vygo
+      <strong>backend plane</strong> — a <strong>Fastify API</strong>,
+      <strong>Postgres</strong>, <strong>Redis</strong>, and an
+      <strong>email worker</strong> — is laid out on <strong>Railway</strong>
+      project <code>vygo</code>. It is a plan, not a provisioning action: no
+      infrastructure is created, destroyed, redeployed, or retargeted by
+      publishing it.
+    </p>
+
+    <blockquote>
+      <strong>No secrets appear anywhere in this document.</strong> It uses
+      environment variable <strong>key names</strong> and public URL shapes only —
+      no tokens, API keys, passwords, or credential-bearing connection strings.
+      This page is the secret-free copy published for live verification at
+      <code>/docs/railway-backend-architecture</code>.
+    </blockquote>
+
+    <h2>1. Hosting split (authoritative)</h2>
+    <p>
+      <strong
+        >The marketing site is hosted on Vercel. The API, Postgres, Redis, and
+        the email worker are hosted on Railway (project <code>vygo</code>).</strong
+      >
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Platform</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Web (<code>apps/web</code>)</td>
+          <td><strong>Vercel</strong></td>
+          <td>Static Next.js export — marketing / site</td>
+        </tr>
+        <tr>
+          <td>API (<code>apps/api</code>)</td>
+          <td><strong>Railway</strong> (<code>vygo</code>)</td>
+          <td>Fastify HTTP service</td>
+        </tr>
+        <tr>
+          <td>Worker (<code>apps/worker</code>)</td>
+          <td><strong>Railway</strong> (<code>vygo</code>)</td>
+          <td>Email / outbox worker — a separate service</td>
+        </tr>
+        <tr>
+          <td>PostgreSQL</td>
+          <td><strong>Railway</strong> (<code>vygo</code>)</td>
+          <td>Primary data store, shared by API + worker</td>
+        </tr>
+        <tr>
+          <td>Redis</td>
+          <td><strong>Railway</strong> (<code>vygo</code>)</td>
+          <td>Rate limiting / cache for the API</td>
+        </tr>
+        <tr>
+          <td>Email provider</td>
+          <td><strong>Resend</strong></td>
+          <td>External SaaS; server-side send + inbound webhook</td>
+        </tr>
+        <tr>
+          <td>Bot protection</td>
+          <td><strong>Cloudflare Turnstile</strong></td>
+          <td>External SaaS; server-side token verification</td>
+        </tr>
+      </tbody>
+    </table>
+    <ul>
+      <li>
+        The marketing / site plane stays on <strong>Vercel</strong> and is
+        <strong>not</strong> retargeted or moved to Railway. Vercel hosting config
+        (<code>vercel.json</code>, <code>apps/web</code>) is unchanged.
+      </li>
+      <li>
+        The API + Postgres + Redis + email worker plane runs on
+        <strong>Railway</strong> in a single project named <code>vygo</code>.
+      </li>
+      <li>
+        The only link from the Vercel frontend to the Railway backend is a
+        <strong>public</strong> API base URL env value (an <code>https://</code>
+        origin), never a secret.
+      </li>
+    </ul>
+
+    <h2>2. Topology (services and process roles)</h2>
+    <pre>
+                       Internet (HTTPS)
+                              |
+        +---------------------+----------------------+
+        |                                            |
+   Vercel (marketing/site)                   Railway project `vygo`
+   apps/web - static Next.js export          +--------------------------+
+        |  public API base URL (https)       |  API service (apps/api)  |
+        +----------------------------------> |  Fastify HTTP server     |
+                                             |   - /healthz /readyz     |
+                                             |   - waitlist, availability|
+                                             |   - Resend webhook intake|
+                                             +------+-----------+-------+
+                                                    | private     | private
+                                        +-----------+ networking  + networking--+
+                                        v                                        v
+                             +--------------------+                 +--------------------+
+                             | Postgres (plugin)  |  (API only)     |  Redis (plugin)    |
+                             | leads, email outbox|<--------------->| rate limit / cache |
+                             | events, heartbeat  |                 +--------------------+
+                             +---------+----------+
+                                       | same DATABASE_URL
+                                       v
+                             +------------------------+       +--------------+
+                             | Worker service         |------>|   Resend     |
+                             | apps/worker            | send  | (email SaaS) |
+                             | outbox drain + retries |       +--------------+
+                             +------------------------+
+    </pre>
+    <p>Four backend process / data roles run in project <code>vygo</code>:</p>
+    <ol>
+      <li>
+        <strong>Fastify API (<code>apps/api</code>)</strong> — the public HTTP
+        service. Handles waitlist submissions, availability, Resend inbound
+        webhooks, and health / readiness probes. Verifies Cloudflare Turnstile
+        tokens server-side and enqueues outbound email into a Postgres-backed
+        outbox.
+      </li>
+      <li>
+        <strong>Email worker (<code>apps/worker</code>)</strong> — a
+        <strong>separate</strong> long-running service (not a web process) that
+        drains the email outbox and delivers via Resend.
+      </li>
+      <li>
+        <strong>PostgreSQL</strong> — a Railway managed plugin; the primary data
+        store shared by the API and the worker.
+      </li>
+      <li>
+        <strong>Redis</strong> — a Railway managed plugin; used by the API for
+        rate limiting / cache.
+      </li>
+    </ol>
+    <p>
+      The worker can also run <strong>inline inside the API process</strong> for
+      local / dev via <code>INLINE_EMAIL_WORKER=true</code>. In production on
+      Railway it runs as its <strong>own service</strong> with
+      <code>INLINE_EMAIL_WORKER=false</code> on both services, so API scaling and
+      worker throughput are independent.
+    </p>
+
+    <h2>3. Data stores</h2>
+    <ul>
+      <li>
+        <strong>PostgreSQL (Railway plugin, shared).</strong> Stores waitlist
+        leads, the email <strong>outbox</strong> (queued / sending / sent /
+        dead-letter jobs), delivered email <strong>events</strong> (from Resend
+        webhooks), and the <strong>worker heartbeat</strong> row that
+        <code>/health</code> reads. Both the API (producer) and the worker
+        (consumer) connect with the same <code>DATABASE_URL</code>; prefer Railway
+        <strong>private networking</strong> for that URL.
+      </li>
+      <li>
+        <strong>Redis (Railway plugin, API-only).</strong> Backs IP / email rate
+        limiting and lightweight caching in the API via <code>REDIS_URL</code>. If
+        Redis is absent the API falls back to an in-process memory store, so it is
+        operationally optional but recommended for multi-instance correctness.
+      </li>
+    </ul>
+
+    <h2>4. Email worker responsibilities</h2>
+    <p>The worker is a database-backed <strong>outbox</strong> processor:</p>
+    <ul>
+      <li>
+        <strong>Claim</strong> due outbox jobs using
+        <code>SELECT … FOR UPDATE SKIP LOCKED</code> so multiple workers /
+        instances never process the same job twice.
+      </li>
+      <li>
+        <strong>Deliver</strong> each job through the Resend transport (server-side
+        API key).
+      </li>
+      <li>
+        <strong>Retry</strong> transient failures with exponential backoff +
+        jitter, up to <code>WORKER_MAX_ATTEMPTS</code>.
+      </li>
+      <li>
+        <strong>Dead-letter</strong> jobs that exhaust their attempts so they stop
+        being retried and can be inspected.
+      </li>
+      <li>
+        <strong>Heartbeat</strong> — periodically upsert a worker heartbeat row;
+        the API <code>/health</code> endpoint reads it to report worker readiness
+        (fresh vs. stale / missing).
+      </li>
+      <li>
+        <strong>Graceful shutdown</strong> on <code>SIGTERM</code> /
+        <code>SIGINT</code> (Railway redeploy / stop) so an in-flight batch
+        finishes or is released cleanly.
+      </li>
+      <li>
+        <strong>Secret redaction</strong> in logs — API keys, signing secrets, and
+        PII are never logged.
+      </li>
+    </ul>
+    <p class="note">
+      Tuning knobs (non-secret): <code>WORKER_POLL_INTERVAL_MS</code>,
+      <code>WORKER_BATCH_SIZE</code>, <code>WORKER_MAX_ATTEMPTS</code>.
+    </p>
+
+    <h2>5. How the services connect</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>From → To</th>
+          <th>Mechanism / env name</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Web (Vercel) → API</td>
+          <td><code>NEXT_PUBLIC_API_BASE_URL</code> (public <code>https://</code> origin)</td>
+          <td>See naming note below; public, not secret</td>
+        </tr>
+        <tr>
+          <td>API → Postgres</td>
+          <td><code>DATABASE_URL</code> (Railway Postgres plugin)</td>
+          <td>Prefer private-networking URL</td>
+        </tr>
+        <tr>
+          <td>API → Redis</td>
+          <td><code>REDIS_URL</code> (Railway Redis plugin)</td>
+          <td>Rate limit / cache; optional fallback</td>
+        </tr>
+        <tr>
+          <td>API → Resend (outbound)</td>
+          <td><code>RESEND_API_KEY</code></td>
+          <td>Server-side send + outbox enqueue</td>
+        </tr>
+        <tr>
+          <td>Resend → API (inbound)</td>
+          <td><code>RESEND_WEBHOOK_SECRET</code></td>
+          <td>Verify inbound webhook signatures</td>
+        </tr>
+        <tr>
+          <td>API → Turnstile</td>
+          <td><code>TURNSTILE_SECRET_KEY</code></td>
+          <td>Server-side bot-token verification</td>
+        </tr>
+        <tr>
+          <td>Worker → Postgres</td>
+          <td><code>DATABASE_URL</code> (same DB as API)</td>
+          <td>Outbox drain, heartbeat</td>
+        </tr>
+        <tr>
+          <td>Worker → Resend</td>
+          <td><code>RESEND_API_KEY</code></td>
+          <td>Delivers queued email</td>
+        </tr>
+        <tr>
+          <td>API CORS allowlist</td>
+          <td><code>CORS_ORIGINS</code></td>
+          <td>Include the Vercel web origin(s)</td>
+        </tr>
+      </tbody>
+    </table>
+    <blockquote>
+      <strong>Naming note — <code>NEXT_PUBLIC_API_BASE_URL</code>.</strong>
+      Architect / provision notes call the web→API link
+      <code>NEXT_PUBLIC_API_BASE_URL</code> ("public API base URL"). The variable
+      the web app <strong>actually reads</strong> is
+      <code>NEXT_PUBLIC_API_URL</code> (see <code>apps/web/src/lib/api.ts</code>
+      and <code>packages/config</code>). Set <code>NEXT_PUBLIC_API_URL</code> on
+      <strong>Vercel</strong> to the Railway API's public <code>https://</code>
+      origin (no trailing slash). It is a <strong>public</strong> value and must
+      never hold a secret.
+    </blockquote>
+
+    <h2>6. Deploy and runtime notes (no secrets)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Source</th>
+          <th>Root dir</th>
+          <th>Build</th>
+          <th>Start</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Postgres</td>
+          <td>Railway plugin</td>
+          <td>—</td>
+          <td>— (managed)</td>
+          <td>— (managed)</td>
+        </tr>
+        <tr>
+          <td>Redis</td>
+          <td>Railway plugin</td>
+          <td>—</td>
+          <td>— (managed)</td>
+          <td>— (managed)</td>
+        </tr>
+        <tr>
+          <td>API</td>
+          <td><code>southu/vygo</code></td>
+          <td>repo root</td>
+          <td><code>pnpm install --frozen-lockfile &amp;&amp; pnpm --filter @vygo/api build</code></td>
+          <td><code>pnpm --filter @vygo/api start</code></td>
+        </tr>
+        <tr>
+          <td>Worker</td>
+          <td><code>southu/vygo</code></td>
+          <td>repo root</td>
+          <td><code>pnpm install --frozen-lockfile &amp;&amp; pnpm --filter @vygo/worker build</code></td>
+          <td><code>pnpm --filter @vygo/worker start</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <ul>
+      <li><strong>Node version:</strong> 24 (matches <code>.nvmrc</code>).</li>
+      <li>
+        <strong>Health checks (API):</strong> <code>/healthz</code> (liveness),
+        <code>/readyz</code> (readiness after migrations), <code>/health</code>
+        (composite: API + database + worker heartbeat).
+      </li>
+      <li>
+        <strong>Migrations:</strong> run <code>pnpm db:migrate</code> against the
+        project's <code>DATABASE_URL</code> before serving traffic (one-off Railway
+        shell or CI job).
+      </li>
+      <li>
+        <strong>Production posture:</strong> on both services set
+        <code>NODE_ENV=production</code>, <code>INLINE_EMAIL_WORKER=false</code>
+        (the worker is its own service), and
+        <code>ENABLE_TEST_SURFACE=false</code>.
+      </li>
+      <li>
+        <strong>Ports:</strong> Railway injects <code>PORT</code>; the API binds to
+        it (schema default 4000).
+      </li>
+      <li>
+        Secret values come from the Railway plugins or the owner's secret vault at
+        deploy time and are entered in the Railway dashboard — never committed.
+      </li>
+    </ul>
+
+    <h2>7. Environment variable key catalog (names only, no values)</h2>
+    <p>
+      All entries are <strong>key names only</strong>. No values, connection
+      strings, or tokens appear here or in git. Full secret-free stubs live under
+      <code>deploy/railway/</code>.
+    </p>
+
+    <h3>API service (<code>apps/api</code> on Railway)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Key name</th>
+          <th>Provided by</th>
+          <th>Secret?</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>DATABASE_URL</code></td>
+          <td>Railway Postgres plugin</td>
+          <td>yes</td>
+          <td>Postgres connection (private-networking URL)</td>
+        </tr>
+        <tr>
+          <td><code>REDIS_URL</code></td>
+          <td>Railway Redis plugin</td>
+          <td>yes</td>
+          <td>Rate limit / cache</td>
+        </tr>
+        <tr>
+          <td><code>RESEND_API_KEY</code></td>
+          <td>Resend (vault)</td>
+          <td>yes</td>
+          <td>Outbound email (Resend server key)</td>
+        </tr>
+        <tr>
+          <td><code>RESEND_WEBHOOK_SECRET</code></td>
+          <td>Resend (vault)</td>
+          <td>yes</td>
+          <td>Verify inbound Resend webhooks (Resend server key)</td>
+        </tr>
+        <tr>
+          <td><code>TURNSTILE_SECRET_KEY</code></td>
+          <td>Cloudflare (vault)</td>
+          <td>yes</td>
+          <td>Server-side Turnstile verification (Turnstile server key)</td>
+        </tr>
+        <tr>
+          <td><code>IP_HASH_SALT</code> / <code>IP_HASH_SALT_VERSION</code></td>
+          <td>vault</td>
+          <td>yes</td>
+          <td>Versioned IP hashing (never log raw IPs)</td>
+        </tr>
+        <tr>
+          <td><code>CORS_ORIGINS</code></td>
+          <td>operator</td>
+          <td>no</td>
+          <td>Allowlist incl. Vercel web origin(s)</td>
+        </tr>
+        <tr>
+          <td><code>EMAIL_FROM</code> / <code>LEAD_NOTIFICATION_EMAIL</code></td>
+          <td>operator</td>
+          <td>no</td>
+          <td>Email identity / notify address</td>
+        </tr>
+        <tr>
+          <td>
+            <code>RATE_LIMIT_IP_MAX</code> /
+            <code>RATE_LIMIT_IP_WINDOW_SECONDS</code> /
+            <code>RATE_LIMIT_EMAIL_MAX</code> /
+            <code>RATE_LIMIT_EMAIL_WINDOW_SECONDS</code>
+          </td>
+          <td>operator</td>
+          <td>no</td>
+          <td>Rate limiting (per IP / per email)</td>
+        </tr>
+        <tr>
+          <td><code>MIN_FORM_COMPLETION_MS</code> / <code>LOG_LEVEL</code></td>
+          <td>operator</td>
+          <td>no</td>
+          <td>Anti-bot timing / log verbosity</td>
+        </tr>
+        <tr>
+          <td><code>NODE_ENV</code> / <code>PORT</code></td>
+          <td>Railway / operator</td>
+          <td>no</td>
+          <td>Runtime mode / injected port</td>
+        </tr>
+        <tr>
+          <td><code>INLINE_EMAIL_WORKER</code> / <code>ENABLE_TEST_SURFACE</code></td>
+          <td>operator</td>
+          <td>no</td>
+          <td><code>false</code> in production</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Worker service (<code>apps/worker</code> on Railway)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Key name</th>
+          <th>Provided by</th>
+          <th>Secret?</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>DATABASE_URL</code></td>
+          <td>Railway Postgres plugin</td>
+          <td>yes</td>
+          <td>Same DB as API (outbox drain)</td>
+        </tr>
+        <tr>
+          <td><code>REDIS_URL</code></td>
+          <td>Railway Redis plugin</td>
+          <td>yes</td>
+          <td>Optional; only if the worker needs it</td>
+        </tr>
+        <tr>
+          <td><code>RESEND_API_KEY</code></td>
+          <td>Resend (vault)</td>
+          <td>yes</td>
+          <td>Deliver queued email (Resend server key)</td>
+        </tr>
+        <tr>
+          <td><code>EMAIL_FROM</code> / <code>LEAD_NOTIFICATION_EMAIL</code></td>
+          <td>operator</td>
+          <td>no</td>
+          <td>Email identity</td>
+        </tr>
+        <tr>
+          <td>
+            <code>WORKER_POLL_INTERVAL_MS</code> /
+            <code>WORKER_BATCH_SIZE</code> / <code>WORKER_MAX_ATTEMPTS</code>
+          </td>
+          <td>operator</td>
+          <td>no</td>
+          <td>Worker tuning</td>
+        </tr>
+        <tr>
+          <td>
+            <code>NODE_ENV</code> / <code>LOG_LEVEL</code> /
+            <code>INLINE_EMAIL_WORKER</code>
+          </td>
+          <td>operator</td>
+          <td>no</td>
+          <td>Runtime; <code>INLINE_EMAIL_WORKER=false</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Vercel web (<code>apps/web</code>) — public link to Railway API</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Key name</th>
+          <th>Secret?</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <code>NEXT_PUBLIC_API_BASE_URL</code> (alias for
+            <code>NEXT_PUBLIC_API_URL</code>)
+          </td>
+          <td>no</td>
+          <td>Public <code>https://</code> origin of the Railway API</td>
+        </tr>
+        <tr>
+          <td><code>NEXT_PUBLIC_TURNSTILE_SITE_KEY</code></td>
+          <td>no</td>
+          <td>Public Turnstile <strong>site</strong> key (client widget)</td>
+        </tr>
+        <tr>
+          <td><code>NEXT_PUBLIC_APP_URL</code></td>
+          <td>no</td>
+          <td>Public site origin</td>
+        </tr>
+      </tbody>
+    </table>
+    <blockquote>
+      <code>NEXT_PUBLIC_*</code> values are <strong>public by design</strong> and
+      safe to expose in the browser bundle. The <strong>server</strong> secrets
+      <code>TURNSTILE_SECRET_KEY</code>, <code>RESEND_API_KEY</code>, and
+      <code>RESEND_WEBHOOK_SECRET</code> live only on <strong>Railway</strong>,
+      never on Vercel and never in git.
+    </blockquote>
+
+    <h2>8. Secret-safety confirmation</h2>
+    <p>
+      This plan and this published HTTP copy <strong>contain no secret material</strong>:
+    </p>
+    <ul>
+      <li>
+        Only environment variable <strong>key names</strong> and public URL shapes
+        are documented; <strong>no values</strong> are present.
+      </li>
+      <li>
+        No API keys, passwords, JWTs, live/test payment tokens, Railway / Vercel
+        API tokens, or credential-bearing database / Redis connection strings
+        appear.
+      </li>
+      <li><code>pnpm secret-scan</code> runs over tracked files in CI and gates this repo.</li>
+      <li>
+        The Vercel frontend, its hosting config, and the deploy SHA marker
+        (<code>/version</code>) are untouched by this document.
+      </li>
+    </ul>
+
+    <hr />
+    <p class="note">
+      Source of truth in-repo: <code>docs/railway-backend-architecture.md</code>.
+      Related: <code>docs/railway-backend-readiness.md</code>,
+      <code>deploy/railway/</code>, <code>docs/deployment.md</code>.
+    </p>
+  </body>
+</html>
