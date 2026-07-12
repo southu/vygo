@@ -52,17 +52,29 @@ Railway plugins or the owner's secret vault at deploy time — **never** committ
 | `RESEND_WEBHOOK_SECRET` | API         | Resend (secret vault)     | Verify inbound Resend webhook signatures         |
 | `TURNSTILE_SECRET_KEY`  | API         | Cloudflare (secret vault) | Server-side Turnstile verification               |
 
-Public frontend → API link (set on **Vercel**, not Railway; public URL only):
+Public frontend → backend links (set on **Vercel**, not Railway). Every entry is
+a `NEXT_PUBLIC_*` value that ships to the browser, so each is **public by
+definition** and must never hold a secret:
 
-| Env name              | Where        | Value shape                                 |
-| --------------------- | ------------ | ------------------------------------------- |
-| `NEXT_PUBLIC_API_URL` | Vercel (web) | Public `https://` origin of the Railway API |
+| Env name                         | Where        | Value shape                                            |
+| -------------------------------- | ------------ | ------------------------------------------------------ |
+| `NEXT_PUBLIC_API_URL`            | Vercel (web) | Public `https://` origin of the Railway API            |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Vercel (web) | Cloudflare Turnstile **site** key (public, not secret) |
 
-> **Naming note:** provision/architect notes may refer to this as
+> **Naming note:** provision/architect notes may refer to the API URL as
 > `NEXT_PUBLIC_API_BASE_URL` ("public API base URL"). The variable the web app
 > actually reads is **`NEXT_PUBLIC_API_URL`** (see `apps/web/src/lib/api.ts` and
 > `packages/config`). Use `NEXT_PUBLIC_API_URL`. It is a **public** value — the
 > API's `https://…` origin, no trailing slash — and must never hold a secret.
+>
+> **Turnstile is a client/server pair.** The **public** site key above lives on
+> Vercel and renders the widget (`apps/web/src/components/WaitlistForm.tsx`); its
+> matching **secret**, `TURNSTILE_SECRET_KEY`, lives on the Railway API (table
+> above) and verifies the token. Both halves must be set for bot protection to
+> work — the site key is safe to expose, the secret never is. If the site key is
+> unset the web app falls back to Cloudflare's public test key for non-prod only.
+> See [turnstile.md](./turnstile.md). This is documentation of an existing public
+> Vercel var — it does **not** change the Vercel hosting setup.
 
 The full operational env name set (rate limits, IP-hash salts, logging, worker
 tuning, `CORS_ORIGINS`, `EMAIL_FROM`, etc.) is captured as **empty stubs** in:
@@ -109,7 +121,9 @@ paste no secrets into git at any step.
    once the API domain exists. This is the only web→Railway change; do not
    retarget the frontend itself.
 8. **Migrate + verify** — run `pnpm db:migrate` against the project's
-   `DATABASE_URL`, then verify per
+   `DATABASE_URL`, then probe the API's health endpoints (`GET /healthz`
+   liveness, `GET /readyz` readiness-after-migrations, `GET /health` composite)
+   before sending traffic. Full procedure:
    [deployment.md → API/worker Railway setup](./deployment.md#api-worker-postgresql-redis--exact-railway-setup).
 
 ## Guarantees for this repo
