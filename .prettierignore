@@ -11,5 +11,7 @@ apps/web/public/api/railway-foundation.json
 apps/web/public/api/provision.json
 shared/provision.json
 apps/web/public/version
+apps/web/public/healthz
+apps/web/public/readyz
 apps/web/public/docs
 *.tsbuildinfo

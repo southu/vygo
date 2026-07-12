@@ -16,6 +16,20 @@
       "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }]
     },
     {
+      "source": "/healthz",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
+      "source": "/readyz",
+      "headers": [
+        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
       "source": "/api/readiness",
       "headers": [
         { "key": "Content-Type", "value": "application/json; charset=utf-8" },

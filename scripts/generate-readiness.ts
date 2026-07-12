@@ -449,6 +449,34 @@ function main() {
     "utf8",
   );
 
+  // Liveness + readiness for the deployed edge site (static export).
+  //
+  // The Fastify API (apps/api) owns the dependency-aware /healthz and /readyz
+  // that check Postgres when DATABASE_URL is configured. The static marketing
+  // edge served at www.vygo.ai has no database dependency, so its readiness is
+  // the documented safe default: ready=true. These files mirror those routes so
+  // the same paths resolve on the edge deployment. Vercel sets their JSON
+  // content type + no-store cache via vercel.json.
+  // No git SHA here: /version and /api/readiness are the SHA sources, so these
+  // stay stable across commits (avoids a stale SHA in the committed artifact).
+  const healthBody = {
+    ok: true,
+    healthy: true,
+    status: "healthy",
+    service: "vygo-web",
+  };
+  const readyBody = {
+    ready: true,
+    status: "ready",
+    service: "vygo-web",
+    // Static edge deployment carries no database dependency; the API's /readyz
+    // performs the Postgres check when DATABASE_URL is set (see README).
+    database: "not_configured",
+    checks: { web: { ready: true } },
+  };
+  writeFileSync(path.join(publicDir, "healthz"), `${JSON.stringify(healthBody)}\n`, "utf8");
+  writeFileSync(path.join(publicDir, "readyz"), `${JSON.stringify(readyBody)}\n`, "utf8");
+
   // Ensure the directory is present for git
   const barrel = path.join(outDir, ".gitkeep");
   if (!existsSync(barrel)) {
@@ -456,7 +484,9 @@ function main() {
   }
 
   console.log(`Wrote ${path.relative(root, outFile)} (ready=${report.ready})`);
-  console.log(`Wrote apps/web/public/version and apps/web/public/api/readiness.json`);
+  console.log(
+    `Wrote apps/web/public/version, apps/web/public/healthz, apps/web/public/readyz, and apps/web/public/api/readiness.json`,
+  );
   if (!report.ready) {
     console.error("Readiness report is not ready=true; inspect checks above.");
     // Still write the file so the endpoint can surface details; fail only when --strict

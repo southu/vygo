@@ -200,19 +200,22 @@ generation, and baseline build.
 | ------ | ------------------------- | ---------------------------------------------------------------------------------- |
 | `GET`  | `/`                       | Marketing home (identifies the Vygo application)                                   |
 | `GET`  | `/version`                | Deployed git SHA (plain text; from Vercel/CI env — not `version.txt`)              |
+| `GET`  | `/healthz`                | Liveness JSON (`healthy: true`) for the static edge site                           |
+| `GET`  | `/readyz`                 | Readiness JSON (`ready: true`); the static edge has no database dependency         |
 | `GET`  | `/api/readiness`          | JSON readiness report (`ready`, workspace structure, check results)                |
 | `GET`  | `/api/railway-foundation` | Railway backend foundation status: provision outcome + go/no-go gate (secret-free) |
 
 ## Machine endpoints (API)
 
-| Method | Path                      | Purpose                                                                                |
-| ------ | ------------------------- | -------------------------------------------------------------------------------------- |
-| `GET`  | `/health`                 | Composite readiness: API + database + email worker (no secrets or applicant data)      |
-| `GET`  | `/healthz`                | Process liveness (no dependency checks)                                                |
-| `GET`  | `/readyz`                 | Ready when Postgres is up and required Drizzle migrations are applied                  |
-| `GET`  | `/v1/public/availability` | Public availability JSON + cache/ETag headers (neutral fallback)                       |
-| `POST` | `/v1/waitlist`            | Secure waitlist intake (Turnstile, rate limits, atomic dual transactional outbox jobs) |
-| `POST` | `/v1/webhooks/resend`     | Idempotent Resend/Svix webhook (signature required; provider events deduplicated)      |
+| Method | Path                      | Purpose                                                                                                |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `GET`  | `/health`                 | Composite readiness: API + database + email worker (no secrets or applicant data)                      |
+| `GET`  | `/healthz`                | Process liveness (no dependency checks)                                                                |
+| `GET`  | `/readyz`                 | Ready when Postgres is up and required Drizzle migrations are applied                                  |
+| `GET`  | `/version`                | Deployed git SHA (plain text; from `VERCEL_GIT_COMMIT_SHA`/`COMMIT_SHA`/`GIT_COMMIT_SHA`/`GITHUB_SHA`) |
+| `GET`  | `/v1/public/availability` | Public availability JSON + cache/ETag headers (neutral fallback)                                       |
+| `POST` | `/v1/waitlist`            | Secure waitlist intake (Turnstile, rate limits, atomic dual transactional outbox jobs)                 |
+| `POST` | `/v1/webhooks/resend`     | Idempotent Resend/Svix webhook (signature required; provider events deduplicated)                      |
 
 See [docs/api.md](docs/api.md) for the full contract (request IDs, CORS, neutral responses).
 

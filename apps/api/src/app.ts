@@ -168,6 +168,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
   }));
 
   /**
+   * Deployed git SHA for Ratchet's version-endpoint deploy gate.
+   * Plain text so a ≥7-hex-character body is returned verbatim. The SHA comes
+   * from a documented build-metadata env var (VERCEL_GIT_COMMIT_SHA / COMMIT_SHA
+   * / GIT_COMMIT_SHA / GITHUB_SHA); "unknown" only when none is configured.
+   */
+  app.get("/version", async (_request, reply) => {
+    const sha = getDeployedGitSha();
+    return reply.type("text/plain; charset=utf-8").send(sha || "unknown");
+  });
+
+  /**
    * Composite readiness for live verification: API process + database + email worker.
    * Never exposes credentials, signing secrets, authorization headers, email bodies, or applicant data.
    */

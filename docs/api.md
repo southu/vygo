@@ -42,6 +42,17 @@ Process liveness. No dependency checks.
 { "ok": true, "healthy": true, "service": "vygo-api" }
 ```
 
+## `GET /version`
+
+Deployed git SHA as `text/plain`, for Ratchet's version-endpoint deploy gate.
+The SHA is read from documented build metadata, in order:
+`VERCEL_GIT_COMMIT_SHA` → `COMMIT_SHA` → `GIT_COMMIT_SHA` → `GITHUB_SHA`. When no
+build-metadata variable is set (e.g. a bare local run), the body is `unknown`.
+
+```
+b657ec298a022aa45babc800d61d00ffdd34bc6c
+```
+
 ## `GET /readyz`
 
 Dependency-aware readiness. HTTP 200 only when PostgreSQL is reachable and all
@@ -56,6 +67,20 @@ required Drizzle migrations / schema objects are present. Otherwise HTTP 503.
   "appliedMigrations": ["…"]
 }
 ```
+
+### Readiness when `DATABASE_URL` is absent
+
+`/readyz` is fail-closed: with no `DATABASE_URL` configured it returns HTTP 503
+with an explicit `reason` (`"DATABASE_URL not configured"`) rather than falsely
+reporting ready. This is the safe local-development default — a probe never
+reports a not-yet-provisioned database as ready.
+
+The marketing site served at `www.vygo.ai` is a **static export with no database
+dependency**, so it publishes its own edge `/healthz` and `/readyz` (written to
+`apps/web/public/` by `scripts/generate-readiness.ts` at prebuild). Those edge
+endpoints report `{"ready": true, "database": "not_configured"}` because the
+static site has nothing to fail against; the Postgres-aware check above belongs
+to the Fastify API deployment where `DATABASE_URL` is provisioned.
 
 ## `GET /v1/public/availability`
 
