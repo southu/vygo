@@ -1,0 +1,22 @@
+# Railway config-as-code for the WORKER service (project `vygo`).
+#
+# Point the worker service's config path here: Service → Settings →
+# Config-as-code → `deploy/railway/worker/railway.toml`. It builds from the same
+# root Dockerfile as the API but starts the worker process instead, so the API
+# and worker run as separate Railway services sharing one image.
+#
+# The worker exposes an HTTP liveness/status surface (apps/worker/src/health-server.ts)
+# on 0.0.0.0:$PORT so Railway can health-check the separate process.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Worker binds 0.0.0.0:$PORT (health server) and drains + shuts down gracefully
+# on SIGTERM/SIGINT. Leave INLINE_EMAIL_WORKER unset/false — this IS the worker.
+startCommand = "pnpm --filter @vygo/worker start"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

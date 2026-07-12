@@ -7,6 +7,12 @@
   "cleanUrls": true,
   "rewrites": [
     { "source": "/v1/waitlist", "destination": "/api/waitlist" },
+    { "source": "/health", "destination": "/api/health" },
+    { "source": "/worker", "destination": "/api/worker-status" },
+    { "source": "/workerz", "destination": "/api/worker-status" },
+    { "source": "/worker/status", "destination": "/api/worker-status" },
+    { "source": "/worker/health", "destination": "/api/worker-status" },
+    { "source": "/api/worker", "destination": "/api/worker-status" },
     { "source": "/api/readiness", "destination": "/api/readiness.json" },
     { "source": "/api/railway-foundation", "destination": "/api/railway-foundation.json" },
     { "source": "/api/provision", "destination": "/api/provision.json" }
