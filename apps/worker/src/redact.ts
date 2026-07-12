@@ -6,7 +6,7 @@
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const BEARER_RE = /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi;
 const CONNECTION_STRING_RE = /(postgres(?:ql)?:\/\/)([^:\s]+):([^@\s]+)@/gi;
-const API_KEY_RE = /\b(re_[A-Za-z0-9]{10,}|whsec_[A-Za-z0-9+/=]{8,})\b/g;
+const API_KEY_RE = /\b(re_[A-Za-z0-9_]{8,}|whsec_[A-Za-z0-9+/=]{8,})\b/g;
 
 const SENSITIVE_KEYS = new Set([
   "password",
@@ -121,12 +121,12 @@ export function runSecretRedactionSuite(): {
   );
 
   const str = redactString(
-    "send to user@example.com with key re_live_abcdefghijklmnopqrst and postgres://u:secret@host/db",
+    "send to user@example.com with key re_live_abcdefghijklmnopqrstuv and postgres://u:secret@host/db",
   );
   record(
     "redacts_string_patterns",
     !str.includes("user@example.com") &&
-      !str.includes("re_live_abcdefghijklmnopqrst") &&
+      !str.includes("re_live_abcdefghijklmnopqrstuv") &&
       str.includes("[REDACTED") &&
       !str.includes(":secret@"),
   );

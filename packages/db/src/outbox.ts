@@ -174,23 +174,18 @@ export async function markOutboxSent(
   jobId: string,
   options?: { now?: Date; providerMessageId?: string | null },
 ): Promise<void> {
-  const now = options?.now ?? new Date();
+  const nowIso = (options?.now ?? new Date()).toISOString();
   await db.execute(sql`
     UPDATE email_outbox
     SET
       status = 'sent',
-      sent_at = ${now},
+      sent_at = ${nowIso}::timestamptz,
       locked_at = NULL,
       locked_by = NULL,
       last_error = NULL,
-      updated_at = ${now}
+      updated_at = ${nowIso}::timestamptz
     WHERE id = ${jobId}
   `);
-
-  // Best-effort stamp on waitlist entry when kind is known.
-  if (options?.providerMessageId) {
-    // provider message id is not stored on outbox schema; payload remains source of truth.
-  }
 }
 
 export async function markOutboxRetry(
@@ -202,17 +197,18 @@ export async function markOutboxRetry(
     now?: Date;
   },
 ): Promise<void> {
-  const now = options.now ?? new Date();
+  const nowIso = (options.now ?? new Date()).toISOString();
+  const nextIso = options.nextAttemptAt.toISOString();
   const err = options.error.slice(0, 500);
   await db.execute(sql`
     UPDATE email_outbox
     SET
       status = 'failed',
-      next_attempt_at = ${options.nextAttemptAt},
+      next_attempt_at = ${nextIso}::timestamptz,
       last_error = ${err},
       locked_at = NULL,
       locked_by = NULL,
-      updated_at = ${now}
+      updated_at = ${nowIso}::timestamptz
     WHERE id = ${jobId}
   `);
 }
@@ -222,7 +218,7 @@ export async function markOutboxDeadLetter(
   jobId: string,
   options: { error: string; now?: Date },
 ): Promise<void> {
-  const now = options.now ?? new Date();
+  const nowIso = (options.now ?? new Date()).toISOString();
   const err = options.error.slice(0, 500);
   await db.execute(sql`
     UPDATE email_outbox
@@ -231,7 +227,7 @@ export async function markOutboxDeadLetter(
       last_error = ${err},
       locked_at = NULL,
       locked_by = NULL,
-      updated_at = ${now}
+      updated_at = ${nowIso}::timestamptz
     WHERE id = ${jobId}
   `);
 }
@@ -242,16 +238,19 @@ export async function stampWaitlistEmailSent(
   kind: string,
   now = new Date(),
 ): Promise<void> {
+  const nowIso = now.toISOString();
   if (kind === OUTBOX_KINDS.applicantConfirmation || kind === OUTBOX_KINDS.waitlistConfirmation) {
     await db.execute(sql`
       UPDATE waitlist_entries
-      SET confirmation_sent_at = COALESCE(confirmation_sent_at, ${now}), updated_at = ${now}
+      SET confirmation_sent_at = COALESCE(confirmation_sent_at, ${nowIso}::timestamptz),
+          updated_at = ${nowIso}::timestamptz
       WHERE id = ${entryId}
     `);
   } else if (kind === OUTBOX_KINDS.internalLeadNotification) {
     await db.execute(sql`
       UPDATE waitlist_entries
-      SET internal_notification_sent_at = COALESCE(internal_notification_sent_at, ${now}), updated_at = ${now}
+      SET internal_notification_sent_at = COALESCE(internal_notification_sent_at, ${nowIso}::timestamptz),
+          updated_at = ${nowIso}::timestamptz
       WHERE id = ${entryId}
     `);
   }
