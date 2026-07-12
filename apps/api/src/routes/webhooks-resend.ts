@@ -1,11 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { ApiEnv } from "@vygo/config";
 import { isTestSurfaceEnabled } from "@vygo/config";
-import { persistEmailEvent, type DatabaseHandle } from "@vygo/db";
+import {
+  countEmailEventsByProviderId,
+  findEmailEventByProviderId,
+  persistEmailEvent,
+  type DatabaseHandle,
+} from "@vygo/db";
 import { safeError } from "../errors.js";
 import {
   parseResendSignatureHeaders,
+  signResendWebhook,
   verifyResendSignature,
   TEST_RESEND_WEBHOOK_SECRET,
 } from "../services/resend-webhook.js";
@@ -19,7 +26,7 @@ export type ResendWebhookDeps = {
 
 type RequestWithRawBody = FastifyRequest & { rawBody?: string };
 
-function resolveWebhookSecret(deps: ResendWebhookDeps): string | null {
+export function resolveWebhookSecret(deps: ResendWebhookDeps): string | null {
   if (deps.webhookSecret !== undefined) return deps.webhookSecret;
   if (deps.env.RESEND_WEBHOOK_SECRET) return deps.env.RESEND_WEBHOOK_SECRET;
   // Non-production / test surface: stable local secret so signature tests can run.
@@ -180,4 +187,95 @@ export function registerResendWebhookRoutes(app: FastifyInstance, deps: ResendWe
       },
     });
   }
+
+  /**
+   * Safe webhook event status (dedup verification).
+   * Lookup by provider event id (body id / data.email_id). No payload contents or secrets.
+   */
+  app.get("/v1/webhooks/resend/events/:providerEventId", async (request, reply) => {
+    const params = request.params as { providerEventId?: string };
+    const providerEventId =
+      typeof params.providerEventId === "string" ? params.providerEventId.trim() : "";
+    if (!providerEventId || providerEventId.length > 200) {
+      return reply.status(400).send(safeError("BAD_REQUEST", "Invalid provider event id."));
+    }
+
+    const db = deps.getDb();
+    if (!db) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      const count = await countEmailEventsByProviderId(db.db, providerEventId);
+      const event = await findEmailEventByProviderId(db.db, providerEventId);
+      const seenAt = event?.receivedAt?.toISOString?.() ?? null;
+      return reply.status(200).send({
+        providerEventId,
+        persisted: count > 0,
+        persistedCount: count,
+        firstSeenAt: seenAt,
+        lastSeenAt: seenAt,
+        // Unique constraint keeps a single row; count===1 means duplicates collapsed to one.
+        deduplicated: count === 1,
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "resend_webhook_event_status_failed" },
+        error instanceof Error ? error.message : "event status failed",
+      );
+      return reply.status(500).send(safeError("INTERNAL_ERROR", "An unexpected error occurred."));
+    }
+  });
+
+  /**
+   * Generate a synthetic, server-signed Resend/Svix webhook sample for live verification.
+   * Signs with the deployment webhook secret server-side — never returns the secret itself.
+   * Clearly marked non-production diagnostic payload (type email.delivered, id diag-<uuid>).
+   */
+  app.get("/v1/diagnostics/webhooks/resend/sample", async (request, reply) => {
+    const secret = resolveWebhookSecret(deps);
+    if (!secret) {
+      return reply
+        .status(503)
+        .send(safeError("WEBHOOK_MISCONFIGURED", "Webhook signing secret is not configured."));
+    }
+
+    const eventId = `diag-${randomUUID()}`;
+    const bodyObj = {
+      type: "email.delivered",
+      id: eventId,
+      created_at: new Date().toISOString(),
+      data: {
+        email_id: eventId,
+        // No real recipient PII — synthetic diagnostic only.
+        to: ["diagnostic@example.invalid"],
+      },
+      diagnostic: true,
+      environment: "non-production",
+    };
+    const body = JSON.stringify(bodyObj);
+    const timestamp = Math.floor(Date.now() / 1000);
+    // Use the same id for svix-id and body id so event-status lookups by either work.
+    const svixId = eventId;
+    const signature = signResendWebhook({
+      secret,
+      id: svixId,
+      timestamp,
+      rawBody: body,
+    });
+
+    request.log.info(
+      { event: "resend_webhook_sample_issued", providerEventId: eventId },
+      "diagnostic webhook sample issued",
+    );
+
+    return reply.status(200).send({
+      headers: {
+        "svix-id": svixId,
+        "svix-timestamp": String(timestamp),
+        "svix-signature": signature,
+      },
+      body,
+    });
+  });
 }

@@ -20,6 +20,7 @@ import { errorHandler, safeError } from "./errors.js";
 import { buildLoggerOptions } from "./logging.js";
 import { resolveRequestId } from "./request-id.js";
 import { registerAvailabilityRoutes } from "./routes/availability.js";
+import { registerDiagnosticsRoutes } from "./routes/diagnostics.js";
 import { registerTestSurfaceRoutes, TEST_SUPPORT_ROUTES } from "./routes/test-surface.js";
 import { registerWaitlistRoutes } from "./routes/waitlist.js";
 import { registerResendWebhookRoutes } from "./routes/webhooks-resend.js";
@@ -284,6 +285,12 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
   });
 
   registerResendWebhookRoutes(app, {
+    env,
+    getDb,
+  });
+
+  // Safe diagnostic surface for live verification (no secrets / no applicant PII).
+  registerDiagnosticsRoutes(app, {
     env,
     getDb,
   });

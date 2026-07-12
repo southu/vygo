@@ -830,3 +830,156 @@ describe("test surface + integration report", () => {
     assert.ok(a.json().data.status);
   });
 });
+
+describe("mission diagnostic surface", () => {
+  it("GET /v1/waitlist/:applicationId/status returns safe job status", async () => {
+    const email = `diag-status-${randomUUID().slice(0, 8)}@example.com`;
+    const create = await postWaitlist(validPayload({ email, idempotencyKey: randomUUID() }));
+    assert.equal(create.statusCode, 200);
+    const applicationId = create.json().data.applicationId as string;
+    assert.ok(applicationId);
+
+    const status = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/waitlist/${applicationId}/status`,
+    });
+    assert.equal(status.statusCode, 200);
+    const body = status.json();
+    assert.equal(body.applicationId, applicationId);
+    assert.equal(typeof body.marketingConsent, "boolean");
+    assert.equal(body.jobs.length, 2);
+    const kinds = new Set(body.jobs.map((j: { kind: string }) => j.kind));
+    assert.ok(kinds.has("applicant_confirmation"));
+    assert.ok(kinds.has("internal_lead_notification"));
+    for (const job of body.jobs) {
+      assert.ok(typeof job.idempotencyKey === "string" && job.idempotencyKey.length > 0);
+      assert.ok(["queued", "processing", "sent", "retry_scheduled", "dead_letter"].includes(job.state));
+      assert.equal(typeof job.attempts, "number");
+    }
+    assert.equal(status.body.toLowerCase().includes(email), false);
+    assert.equal(status.body.includes("@example.com"), false);
+
+    // Duplicate equivalent submission must not create extra jobs / new keys.
+    await postWaitlist(validPayload({ email, idempotencyKey: randomUUID() }));
+    const again = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/waitlist/${applicationId}/status`,
+    });
+    assert.equal(again.statusCode, 200);
+    assert.equal(again.json().jobs.length, 2);
+    const keys1 = body.jobs.map((j: { idempotencyKey: string }) => j.idempotencyKey).sort();
+    const keys2 = again
+      .json()
+      .jobs.map((j: { idempotencyKey: string }) => j.idempotencyKey)
+      .sort();
+    assert.deepEqual(keys1, keys2);
+  });
+
+  it("webhook sample, event status, and diagnostics tests report", async () => {
+    const sample = await ctx.app.inject({
+      method: "GET",
+      url: "/v1/diagnostics/webhooks/resend/sample",
+    });
+    assert.equal(sample.statusCode, 200);
+    const sampleBody = sample.json();
+    assert.ok(sampleBody.headers["svix-id"]);
+    assert.ok(sampleBody.headers["svix-timestamp"]);
+    assert.ok(sampleBody.headers["svix-signature"]);
+    assert.equal(typeof sampleBody.body, "string");
+    assert.equal(sample.body.toLowerCase().includes("whsec_"), false);
+
+    const eventId = JSON.parse(sampleBody.body).id as string;
+    assert.ok(eventId.startsWith("diag-"));
+
+    // Missing signature → 4xx, not persisted
+    const missing = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/webhooks/resend",
+      headers: { "content-type": "application/json" },
+      payload: sampleBody.body,
+    });
+    assert.ok(missing.statusCode >= 400 && missing.statusCode < 500);
+    const missingStatus = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/webhooks/resend/events/${eventId}`,
+    });
+    assert.equal(missingStatus.statusCode, 200);
+    assert.equal(missingStatus.json().persisted, false);
+    assert.equal(missingStatus.json().persistedCount, 0);
+
+    // Invalid signature → 4xx, not persisted
+    const invalid = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/webhooks/resend",
+      headers: {
+        "content-type": "application/json",
+        "svix-id": sampleBody.headers["svix-id"],
+        "svix-timestamp": sampleBody.headers["svix-timestamp"],
+        "svix-signature": "v1,notavalidsignature====",
+      },
+      payload: sampleBody.body,
+    });
+    assert.ok(invalid.statusCode >= 400 && invalid.statusCode < 500);
+
+    // Valid signed sample → 2xx and persisted once
+    const good = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/webhooks/resend",
+      headers: {
+        "content-type": "application/json",
+        "svix-id": sampleBody.headers["svix-id"],
+        "svix-timestamp": sampleBody.headers["svix-timestamp"],
+        "svix-signature": sampleBody.headers["svix-signature"],
+      },
+      payload: sampleBody.body,
+    });
+    assert.ok(good.statusCode >= 200 && good.statusCode < 300);
+    assert.equal(good.body.toLowerCase().includes("whsec_"), false);
+
+    const eventStatus = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/webhooks/resend/events/${eventId}`,
+    });
+    assert.equal(eventStatus.statusCode, 200);
+    assert.equal(eventStatus.json().persisted, true);
+    assert.equal(eventStatus.json().persistedCount, 1);
+    assert.ok(eventStatus.json().firstSeenAt);
+    assert.equal(eventStatus.body.includes("diagnostic@"), false);
+
+    // Duplicate delivery still 2xx, still one event
+    const dup = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/webhooks/resend",
+      headers: {
+        "content-type": "application/json",
+        "svix-id": sampleBody.headers["svix-id"],
+        "svix-timestamp": sampleBody.headers["svix-timestamp"],
+        "svix-signature": sampleBody.headers["svix-signature"],
+      },
+      payload: sampleBody.body,
+    });
+    assert.ok(dup.statusCode >= 200 && dup.statusCode < 300);
+    const again = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/webhooks/resend/events/${eventId}`,
+    });
+    assert.equal(again.json().persistedCount, 1);
+
+    const tests = await ctx.app.inject({ method: "GET", url: "/v1/diagnostics/tests" });
+    assert.equal(tests.statusCode, 200);
+    const report = tests.json();
+    assert.ok(Array.isArray(report.suites));
+    assert.ok(report.generatedAt);
+    const names = report.suites.map((s: { name: string }) => s.name.toLowerCase());
+    assert.ok(names.some((n: string) => n.includes("react-email")));
+    assert.ok(names.some((n: string) => n.includes("worker")));
+    assert.ok(names.some((n: string) => n.includes("webhook")));
+    assert.ok(names.some((n: string) => n.includes("graceful shutdown")));
+    assert.ok(names.some((n: string) => n.includes("secret redaction")));
+    for (const suite of report.suites) {
+      assert.equal(suite.failed, 0, suite.name);
+      assert.ok(suite.passed > 0, suite.name);
+    }
+    assert.equal(tests.body.toLowerCase().includes("whsec_"), false);
+  });
+});

@@ -2,7 +2,9 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { isTestSurfaceEnabled, parseCorsOrigins, type ApiEnv } from "@vygo/config";
 import {
   findIdempotency,
+  findWaitlistById,
   hashWaitlistRequest,
+  listOutboxForEntry,
   persistWaitlistIntake,
   saveIdempotency,
   type DatabaseHandle,
@@ -27,6 +29,26 @@ import {
 } from "../services/rate-limit.js";
 import { computeLeadScore } from "../services/scoring.js";
 import type { TurnstileVerifier } from "../services/turnstile.js";
+
+/** Map internal outbox status → mission-safe job state (no secrets / no bodies). */
+function mapOutboxJobState(
+  status: string,
+): "queued" | "processing" | "sent" | "retry_scheduled" | "dead_letter" | string {
+  switch (status) {
+    case "pending":
+      return "queued";
+    case "processing":
+      return "processing";
+    case "sent":
+      return "sent";
+    case "failed":
+      return "retry_scheduled";
+    case "dead_letter":
+      return "dead_letter";
+    default:
+      return status;
+  }
+}
 
 export type WaitlistRouteDeps = {
   env: ApiEnv;
@@ -82,6 +104,57 @@ export function registerWaitlistRoutes(app: FastifyInstance, deps: WaitlistRoute
       handler: methodNotAllowed,
     });
   }
+
+  /**
+   * Safe job status for a durable application id.
+   * Never returns email addresses, message bodies, secrets, or credentials.
+   */
+  app.get("/v1/waitlist/:applicationId/status", async (request, reply) => {
+    const params = request.params as { applicationId?: string };
+    const applicationId =
+      typeof params.applicationId === "string" ? params.applicationId.trim() : "";
+    if (
+      !applicationId ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        applicationId,
+      )
+    ) {
+      return reply.status(400).send(safeError("BAD_REQUEST", "Invalid application id."));
+    }
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      const entry = await findWaitlistById(dbHandle.db, applicationId);
+      if (!entry) {
+        return reply.status(404).send(safeError("NOT_FOUND", "Application not found."));
+      }
+
+      const outbox = await listOutboxForEntry(dbHandle.db, entry.id);
+      return reply.status(200).send({
+        applicationId: entry.id,
+        marketingConsent: entry.marketingConsent,
+        jobs: outbox.map((row) => ({
+          kind: row.kind,
+          state: mapOutboxJobState(row.status),
+          attempts: row.attemptCount,
+          /** Stable non-secret provider idempotency identifier. */
+          idempotencyKey: row.providerIdempotencyKey,
+        })),
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "waitlist_status_failed" },
+        error instanceof Error ? error.message : "status lookup failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
 
   app.post("/v1/waitlist", async (request, reply) => {
     // 1. Content-Type
