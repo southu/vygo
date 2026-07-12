@@ -442,7 +442,11 @@ function main() {
   mkdirSync(publicApiDir, { recursive: true });
   const sha = report.gitSha || "unknown";
   // No trailing newline: GET /version body must be 7–40 hex characters.
+  // Publish both /version and /version.txt from the same build-time SHA so the
+  // Ratchet deploy gate (which polls /version.txt) and /api/health agree. The
+  // content is never hand-edited; it is derived from the deployed commit here.
   writeFileSync(path.join(publicDir, "version"), sha, "utf8");
+  writeFileSync(path.join(publicDir, "version.txt"), sha, "utf8");
   writeFileSync(
     path.join(publicApiDir, "readiness.json"),
     `${JSON.stringify(report, null, 2)}\n`,
@@ -485,7 +489,7 @@ function main() {
 
   console.log(`Wrote ${path.relative(root, outFile)} (ready=${report.ready})`);
   console.log(
-    `Wrote apps/web/public/version, apps/web/public/healthz, apps/web/public/readyz, and apps/web/public/api/readiness.json`,
+    `Wrote apps/web/public/version, apps/web/public/version.txt, apps/web/public/healthz, apps/web/public/readyz, and apps/web/public/api/readiness.json`,
   );
   if (!report.ready) {
     console.error("Readiness report is not ready=true; inspect checks above.");
