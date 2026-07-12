@@ -4,6 +4,7 @@
   "buildCommand": "pnpm --filter @vygo/web build",
   "outputDirectory": "apps/web/out",
   "framework": null,
+  "cleanUrls": true,
   "rewrites": [{ "source": "/api/readiness", "destination": "/api/readiness.json" }],
   "headers": [
     {
