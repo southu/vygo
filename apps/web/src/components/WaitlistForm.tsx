@@ -1205,6 +1205,11 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
     );
   }
 
+  // Loading is the static-export/prerender default (availability is fetched
+  // client-side). Fail open and render the operable application form so the
+  // served HTML always ships a usable conversion surface — a real <form> with
+  // email + submit controls — even before/without JS resolving availability.
+  // Only the client-resolved `paused` state (handled above) gates the form.
   if (uiState === "loading") {
     return (
       <div
@@ -1212,23 +1217,8 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
         data-testid="waitlist-page-form"
         data-form-gated="loading"
         data-availability-state="loading"
-        aria-busy="true"
-        role="status"
       >
-        <h2 className="font-display text-2xl font-bold text-ink">Checking availability</h2>
-        <p className="mt-3 text-muted">Loading current availability…</p>
-        <div className="mt-6">
-          <button
-            type="button"
-            className="btn-primary opacity-70"
-            disabled
-            aria-busy="true"
-            data-cta-mode="loading"
-            data-testid="waitlist-page-loading-cta"
-          >
-            Loading
-          </button>
-        </div>
+        {content}
       </div>
     );
   }
