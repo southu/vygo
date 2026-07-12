@@ -38,7 +38,10 @@ test.describe("Availability UI states", () => {
     const pageForm = page.getByTestId("waitlist-page-form");
     await expect(pageForm).toHaveAttribute("data-form-gated", "paused");
     await expect(pageForm.locator("[data-paused-explanation]")).toBeVisible();
-    await expect(pageForm.getByText(/Enrollment paused|not accepting new applications/i)).toBeVisible();
+    await expect(pageForm.locator("[data-paused-explanation]")).toContainText(
+      /not accepting new applications|Enrollment is paused/i,
+    );
+    await expect(pageForm.getByRole("heading", { name: /Enrollment paused/i })).toBeVisible();
     await expect(page.getByTestId("waitlist-form")).toHaveCount(0);
     await expect(page.getByTestId("waitlist-continue")).toHaveCount(0);
     await expect(page.getByTestId("waitlist-submit")).toHaveCount(0);
