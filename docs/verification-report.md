@@ -2,7 +2,7 @@
 
 **Mission:** `vygo-owner-hosting-readiness`  
 **Date (UTC):** 2026-07-12  
-**Re-verified (UTC):** 2026-07-12T04:52Z (iteration 2)  
+**Re-verified (UTC):** 2026-07-12T05:00Z (iteration 1 of this mission run)  
 **Repository:** `southu/vygo`  
 **Branch:** `main`  
 **Scope:** Owner-managed hosting documentation, CI representation, lockfile, ops
@@ -11,8 +11,9 @@ Railway production deployments were **not** configured or claimed.
 
 **Runtime:** Node **24.18.0** (via `/opt/homebrew/opt/node@24`, matching
 `.nvmrc` / `engines.node` `24.x`) and **pnpm 9.15.9**. CI uses Node 24 via
-`actions/setup-node` + `.nvmrc`. Final readiness regeneration used Node 24 so
-`ready=true` (Node 25 is unsupported by `engines` and is not the verified path).
+`actions/setup-node` + `.nvmrc`. Verification used Node 24 so readiness
+reports `ready=true` (Node 25 is unsupported by `engines` and is not the
+verified path).
 
 ---
 
