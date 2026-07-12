@@ -531,14 +531,38 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
 
   const errorEntries = Object.entries(errors).filter(([, msg]) => Boolean(msg));
 
+  const liveRegions = (
+    <>
+      <div
+        id={liveAssertiveId}
+        className="sr-only"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+        data-testid="waitlist-live-assertive"
+      >
+        {assertiveMessage}
+      </div>
+      <div
+        id={livePoliteId}
+        className="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="waitlist-live-polite"
+      >
+        {statusMessage}
+      </div>
+    </>
+  );
+
   const successCard = (
     <div
-      className="card"
       data-testid="waitlist-success-card"
       data-waitlist-outcome={status === "duplicate" ? "duplicate" : "success"}
       role="status"
-      aria-live="polite"
     >
+      {liveRegions}
       <h2
         ref={headingRef}
         id={headingId}
@@ -566,6 +590,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
 
   const formBody = (
     <>
+      {liveRegions}
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2
@@ -605,30 +630,6 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
         >
           2. {form.step2Title}
         </span>
-      </div>
-
-      {/* Assertive live region for validation / critical updates */}
-      <div
-        id={liveAssertiveId}
-        className="sr-only"
-        role="alert"
-        aria-live="assertive"
-        aria-atomic="true"
-        data-testid="waitlist-live-assertive"
-      >
-        {assertiveMessage}
-      </div>
-
-      {/* Polite live region for status / success / progress */}
-      <div
-        id={livePoliteId}
-        className="sr-only"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        data-testid="waitlist-live-polite"
-      >
-        {statusMessage}
       </div>
 
       {showErrorSummary && errorEntries.length > 0 ? (

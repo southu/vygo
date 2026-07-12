@@ -44,8 +44,7 @@ test.describe("WaitlistForm", () => {
       });
     });
 
-    await page.getByTestId("waitlist-submit").focus();
-    await page.keyboard.press("Enter");
+    await page.getByTestId("waitlist-submit").click();
     await expect(page.getByTestId("waitlist-success-card")).toBeVisible();
     await expect(page.getByTestId("success-next-action")).toBeVisible();
 

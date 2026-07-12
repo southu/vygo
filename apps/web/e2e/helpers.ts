@@ -52,7 +52,8 @@ export async function installTurnstileStub(page: Page, token = "test-turnstile-t
     const w = window as any;
     w.turnstile = {
       render: (_el: HTMLElement, opts: { callback: (t: string) => void }) => {
-        setTimeout(() => opts.callback(tok), 50);
+        // Immediate token so validation never races the stub.
+        opts.callback(tok);
         return "widget-test";
       },
       reset: () => undefined,
@@ -84,6 +85,8 @@ export async function fillStep2(page: Page) {
   await page.locator("#desiredStartWindow").selectOption("within_30_days");
   await page.locator("#message").fill("We need production hardening before an enterprise rollout next month.");
   await page.locator("#privacyAccepted").check();
+  // Allow Turnstile stub callback to populate token before submit.
+  await page.waitForTimeout(150);
 }
 
 export function piiLeakInAnalytics(events: unknown[]): string[] {
