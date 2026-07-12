@@ -2,8 +2,8 @@
   "ready": true,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "a17c7beb4e47d1726f192f77f31187de6e6cd6b8",
-  "generatedAt": "2026-07-12T04:44:51.277Z",
+  "gitSha": "64a015dd071f503a2d366737bff10e632c81c5bc",
+  "generatedAt": "2026-07-12T04:52:42.732Z",
   "workspace": {
     "apps": {
       "web": {
