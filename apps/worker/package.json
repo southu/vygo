@@ -20,11 +20,11 @@
   "dependencies": {
     "@vygo/config": "workspace:*",
     "@vygo/db": "workspace:*",
-    "@vygo/email": "workspace:*"
+    "@vygo/email": "workspace:*",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }
