@@ -21,6 +21,7 @@
     "check": "pnpm lint && pnpm format:check && pnpm typecheck",
     "readiness": "tsx scripts/generate-readiness.ts",
     "foundation-status": "tsx scripts/generate-foundation-status.ts",
+    "provision": "tsx scripts/provision-railway.ts",
     "secret-scan": "tsx scripts/secret-scan.ts",
     "seed:local": "tsx scripts/seed-local.ts",
     "availability:set": "tsx scripts/set-availability.ts",
@@ -29,7 +30,7 @@
     "test:integration": "pnpm --filter @vygo/api test",
     "test:email": "pnpm --filter @vygo/email test",
     "test:e2e": "pnpm --filter @vygo/web test:e2e",
-    "ci:verify": "pnpm secret-scan && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:email && pnpm foundation-status && pnpm readiness && pnpm build",
+    "ci:verify": "pnpm secret-scan && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:email && pnpm provision && pnpm foundation-status && pnpm readiness && pnpm build",
     "clean": "pnpm -r --if-present run clean && rm -rf node_modules"
   },
   "devDependencies": {

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
-    "prebuild": "tsx ../../scripts/generate-foundation-status.ts && tsx ../../scripts/generate-readiness.ts --assume-passed",
+    "prebuild": "tsx ../../scripts/provision-railway.ts && tsx ../../scripts/generate-foundation-status.ts && tsx ../../scripts/generate-readiness.ts --assume-passed",
     "build": "next build",
     "postbuild": "node ./scripts/prune-draft-insights.mjs",
     "start": "next start --port 3000",

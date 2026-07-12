@@ -49,6 +49,12 @@ jobs:
       - name: Unit tests (email package)
         run: pnpm test:email
 
+      - name: Vault Provisioner (Railway project vygo, fail-closed)
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: pnpm provision
+
       - name: Generate Railway foundation status
         env:
           COMMIT_SHA: ${{ github.sha }}

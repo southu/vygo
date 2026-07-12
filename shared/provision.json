@@ -1,0 +1,90 @@
+{
+  "artifact": "vault-provisioner-railway",
+  "tool": "vault-provisioner",
+  "app": "vygo",
+  "project": "vygo",
+  "ok": false,
+  "outcome": "failed_closed",
+  "code": "consumer_not_armed",
+  "project_id": null,
+  "dashboard_url": null,
+  "detail": "The vault consumer for Railway provisioning is not armed in this environment (PROVISION_ARM is not set and/or no vault consumer key is present). By design this builder holds no Railway token or vault consumer key, so it fails closed rather than provisioning. No Railway services were created, nothing was destroyed, and no project_id was emitted. A follow-on run with an armed consumer completes provisioning.",
+  "allowlist": {
+    "project_names": [
+      "vygo"
+    ],
+    "destroy": false
+  },
+  "guardrails": {
+    "allowlistEnforced": true,
+    "destroyDisabled": true,
+    "requestedProject": "vygo",
+    "requestedProjectAllowed": true,
+    "failsClosed": true
+  },
+  "closedFailureCodes": [
+    "vault_locked",
+    "consumer_not_armed",
+    "vault_access_denied"
+  ],
+  "scope": {
+    "note": "Railway project shell only (create if missing, reuse if present). Postgres/Redis/API/worker services are NOT created by this step unless a real provisioning run reports them.",
+    "frontend": {
+      "platform": "vercel",
+      "retargetedToRailway": false
+    }
+  },
+  "env": {
+    "note": "Names only. No values. Backend secrets come from the owner's vault; DATABASE_URL / REDIS_URL come from the Railway plugins. NEXT_PUBLIC_* are public browser values.",
+    "backend": {
+      "api": [
+        "NODE_ENV",
+        "PORT",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "CORS_ORIGINS",
+        "RESEND_API_KEY",
+        "RESEND_WEBHOOK_SECRET",
+        "TURNSTILE_SECRET_KEY",
+        "IP_HASH_SALT",
+        "IP_HASH_SALT_VERSION",
+        "EMAIL_FROM",
+        "LEAD_NOTIFICATION_EMAIL",
+        "RATE_LIMIT_IP_MAX",
+        "RATE_LIMIT_IP_WINDOW_SECONDS",
+        "RATE_LIMIT_EMAIL_MAX",
+        "RATE_LIMIT_EMAIL_WINDOW_SECONDS",
+        "MIN_FORM_COMPLETION_MS",
+        "LOG_LEVEL",
+        "INLINE_EMAIL_WORKER",
+        "ENABLE_TEST_SURFACE"
+      ],
+      "worker": [
+        "NODE_ENV",
+        "DATABASE_URL",
+        "REDIS_URL",
+        "RESEND_API_KEY",
+        "EMAIL_FROM",
+        "LEAD_NOTIFICATION_EMAIL",
+        "LOG_LEVEL",
+        "WORKER_POLL_INTERVAL_MS",
+        "WORKER_BATCH_SIZE",
+        "WORKER_MAX_ATTEMPTS",
+        "INLINE_EMAIL_WORKER"
+      ]
+    },
+    "webPublic": [
+      "NEXT_PUBLIC_APP_URL",
+      "NEXT_PUBLIC_API_URL",
+      "NEXT_PUBLIC_TURNSTILE_SITE_KEY"
+    ]
+  },
+  "gitSha": "58ada1b16db2f374f65ed86448450b6d09617794",
+  "generatedAt": "2026-07-12T19:39:32.887Z",
+  "secretsScan": {
+    "policy": "names-only",
+    "selfScan": "passed",
+    "detectedSecrets": 0,
+    "enforcedBy": "pnpm secret-scan (scripts/secret-scan.ts)"
+  }
+}
