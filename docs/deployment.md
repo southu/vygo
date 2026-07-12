@@ -66,6 +66,11 @@ Do **not** use `version.txt` for deploy identity. Web `GET /version` reads
 
 **Live Railway production deployment was not configured or claimed.**
 
+The backend targets **Railway project `vygo`**. For a secret-free readiness
+summary (env **names** only, config stubs, and human attach steps) see
+[railway-backend-readiness.md](./railway-backend-readiness.md) and the stubs in
+[`deploy/railway/`](../deploy/railway/).
+
 Create **separate** Railway projects (or clearly named environment groups) for
 **staging** and **production**. Within each environment, create **four** services:
 

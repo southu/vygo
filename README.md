@@ -232,6 +232,7 @@ pnpm readiness
 | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
 | [API contracts](docs/api.md)                                           | Request IDs, health, waitlist, webhooks, test surface          |
 | [Deployment](docs/deployment.md)                                       | Vercel web, Railway API/worker/Postgres/Redis, staging vs prod |
+| [Railway backend readiness](docs/railway-backend-readiness.md)         | Project `vygo`: env names, config stubs, human attach steps    |
 | [Email & Resend](docs/email-and-resend.md)                             | Domain/DNS, sender, webhooks, event handling, failed-email ops |
 | [Turnstile](docs/turnstile.md)                                         | Site/secret keys for local, staging, production                |
 | [Backups & restore](docs/backups.md)                                   | Schedule, retention, restore, restore-test evidence fields     |
@@ -246,7 +247,11 @@ pnpm readiness
 - **Live Vercel production deployment was not configured or claimed** by this
   mission. The owner connects the project and deploys when ready.
 - **Live Railway production deployment was not configured or claimed** by this
-  mission. The owner creates API, worker, PostgreSQL, and Redis services when ready.
+  mission. The backend targets **Railway project `vygo`** (API, worker,
+  PostgreSQL, Redis); the owner creates the services and wires env by name using
+  [docs/railway-backend-readiness.md](docs/railway-backend-readiness.md) and the
+  secret-free stubs in [deploy/railway/](deploy/railway/). Provisioning was not
+  run, so no `project_id` was emitted — fill it from the Railway dashboard.
 - Do not treat marketing claims (availability dates, pricing, U.S.-based /
   senior-only language, SLA, equity terms) as verified — see the
   [decision inventory](docs/credentials-and-decisions.md).
