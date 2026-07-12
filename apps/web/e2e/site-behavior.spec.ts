@@ -46,7 +46,7 @@ test.describe("Site behavior preservation", () => {
     await expect(toggle).toBeFocused();
 
     await toggle.click();
-    await page.getByRole("link", { name: "Audit" }).click();
+    await page.getByTestId("mobile-navigation").getByRole("link", { name: "Audit" }).click();
     await expect(page).toHaveURL(/\/audit/);
   });
 
@@ -76,11 +76,26 @@ test.describe("Site behavior preservation", () => {
     expect(afterKey).toBe(expanded);
   });
 
-  test("non-waitlist navigation still works", async ({ page }) => {
+  test("non-waitlist navigation still works", async ({ page }, testInfo) => {
     await page.goto("/");
-    await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Method" }).click();
-    await expect(page).toHaveURL(/\/method/);
-    await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Security" }).click();
-    await expect(page).toHaveURL(/\/security/);
+    if (testInfo.project.name === "mobile") {
+      await page.getByTestId("mobile-nav-toggle").click();
+      await page.getByTestId("mobile-navigation").getByRole("link", { name: "Method" }).click();
+      await expect(page).toHaveURL(/\/method/);
+      await page.getByTestId("mobile-nav-toggle").click();
+      await page.getByTestId("mobile-navigation").getByRole("link", { name: "Security" }).click();
+      await expect(page).toHaveURL(/\/security/);
+    } else {
+      await page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: "Method" })
+        .click();
+      await expect(page).toHaveURL(/\/method/);
+      await page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: "Security" })
+        .click();
+      await expect(page).toHaveURL(/\/security/);
+    }
   });
 });
