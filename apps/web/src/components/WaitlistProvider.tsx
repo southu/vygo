@@ -45,9 +45,7 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
   return (
     <WaitlistContext.Provider value={value}>
       {children}
-      {isOpen ? (
-        <WaitlistForm mode="modal" open={isOpen} onDismiss={closeWaitlist} />
-      ) : null}
+      {isOpen ? <WaitlistForm mode="modal" open={isOpen} onDismiss={closeWaitlist} /> : null}
     </WaitlistContext.Provider>
   );
 }

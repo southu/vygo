@@ -482,7 +482,10 @@ test.describe("WaitlistForm", () => {
           const active = document.activeElement;
           if (!modal || !active || active === document.body) return "body-or-outside";
           if (!modal.contains(active)) return "outside-modal";
-          if (active.id === "waitlist-form-heading" || active.closest("[data-testid=waitlist-success-card]")) {
+          if (
+            active.id === "waitlist-form-heading" ||
+            active.closest("[data-testid=waitlist-success-card]")
+          ) {
             return "inside-success";
           }
           return modal.contains(active) ? "inside-modal" : "outside-modal";

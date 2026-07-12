@@ -1,13 +1,7 @@
 import type { PublicAvailability } from "@vygo/validation";
 
 /** UI states the availability surface must render distinctly for tests. */
-export type AvailabilityUiState =
-  | "loading"
-  | "open"
-  | "waitlist"
-  | "paused"
-  | "stale"
-  | "error";
+export type AvailabilityUiState = "loading" | "open" | "waitlist" | "paused" | "stale" | "error";
 
 /** Client marks data stale slightly after API max-age (60s). */
 export const AVAILABILITY_STALE_MS = 90_000;
@@ -54,8 +48,7 @@ export function deriveUiState(input: {
   }
 
   const effective = input.data ?? input.lastGood;
-  const isStaleByAge =
-    input.fetchedAt != null && now - input.fetchedAt > AVAILABILITY_STALE_MS;
+  const isStaleByAge = input.fetchedAt != null && now - input.fetchedAt > AVAILABILITY_STALE_MS;
   const isStaleByError = input.error && Boolean(input.lastGood);
 
   if (isStaleByAge || isStaleByError) {
@@ -139,8 +132,7 @@ export function availabilityCopy(
     default:
       return {
         label: "AVAILABILITY UNAVAILABLE",
-        message:
-          "We could not load current availability. You can retry, or email hello@vygo.ai.",
+        message: "We could not load current availability. You can retry, or email hello@vygo.ai.",
         action: "retry",
         ctaLabel: "Retry",
       };

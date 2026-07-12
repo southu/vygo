@@ -853,7 +853,9 @@ describe("mission diagnostic surface", () => {
     assert.ok(kinds.has("internal_lead_notification"));
     for (const job of body.jobs) {
       assert.ok(typeof job.idempotencyKey === "string" && job.idempotencyKey.length > 0);
-      assert.ok(["queued", "processing", "sent", "retry_scheduled", "dead_letter"].includes(job.state));
+      assert.ok(
+        ["queued", "processing", "sent", "retry_scheduled", "dead_letter"].includes(job.state),
+      );
       assert.equal(typeof job.attempts, "number");
     }
     assert.equal(status.body.toLowerCase().includes(email), false);

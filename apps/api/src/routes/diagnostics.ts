@@ -266,8 +266,7 @@ async function runWebhookSuite(
       payload: rawBody,
     });
     const body = good.json() as { data?: { accepted?: boolean } };
-    const noSecretLeak =
-      !good.body.toLowerCase().includes("whsec_") && !good.body.includes(secret);
+    const noSecretLeak = !good.body.toLowerCase().includes("whsec_") && !good.body.includes(secret);
     let persisted = good.statusCode >= 200 && good.statusCode < 300;
     const db = deps.getDb();
     if (db && persisted) {

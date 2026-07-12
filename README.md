@@ -2,20 +2,25 @@
 
 Production monorepo for **vygo.ai** — production engineering for AI-built software.
 
+This repository is prepared for **owner-managed hosting**. Live Vercel and Railway
+production deployments were **not** configured or claimed by this repository work;
+the owner completes accounts, DNS, credentials, and launch using the checklists in
+[`docs/`](docs/).
+
 This repository is a **pnpm workspace** with:
 
 | Path                  | Role                                                                        |
 | --------------------- | --------------------------------------------------------------------------- |
-| `apps/web`            | Next.js marketing site (Vercel)                                             |
-| `apps/api`            | Fastify API (Railway)                                                       |
-| `apps/worker`         | Email / outbox worker (Railway)                                             |
-| `packages/db`         | Database client / schema (Drizzle)                                          |
+| `apps/web`            | Next.js marketing site (intended host: Vercel)                              |
+| `apps/api`            | Fastify API (intended host: Railway)                                        |
+| `apps/worker`         | Email / outbox worker (intended host: Railway)                              |
+| `packages/db`         | Database client / schema (Drizzle) + checked-in SQL migrations              |
 | `packages/email`      | Email templates and helpers                                                 |
 | `packages/validation` | Shared Zod schemas                                                          |
 | `packages/config`     | Typed environment validation                                                |
 | `packages/ui`         | Design tokens and shared UI primitives                                      |
 | `scripts/`            | Operational CLIs (`seed-local`, `set-availability`, readiness, secret scan) |
-| `docs/`               | Deployment, content ops, incident response                                  |
+| `docs/`               | Deployment, ops, credentials inventory, launch checklist, verification      |
 | `.github/workflows/`  | CI                                                                          |
 
 ## Prerequisites
@@ -24,7 +29,12 @@ This repository is a **pnpm workspace** with:
 - **pnpm 9** (declared via `packageManager` in root `package.json`; enable with `corepack enable`)
 - Git
 
-Optional for later API/worker work: PostgreSQL 16+, Redis 7+, Resend account, Cloudflare Turnstile.
+Optional for full local API/worker stack:
+
+- PostgreSQL 16+
+- Redis 7+
+- Resend account (production email)
+- Cloudflare Turnstile site + secret keys
 
 ## Environment setup
 
@@ -37,7 +47,9 @@ Optional for later API/worker work: PostgreSQL 16+, Redis 7+, Resend account, Cl
    cp apps/worker/.env.example apps/worker/.env
    ```
 
-2. Fill in local values as needed. Typed validation lives in `@vygo/config` (`packages/config`).
+2. Fill in local values as needed. Typed validation lives in `@vygo/config`
+   (`packages/config`). See [docs/credentials-and-decisions.md](docs/credentials-and-decisions.md)
+   for the full inventory of owner-supplied values.
 3. `external-docs/` is gitignored for private planning material — do not commit it.
 
 ## Installation
@@ -47,40 +59,26 @@ corepack enable
 pnpm install --frozen-lockfile
 ```
 
-A clean frozen-lockfile install is the supported path (and what CI uses).
+A clean frozen-lockfile install is the supported path (and what CI uses). The
+verified lockfile is `pnpm-lock.yaml` at the repository root.
 
-## Development
+## Local development — web, API, worker
+
+### Marketing web (`apps/web`)
 
 ```bash
-# Marketing site (http://localhost:3000)
+pnpm install --frozen-lockfile
+cp apps/web/.env.example apps/web/.env
+# Optional: set NEXT_PUBLIC_API_URL, NEXT_PUBLIC_TURNSTILE_SITE_KEY
 pnpm dev
-# or
-pnpm dev:web
-
-# API (http://localhost:4000) — requires env as needed
-pnpm dev:api
-
-# Worker
-pnpm dev:worker
+# or: pnpm dev:web
+# → http://localhost:3000
 ```
 
-## Local startup
-
-End-to-end local startup for the web app:
+Verify:
 
 ```bash
-# 1. Install dependencies
-pnpm install --frozen-lockfile
-
-# 2. Configure environment (see Environment setup)
-cp .env.example .env
-cp apps/web/.env.example apps/web/.env
-
-# 3. Start the Next.js dev server
-pnpm dev
-
-# 4. Verify
-open http://localhost:3000
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/
 curl -s http://localhost:3000/version
 curl -s http://localhost:3000/api/readiness
 ```
@@ -92,28 +90,108 @@ pnpm --filter @vygo/web build
 pnpm --filter @vygo/web start
 ```
 
-## Checks
+### API (`apps/api`)
+
+Requires PostgreSQL (and preferably Redis) plus env from `apps/api/.env.example`
+and/or root `.env.example`.
 
 ```bash
-pnpm lint
-pnpm format:check
-pnpm typecheck
-pnpm secret-scan
-pnpm readiness -- --assume-passed
-pnpm check          # lint + format:check + typecheck
+# Ensure Postgres is running, then apply migrations
+export DATABASE_URL=postgresql://vygo:vygo@localhost:5432/vygo
+pnpm db:migrate
+pnpm seed:local   # optional: seed availability singleton
+
+cp apps/api/.env.example apps/api/.env
+# Set DATABASE_URL, REDIS_URL, CORS_ORIGINS, TURNSTILE_SECRET_KEY, etc.
+pnpm dev:api
+# → http://localhost:4000
 ```
 
-## Builds
+Verify:
 
 ```bash
-# All packages/apps with a build script
+curl -s http://localhost:4000/healthz
+curl -s http://localhost:4000/readyz
+curl -s http://localhost:4000/health
+curl -s http://localhost:4000/v1/public/availability
+```
+
+### Worker (`apps/worker`)
+
+```bash
+cp apps/worker/.env.example apps/worker/.env
+# Set DATABASE_URL, RESEND_API_KEY (or leave empty for mock transport), EMAIL_FROM
+pnpm dev:worker
+```
+
+For a single-process local harness, the API may set `INLINE_EMAIL_WORKER=true`
+so the worker loop runs inside the API process (see `.env.example`). Production
+Railway should run API and worker as **separate** services with
+`INLINE_EMAIL_WORKER` unset/false.
+
+## Database migrations
+
+Checked-in SQL lives under `packages/db/migrations/`.
+
+```bash
+export DATABASE_URL=postgresql://vygo:vygo@localhost:5432/vygo
+pnpm db:migrate
+```
+
+Successful output includes JSON: `{"ok":true,"action":"migrate"}`.
+
+Apply migrations against the **target** environment (staging or production)
+before or as part of releasing API/worker changes. See
+[docs/deployment.md](docs/deployment.md) for staging vs production migration
+procedure.
+
+## Complete verification command sequence
+
+Run from the repository root after `pnpm install --frozen-lockfile`:
+
+```bash
+# 1. Dependency install (frozen lockfile)
+pnpm install --frozen-lockfile
+
+# 2. Secret scan (blocks obvious credential material)
+pnpm secret-scan
+
+# 3. Lint
+pnpm lint
+
+# 4. Formatting
+pnpm format:check
+
+# 5. Typecheck (all packages/apps with a typecheck script)
+pnpm typecheck
+
+# 6. Unit / package tests (email + API suites; API integration needs Postgres)
+pnpm test:email
+# Optional (requires Postgres + DATABASE_URL_TEST):
+# DATABASE_URL_TEST=postgresql://vygo:vygo@localhost:5432/vygo_test pnpm test:integration
+# Combined (email always; integration when DB available):
+pnpm test
+
+# 7. Readiness report generation
+pnpm readiness -- --assume-passed
+
+# 8. Production builds (web static export + package builds)
 pnpm build
 
-# Web only (also regenerates readiness via prebuild)
-pnpm build:web
+# 9. Migrations (requires Postgres)
+# DATABASE_URL=postgresql://vygo:vygo@localhost:5432/vygo pnpm db:migrate
+
+# 10. Aggregate check alias
+pnpm check   # lint + format:check + typecheck
+
+# 11. CI-equivalent aggregate
+pnpm ci:verify
 ```
 
-CI runs the full verify path (`pnpm install --frozen-lockfile`, secret scan, lint, format check, typecheck, readiness, build). See `.github/workflows/ci.yml`.
+Recorded results for this readiness pass: [docs/verification-report.md](docs/verification-report.md).
+
+CI (`.github/workflows/ci.yml`) runs frozen-lockfile install, secret scan, lint,
+format check, typecheck, email tests, readiness generation, and baseline build.
 
 ## Machine endpoints (web)
 
@@ -150,10 +228,28 @@ pnpm readiness
 
 ## Documentation
 
-- [API contracts](docs/api.md)
-- [Deployment](docs/deployment.md)
-- [Content operations](docs/content-operations.md)
-- [Incident response](docs/incident-response.md)
+| Doc                                                                    | Contents                                                       |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [API contracts](docs/api.md)                                           | Request IDs, health, waitlist, webhooks, test surface          |
+| [Deployment](docs/deployment.md)                                       | Vercel web, Railway API/worker/Postgres/Redis, staging vs prod |
+| [Email & Resend](docs/email-and-resend.md)                             | Domain/DNS, sender, webhooks, event handling, failed-email ops |
+| [Turnstile](docs/turnstile.md)                                         | Site/secret keys for local, staging, production                |
+| [Backups & restore](docs/backups.md)                                   | Schedule, retention, restore, restore-test evidence fields     |
+| [Content operations](docs/content-operations.md)                       | Copy, flags, availability, waitlist export/delete, content ops |
+| [Incident response](docs/incident-response.md)                         | Severity, detection, containment, rollback, comms, recovery    |
+| [Owner launch checklist](docs/owner-launch-checklist.md)               | Exact ordered hosting launch steps                             |
+| [Credentials & decisions inventory](docs/credentials-and-decisions.md) | Every external credential + unresolved owner decisions         |
+| [Verification report](docs/verification-report.md)                     | Exact commands and exit results for this readiness pass        |
+
+## Hosting status (explicit)
+
+- **Live Vercel production deployment was not configured or claimed** by this
+  mission. The owner connects the project and deploys when ready.
+- **Live Railway production deployment was not configured or claimed** by this
+  mission. The owner creates API, worker, PostgreSQL, and Redis services when ready.
+- Do not treat marketing claims (availability dates, pricing, U.S.-based /
+  senior-only language, SLA, equity terms) as verified — see the
+  [decision inventory](docs/credentials-and-decisions.md).
 
 ## License
 

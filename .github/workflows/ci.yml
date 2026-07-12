@@ -46,6 +46,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Unit tests (email package)
+        run: pnpm test:email
+
       - name: Generate readiness report
         env:
           READINESS_ASSUME_CHECKS: passed

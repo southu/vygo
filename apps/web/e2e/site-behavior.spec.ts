@@ -52,9 +52,12 @@ test.describe("Site behavior preservation", () => {
 
   test("FAQ toggles by mouse and keyboard with aria relationships", async ({ page }) => {
     await page.goto("/");
-    const faqSection = page.locator("#main-content").locator("section").filter({
-      has: page.getByRole("heading", { name: /Frequently asked questions/i }),
-    });
+    const faqSection = page
+      .locator("#main-content")
+      .locator("section")
+      .filter({
+        has: page.getByRole("heading", { name: /Frequently asked questions/i }),
+      });
     const buttons = faqSection.getByRole("button");
     const first = buttons.first();
     const controls = await first.getAttribute("aria-controls");

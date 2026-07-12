@@ -33,7 +33,10 @@ export function AvailabilityCard({ className = "" }: { className?: string }) {
         {copy.message}
       </p>
       {uiState === "stale" ? (
-        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-amber-200" data-stale-badge>
+        <p
+          className="mt-2 text-xs font-bold uppercase tracking-wide text-amber-200"
+          data-stale-badge
+        >
           Stale — last known safe state retained
         </p>
       ) : null}

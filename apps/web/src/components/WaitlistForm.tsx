@@ -768,7 +768,11 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
                 required
               />
               {errors.fullName ? (
-                <p id="fullName-error" className="mt-1 text-xs text-red" data-field-error="fullName">
+                <p
+                  id="fullName-error"
+                  className="mt-1 text-xs text-red"
+                  data-field-error="fullName"
+                >
                   {errors.fullName}
                 </p>
               ) : null}
@@ -1015,7 +1019,10 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
               An enterprise or customer deadline is involved
             </label>
 
-            <label className="flex items-start gap-3 text-sm text-ink-soft" htmlFor="privacyAccepted">
+            <label
+              className="flex items-start gap-3 text-sm text-ink-soft"
+              htmlFor="privacyAccepted"
+            >
               <input
                 id="privacyAccepted"
                 name="privacyAccepted"
@@ -1179,7 +1186,8 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
           {availabilityCopy.message}
         </p>
         <p className="mt-2 text-sm text-ink-soft">
-          Submission is not available until openings resume. Check back later or email hello@vygo.ai.
+          Submission is not available until openings resume. Check back later or email
+          hello@vygo.ai.
         </p>
         <div className="mt-6">
           <button

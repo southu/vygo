@@ -177,9 +177,7 @@ export function AvailabilityProvider({ children }: { children: ReactNode }) {
     [snapshot, copy, refresh],
   );
 
-  return (
-    <AvailabilityContext.Provider value={value}>{children}</AvailabilityContext.Provider>
-  );
+  return <AvailabilityContext.Provider value={value}>{children}</AvailabilityContext.Provider>;
 }
 
 export function useAvailability(): AvailabilityContextValue {

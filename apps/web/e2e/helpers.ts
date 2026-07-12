@@ -1,10 +1,14 @@
 import type { Page, Route } from "@playwright/test";
 
-export const LIVE = process.env.PLAYWRIGHT_BASE_URL || process.env.LIVE_URL || "http://127.0.0.1:8380";
+export const LIVE =
+  process.env.PLAYWRIGHT_BASE_URL || process.env.LIVE_URL || "http://127.0.0.1:8380";
 
 export type AvailabilityStatus = "open" | "waitlist" | "paused";
 
-export function availabilityPayload(status: AvailabilityStatus, overrides: Record<string, unknown> = {}) {
+export function availabilityPayload(
+  status: AvailabilityStatus,
+  overrides: Record<string, unknown> = {},
+) {
   return {
     data: {
       status,
@@ -25,7 +29,11 @@ export async function mockAvailability(
 ) {
   await page.route("**/v1/public/availability**", async (route: Route) => {
     if (status === "error") {
-      await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "fail" }) });
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "fail" }),
+      });
       return;
     }
     if (status === "delay") {
@@ -83,7 +91,9 @@ export async function fillStep2(page: Page) {
   await page.locator("#stage").selectOption("live_users");
   await page.locator("#primaryBlocker").selectOption("security");
   await page.locator("#desiredStartWindow").selectOption("within_30_days");
-  await page.locator("#message").fill("We need production hardening before an enterprise rollout next month.");
+  await page
+    .locator("#message")
+    .fill("We need production hardening before an enterprise rollout next month.");
   await page.locator("#privacyAccepted").check();
   // Allow Turnstile stub callback to populate token before submit.
   await page.waitForTimeout(150);
