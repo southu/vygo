@@ -1,12 +1,14 @@
-import Link from "next/link";
-import { ctas, ctaHrefs } from "@/content/ctas";
+"use client";
+
+import { ctas } from "@/content/ctas";
+import { ApplyCta } from "./ApplyCta";
 
 export function StickyMobileCTA() {
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 p-3 backdrop-blur lg:hidden">
-      <Link href={ctaHrefs.waitlist} className="btn-primary w-full">
+      <ApplyCta className="w-full" testId="sticky-mobile-cta">
         {ctas.applyNextOpening}
-      </Link>
+      </ApplyCta>
     </div>
   );
 }

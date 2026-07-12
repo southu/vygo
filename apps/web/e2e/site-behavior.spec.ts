@@ -1,0 +1,86 @@
+import { test, expect } from "@playwright/test";
+import { mockAvailability } from "./helpers";
+
+test.describe("Site behavior preservation", () => {
+  test("home page returns content", async ({ page }) => {
+    await page.goto("/");
+    await expect(page).toHaveURL(/127\.0\.0\.1:8380|localhost/);
+    await expect(page.locator("#main-content")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+
+  test("version endpoint identifies commit", async ({ request }) => {
+    const res = await request.get("/version");
+    expect(res.status()).toBe(200);
+    const text = (await res.text()).trim();
+    expect(text.length).toBeGreaterThan(7);
+    expect(text).toMatch(/^[0-9a-f]+$/i);
+  });
+
+  test("primary CTAs reach open-access or waitlist form", async ({ page }) => {
+    await mockAvailability(page, "open");
+    await page.goto("/");
+    await page.getByTestId("availability-bar-cta").click();
+    await expect(page).toHaveURL(/\/waitlist/);
+
+    await mockAvailability(page, "waitlist");
+    await page.goto("/");
+    await page.getByTestId("availability-bar-cta").click();
+    await expect(page.getByTestId("waitlist-modal")).toBeVisible();
+  });
+
+  test("mobile nav keyboard open/close, expanded state, no trap, links work", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== "mobile", "mobile project only");
+    await page.goto("/");
+    const toggle = page.getByTestId("mobile-nav-toggle");
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("mobile-navigation")).toBeVisible();
+
+    // Focus can leave the panel (no trap): Tab enough times then Escape
+    await page.keyboard.press("Escape");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(toggle).toBeFocused();
+
+    await toggle.click();
+    await page.getByRole("link", { name: "Audit" }).click();
+    await expect(page).toHaveURL(/\/audit/);
+  });
+
+  test("FAQ toggles by mouse and keyboard with aria relationships", async ({ page }) => {
+    await page.goto("/");
+    const faqSection = page.locator("#main-content").locator("section").filter({
+      has: page.getByRole("heading", { name: /Frequently asked questions/i }),
+    });
+    const buttons = faqSection.getByRole("button");
+    const first = buttons.first();
+    const controls = await first.getAttribute("aria-controls");
+    expect(controls).toBeTruthy();
+    const expanded = await first.getAttribute("aria-expanded");
+    // Toggle via click
+    await first.click();
+    const afterClick = await first.getAttribute("aria-expanded");
+    expect(afterClick).not.toBe(expanded);
+    // Panel relationship
+    const panel = page.locator(`#${controls}`);
+    if (afterClick === "true") {
+      await expect(panel).toBeVisible();
+    }
+    // Keyboard
+    await first.focus();
+    await page.keyboard.press("Enter");
+    const afterKey = await first.getAttribute("aria-expanded");
+    expect(afterKey).toBe(expanded);
+  });
+
+  test("non-waitlist navigation still works", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Method" }).click();
+    await expect(page).toHaveURL(/\/method/);
+    await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Security" }).click();
+    await expect(page).toHaveURL(/\/security/);
+  });
+});

@@ -3,6 +3,7 @@ import { getHeaderPrimaryCta, getPrimaryNav } from "@/content/site";
 import { hasPublishedInsights } from "@/content/insights";
 import { LogoText } from "./LogoText";
 import { MobileNav } from "./MobileNav";
+import { ApplyCta } from "./ApplyCta";
 
 export function SiteHeader() {
   const nav = getPrimaryNav();
@@ -33,9 +34,9 @@ export function SiteHeader() {
               {insightsItem.label}
             </Link>
           ) : null}
-          <Link href={primaryCta.href} className="btn-primary ml-2">
+          <ApplyCta className="ml-2" testId="desktop-primary-cta">
             {primaryCta.label}
-          </Link>
+          </ApplyCta>
         </nav>
 
         <MobileNav items={nav} primaryCta={primaryCta} insightsItem={insightsItem} />

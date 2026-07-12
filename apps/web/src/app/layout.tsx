@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Montserrat, Open_Sans } from "next/font/google";
 import { site } from "@/content/site";
+import { AvailabilityProvider } from "@/components/AvailabilityProvider";
+import { WaitlistProvider } from "@/components/WaitlistProvider";
 import { AvailabilityBar } from "@/components/AvailabilityBar";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -36,11 +38,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <a href="#main-content" className="skip-link">
           Skip to content
         </a>
-        <AvailabilityBar />
-        <SiteHeader />
-        {children}
-        <SiteFooter />
-        <StickyMobileCTA />
+        <AvailabilityProvider>
+          <WaitlistProvider>
+            <AvailabilityBar />
+            <SiteHeader />
+            {children}
+            <SiteFooter />
+            <StickyMobileCTA />
+          </WaitlistProvider>
+        </AvailabilityProvider>
       </body>
     </html>
   );

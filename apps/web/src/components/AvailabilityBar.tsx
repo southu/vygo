@@ -1,27 +1,86 @@
-import Link from "next/link";
-import { waitlistContent } from "@/content/waitlist";
-import { ctaHrefs } from "@/content/ctas";
+"use client";
 
-/**
- * Truthful availability surface. Without a live API date, show the safe
- * fallback rather than inventing scarcity or openings.
- */
+import Link from "next/link";
+import { ctaHrefs } from "@/content/ctas";
+import { useAvailability } from "./AvailabilityProvider";
+import { useWaitlistModal } from "./WaitlistProvider";
+
 export function AvailabilityBar() {
-  const { availabilityFallback } = waitlistContent;
+  const { uiState, isBusy, copy, refresh, data } = useAvailability();
+  const { openWaitlist } = useWaitlistModal();
+
+  const showAction = copy.action !== "none";
+  const isRetry = copy.action === "retry";
+  const isWaitlist = copy.action === "open-waitlist";
+  const isOpenAccess = copy.action === "open-access";
 
   return (
-    <div className="bg-trust text-white">
+    <div
+      className="bg-trust text-white"
+      data-availability-ui="bar"
+      data-availability-state={uiState}
+      data-availability-status={data?.status ?? ""}
+      aria-busy={isBusy || uiState === "loading" ? true : undefined}
+      role="region"
+      aria-label="Current availability"
+    >
       <div className="container-page flex flex-col items-start justify-between gap-3 py-2.5 sm:flex-row sm:items-center">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/90 sm:text-sm sm:normal-case sm:tracking-normal sm:font-medium">
-          <span className="mr-2 text-green">{availabilityFallback.label}</span>
-          {availabilityFallback.message}
+          <span className="mr-2 text-green" data-availability-label>
+            {copy.label}
+          </span>
+          <span data-availability-message>{copy.message}</span>
+          {uiState === "stale" ? (
+            <span className="ml-2 rounded bg-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+              Stale
+            </span>
+          ) : null}
+          {uiState === "loading" ? (
+            <span className="sr-only" role="status">
+              Loading availability
+            </span>
+          ) : null}
         </p>
-        <Link
-          href={ctaHrefs.waitlist}
-          className="inline-flex min-h-10 items-center rounded-lg bg-green px-4 py-2 text-sm font-semibold text-white hover:bg-green-dark"
-        >
-          {availabilityFallback.cta} →
-        </Link>
+
+        {showAction ? (
+          isRetry ? (
+            <button
+              type="button"
+              className="inline-flex min-h-10 items-center rounded-lg bg-green px-4 py-2 text-sm font-semibold text-white hover:bg-green-dark"
+              onClick={() => void refresh()}
+              data-availability-action="retry"
+            >
+              {copy.ctaLabel} →
+            </button>
+          ) : isWaitlist ? (
+            <button
+              type="button"
+              className="inline-flex min-h-10 items-center rounded-lg bg-green px-4 py-2 text-sm font-semibold text-white hover:bg-green-dark"
+              onClick={(e) => openWaitlist(e.currentTarget)}
+              data-availability-action="open-waitlist"
+              data-testid="availability-bar-cta"
+            >
+              {copy.ctaLabel} →
+            </button>
+          ) : isOpenAccess ? (
+            <Link
+              href={ctaHrefs.waitlist}
+              className="inline-flex min-h-10 items-center rounded-lg bg-green px-4 py-2 text-sm font-semibold text-white hover:bg-green-dark"
+              data-availability-action="open-access"
+              data-testid="availability-bar-cta"
+            >
+              {copy.ctaLabel} →
+            </Link>
+          ) : null
+        ) : (
+          <span
+            className="inline-flex min-h-10 items-center rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white/80"
+            data-availability-action="none"
+            aria-disabled="true"
+          >
+            {copy.ctaLabel}
+          </span>
+        )}
       </div>
     </div>
   );

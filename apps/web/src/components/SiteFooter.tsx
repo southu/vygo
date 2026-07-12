@@ -4,6 +4,7 @@ import { getFooterNav } from "@/content/site";
 import { hasPublishedInsights } from "@/content/insights";
 import { ctas } from "@/content/ctas";
 import { LogoText } from "./LogoText";
+import { ApplyCta } from "./ApplyCta";
 
 export function SiteFooter() {
   const nav = getFooterNav();
@@ -52,12 +53,13 @@ export function SiteFooter() {
           <p className="text-sm font-semibold text-ink">Apply</p>
           <ul className="mt-4 space-y-2">
             <li>
-              <Link
-                href="/waitlist"
-                className="text-sm font-semibold text-purple hover:text-purple-dark"
+              <ApplyCta
+                variant="secondary"
+                className="!min-h-0 border-0 bg-transparent px-0 py-0 text-sm font-semibold text-purple shadow-none hover:bg-transparent hover:text-purple-dark"
+                testId="footer-apply-cta"
               >
                 {ctas.applyNextOpening}
-              </Link>
+              </ApplyCta>
             </li>
             <li>
               <Link href="/privacy" className="text-sm text-muted hover:text-purple">
