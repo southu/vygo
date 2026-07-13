@@ -31,8 +31,8 @@ export function ApplicantConfirmationEmail(props: ApplicantConfirmationEmailProp
           <Text style={text}>
             Thanks for applying to the next vygo production opening
             {company ? ` for ${company}` : ""}. VYGO LLC will review your application against the
-            next available opening and follow up by email. Submitting does not form a client
-            engagement until a separate agreement is signed.
+            next available Production Readiness Audit or engineering opening and follow up by email.
+            Submitting does not form a client engagement until a separate agreement is signed.
           </Text>
           {msg.display ? (
             <Section style={box}>
@@ -47,7 +47,8 @@ export function ApplicantConfirmationEmail(props: ApplicantConfirmationEmailProp
           ) : null}
           <Hr style={hr} />
           <Text style={footer}>
-            Questions, privacy requests, or legal notices: hello@vygo.ai
+            Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are
+            effective when received.
           </Text>
           <Text style={footer}>— the vygo team (VYGO LLC)</Text>
         </Container>
@@ -68,7 +69,7 @@ export function buildApplicantConfirmationText(payload: ApplicantConfirmationPay
     `Hi ${name},`,
     "",
     `Thanks for applying to the next vygo production opening${company ? ` for ${company}` : ""}.`,
-    "VYGO LLC will review your application against the next available opening and follow up by email.",
+    "VYGO LLC will review your application against the next available Production Readiness Audit or engineering opening and follow up by email.",
     "Submitting does not form a client engagement until a separate agreement is signed.",
   ];
   if (msg.display) {
@@ -79,7 +80,7 @@ export function buildApplicantConfirmationText(payload: ApplicantConfirmationPay
   }
   lines.push(
     "",
-    "Questions, privacy requests, or legal notices: hello@vygo.ai",
+    "Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     "",
     "— the vygo team (VYGO LLC)",
   );
@@ -102,7 +103,7 @@ export function buildApplicantConfirmationHtmlFallback(
     : "";
   return `<!doctype html><html><body><h1>Application received</h1><p>Hi ${name},</p><p>Thanks for applying to the next vygo production opening${
     company ? ` for ${company}` : ""
-  }. VYGO LLC will review your application against the next available opening and follow up by email. Submitting does not form a client engagement until a separate agreement is signed.</p>${note}<p>Questions, privacy requests, or legal notices: hello@vygo.ai</p><p>— the vygo team (VYGO LLC)</p></body></html>`;
+  }. VYGO LLC will review your application against the next available Production Readiness Audit or engineering opening and follow up by email. Submitting does not form a client engagement until a separate agreement is signed.</p>${note}<p>Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.</p><p>— the vygo team (VYGO LLC)</p></body></html>`;
 }
 
 const main = {

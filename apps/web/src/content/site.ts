@@ -15,22 +15,22 @@ export const site = {
       "vygo, operated by VYGO LLC, re-engineers validated AI-built products into secure, scalable software with compliance readiness. Senior U.S.-based production engineering with fixed-price engagements and full IP handoff.",
     auditTitle: "Production Readiness Audit for AI-Built Apps",
     auditDescription:
-      "A two-week Production Readiness Audit for AI-built products: prioritized findings, keep-versus-rebuild map, and a fixed-price plan.",
+      "A two-week Production Readiness Audit from vygo, operated by VYGO LLC: prioritized findings, keep-versus-rebuild map, and a fixed-price plan for AI-built products.",
     methodTitle: "Production Rebuild Method",
     methodDescription:
-      "A fixed six-step methodology from Production Readiness Audit through rebuild, hardening, compliance readiness, and operations.",
+      "The vygo production rebuild method, operated by VYGO LLC: a fixed six-step path from Production Readiness Audit through rebuild, hardening, compliance readiness, and operations.",
     securityTitle: "Security and Compliance Readiness for AI-Built Software",
     securityDescription:
-      "Security controls, identity, data protection, offensive testing, and compliance readiness built into production engineering.",
+      "Security controls, identity, data protection, offensive testing, and compliance readiness built into production engineering by vygo, operated by VYGO LLC.",
     pricingTitle: "Engagement Pricing",
     pricingDescription:
-      "Fixed-price Production Readiness Audit, Launch, Scale, and Enterprise rebuild engagements, plus ongoing vygo Ops plans.",
+      "Fixed-price Production Readiness Audit, Launch, Scale, and Enterprise rebuild engagements from vygo, operated by VYGO LLC, plus ongoing Ops plans.",
     waitlistTitle: "Apply for the next production opening",
     waitlistDescription:
       "Apply for the next Production Readiness Audit or production engineering opening with vygo, operated by VYGO LLC. Applications are reviewed for openings and do not form a client engagement until a separate agreement is signed. Contact hello@vygo.ai for hard deadlines, privacy requests, or legal notices.",
     insightsTitle: "Insights",
     insightsDescription:
-      "Prototype teardowns and field notes on production engineering for AI-built software.",
+      "Prototype teardowns and field notes on production engineering for AI-built software from vygo, operated by VYGO LLC.",
     privacyTitle: "Privacy Policy",
     privacyDescription:
       "Privacy Policy for VYGO LLC explaining how vygo.ai collects, uses, and protects personal information from the marketing site and waitlist.",

@@ -4,9 +4,9 @@ export const methodContent = {
   hero: {
     heading: "A fixed methodology, not open-ended consulting.",
     principle:
-      "The validated product remains visible throughout the rebuild. Customers receive weekly demos and staging access rather than waiting months for a reveal.",
+      "The validated product remains visible throughout the rebuild. Customers of vygo, operated by VYGO LLC, receive weekly demos and staging access rather than waiting months for a reveal.",
     cutoverNote:
-      "Cutover is planned with rollback procedures. Zero-downtime migration is not promised in all cases unless the contract specifically guarantees it.",
+      "Cutover is planned with rollback procedures. Zero-downtime migration is not promised in all cases unless a separately executed agreement specifically guarantees it.",
   },
   steps: [
     {

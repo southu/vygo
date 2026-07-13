@@ -4,7 +4,7 @@ export const waitlistContent = {
   page: {
     eyebrow: "LIMITED SENIOR-POD CAPACITY",
     headline: "Apply for the next production opening.",
-    body: "Tell us what you built, where it is getting stuck, and what deadline matters. We prioritize products with validated demand, active users, sensitive data, or a real commercial opportunity blocked by production risk. Applications are reviewed by VYGO LLC against the next available Production Readiness Audit and engineering opening and do not form a client engagement until a separate agreement is signed. For hard commercial or security-review deadlines, privacy requests, or legal notices, email hello@vygo.ai with the details.",
+    body: "Tell us what you built, where it is getting stuck, and what deadline matters. We prioritize products with validated demand, active users, sensitive data, or a real commercial opportunity blocked by production risk. VYGO LLC reviews applications against the next available Production Readiness Audit and engineering opening. Submitting does not form a client engagement until a separate agreement is signed. For hard commercial or security-review deadlines, privacy requests, or legal notices, contact hello@vygo.ai.",
   },
   form: {
     step1Title: "About you and the product",
@@ -48,7 +48,7 @@ export const waitlistContent = {
   },
   success: {
     heading: "You’re on the list.",
-    body: "Your application will be reviewed by VYGO LLC against the next available Production Readiness Audit and engineering opening. Submitting does not form a client engagement until a separate agreement is signed. If a customer contract or security review has a hard deadline, or for privacy requests and legal notices, email hello@vygo.ai with the details.",
+    body: "VYGO LLC will review your application against the next available Production Readiness Audit and engineering opening. Submitting does not form a client engagement until a separate agreement is signed. If a customer contract or security review has a hard deadline, or for privacy requests and legal notices, contact hello@vygo.ai.",
     nextLinkLabel: "View what happens next",
     nextHref: "/audit",
   },
@@ -61,7 +61,7 @@ export const waitlistContent = {
 
 export const thankYouContent = {
   heading: "Thank you for applying.",
-  body: "Your application will be reviewed by VYGO LLC against the next available Production Readiness Audit and engineering opening. Submitting does not form a client engagement until a separate agreement is signed. If a customer contract or security review has a hard deadline, or for privacy requests and legal notices, email hello@vygo.ai with the details.",
+  body: "VYGO LLC will review your application against the next available Production Readiness Audit and engineering opening. Submitting does not form a client engagement until a separate agreement is signed. If a customer contract or security review has a hard deadline, or for privacy requests and legal notices, contact hello@vygo.ai.",
   cta: { label: "View the Production Readiness Audit", href: "/audit" },
   homeCta: { label: "Back to home", href: "/" },
 } as const;

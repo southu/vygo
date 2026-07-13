@@ -7,7 +7,7 @@ export const brand = {
   tagline: "Your MVP proved the market. vygo makes it production-grade.",
   promise: "We keep the validated product. We rebuild everything underneath it.",
   positioning:
-    "For teams whose AI-built product has proven demand but is not ready for scale, enterprise procurement, compliance readiness, or sustained operations, vygo (operated by VYGO LLC) provides senior U.S.-based production engineering that preserves the validated product and rebuilds the foundation beneath it.",
+    "For teams whose AI-built product has proven demand but is not ready for scale, enterprise procurement, compliance readiness, or sustained operations, vygo, operated by VYGO LLC, provides senior U.S.-based production engineering that preserves the validated product and rebuilds the foundation beneath it.",
 } as const;
 
 export const colors = {
