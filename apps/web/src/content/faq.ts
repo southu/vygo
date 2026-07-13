@@ -17,7 +17,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "What does the Production Readiness Audit include?",
     answer:
-      "A code, architecture, data, security, scalability, and operations review; a threat model; a keep-versus-rebuild map; a prioritized findings report; and a fixed-price plan.",
+      "A code, architecture, data, security, scalability, operations, and compliance-readiness review; a threat model; a keep-versus-rebuild map; a prioritized findings report; and a fixed-price plan.",
   },
   {
     question: "Is the $15K audit required?",

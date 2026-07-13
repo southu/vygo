@@ -6,7 +6,7 @@ export const homepage = {
     eyebrow: "PRODUCTION ENGINEERING FOR AI-BUILT SOFTWARE",
     headline: "From working prototype to production-grade company.",
     supporting:
-      "You already proved people want the product. vygo preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and real operations.",
+      "You already proved people want the product. vygo preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations—with fixed-price engagements and full IP handoff.",
     proofLine: commercialFlags.showUsBasedClaim
       ? "Senior U.S.-based engineers · Fixed price · 6–20 weeks · Full IP handoff"
       : "Senior engineers · Fixed price · 6–20 weeks · Full IP handoff",
@@ -123,7 +123,7 @@ export const homepage = {
       {
         title: "Architect",
         weeks: "Weeks 2–4",
-        body: "Define the target architecture, data model, environments, delivery pipeline, security boundaries, and compliance roadmap.",
+        body: "Define the target architecture, data model, environments, delivery pipeline, security boundaries, and compliance-readiness roadmap.",
       },
       {
         title: "Rebuild",
@@ -143,7 +143,7 @@ export const homepage = {
       {
         title: "Operate",
         weeks: "Ongoing",
-        body: "Keep the platform secure, compliant, observable, and moving through vygo Ops.",
+        body: "Keep the platform secure, compliance-ready, observable, and moving through vygo Ops.",
       },
     ],
     cta: { label: ctas.viewFullMethod, href: ctaHrefs.method },

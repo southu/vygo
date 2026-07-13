@@ -78,7 +78,12 @@ export function SiteFooter() {
       <div className="border-t border-border">
         <div className="container-page flex flex-col gap-2 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} VYGO LLC. All rights reserved.</p>
-          <p>Production engineering for AI-built software · {brand.email}</p>
+          <p>
+            Production engineering for AI-built software ·{" "}
+            <a href={`mailto:${brand.email}`} className="hover:text-purple">
+              {brand.email}
+            </a>
+          </p>
         </div>
       </div>
     </footer>

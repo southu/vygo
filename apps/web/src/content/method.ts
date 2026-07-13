@@ -32,10 +32,14 @@ export const methodContent = {
       activities: [
         "Target architecture and data model",
         "Environment and delivery pipeline design",
-        "Security boundaries and compliance roadmap",
+        "Security boundaries and compliance-readiness roadmap",
       ],
       involvement: "Validate product behavior priorities and environment constraints.",
-      deliverables: ["Architecture blueprint", "Environment plan", "Security/compliance roadmap"],
+      deliverables: [
+        "Architecture blueprint",
+        "Environment plan",
+        "Security and compliance-readiness roadmap",
+      ],
       risks: ["Unresolved product edge cases", "Third-party constraints"],
       gate: "Architecture and delivery plan approved before rebuild acceleration.",
     },
@@ -84,7 +88,7 @@ export const methodContent = {
     {
       title: "Operate",
       weeks: "Ongoing",
-      objectives: "Keep the platform secure, compliant, observable, and moving.",
+      objectives: "Keep the platform secure, compliance-ready, observable, and moving.",
       activities: [
         "vygo Ops monitoring and response",
         "Security and compliance-readiness upkeep",
