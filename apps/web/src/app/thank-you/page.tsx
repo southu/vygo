@@ -5,7 +5,7 @@ import { CtaLink } from "@/components/CtaLink";
 
 export const metadata: Metadata = {
   title: site.metadata.thankYouTitle,
-  description: "Thank you for applying to the next vygo production opening.",
+  description: site.metadata.thankYouDescription,
   robots: { index: false, follow: false },
 };
 

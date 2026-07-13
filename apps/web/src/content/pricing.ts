@@ -7,7 +7,7 @@ export const pricingContent = {
     eyebrow: "ENGAGEMENTS",
     heading: "Simple engagements. Fixed prices.",
     intro:
-      "Start with a Production Readiness Audit when you need a defensible plan. Choose Launch, Scale, or Enterprise when you are ready to rebuild on a fixed scope and price with vygo, operated by VYGO LLC. Services begin only under a separately executed agreement with VYGO LLC.",
+      "Start with a Production Readiness Audit when you need a defensible plan. Choose Launch, Scale, or Enterprise when you are ready to rebuild on a fixed scope and price with vygo, operated by VYGO LLC. Services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
   },
   audit: {
     name: "Production Readiness Audit",
