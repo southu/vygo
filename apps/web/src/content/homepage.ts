@@ -6,7 +6,7 @@ export const homepage = {
     eyebrow: "PRODUCTION ENGINEERING FOR AI-BUILT SOFTWARE",
     headline: "From working prototype to production-grade company.",
     supporting:
-      "You already proved people want the product. vygo preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance, and real operations.",
+      "You already proved people want the product. vygo preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and real operations.",
     proofLine: commercialFlags.showUsBasedClaim
       ? "Senior U.S.-based engineers · Fixed price · 6–20 weeks · Full IP handoff"
       : "Senior engineers · Fixed price · 6–20 weeks · Full IP handoff",
@@ -203,7 +203,7 @@ export const homepage = {
       },
       {
         title: "U.S.-based engineering",
-        body: "Publish only while operationally true.",
+        body: "Engineering delivery is staffed from the United States.",
       },
       {
         title: "Fixed price after audit",
