@@ -6,11 +6,11 @@ export const homepage = {
     eyebrow: "PRODUCTION ENGINEERING FOR AI-BUILT SOFTWARE",
     headline: "From working prototype to production-grade company.",
     supporting: commercialFlags.showUsBasedClaim
-      ? "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit, senior U.S.-based delivery, and full IP handoff under a separately executed agreement—without erasing what already works."
-      : "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit and full IP handoff under a separately executed agreement—without erasing what already works.",
+      ? "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit, senior U.S.-based delivery, and full IP handoff under a separately executed agreement with VYGO LLC—without erasing what already works."
+      : "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit and full IP handoff under a separately executed agreement with VYGO LLC—without erasing what already works.",
     proofLine: commercialFlags.showUsBasedClaim
-      ? "Senior U.S.-based engineers · Fixed price after audit · 6–20 weeks · IP handoff under separately executed agreement"
-      : "Senior engineers · Fixed price after audit · 6–20 weeks · IP handoff under separately executed agreement",
+      ? "Senior U.S.-based engineers · Fixed price after audit · 6–20 weeks · IP handoff under a separately executed agreement with VYGO LLC"
+      : "Senior engineers · Fixed price after audit · 6–20 weeks · IP handoff under a separately executed agreement with VYGO LLC",
     primaryCta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
     secondaryCta: { label: ctas.seeHowRebuildWorks, href: ctaHrefs.method },
     toolLine:
@@ -144,7 +144,7 @@ export const homepage = {
       {
         title: "Operate",
         weeks: "Ongoing",
-        body: "Keep the platform secure, observable, and moving—with compliance-readiness upkeep through vygo Ops.",
+        body: "Keep the platform secure, observable, and moving—with compliance-readiness upkeep through vygo Ops, operated by VYGO LLC.",
       },
     ],
     cta: { label: ctas.viewFullMethod, href: ctaHrefs.method },
@@ -187,7 +187,7 @@ export const homepage = {
   },
   ops: {
     heading: "We do not disappear at launch.",
-    body: "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC.",
+    body: "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC. Ops engagements begin only under a separately executed agreement with VYGO LLC.",
     plans: [
       { name: "Keep It Running", price: "$8K/month" },
       { name: "Keep It Compliant", price: "$15K/month" },
@@ -216,7 +216,7 @@ export const homepage = {
       },
       {
         title: "Aligned for the long term",
-        body: "Ongoing operations and optional equity alignment keep incentives connected.",
+        body: "Ongoing operations and optional equity alignment keep incentives connected under a separately executed agreement with VYGO LLC.",
       },
     ].filter((p) => {
       if (p.title === "U.S.-based engineering" && !commercialFlags.showUsBasedClaim) return false;

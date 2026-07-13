@@ -6,7 +6,7 @@ export const methodContent = {
     principle:
       "The validated product remains visible throughout the rebuild. Customers of vygo, operated by VYGO LLC, receive weekly demos and staging access rather than waiting months for a reveal.",
     cutoverNote:
-      "Cutover is planned with rollback procedures. Zero-downtime migration is not promised in all cases unless a separately executed agreement specifically guarantees it.",
+      "Cutover is planned with rollback procedures. Zero-downtime migration is not promised in all cases unless a separately executed agreement with VYGO LLC specifically guarantees it.",
   },
   steps: [
     {

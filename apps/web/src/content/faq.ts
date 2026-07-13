@@ -12,22 +12,22 @@ export const faqItems: FaqItem[] = [
   {
     question: "Which AI-built stacks do you work with?",
     answer:
-      "vygo can assess products created with Lovable, Cursor, Replit, Bolt, v0, Supabase, Firebase, and conventional React, Node.js, Python, Go, and cloud stacks. Tool names describe compatibility, not formal partnerships.",
+      "vygo, operated by VYGO LLC, can assess products created with Lovable, Cursor, Replit, Bolt, v0, Supabase, Firebase, and conventional React, Node.js, Python, Go, and cloud stacks. Tool names describe compatibility, not formal partnerships.",
   },
   {
     question: "What does the Production Readiness Audit include?",
     answer:
-      "A code, architecture, data, security, scalability, operations, and compliance-readiness review; a threat model; a keep-versus-rebuild map; a prioritized findings report; and a fixed-price plan.",
+      "A code, architecture, data, security, scalability, operations, and compliance-readiness review; a threat model; a keep-versus-rebuild map; a prioritized findings report; and a fixed-price plan. Rebuild services begin only under a separately executed agreement with VYGO LLC.",
   },
   {
     question: "Is the $15K audit required?",
     answer:
-      "The audit is the normal starting point because it creates a defensible scope and price. For unusually well-documented systems, vygo may adjust the process after an initial review.",
+      "The audit is the normal starting point because it creates a defensible scope and price. For unusually well-documented systems, vygo, operated by VYGO LLC, may adjust the process after an initial review.",
   },
   {
     question: "Can you guarantee SOC 2 certification?",
     answer:
-      "No responsible engineering firm can guarantee an independent auditor’s decision. vygo implements the technical and operational controls, evidence workflows, policies, testing, and audit support needed to pursue SOC 2 readiness efficiently.",
+      "No responsible engineering firm can guarantee an independent auditor’s decision. vygo, operated by VYGO LLC, implements the technical and operational controls, evidence workflows, policies, testing, and audit support needed to pursue SOC 2 readiness efficiently under a separately executed agreement with VYGO LLC.",
   },
   {
     question: "Who owns the code and infrastructure?",
@@ -49,11 +49,11 @@ export const faqItems: FaqItem[] = [
     // Editorial: do not publish numeric premiums/equity % until counsel approves;
     // gate numbers via commercialFlags.showExactEquityTerms / showCashOnlyPremium.
     answer:
-      "A cash-only option is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
+      "A cash-only option is available under a separately executed agreement with VYGO LLC. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
   },
   {
     question: "What if we only need a small bug fix?",
     answer:
-      "vygo is built for production risk, architecture, security, compliance readiness, and scale—not isolated low-cost patches. The audit may identify a smaller remediation path or determine that another provider is a better fit.",
+      "vygo, operated by VYGO LLC, is built for production risk, architecture, security, compliance readiness, and scale—not isolated low-cost patches. The audit may identify a smaller remediation path or determine that another provider is a better fit.",
   },
 ];

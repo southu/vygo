@@ -56,6 +56,7 @@ export const pricingContent = {
         "Penetration-test report and remediation",
         "Load testing and SLO dashboards",
         "SOC 2 Type I readiness program",
+        "Full IP handoff under a separately executed agreement with VYGO LLC",
       ],
     },
     {

@@ -21,7 +21,7 @@ export const auditContent = {
     ],
   },
   reviews: {
-    heading: "What vygo reviews",
+    heading: "What vygo, operated by VYGO LLC, reviews",
     categories: [
       "Product architecture",
       "Data model and migrations",

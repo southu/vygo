@@ -71,7 +71,7 @@ export const securityContent = {
     },
   ],
   complianceNote:
-    "Certification and attestation decisions are made by independent auditors or certification bodies. vygo, operated by VYGO LLC, prepares the product and operating program for compliance readiness under a separately executed agreement; readiness work does not guarantee certification or attestation. For privacy requests or legal notices, contact hello@vygo.ai. Notices are effective when received.",
+    "Certification and attestation decisions are made by independent auditors or certification bodies. vygo, operated by VYGO LLC, prepares the product and operating program for compliance readiness under a separately executed agreement with VYGO LLC; readiness work does not guarantee certification or attestation. For privacy requests or legal notices, contact hello@vygo.ai. Notices are effective when received.",
   language: {
     use: [
       "SOC 2 readiness",
