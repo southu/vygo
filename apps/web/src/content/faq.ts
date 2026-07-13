@@ -27,7 +27,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "Can you guarantee SOC 2 certification?",
     answer:
-      "No responsible engineering firm can guarantee an independent auditor’s decision. vygo implements the technical and operational controls, evidence workflows, policies, testing, and audit support required to pursue readiness efficiently.",
+      "No responsible engineering firm can guarantee an independent auditor’s decision. vygo implements the technical and operational controls, evidence workflows, policies, testing, and audit support needed to pursue SOC 2 readiness efficiently.",
   },
   {
     question: "Who owns the code and infrastructure?",
@@ -37,12 +37,12 @@ export const faqItems: FaqItem[] = [
   {
     question: "Can you start immediately?",
     answer:
-      "Capacity depends on the current senior engineering pods. The website shows the next real opening. Urgent, contract-blocking situations should be described in the application so they can be reviewed appropriately.",
+      "Capacity depends on the current senior engineering pods. The website shows the next real opening. Urgent, contract-blocking situations should be described in the application so they can be reviewed appropriately. For hard deadlines, email hello@vygo.ai with the details.",
   },
   {
     question: "What happens after launch?",
     answer:
-      "Clients receive documentation, runbooks, and a full walkthrough. vygo Ops is available for monitoring, incident response, security updates, compliance upkeep, and ongoing engineering.",
+      "Clients receive documentation, runbooks, and a full walkthrough. vygo Ops is available for monitoring, incident response, security updates, compliance-readiness upkeep, and ongoing engineering.",
   },
   {
     question: "Can we pay cash and keep all of our equity?",
@@ -54,6 +54,6 @@ export const faqItems: FaqItem[] = [
   {
     question: "What if we only need a small bug fix?",
     answer:
-      "vygo is built for production risk, architecture, security, compliance, and scale—not isolated low-cost patches. The audit may identify a smaller remediation path or determine that another provider is a better fit.",
+      "vygo is built for production risk, architecture, security, compliance readiness, and scale—not isolated low-cost patches. The audit may identify a smaller remediation path or determine that another provider is a better fit.",
   },
 ];

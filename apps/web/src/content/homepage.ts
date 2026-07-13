@@ -151,7 +151,7 @@ export const homepage = {
   auditOffer: {
     eyebrow: "START HERE",
     heading: "Know exactly what has to change before you fund the rebuild.",
-    body: "The Production Readiness Audit is a two-week review of your code, architecture, security, scalability, and compliance gaps. You receive a prioritized findings report and a fixed-price plan. The report is yours to keep either way.",
+    body: "The Production Readiness Audit is a two-week review of your code, architecture, security, scalability, and compliance-readiness gaps. You receive a prioritized findings report and a fixed-price plan. The report is yours to keep either way.",
     priceLine: "$15K · credited toward your build",
     deliverables: [
       "Codebase and architecture assessment",
@@ -210,8 +210,8 @@ export const homepage = {
         body: "The audit defines the scope before the build begins.",
       },
       {
-        title: "Security and compliance integrated",
-        body: "Not sold as a last-minute add-on.",
+        title: "Security and compliance readiness",
+        body: "Controls, evidence, and operating practices are built into the delivery—not bolted on after launch.",
       },
       {
         title: "Aligned for the long term",
@@ -225,7 +225,7 @@ export const homepage = {
   },
   finalCta: {
     heading: "Your MVP earned a real launch.",
-    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. We will review the application against the next available Production Readiness Audit and engineering pod.",
+    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. Applications are reviewed against the next available Production Readiness Audit and engineering opening. For hard commercial or security-review deadlines, email hello@vygo.ai.",
     cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
   },
 } as const;

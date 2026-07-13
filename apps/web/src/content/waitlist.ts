@@ -48,7 +48,7 @@ export const waitlistContent = {
   },
   success: {
     heading: "You’re on the list.",
-    body: "Your application will be reviewed against the next available audit and engineering opening. If a customer contract or security review has a hard deadline, email hello@vygo.ai with the details.",
+    body: "Your application will be reviewed against the next available Production Readiness Audit and engineering opening. If a customer contract or security review has a hard deadline, email hello@vygo.ai with the details.",
     nextLinkLabel: "View what happens next",
     nextHref: "/audit",
   },

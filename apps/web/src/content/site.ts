@@ -32,7 +32,11 @@ export const site = {
     insightsDescription:
       "Prototype teardowns and field notes on production engineering for AI-built software.",
     privacyTitle: "Privacy Policy",
+    privacyDescription:
+      "Privacy Policy for VYGO LLC explaining how vygo.ai collects, uses, and protects personal information from the marketing site and waitlist.",
     termsTitle: "Terms of Use",
+    termsDescription:
+      "Terms of Use for the vygo.ai website and waitlist features operated by VYGO LLC, a Michigan limited liability company.",
     thankYouTitle: "Thank you",
   },
 } as const;

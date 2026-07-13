@@ -5,8 +5,7 @@ import { site } from "@/content/site";
 
 export const metadata: Metadata = {
   title: site.metadata.termsTitle,
-  description:
-    "Terms of Use for the vygo.ai website and waitlist features operated by VYGO LLC.",
+  description: site.metadata.termsDescription,
 };
 
 export default function TermsPage() {
