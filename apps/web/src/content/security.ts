@@ -3,7 +3,7 @@ import { ctas, ctaHrefs } from "./ctas";
 export const securityContent = {
   hero: {
     headline: "The security controls buyers ask about, built into the product they are buying.",
-    body: "vygo, operated by VYGO LLC, treats security, evidence, and operations as engineering work—not paperwork added after launch.",
+    body: "vygo, operated by VYGO LLC, treats security, evidence, and operations as engineering work—not paperwork added after launch. Client services begin only under a separately executed agreement with VYGO LLC. For privacy requests or legal notices, contact hello@vygo.ai. Notices are effective when received.",
   },
   sections: [
     {
