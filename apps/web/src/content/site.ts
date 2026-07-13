@@ -31,8 +31,8 @@ export const site = {
     insightsTitle: "Insights",
     insightsDescription:
       "Prototype teardowns and field notes on production engineering for AI-built software.",
-    privacyTitle: "Privacy Notice",
-    termsTitle: "Website Terms",
+    privacyTitle: "Privacy Policy",
+    termsTitle: "Terms of Use",
     thankYouTitle: "Thank you",
   },
 } as const;

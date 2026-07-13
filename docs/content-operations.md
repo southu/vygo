@@ -15,7 +15,7 @@ Marketing copy lives in centralized typed modules under `apps/web/src/content/`,
 | `faq.ts`                                 | FAQ items                                         |
 | `waitlist.ts`                            | Waitlist + thank-you copy                         |
 | `insights.ts`                            | Insight articles (`draft` \| `published`)         |
-| `legal.ts`                               | Privacy/terms placeholders + legal-review markers |
+| `legal.ts`                               | Published Privacy Policy and Terms of Use copy    |
 
 ## Principles
 
@@ -53,7 +53,7 @@ Exact equity percentages and cash-only premiums stay unpublished until counsel a
 
 ## Legal pages
 
-`privacy` and `terms` source files are marked `LEGAL REVIEW: Draft for legal review`. Deployed pages emit `data-legal-review="legal-review-draft"` and visible draft disclaimer text. Do not present them as finalized legal advice until counsel approves. **Legal review is an unresolved owner decision.**
+`/privacy` and `/terms` render the published VYGO LLC legal pack from `apps/web/src/content/legal.ts` (effective date in `legalMeta`). Markdown mirrors live in `docs/vygo/` and `apps/web/public/docs/vygo/`. When counsel or the owner updates the pack, edit those sources together and redeploy web.
 
 ## Metadata
 

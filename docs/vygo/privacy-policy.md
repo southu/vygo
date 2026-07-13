@@ -1,96 +1,87 @@
 # Privacy Policy
 
-**[DRAFT: This document requires privacy and legal review.]**
+**Effective date: July 13, 2026**
 
-This Privacy Policy describes how we collect, use, and share your personal information. This Privacy Policy is separate from our Terms of Use.
+This Privacy Policy explains how VYGO LLC, a Michigan limited liability company ("VYGO LLC," "we," "us," or "our"), collects, uses, discloses, and protects personal information when you visit vygo.ai or submit its waitlist form (collectively, the "Site"). It also explains your choices. Your use of the Site is also governed by our [Terms of Use](terms-of-use.md).
 
-## Information Collected
+## Information We Collect
 
-When you apply to our waitlist, we collect the following information:
+When you visit the Site or apply to our waitlist, we collect:
 
-- Contact and Identity Information: Full name, work email address, and company name.
-- Professional Details: Role, product URL, prototype platform, and current lead stage.
-- Project Information: Primary blockers, desired start window, budget range, commercial deadlines, and any message or description you provide.
-- Technical and Marketing Data: Landing page URL, referrer URL, and UTM tracking parameters (source, medium, campaign, content, term).
-- Consent Records: Your acceptance of privacy terms and optional marketing consent.
-- Anti-bot Data: Cloudflare Turnstile tokens to verify you are not a bot.
+- **Contact and identity information:** full name, work email address, and company name.
+- **Professional details:** role, product URL, prototype platform, and current lead stage.
+- **Project information:** primary blockers, desired start window, budget range, commercial deadlines, and messages or descriptions you provide.
+- **Technical and marketing data:** landing and referring page URLs, UTM parameters, interaction and availability events, and security data associated with rate limiting and bot detection. We hash IP addresses with versioned salts rather than retaining them in raw form for rate limiting.
+- **Consent records:** acceptance of privacy terms and your marketing preference.
+- **Anti-bot data:** Cloudflare Turnstile tokens and related device or interaction signals used to distinguish people from automated traffic.
 
-[To be confirmed: Any other information collected automatically or via third parties.]
+Please do not submit sensitive personal information through free-text fields.
 
-## Collection Sources
+## Sources of Information
 
-We collect information directly from you when you submit the waitlist application form on our website.
+We collect information directly from you, automatically from your browser or device when you use the Site, and from the service providers identified below when they operate the Site on our behalf. We may also receive a referring URL and campaign parameters from the page or link that directed you to us.
 
-[To be confirmed: Other sources of collection, if any.]
+## How We Use Information
 
-## Purposes and Legal Bases
+We use personal information to:
 
-We use the collected information to:
+- evaluate and respond to waitlist applications and service inquiries;
+- send transactional messages about waitlist status;
+- send marketing communications when you have opted in, which you may stop using the unsubscribe link in the message;
+- understand Site use, measure demand, and improve the Site and our offerings;
+- prevent fraud, spam, bot submissions, and other abuse;
+- maintain, troubleshoot, and secure our systems; and
+- comply with law and establish, exercise, or defend legal claims.
 
-- Evaluate your waitlist application and contact you regarding our services.
-- Send transactional emails related to your waitlist status.
-- Analyze waitlist metrics and product demand.
-- Prevent abuse, spam, and bot submissions using rate limiting and anti-bot challenges.
+Where a law requires a legal basis, we process information as needed for our legitimate interests in operating, securing, and improving the Site and responding to inquiries; with your consent for optional marketing; to take steps at your request before entering a contract; and to comply with legal obligations. You may withdraw consent at any time without affecting processing that occurred before withdrawal.
 
-[To be confirmed: Applicable legal bases for processing under applicable privacy laws (e.g., consent, legitimate interests, performance of a contract).]
+## Cookies and Similar Technologies
 
-## Cookies and Analytics
+Cloudflare Turnstile may use necessary cookies, tokens, and device or interaction signals to protect the waitlist form from automated abuse. We also record Site interaction and availability events to understand application flow and demand. These analytics events do not include your name, email address, phone number, or free-text messages. We do not use advertising cookies or cross-site behavioral advertising on the Site.
 
-- Anti-Bot Protection: We use Cloudflare Turnstile to protect our waitlist form from automated abuse. This service may set necessary cookies or tokens.
-- Analytics: We record privacy-safe analytics events for waitlist interactions and availability views. These events track application flow but explicitly exclude Personally Identifiable Information (PII) such as your name, email, phone number, and free-text messages.
-
-[To be confirmed: Specific third-party analytics providers, additional cookies, and cookie consent mechanisms.]
+Browser controls may allow you to block or delete cookies, but blocking necessary technologies can prevent the waitlist form from working.
 
 ## AI-Related Processing
 
-[To be confirmed: Details of any AI-related processing of user data, including model training, automated decision-making, or third-party AI sub-processors, if applicable.]
+We do not use personal information submitted through the waitlist to train artificial-intelligence models or make decisions that produce legal or similarly significant effects about you. If our practices change, we will update this policy before applying the new practice as required by law.
 
-## Disclosures and Service Providers
+## How We Disclose Information
 
-We share your information with the following service providers to operate our platform:
+We disclose personal information to vendors that process it on our behalf to operate the Site:
 
-- Resend: For delivering transactional emails and waitlist notifications.
-- Cloudflare (Turnstile): For anti-bot protection and security.
-- Vercel: For hosting our marketing website.
-- Railway: For hosting our backend application programming interface (API), PostgreSQL database, and Redis cache.
+- **Resend** delivers transactional and opted-in marketing email.
+- **Cloudflare** provides Turnstile bot protection and security.
+- **Vercel** hosts the marketing Site.
+- **Railway** hosts the backend API, PostgreSQL database, and Redis cache.
 
-[To be confirmed: Additional disclosures to affiliates, partners, or other third parties.]
+We may also disclose information when required by law; to protect rights, safety, and security; in connection with a merger, financing, acquisition, reorganization, bankruptcy, or sale of assets; or at your direction. We do not sell personal information or share it for cross-context behavioral advertising.
 
 ## Retention
 
-Your waitlist application data is stored securely in our PostgreSQL database.
-
-[To be confirmed: Specific data retention periods for waitlist data, analytics, and marketing consents.]
+We retain waitlist and inquiry information while evaluating your application and for up to 24 months after our last substantive interaction with you, unless a longer period is needed for an active business relationship, legal compliance, dispute resolution, or enforcement of agreements. We retain marketing-consent records until you withdraw consent and for a reasonable period afterward to honor and document your choice. Security and analytics records are retained only as long as reasonably necessary for security, troubleshooting, and aggregate analysis. We delete or de-identify information when the applicable retention period ends.
 
 ## Security
 
-We employ technical safeguards to protect your data, including:
+We use administrative, technical, and organizational safeguards appropriate to the nature of the information, including HTTPS encryption in transit, access controls, environment separation, secrets scanning, rate limiting, bot protection, and hashed IP identifiers for rate limiting. Our hosting providers manage infrastructure-level protections, including storage security. No transmission or storage system is completely secure, and we cannot guarantee absolute security.
 
-- HTTPS encryption for all data in transit.
-- Rate limiting by IP address and email address to prevent abuse. (IP addresses are hashed using versioned salts rather than being logged in raw form).
-- Cloudflare Turnstile for automated abuse protection.
-- Secrets scanning and separation of database environments.
+## International Data Transfers
 
-[To be confirmed: Specific security controls, encryption at rest details, and incident response procedures for user data.]
+We and our service providers may process information in the United States and other countries where they operate. Those countries may have different data-protection laws from your country. Where required, we use recognized transfer safeguards, such as contractual protections, and take steps designed to protect information consistently with this policy.
 
-## International Transfers
+## Your Privacy Rights
 
-[To be confirmed: Mechanisms for international data transfers, hosting locations for Vercel and Railway databases, and cross-border data transfer compliance.]
+Depending on where you live, you may have rights to request access to, correction of, deletion of, or a portable copy of your personal information; object to or restrict certain processing; withdraw consent; or appeal our response. You may also opt out of marketing at any time.
 
-## Privacy Rights
-
-[To be confirmed: Specific user privacy rights (e.g., access, deletion, correction), how to exercise them, and verification procedures.]
+To exercise a right, email `hello@vygo.ai` and describe your request. We may ask for information reasonably necessary to verify your identity and authority. We will respond within the period required by applicable law and will not discriminate against you for exercising a privacy right. You may also complain to your local data-protection authority.
 
 ## Children's Privacy
 
-[To be confirmed: Policy regarding the collection of data from minors and the minimum age requirement.]
+The Site is intended for people age 18 and older. We do not knowingly collect personal information from anyone under 18. If you believe a person under 18 has provided personal information, contact us at `hello@vygo.ai` so we can delete it.
 
 ## Policy Updates
 
-[To be confirmed: How users will be notified of material changes to this Privacy Policy.]
+We may update this Privacy Policy by posting the revised version on the Site and changing the effective date. If a change is material, we will provide additional notice when required by law.
 
-## Contact Methods
+## Contact and Notices
 
-If you have questions about this Privacy Policy, please contact us at hello@vygo.ai.
-
-[To be confirmed: physical mailing address and Data Protection Officer (DPO) details if applicable.]
+For questions, privacy requests, or notices concerning this Privacy Policy, contact VYGO LLC at `hello@vygo.ai`. Notices are effective when received.
