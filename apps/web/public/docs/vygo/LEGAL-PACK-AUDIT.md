@@ -110,6 +110,17 @@ Every file present under `docs/vygo/` at audit completion was reviewed and liste
 
 Included out-of-folder files are the two public policy mirrors, their audit delivery copy, the deployed legal-content source, the legal publication procedure, and the legal decision register listed above. They were included because they either publish alternate Vygo policy text or directly control/record the policies’ draft and approval state.
 
-The remaining files under `docs/` were deliberately excluded from per-file legal-pack review: `backups.md` and `incident-response.md` are internal operational runbooks; `owner-launch-checklist.md` only points maintainers to the already-included legal status records; and the API, deployment, architecture, readiness, email, Turnstile, verification, and other operations documents describe technical systems rather than customer-facing legal terms. Their isolated mentions of privacy, retention, deletion, counsel, or the Vygo project do not make them policy templates or cross-linked members of this legal pack. Marketing page components that merely render `legal.ts` were likewise excluded because they contain no independent policy text.
+The following legal-adjacent files were deliberately excluded from per-file legal-pack review after inspection:
+
+| Excluded path(s) | Reason for exclusion |
+| --- | --- |
+| `apps/web/src/app/privacy/page.tsx`; `apps/web/src/app/terms/page.tsx` | Route/rendering wrappers for the already-included `apps/web/src/content/legal.ts`; they contain draft metadata but no independent policy clauses. |
+| `apps/web/src/components/SiteFooter.tsx` | Navigation/rendering code only; its legal links add no independent legal text. |
+| `docs/owner-launch-checklist.md` | Internal launch checklist that points maintainers to the already-included legal status records; it is neither a policy nor a source of policy terms. |
+| `docs/backups.md` | Internal backup/restore runbook. Its retention and erasure notes expressly defer to the owner/counsel decision recorded in the included `docs/credentials-and-decisions.md`; it supplies no customer-facing policy language. |
+| `docs/incident-response.md` | Internal incident runbook. Its privacy-notification and counsel references are operational cautions, not notification promises or policy terms. |
+| `docs/api.md`; `docs/deployment.md`; `docs/email-and-resend.md`; `docs/railway-backend-architecture.md`; `docs/railway-backend-readiness.md`; `docs/turnstile.md`; `docs/verification-report.md` | Technical documentation. References to Vygo, email, hosting, security, or data handling describe implementation rather than shared or customer-facing legal text. |
+
+Other repository marketing, application, infrastructure, and generated files were excluded because they contain no independent legal policy text. Their isolated mentions of privacy, retention, deletion, counsel, compliance, or the Vygo project do not make them policy templates or cross-linked members of this legal pack.
 
 No source policy was changed as part of this audit.
