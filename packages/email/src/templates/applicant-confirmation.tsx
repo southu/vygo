@@ -33,7 +33,7 @@ export function ApplicantConfirmationEmail(props: ApplicantConfirmationEmailProp
             {company ? ` for ${company}` : ""}. VYGO LLC will review your application against the
             next available Production Readiness Audit or engineering opening and follow up by email.
             Submitting does not form a client relationship. Services begin only under a separately
-            executed agreement.
+            executed agreement with VYGO LLC.
           </Text>
           {msg.display ? (
             <Section style={box}>
@@ -71,7 +71,7 @@ export function buildApplicantConfirmationText(payload: ApplicantConfirmationPay
     "",
     `Thanks for applying to the next vygo production opening${company ? ` for ${company}` : ""}.`,
     "VYGO LLC will review your application against the next available Production Readiness Audit or engineering opening and follow up by email.",
-    "Submitting does not form a client relationship. Services begin only under a separately executed agreement.",
+    "Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC.",
   ];
   if (msg.display) {
     lines.push("", "Your note:", msg.display);
@@ -104,7 +104,7 @@ export function buildApplicantConfirmationHtmlFallback(
     : "";
   return `<!doctype html><html><body><h1>Application received</h1><p>Hi ${name},</p><p>Thanks for applying to the next vygo production opening${
     company ? ` for ${company}` : ""
-  }. VYGO LLC will review your application against the next available Production Readiness Audit or engineering opening and follow up by email. Submitting does not form a client relationship. Services begin only under a separately executed agreement.</p>${note}<p>Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.</p><p>— the vygo team (VYGO LLC)</p></body></html>`;
+  }. VYGO LLC will review your application against the next available Production Readiness Audit or engineering opening and follow up by email. Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC.</p>${note}<p>Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.</p><p>— the vygo team (VYGO LLC)</p></body></html>`;
 }
 
 const main = {

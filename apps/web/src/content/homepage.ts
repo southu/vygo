@@ -9,8 +9,8 @@ export const homepage = {
       ? "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit, senior U.S.-based delivery, and full IP handoff under a separately executed agreement—without erasing what already works."
       : "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit and full IP handoff under a separately executed agreement—without erasing what already works.",
     proofLine: commercialFlags.showUsBasedClaim
-      ? "Senior U.S.-based engineers · Fixed price after audit · 6–20 weeks · IP handoff by agreement"
-      : "Senior engineers · Fixed price after audit · 6–20 weeks · IP handoff by agreement",
+      ? "Senior U.S.-based engineers · Fixed price after audit · 6–20 weeks · IP handoff under agreement"
+      : "Senior engineers · Fixed price after audit · 6–20 weeks · IP handoff under agreement",
     primaryCta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
     secondaryCta: { label: ctas.seeHowRebuildWorks, href: ctaHrefs.method },
     toolLine:
@@ -109,7 +109,7 @@ export const homepage = {
       },
       {
         title: "A codebase your team can own",
-        body: "Architecture documentation, runbooks, test suites, deployment instructions, and full ownership of the code, infrastructure, and IP at handoff under a separately executed agreement.",
+        body: "Architecture documentation, runbooks, test suites, deployment instructions, and full ownership of the code, infrastructure, and IP at handoff under a separately executed agreement with VYGO LLC.",
       },
     ],
   },
@@ -208,7 +208,7 @@ export const homepage = {
       },
       {
         title: "Fixed price after audit",
-        body: "The audit defines the scope before the build begins. Services begin only under a separately executed agreement.",
+        body: "The audit defines the scope before the build begins. Services begin only under a separately executed agreement with VYGO LLC.",
       },
       {
         title: "Security and compliance readiness",
@@ -226,7 +226,7 @@ export const homepage = {
   },
   finalCta: {
     heading: "Your MVP earned a real launch.",
-    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. VYGO LLC reviews applications against the next available Production Readiness Audit and engineering opening. Submitting does not form a client relationship. Services begin only under a separately executed agreement. For hard commercial or security-review deadlines, or for privacy requests and legal notices, contact hello@vygo.ai. Notices are effective when received.",
+    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. VYGO LLC reviews applications against the next available Production Readiness Audit and engineering opening. Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC. For hard commercial or security-review deadlines, or for privacy requests and legal notices, contact hello@vygo.ai. Notices are effective when received.",
     cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
   },
 } as const;

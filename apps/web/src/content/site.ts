@@ -24,10 +24,10 @@ export const site = {
       "Security controls, identity, data protection, offensive testing, and compliance readiness built into production engineering by vygo, operated by VYGO LLC.",
     pricingTitle: "Engagement Pricing",
     pricingDescription:
-      "Fixed-price Production Readiness Audit, Launch, Scale, and Enterprise rebuild engagements from vygo, operated by VYGO LLC, plus ongoing Ops plans.",
+      "Fixed-price Production Readiness Audit, Launch, Scale, and Enterprise rebuild engagements from vygo, operated by VYGO LLC, plus ongoing Ops plans. Services begin only under a separately executed agreement.",
     waitlistTitle: "Apply for the next production opening",
     waitlistDescription:
-      "Apply for the next Production Readiness Audit or production engineering opening with vygo, operated by VYGO LLC. VYGO LLC reviews applications against available openings. Submitting does not form a client relationship. Services begin only under a separately executed agreement. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+      "Apply for the next Production Readiness Audit or production engineering opening with vygo, operated by VYGO LLC. VYGO LLC reviews applications against available openings. Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     insightsTitle: "Insights",
     insightsDescription:
       "Prototype teardowns and field notes on production engineering for AI-built software from vygo, operated by VYGO LLC.",
