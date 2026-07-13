@@ -6,8 +6,8 @@ export const homepage = {
     eyebrow: "PRODUCTION ENGINEERING FOR AI-BUILT SOFTWARE",
     headline: "From working prototype to production-grade company.",
     supporting: commercialFlags.showUsBasedClaim
-      ? "You already proved people want the product. vygo preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations—with fixed-price engagements, senior U.S.-based delivery, and full IP handoff."
-      : "You already proved people want the product. vygo preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations—with fixed-price engagements and full IP handoff.",
+      ? "You already proved people want the product. vygo (VYGO LLC) preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations—with fixed-price engagements, senior U.S.-based delivery, and full IP handoff."
+      : "You already proved people want the product. vygo (VYGO LLC) preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations—with fixed-price engagements and full IP handoff.",
     proofLine: commercialFlags.showUsBasedClaim
       ? "Senior U.S.-based engineers · Fixed price · 6–20 weeks · Full IP handoff"
       : "Senior engineers · Fixed price · 6–20 weeks · Full IP handoff",
@@ -226,7 +226,7 @@ export const homepage = {
   },
   finalCta: {
     heading: "Your MVP earned a real launch.",
-    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. Applications are reviewed against the next available Production Readiness Audit and engineering opening. For hard commercial or security-review deadlines, email hello@vygo.ai with the details.",
+    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. Applications are reviewed against the next available Production Readiness Audit and engineering opening and do not form a client engagement until a separate agreement is signed. For hard commercial or security-review deadlines, email hello@vygo.ai with the details.",
     cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
   },
 } as const;

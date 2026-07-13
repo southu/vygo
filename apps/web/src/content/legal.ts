@@ -76,7 +76,7 @@ export const privacyContent: LegalDocument = {
             },
             {
               lead: "Consent records:",
-              text: "acceptance of privacy terms and your marketing preference.",
+              text: "acceptance of the Privacy Policy and your marketing preference.",
             },
             {
               lead: "Anti-bot data:",

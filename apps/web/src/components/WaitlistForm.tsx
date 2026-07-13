@@ -1038,6 +1038,10 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
                 <a href="/privacy" className="font-semibold text-purple underline">
                   Privacy Policy
                 </a>{" "}
+                and{" "}
+                <a href="/terms" className="font-semibold text-purple underline">
+                  Terms of Use
+                </a>{" "}
                 for application processing. <span className="text-red">*</span>
               </span>
             </label>

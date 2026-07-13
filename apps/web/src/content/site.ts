@@ -27,7 +27,7 @@ export const site = {
       "Fixed-price Production Readiness Audit, Launch, Scale, and Enterprise rebuild engagements, plus ongoing vygo Ops plans.",
     waitlistTitle: "Apply for the next production opening",
     waitlistDescription:
-      "Apply for the next Production Readiness Audit or production engineering opening with vygo.",
+      "Apply for the next Production Readiness Audit or production engineering opening with vygo (VYGO LLC). Applications are reviewed for openings and do not form a client engagement until a separate agreement is signed.",
     insightsTitle: "Insights",
     insightsDescription:
       "Prototype teardowns and field notes on production engineering for AI-built software.",

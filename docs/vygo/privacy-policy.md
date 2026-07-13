@@ -12,7 +12,7 @@ When you visit the Site or apply to our waitlist, we collect:
 - **Professional details:** role, product URL, prototype platform, and current lead stage.
 - **Project information:** primary blockers, desired start window, budget range, commercial deadlines, and messages or descriptions you provide.
 - **Technical and marketing data:** landing and referring page URLs, UTM parameters, interaction and availability events, and security data associated with rate limiting and bot detection. We hash IP addresses with versioned salts rather than retaining them in raw form for rate limiting.
-- **Consent records:** acceptance of privacy terms and your marketing preference.
+- **Consent records:** acceptance of the Privacy Policy and your marketing preference.
 - **Anti-bot data:** Cloudflare Turnstile tokens and related device or interaction signals used to distinguish people from automated traffic.
 
 Please do not submit sensitive personal information through free-text fields.
