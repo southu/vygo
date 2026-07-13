@@ -159,7 +159,7 @@ export const homepage = {
       "Keep-versus-rebuild map",
       "Data and access-control review",
       "Production architecture blueprint",
-      "Compliance gap analysis where relevant",
+      "Compliance-readiness gap analysis where relevant",
       "Prioritized remediation roadmap",
       "Locked scope and fixed-price proposal",
     ],
@@ -225,7 +225,7 @@ export const homepage = {
   },
   finalCta: {
     heading: "Your MVP earned a real launch.",
-    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. Applications are reviewed against the next available Production Readiness Audit and engineering opening. For hard commercial or security-review deadlines, email hello@vygo.ai.",
+    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. Applications are reviewed against the next available Production Readiness Audit and engineering opening. For hard commercial or security-review deadlines, email hello@vygo.ai with the details.",
     cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
   },
 } as const;

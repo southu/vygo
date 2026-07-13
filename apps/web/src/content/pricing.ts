@@ -14,7 +14,7 @@ export const pricingContent = {
     price: "$15K",
     duration: "2 weeks",
     summary:
-      "A two-week review of code, architecture, security, scalability, and compliance gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent vygo build.",
+      "A two-week review of code, architecture, security, scalability, and compliance-readiness gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent vygo build.",
     outcomes: [
       "Codebase and architecture assessment",
       "Threat model and security findings",

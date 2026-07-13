@@ -87,7 +87,7 @@ export const methodContent = {
       objectives: "Keep the platform secure, compliant, observable, and moving.",
       activities: [
         "vygo Ops monitoring and response",
-        "Security and compliance upkeep",
+        "Security and compliance-readiness upkeep",
         "Continued feature engineering when contracted",
       ],
       involvement:

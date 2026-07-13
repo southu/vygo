@@ -34,7 +34,7 @@ export const auditContent = {
       "Logging, metrics, tracing, and alerting",
       "Backups and disaster recovery",
       "Dependency and supply-chain risk",
-      "Compliance gaps relevant to the target customer",
+      "Compliance-readiness gaps relevant to the target customer",
     ],
   },
   receives: {
@@ -45,7 +45,7 @@ export const auditContent = {
       "Keep-versus-rebuild map",
       "Data and access-control review",
       "Production architecture blueprint",
-      "Compliance gap analysis where relevant",
+      "Compliance-readiness gap analysis where relevant",
       "Prioritized remediation roadmap",
       "Locked scope and fixed-price proposal",
     ],
