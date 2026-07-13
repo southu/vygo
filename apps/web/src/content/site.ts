@@ -12,7 +12,7 @@ export const site = {
   metadata: {
     homeTitle: "vygo.ai — Production Engineering for AI-Built Software",
     homeDescription:
-      "vygo re-engineers validated AI-built products into secure, scalable, compliance-ready software. Senior U.S.-based production engineering with fixed-price engagements and full IP handoff.",
+      "vygo re-engineers validated AI-built products into secure, scalable, compliance-ready software. Senior U.S.-based production engineering from VYGO LLC with fixed-price engagements and full IP handoff.",
     auditTitle: "Production Readiness Audit for AI-Built Apps",
     auditDescription:
       "A two-week Production Readiness Audit for AI-built products: prioritized findings, keep-versus-rebuild map, and a fixed-price plan.",

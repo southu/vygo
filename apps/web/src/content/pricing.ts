@@ -79,7 +79,7 @@ export const pricingContent = {
   ops: {
     heading: "vygo Ops — after launch",
     intro:
-      "The same team that rebuilt the product can stay accountable for uptime, security, compliance evidence, and continued feature delivery.",
+      "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery.",
     plans: [
       {
         name: "Keep It Running",
@@ -96,7 +96,7 @@ export const pricingContent = {
         price: "$15K/month",
         includes: [
           "Everything in Keep It Running",
-          "Compliance evidence upkeep",
+          "Compliance-readiness evidence upkeep",
           "Control drift review",
           "Audit support coordination",
         ],

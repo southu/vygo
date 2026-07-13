@@ -3,6 +3,7 @@ import { brand } from "@vygo/ui";
 import { getFooterNav } from "@/content/site";
 import { hasPublishedInsights } from "@/content/insights";
 import { ctas } from "@/content/ctas";
+import { legalMeta } from "@/content/legal";
 import { LogoText } from "./LogoText";
 import { ApplyCta } from "./ApplyCta";
 
@@ -24,6 +25,9 @@ export function SiteFooter() {
             >
               {brand.email}
             </a>
+          </p>
+          <p className="mt-2 text-xs text-muted">
+            {legalMeta.operator}, {legalMeta.operatorDescription}
           </p>
         </div>
 
@@ -77,7 +81,10 @@ export function SiteFooter() {
 
       <div className="border-t border-border">
         <div className="container-page flex flex-col gap-2 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} VYGO LLC. All rights reserved.</p>
+          <p>
+            © {new Date().getFullYear()} {legalMeta.operator}, {legalMeta.operatorDescription}. All
+            rights reserved.
+          </p>
           <p>
             Production engineering for AI-built software ·{" "}
             <a href={`mailto:${brand.email}`} className="hover:text-purple">

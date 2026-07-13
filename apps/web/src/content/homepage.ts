@@ -5,8 +5,9 @@ export const homepage = {
   hero: {
     eyebrow: "PRODUCTION ENGINEERING FOR AI-BUILT SOFTWARE",
     headline: "From working prototype to production-grade company.",
-    supporting:
-      "You already proved people want the product. vygo preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations—with fixed-price engagements and full IP handoff.",
+    supporting: commercialFlags.showUsBasedClaim
+      ? "You already proved people want the product. vygo preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations—with fixed-price engagements, senior U.S.-based delivery, and full IP handoff."
+      : "You already proved people want the product. vygo preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations—with fixed-price engagements and full IP handoff.",
     proofLine: commercialFlags.showUsBasedClaim
       ? "Senior U.S.-based engineers · Fixed price · 6–20 weeks · Full IP handoff"
       : "Senior engineers · Fixed price · 6–20 weeks · Full IP handoff",
@@ -186,7 +187,7 @@ export const homepage = {
   },
   ops: {
     heading: "We do not disappear at launch.",
-    body: "The same team that rebuilt the product can stay accountable for uptime, security, compliance evidence, and continued feature delivery.",
+    body: "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery.",
     plans: [
       { name: "Keep It Running", price: "$8K/month" },
       { name: "Keep It Compliant", price: "$15K/month" },

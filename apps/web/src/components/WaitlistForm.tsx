@@ -1036,7 +1036,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
               <span>
                 I accept the{" "}
                 <a href="/privacy" className="font-semibold text-purple underline">
-                  privacy notice
+                  Privacy Policy
                 </a>{" "}
                 for application processing. <span className="text-red">*</span>
               </span>

@@ -4,7 +4,7 @@ export const waitlistContent = {
   page: {
     eyebrow: "LIMITED SENIOR-POD CAPACITY",
     headline: "Apply for the next production opening.",
-    body: "Tell us what you built, where it is getting stuck, and what deadline matters. We prioritize products with validated demand, active users, sensitive data, or a real commercial opportunity blocked by production risk.",
+    body: "Tell us what you built, where it is getting stuck, and what deadline matters. We prioritize products with validated demand, active users, sensitive data, or a real commercial opportunity blocked by production risk. Applications are reviewed against the next available Production Readiness Audit and engineering opening. For hard commercial or security-review deadlines, email hello@vygo.ai with the details.",
   },
   form: {
     step1Title: "About you and the product",
