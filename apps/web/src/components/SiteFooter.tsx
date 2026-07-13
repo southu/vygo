@@ -96,7 +96,8 @@ export function SiteFooter() {
             rights reserved.
           </p>
           <p>
-            Production engineering for AI-built software ·{" "}
+            Production engineering for AI-built software. Questions, privacy requests, or legal
+            notices may be sent to{" "}
             <a href={`mailto:${brand.email}`} className="hover:text-purple">
               {brand.email}
             </a>

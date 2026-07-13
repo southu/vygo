@@ -152,7 +152,7 @@ export const homepage = {
   auditOffer: {
     eyebrow: "START HERE",
     heading: "Know exactly what has to change before you fund the rebuild.",
-    body: "The Production Readiness Audit is a two-week review of your code, architecture, security, scalability, and compliance-readiness gaps from vygo, operated by VYGO LLC. You receive a prioritized findings report and a fixed-price plan. The report is yours to keep either way. Rebuild services begin only under a separately executed agreement with VYGO LLC.",
+    body: "The Production Readiness Audit is a two-week review of your code, architecture, security, scalability, and compliance-readiness gaps from vygo, operated by VYGO LLC. You receive a prioritized findings report and a fixed-price plan. The report is yours to keep either way. Submitting does not form a client relationship. Rebuild services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     priceLine: "$15K · credited toward your build",
     deliverables: [
       "Codebase and architecture assessment",
@@ -170,7 +170,7 @@ export const homepage = {
     heading: "Simple engagements. Fixed prices.",
     // Editorial: exact equity % / cash premiums stay behind commercialFlags.showExactEquityTerms
     // (and showCashOnlyPremium). Do not put author instructions in rendered note copy.
-    note: "Standard engagements can include an equity-aligned structure under a separately executed agreement with VYGO LLC. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
+    note: "Standard engagements can include an equity-aligned structure under a separately executed agreement with VYGO LLC. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     cta: { label: ctas.reviewEngagementDetails, href: ctaHrefs.pricing },
   },
   securityPreview: {
@@ -187,13 +187,13 @@ export const homepage = {
   },
   ops: {
     heading: "We do not disappear at launch.",
-    body: "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC. Ops engagements begin only under a separately executed agreement with VYGO LLC.",
+    body: "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC. Ops engagements begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     plans: [
       { name: "Keep It Running", price: "$8K/month" },
       { name: "Keep It Compliant", price: "$15K/month" },
       { name: "Keep It Growing", price: "$25K/month" },
     ],
-    note: "Month-to-month after the initial commitment under a separately executed agreement with VYGO LLC. Everything remains documented so another qualified team can take over.",
+    note: "Month-to-month after the initial commitment under a separately executed agreement with VYGO LLC. Everything remains documented so another qualified team can take over. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
   },
   why: {
     heading: "Senior people on the work. Accountability after the launch.",

@@ -32,7 +32,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "Who owns the code and infrastructure?",
     answer:
-      "The client owns the code, infrastructure, documentation, and IP produced for the engagement under a separately executed agreement with VYGO LLC, subject to any clearly identified third-party components.",
+      "The client owns the code, infrastructure, documentation, and IP produced for the engagement under a separately executed agreement with VYGO LLC, subject to any clearly identified third-party components. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
   },
   {
     question: "Can you start immediately?",
@@ -42,7 +42,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "What happens after launch?",
     answer:
-      "Clients receive documentation, runbooks, and a full walkthrough. vygo Ops, operated by VYGO LLC, is available for monitoring, incident response, security updates, compliance-readiness upkeep, and ongoing engineering under a separately executed agreement with VYGO LLC.",
+      "Clients receive documentation, runbooks, and a full walkthrough. vygo Ops, operated by VYGO LLC, is available for monitoring, incident response, security updates, compliance-readiness upkeep, and ongoing engineering under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
   },
   {
     question: "Can we pay cash and keep all of our equity?",

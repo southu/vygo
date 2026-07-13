@@ -14,7 +14,7 @@ export const pricingContent = {
     price: "$15K",
     duration: "2 weeks",
     summary:
-      "A two-week review of code, architecture, security, scalability, and compliance-readiness gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent vygo build. Rebuild services begin only under a separately executed agreement with VYGO LLC.",
+      "A two-week review of code, architecture, security, scalability, and compliance-readiness gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent vygo build. Submitting does not form a client relationship. Rebuild services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     outcomes: [
       "Codebase and architecture assessment",
       "Threat model and security findings",
@@ -81,7 +81,7 @@ export const pricingContent = {
   ops: {
     heading: "vygo Ops — after launch",
     intro:
-      "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC. Ops engagements begin only under a separately executed agreement with VYGO LLC.",
+      "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC. Ops engagements begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     plans: [
       {
         name: "Keep It Running",
@@ -114,11 +114,11 @@ export const pricingContent = {
         ],
       },
     ],
-    note: "Month-to-month after the initial commitment under a separately executed agreement with VYGO LLC. Everything remains documented so another qualified team can take over.",
+    note: "Month-to-month after the initial commitment under a separately executed agreement with VYGO LLC. Everything remains documented so another qualified team can take over. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
   },
   // Editorial: exact equity % / cash premiums stay behind commercialFlags.showExactEquityTerms
   // (and showCashOnlyPremium). Keep this note visitor-facing; do not add author instructions.
   equityNote:
-    "Standard engagements can include an equity-aligned structure under a separately executed agreement with VYGO LLC. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
+    "Standard engagements can include an equity-aligned structure under a separately executed agreement with VYGO LLC. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
   cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
 } as const;

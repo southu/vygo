@@ -1044,7 +1044,11 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
                 </a>{" "}
                 of VYGO LLC for application processing. Submitting does not form a client
                 relationship. Services begin only under a separately executed agreement with
-                VYGO LLC.{" "}
+                VYGO LLC. Questions, privacy requests, or legal notices may be sent to{" "}
+                <a className="font-semibold text-purple underline" href="mailto:hello@vygo.ai">
+                  hello@vygo.ai
+                </a>
+                . Notices are effective when received.{" "}
                 <span className="text-red">*</span>
               </span>
             </label>

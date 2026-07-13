@@ -80,7 +80,7 @@ export const auditContent = {
   },
   scope: {
     heading: "How the fixed-price build scope is created",
-    body: "The audit converts findings into a concrete keep-versus-rebuild map, ordered workstreams, and a locked price. You decide whether to proceed; the report remains yours either way. Rebuild services begin only under a separately executed agreement with VYGO LLC.",
+    body: "The audit converts findings into a concrete keep-versus-rebuild map, ordered workstreams, and a locked price. You decide whether to proceed; the report remains yours either way. Submitting does not form a client relationship. Rebuild services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
   },
   cta: { label: ctas.applyNextAuditOpening, href: ctaHrefs.waitlist },
 } as const;
