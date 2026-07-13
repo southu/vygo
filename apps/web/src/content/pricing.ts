@@ -79,7 +79,7 @@ export const pricingContent = {
   ops: {
     heading: "vygo Ops — after launch",
     intro:
-      "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery.",
+      "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC.",
     plans: [
       {
         name: "Keep It Running",

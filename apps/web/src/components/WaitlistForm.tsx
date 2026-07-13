@@ -1043,7 +1043,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
                   Terms of Use
                 </a>{" "}
                 of VYGO LLC for application processing. Submitting does not form a client
-                engagement until a separate agreement is signed.{" "}
+                relationship. Services begin only under a separately executed agreement.{" "}
                 <span className="text-red">*</span>
               </span>
             </label>

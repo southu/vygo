@@ -12,7 +12,7 @@ export const site = {
   metadata: {
     homeTitle: "vygo.ai — Production Engineering for AI-Built Software",
     homeDescription:
-      "vygo, operated by VYGO LLC, re-engineers validated AI-built products into secure, scalable software with compliance readiness. Senior U.S.-based production engineering with fixed-price engagements and full IP handoff.",
+      "vygo, operated by VYGO LLC, re-engineers validated AI-built products into secure, scalable software with compliance readiness. Senior U.S.-based production engineering with fixed-price engagements and full IP handoff under a separately executed agreement.",
     auditTitle: "Production Readiness Audit for AI-Built Apps",
     auditDescription:
       "A two-week Production Readiness Audit from vygo, operated by VYGO LLC: prioritized findings, keep-versus-rebuild map, and a fixed-price plan for AI-built products.",
@@ -27,7 +27,7 @@ export const site = {
       "Fixed-price Production Readiness Audit, Launch, Scale, and Enterprise rebuild engagements from vygo, operated by VYGO LLC, plus ongoing Ops plans.",
     waitlistTitle: "Apply for the next production opening",
     waitlistDescription:
-      "Apply for the next Production Readiness Audit or production engineering opening with vygo, operated by VYGO LLC. VYGO LLC reviews applications against available openings. Submitting does not form a client engagement until a separate agreement is signed. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai.",
+      "Apply for the next Production Readiness Audit or production engineering opening with vygo, operated by VYGO LLC. VYGO LLC reviews applications against available openings. Submitting does not form a client relationship. Services begin only under a separately executed agreement. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     insightsTitle: "Insights",
     insightsDescription:
       "Prototype teardowns and field notes on production engineering for AI-built software from vygo, operated by VYGO LLC.",
