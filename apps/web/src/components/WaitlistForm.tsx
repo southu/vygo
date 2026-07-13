@@ -1042,7 +1042,9 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
                 <a href="/terms" className="font-semibold text-purple underline">
                   Terms of Use
                 </a>{" "}
-                for application processing. <span className="text-red">*</span>
+                of VYGO LLC for application processing. Submitting does not form a client
+                engagement until a separate agreement is signed.{" "}
+                <span className="text-red">*</span>
               </span>
             </label>
             {errors.privacyAccepted ? (

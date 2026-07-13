@@ -32,12 +32,12 @@ export const faqItems: FaqItem[] = [
   {
     question: "Who owns the code and infrastructure?",
     answer:
-      "The client owns the code, infrastructure, documentation, and IP produced for the engagement, subject to the final contract and any clearly identified third-party components.",
+      "The client owns the code, infrastructure, documentation, and IP produced for the engagement, subject to a separately executed agreement and any clearly identified third-party components.",
   },
   {
     question: "Can you start immediately?",
     answer:
-      "Capacity depends on the current senior engineering pods. The website shows the next real opening. Urgent, contract-blocking situations should be described in the application so VYGO LLC can review them appropriately. Submitting does not form a client engagement until a separate agreement is signed. For hard deadlines, privacy requests, or legal notices, contact hello@vygo.ai.",
+      "Capacity depends on the current senior engineering pods. The website shows the next real opening. Urgent, contract-blocking situations should be described in the application so VYGO LLC can review them appropriately. Submitting does not form a client engagement until a separate agreement is signed. For hard deadlines, privacy requests, or legal notices, contact hello@vygo.ai. Notices are effective when received.",
   },
   {
     question: "What happens after launch?",
