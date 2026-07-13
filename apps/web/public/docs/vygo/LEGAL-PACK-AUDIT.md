@@ -14,7 +14,7 @@
 - Each policy links to the other and uses consistent definitions for the Site.
 - The Terms select Michigan law and Michigan state or federal courts, subject to non-waivable consumer rights.
 - The Privacy Policy states the data categories, sources, purposes, legal bases, service providers, retention rules, safeguards, transfer approach, and rights process applicable to the Site.
-- Questions, legal notices, and privacy requests may be sent to `hello@vygo.ai`.
+- Questions, privacy requests, or legal notices may be sent to `hello@vygo.ai`. Notices are effective when received.
 
 ## Pack Scope
 

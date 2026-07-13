@@ -33,10 +33,10 @@ export const site = {
       "Prototype teardowns and field notes on production engineering for AI-built software from vygo, operated by VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     privacyTitle: "Privacy Policy",
     privacyDescription:
-      "Privacy Policy for VYGO LLC explaining how vygo.ai collects, uses, and protects personal information from the marketing site and waitlist.",
+      "Privacy Policy for VYGO LLC explaining how vygo.ai collects, uses, and protects personal information from the marketing site and waitlist. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     termsTitle: "Terms of Use",
     termsDescription:
-      "Terms of Use for the vygo.ai website and waitlist features operated by VYGO LLC, a Michigan limited liability company.",
+      "Terms of Use for the vygo.ai website and waitlist features operated by VYGO LLC, a Michigan limited liability company. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     thankYouTitle: "Thank you",
     thankYouDescription:
       "Thank you for applying to the next production opening with vygo, operated by VYGO LLC. Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",

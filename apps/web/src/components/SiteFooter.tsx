@@ -100,6 +100,7 @@ export function SiteFooter() {
             <a href={`mailto:${brand.email}`} className="hover:text-purple">
               {brand.email}
             </a>
+            . Notices are effective when received.
           </p>
         </div>
       </div>
