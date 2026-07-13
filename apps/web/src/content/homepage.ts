@@ -226,7 +226,7 @@ export const homepage = {
   },
   finalCta: {
     heading: "Your MVP earned a real launch.",
-    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. VYGO LLC reviews applications against the next available Production Readiness Audit and engineering opening. Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC. For hard commercial or security-review deadlines, or for privacy requests and legal notices, contact hello@vygo.ai. Notices are effective when received.",
+    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. VYGO LLC reviews applications against the next available Production Readiness Audit and engineering opening. Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC. For hard commercial or security-review deadlines, or for questions, privacy requests, or legal notices, contact hello@vygo.ai. Notices are effective when received.",
     cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
   },
 } as const;

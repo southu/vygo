@@ -30,7 +30,7 @@ export function SiteFooter() {
             Operated by {legalMeta.operator}, {legalMeta.operatorDescription}.
           </p>
           <p className="mt-1 text-xs text-muted">
-            Questions, privacy requests, and legal notices may be sent to{" "}
+            Questions, privacy requests, or legal notices may be sent to{" "}
             <a
               href={`mailto:${legalMeta.contactEmail}`}
               className="font-medium text-purple hover:text-purple-dark"

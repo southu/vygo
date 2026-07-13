@@ -30,7 +30,7 @@ export const site = {
       "Apply for the next Production Readiness Audit or production engineering opening with vygo, operated by VYGO LLC. VYGO LLC reviews applications against available openings. Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     insightsTitle: "Insights",
     insightsDescription:
-      "Prototype teardowns and field notes on production engineering for AI-built software from vygo, operated by VYGO LLC.",
+      "Prototype teardowns and field notes on production engineering for AI-built software from vygo, operated by VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     privacyTitle: "Privacy Policy",
     privacyDescription:
       "Privacy Policy for VYGO LLC explaining how vygo.ai collects, uses, and protects personal information from the marketing site and waitlist.",
