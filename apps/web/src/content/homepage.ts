@@ -9,8 +9,8 @@ export const homepage = {
       ? "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit, senior U.S.-based delivery, and full IP handoff under a separately executed agreement—without erasing what already works."
       : "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit and full IP handoff under a separately executed agreement—without erasing what already works.",
     proofLine: commercialFlags.showUsBasedClaim
-      ? "Senior U.S.-based engineers · Fixed price · 6–20 weeks · Full IP handoff"
-      : "Senior engineers · Fixed price · 6–20 weeks · Full IP handoff",
+      ? "Senior U.S.-based engineers · Fixed price after audit · 6–20 weeks · IP handoff by agreement"
+      : "Senior engineers · Fixed price after audit · 6–20 weeks · IP handoff by agreement",
     primaryCta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
     secondaryCta: { label: ctas.seeHowRebuildWorks, href: ctaHrefs.method },
     toolLine:
@@ -109,7 +109,7 @@ export const homepage = {
       },
       {
         title: "A codebase your team can own",
-        body: "Architecture documentation, runbooks, test suites, deployment instructions, and full ownership of the code, infrastructure, and IP at handoff.",
+        body: "Architecture documentation, runbooks, test suites, deployment instructions, and full ownership of the code, infrastructure, and IP at handoff under a separately executed agreement.",
       },
     ],
   },
@@ -208,7 +208,7 @@ export const homepage = {
       },
       {
         title: "Fixed price after audit",
-        body: "The audit defines the scope before the build begins.",
+        body: "The audit defines the scope before the build begins. Services begin only under a separately executed agreement.",
       },
       {
         title: "Security and compliance readiness",

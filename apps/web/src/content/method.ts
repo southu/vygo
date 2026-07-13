@@ -23,7 +23,7 @@ export const methodContent = {
       involvement: "Provide access, context, and commercial constraints; review interim findings.",
       deliverables: ["Findings report", "Keep-versus-rebuild map", "Fixed-price proposal"],
       risks: ["Incomplete access slows assessment", "Hidden production dependencies"],
-      gate: "Customer accepts, revises, or declines the rebuild plan.",
+      gate: "Customer accepts, revises, or declines the rebuild plan. Rebuild services begin only under a separately executed agreement.",
     },
     {
       title: "Architect",

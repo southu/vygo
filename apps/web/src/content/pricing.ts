@@ -38,7 +38,7 @@ export const pricingContent = {
         "Hardened infrastructure and authentication",
         "Automated tests and deployment pipeline",
         "Monitoring and operational runbooks",
-        "Full IP handoff",
+        "Full IP handoff under a separately executed agreement",
       ],
     },
     {

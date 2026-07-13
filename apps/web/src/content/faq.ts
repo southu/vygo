@@ -32,7 +32,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "Who owns the code and infrastructure?",
     answer:
-      "The client owns the code, infrastructure, documentation, and IP produced for the engagement, subject to a separately executed agreement and any clearly identified third-party components.",
+      "The client owns the code, infrastructure, documentation, and IP produced for the engagement under a separately executed agreement with VYGO LLC, subject to any clearly identified third-party components.",
   },
   {
     question: "Can you start immediately?",
