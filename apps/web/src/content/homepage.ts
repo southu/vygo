@@ -9,8 +9,8 @@ export const homepage = {
       ? "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit, senior U.S.-based delivery, and full IP handoff under a separately executed agreement—without erasing what already works."
       : "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit and full IP handoff under a separately executed agreement—without erasing what already works.",
     proofLine: commercialFlags.showUsBasedClaim
-      ? "Senior U.S.-based engineers · Fixed price after audit · 6–20 weeks · IP handoff under agreement"
-      : "Senior engineers · Fixed price after audit · 6–20 weeks · IP handoff under agreement",
+      ? "Senior U.S.-based engineers · Fixed price after audit · 6–20 weeks · IP handoff under separately executed agreement"
+      : "Senior engineers · Fixed price after audit · 6–20 weeks · IP handoff under separately executed agreement",
     primaryCta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
     secondaryCta: { label: ctas.seeHowRebuildWorks, href: ctaHrefs.method },
     toolLine:
@@ -152,7 +152,7 @@ export const homepage = {
   auditOffer: {
     eyebrow: "START HERE",
     heading: "Know exactly what has to change before you fund the rebuild.",
-    body: "The Production Readiness Audit is a two-week review of your code, architecture, security, scalability, and compliance-readiness gaps. You receive a prioritized findings report and a fixed-price plan. The report is yours to keep either way.",
+    body: "The Production Readiness Audit is a two-week review of your code, architecture, security, scalability, and compliance-readiness gaps from vygo, operated by VYGO LLC. You receive a prioritized findings report and a fixed-price plan. The report is yours to keep either way. Rebuild services begin only under a separately executed agreement with VYGO LLC.",
     priceLine: "$15K · credited toward your build",
     deliverables: [
       "Codebase and architecture assessment",
@@ -170,7 +170,7 @@ export const homepage = {
     heading: "Simple engagements. Fixed prices.",
     // Editorial: exact equity % / cash premiums stay behind commercialFlags.showExactEquityTerms
     // (and showCashOnlyPremium). Do not put author instructions in rendered note copy.
-    note: "Standard engagements can include an equity-aligned structure. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
+    note: "Standard engagements can include an equity-aligned structure under a separately executed agreement with VYGO LLC. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
     cta: { label: ctas.reviewEngagementDetails, href: ctaHrefs.pricing },
   },
   securityPreview: {
@@ -193,7 +193,7 @@ export const homepage = {
       { name: "Keep It Compliant", price: "$15K/month" },
       { name: "Keep It Growing", price: "$25K/month" },
     ],
-    note: "Month-to-month after the initial commitment. Everything remains documented so another qualified team can take over.",
+    note: "Month-to-month after the initial commitment under a separately executed agreement with VYGO LLC. Everything remains documented so another qualified team can take over.",
   },
   why: {
     heading: "Senior people on the work. Accountability after the launch.",

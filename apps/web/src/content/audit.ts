@@ -3,7 +3,7 @@ import { ctas, ctaHrefs } from "./ctas";
 export const auditContent = {
   hero: {
     headline: "A two-week plan for getting your product safely into production.",
-    body: "Before you commit to a rebuild, senior engineers at vygo, operated by VYGO LLC, inspect the code, data model, access controls, infrastructure, deployment process, and operational risks. You leave with a prioritized report and a fixed-price path forward.",
+    body: "Before you commit to a rebuild, senior engineers at vygo, operated by VYGO LLC, inspect the code, data model, access controls, infrastructure, deployment process, and operational risks. You leave with a prioritized report and a fixed-price path forward. The audit does not form a client rebuild relationship; rebuild services begin only under a separately executed agreement with VYGO LLC.",
     price: "$15K · credited toward a subsequent vygo build",
     cta: { label: ctas.applyNextAuditOpening, href: ctaHrefs.waitlist },
   },

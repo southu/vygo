@@ -7,14 +7,14 @@ export const pricingContent = {
     eyebrow: "ENGAGEMENTS",
     heading: "Simple engagements. Fixed prices.",
     intro:
-      "Start with a Production Readiness Audit when you need a defensible plan. Choose Launch, Scale, or Enterprise when you are ready to rebuild on a fixed scope and price with vygo, operated by VYGO LLC. Services begin only under a separately executed agreement.",
+      "Start with a Production Readiness Audit when you need a defensible plan. Choose Launch, Scale, or Enterprise when you are ready to rebuild on a fixed scope and price with vygo, operated by VYGO LLC. Services begin only under a separately executed agreement with VYGO LLC.",
   },
   audit: {
     name: "Production Readiness Audit",
     price: "$15K",
     duration: "2 weeks",
     summary:
-      "A two-week review of code, architecture, security, scalability, and compliance-readiness gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent vygo build.",
+      "A two-week review of code, architecture, security, scalability, and compliance-readiness gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent vygo build. Rebuild services begin only under a separately executed agreement with VYGO LLC.",
     outcomes: [
       "Codebase and architecture assessment",
       "Threat model and security findings",
@@ -73,13 +73,14 @@ export const pricingContent = {
         "Complex data and integration work",
         "Type II evidence program and auditor coordination",
         "ISO 27001 pathway where required",
+        "Full IP handoff under a separately executed agreement with VYGO LLC",
       ],
     },
   ],
   ops: {
     heading: "vygo Ops — after launch",
     intro:
-      "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC.",
+      "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC. Ops engagements begin only under a separately executed agreement with VYGO LLC.",
     plans: [
       {
         name: "Keep It Running",
@@ -112,11 +113,11 @@ export const pricingContent = {
         ],
       },
     ],
-    note: "Month-to-month after the initial commitment. Everything remains documented so another qualified team can take over.",
+    note: "Month-to-month after the initial commitment under a separately executed agreement with VYGO LLC. Everything remains documented so another qualified team can take over.",
   },
   // Editorial: exact equity % / cash premiums stay behind commercialFlags.showExactEquityTerms
   // (and showCashOnlyPremium). Keep this note visitor-facing; do not add author instructions.
   equityNote:
-    "Standard engagements can include an equity-aligned structure. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
+    "Standard engagements can include an equity-aligned structure under a separately executed agreement with VYGO LLC. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
   cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
 } as const;

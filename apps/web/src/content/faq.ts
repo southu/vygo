@@ -42,7 +42,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "What happens after launch?",
     answer:
-      "Clients receive documentation, runbooks, and a full walkthrough. vygo Ops is available for monitoring, incident response, security updates, compliance-readiness upkeep, and ongoing engineering.",
+      "Clients receive documentation, runbooks, and a full walkthrough. vygo Ops, operated by VYGO LLC, is available for monitoring, incident response, security updates, compliance-readiness upkeep, and ongoing engineering under a separately executed agreement with VYGO LLC.",
   },
   {
     question: "Can we pay cash and keep all of our equity?",

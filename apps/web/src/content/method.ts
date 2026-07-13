@@ -88,9 +88,10 @@ export const methodContent = {
     {
       title: "Operate",
       weeks: "Ongoing",
-      objectives: "Keep the platform secure, observable, and moving—with compliance-readiness upkeep.",
+      objectives:
+        "Keep the platform secure, observable, and moving—with compliance-readiness upkeep through vygo Ops, operated by VYGO LLC.",
       activities: [
-        "vygo Ops monitoring and response",
+        "vygo Ops monitoring and response under a separately executed agreement with VYGO LLC",
         "Security and compliance-readiness upkeep",
         "Continued feature engineering when contracted",
       ],
@@ -98,7 +99,7 @@ export const methodContent = {
         "Product prioritization and operational decision rights remain with the customer.",
       deliverables: ["Operational ownership", "Documented handoff-ready system"],
       risks: ["Unowned production decisions after launch"],
-      gate: "Customer may continue Ops or transfer to another qualified team.",
+      gate: "Customer may continue Ops under a separately executed agreement with VYGO LLC, or transfer to another qualified team.",
     },
   ],
   tierMatrix: {
