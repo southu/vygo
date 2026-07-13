@@ -122,7 +122,7 @@ const FIELD_LABELS: Record<string, string> = {
   message: "Short description",
   prototypePlatform: "Build tool / stack",
   budgetRange: "Budget range",
-  privacyAccepted: "Privacy acceptance",
+  privacyAccepted: "Privacy Policy and Terms of Use acceptance",
   turnstileToken: "Verification challenge",
 };
 
@@ -419,7 +419,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
       next.message = "Add a short description (at least a sentence).";
     }
     if (!values.privacyAccepted) {
-      next.privacyAccepted = "Privacy acceptance is required.";
+      next.privacyAccepted = "Acceptance of the Privacy Policy and Terms of Use is required.";
     }
     if (!turnstileToken) {
       next.turnstileToken = turnstileFailed

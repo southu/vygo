@@ -27,7 +27,16 @@ export function SiteFooter() {
             </a>
           </p>
           <p className="mt-2 text-xs text-muted">
-            {legalMeta.operator}, {legalMeta.operatorDescription}
+            Operated by {legalMeta.operator}, {legalMeta.operatorDescription}.
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            Questions, privacy requests, and legal notices:{" "}
+            <a
+              href={`mailto:${legalMeta.contactEmail}`}
+              className="font-medium text-purple hover:text-purple-dark"
+            >
+              {legalMeta.contactEmail}
+            </a>
           </p>
         </div>
 

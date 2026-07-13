@@ -88,7 +88,7 @@ export const methodContent = {
     {
       title: "Operate",
       weeks: "Ongoing",
-      objectives: "Keep the platform secure, compliance-ready, observable, and moving.",
+      objectives: "Keep the platform secure, observable, and moving—with compliance-readiness upkeep.",
       activities: [
         "vygo Ops monitoring and response",
         "Security and compliance-readiness upkeep",

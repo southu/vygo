@@ -12,7 +12,7 @@ export const site = {
   metadata: {
     homeTitle: "vygo.ai — Production Engineering for AI-Built Software",
     homeDescription:
-      "vygo re-engineers validated AI-built products into secure, scalable, compliance-ready software. Senior U.S.-based production engineering from VYGO LLC with fixed-price engagements and full IP handoff.",
+      "vygo, operated by VYGO LLC, re-engineers validated AI-built products into secure, scalable software with compliance readiness. Senior U.S.-based production engineering with fixed-price engagements and full IP handoff.",
     auditTitle: "Production Readiness Audit for AI-Built Apps",
     auditDescription:
       "A two-week Production Readiness Audit for AI-built products: prioritized findings, keep-versus-rebuild map, and a fixed-price plan.",
@@ -27,7 +27,7 @@ export const site = {
       "Fixed-price Production Readiness Audit, Launch, Scale, and Enterprise rebuild engagements, plus ongoing vygo Ops plans.",
     waitlistTitle: "Apply for the next production opening",
     waitlistDescription:
-      "Apply for the next Production Readiness Audit or production engineering opening with vygo (VYGO LLC). Applications are reviewed for openings and do not form a client engagement until a separate agreement is signed.",
+      "Apply for the next Production Readiness Audit or production engineering opening with vygo, operated by VYGO LLC. Applications are reviewed for openings and do not form a client engagement until a separate agreement is signed. Contact hello@vygo.ai for hard deadlines, privacy requests, or legal notices.",
     insightsTitle: "Insights",
     insightsDescription:
       "Prototype teardowns and field notes on production engineering for AI-built software.",

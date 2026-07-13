@@ -37,7 +37,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "Can you start immediately?",
     answer:
-      "Capacity depends on the current senior engineering pods. The website shows the next real opening. Urgent, contract-blocking situations should be described in the application so they can be reviewed appropriately. Applying does not form a client engagement until a separate agreement is signed. For hard deadlines, email hello@vygo.ai with the details.",
+      "Capacity depends on the current senior engineering pods. The website shows the next real opening. Urgent, contract-blocking situations should be described in the application so they can be reviewed appropriately. Applying does not form a client engagement until a separate agreement is signed. For hard deadlines, privacy requests, or legal notices, email hello@vygo.ai with the details.",
   },
   {
     question: "What happens after launch?",
