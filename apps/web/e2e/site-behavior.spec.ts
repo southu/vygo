@@ -31,6 +31,17 @@ test.describe("Site behavior preservation", () => {
     }
   });
 
+  test("home and pricing pages do not market an equity-for-discount option", async ({ page }) => {
+    // Equity deals are handled case-by-case offline and must not be marketed or
+    // offered in-product; guard against any equity-pricing copy reappearing.
+    for (const path of ["/", "/pricing"]) {
+      await page.goto(path);
+      const main = page.locator("#main-content");
+      await expect(main).not.toContainText(/equity/i);
+      await expect(main).not.toContainText(/cash[- ]?(?:only|vs\.?)/i);
+    }
+  });
+
   test("Why vygo.ai is discoverable and renders the complete marketing page", async ({
     page,
     request,
