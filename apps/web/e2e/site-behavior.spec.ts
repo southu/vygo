@@ -17,6 +17,20 @@ test.describe("Site behavior preservation", () => {
     expect(text).toMatch(/^[0-9a-f]+$/i);
   });
 
+  test("tier pricing is consistent on the home and pricing pages", async ({ page }) => {
+    for (const path of ["/", "/pricing"]) {
+      await page.goto(path);
+      const main = page.locator("#main-content");
+
+      await expect(main.getByText("From $75K", { exact: true })).toBeVisible();
+      await expect(main.getByText("From $145K", { exact: true })).toBeVisible();
+      await expect(main.getByText("$275K+", { exact: true })).toBeVisible();
+      await expect(main).not.toContainText("From $95K");
+      await expect(main).not.toContainText("From $185K");
+      await expect(main).not.toContainText("$350K+");
+    }
+  });
+
   test("primary CTAs reach open-access or waitlist form", async ({ page }) => {
     await mockAvailability(page, "open");
     await page.goto("/");
