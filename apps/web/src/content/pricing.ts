@@ -28,7 +28,7 @@ export const pricingContent = {
     {
       id: "launch",
       name: "Launch",
-      price: "From $95K",
+      price: "From $75K",
       duration: "6–8 weeks",
       badge: null as string | null,
       summary:
@@ -44,7 +44,7 @@ export const pricingContent = {
     {
       id: "scale",
       name: "Scale",
-      price: "From $185K",
+      price: "From $145K",
       duration: "10–14 weeks",
       badge: "Most common",
       summary:
@@ -62,7 +62,7 @@ export const pricingContent = {
     {
       id: "enterprise",
       name: "Enterprise",
-      price: "$350K+",
+      price: "$275K+",
       duration: "16–20+ weeks",
       badge: null as string | null,
       summary:
