@@ -34,7 +34,7 @@ test.describe("Site behavior preservation", () => {
   test("marketing surfaces do not offer an equity-for-discount option", async ({ page }) => {
     // Equity deals are handled case-by-case offline and must not be marketed or
     // offered in-product; guard against any equity-pricing copy or intake flow
-    // reappearing on the home page, pricing page, or FAQ-bearing audit page.
+    // reappearing in the visible marketing surfaces.
     for (const path of ["/", "/pricing", "/audit"]) {
       await page.goto(path);
       const main = page.locator("#main-content");
@@ -42,6 +42,34 @@ test.describe("Site behavior preservation", () => {
       await expect(main).not.toContainText(/cash[- ]?(?:only|vs\.?)/i);
       // No new public "request equity deal" / "pay with equity" intake CTA.
       await expect(main).not.toContainText(/(?:request|apply for|pay with|trade).{0,20}equity/i);
+    }
+  });
+
+  test("no public page source exposes equity-pricing copy or meta/SEO", async ({ request }) => {
+    // Acceptance criteria check page *source*, not just rendered text: equity copy
+    // could hide in meta/SEO tags, JSON-LD, or legal/docs pages that the visible-
+    // text guard above never inspects. Sweep the full public + legal/docs surface.
+    const paths = [
+      "/",
+      "/pricing",
+      "/audit",
+      "/method",
+      "/why-vygo",
+      "/security",
+      "/privacy",
+      "/terms",
+      "/waitlist",
+    ];
+    for (const path of paths) {
+      const res = await request.get(path);
+      expect(res.status(), `${path} should return 200`).toBe(200);
+      const source = await res.text();
+      expect(source.length, `${path} should serve non-empty HTML`).toBeGreaterThan(0);
+      // Any mention of equity, or dual cash-vs-equity pricing, in the raw markup.
+      expect(source, `${path} source must not mention equity`).not.toMatch(/equity/i);
+      expect(source, `${path} source must not offer cash-vs-equity pricing`).not.toMatch(
+        /cash[- ]?(?:only|vs\.?)/i,
+      );
     }
   });
 
