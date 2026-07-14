@@ -49,6 +49,8 @@ test.describe("Site behavior preservation", () => {
       const main = page.locator("#main-content");
       await expect(main).not.toContainText(/equity/i);
       await expect(main).not.toContainText(/cash[- ]?(?:only|vs\.?)/i);
+      // Dual cash-vs-equity option phrasing ("cash or equity", "equity or cash").
+      await expect(main).not.toContainText(/\b(?:cash|equity)\s+or\s+(?:cash|equity)\b/i);
       // No new public "request equity deal" / "pay with equity" intake CTA.
       await expect(main).not.toContainText(/(?:request|apply for|pay with|trade).{0,20}equity/i);
     }
@@ -69,6 +71,7 @@ test.describe("Site behavior preservation", () => {
       "/privacy",
       "/terms",
       "/waitlist",
+      "/thank-you",
     ];
     for (const path of paths) {
       const res = await request.get(path);
@@ -79,6 +82,9 @@ test.describe("Site behavior preservation", () => {
       expect(source, `${path} source must not mention equity`).not.toMatch(/equity/i);
       expect(source, `${path} source must not offer cash-vs-equity pricing`).not.toMatch(
         /cash[- ]?(?:only|vs\.?)/i,
+      );
+      expect(source, `${path} source must not offer a cash-or-equity option`).not.toMatch(
+        /\b(?:cash|equity)\s+or\s+(?:cash|equity)\b/i,
       );
     }
   });
