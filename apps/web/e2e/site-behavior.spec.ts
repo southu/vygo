@@ -49,8 +49,11 @@ test.describe("Site behavior preservation", () => {
     await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /.+/);
 
     const main = page.locator("#main-content");
-    await expect(main.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(main.getByText("$4.7–7.4B", { exact: true })).toBeVisible();
+    await expect(main.locator('section[data-section="hero"]')).toContainText("Why vygo.ai");
+    await expect(main.locator('section[data-section="market"]')).toContainText("$4.7–7.4B");
+    await expect(main.locator('section[data-section="providers"]')).toContainText(
+      "Two types of providers",
+    );
     await expect(
       main.getByRole("paragraph").filter({ hasText: /^Budget \/ tactical shops$/ }),
     ).toBeVisible();
@@ -122,6 +125,28 @@ test.describe("Site behavior preservation", () => {
     await toggle.click();
     await page.getByTestId("mobile-navigation").getByRole("link", { name: "Audit" }).click();
     await expect(page).toHaveURL(/\/audit/);
+  });
+
+  test("Why vygo.ai is reachable through viewport-specific primary navigation", async ({
+    page,
+  }, testInfo) => {
+    await page.goto("/");
+
+    if (testInfo.project.name === "mobile") {
+      await page.getByTestId("mobile-nav-toggle").click();
+      await page
+        .getByTestId("mobile-navigation")
+        .getByRole("link", { name: "Why vygo.ai" })
+        .click();
+    } else {
+      await page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: "Why vygo.ai" })
+        .click();
+    }
+
+    await expect(page).toHaveURL(/\/why-vygo$/);
+    await expect(page.locator('main section[data-section="hero"]')).toBeVisible();
   });
 
   test("FAQ toggles by mouse and keyboard with aria relationships", async ({ page }) => {

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function WhyVygoPage() {
   return (
     <main id="main-content">
-      <section className="section-pad">
+      <section className="section-pad" data-section="hero">
         <div className="container-page max-w-4xl">
           <p className="eyebrow">{whyVygoContent.hero.eyebrow}</p>
           <h1 className="mt-5 max-w-4xl font-display text-4xl font-bold tracking-tight sm:text-5xl lg:text-[3.25rem]">
@@ -21,7 +21,7 @@ export default function WhyVygoPage() {
         </div>
       </section>
 
-      <section className="section-pad border-t border-border bg-surface">
+      <section className="section-pad border-t border-border bg-surface" data-section="market">
         <div className="container-page">
           <SectionHeading title={whyVygoContent.market.heading} />
           <ul className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -35,7 +35,7 @@ export default function WhyVygoPage() {
         </div>
       </section>
 
-      <section className="section-pad border-t border-border">
+      <section className="section-pad border-t border-border" data-section="providers">
         <div className="container-page">
           <SectionHeading
             title={whyVygoContent.providers.heading}
