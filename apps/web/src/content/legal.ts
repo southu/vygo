@@ -10,8 +10,7 @@ export type LegalListItem = {
 };
 
 export type LegalBlock =
-  | { type: "paragraph"; text: string }
-  | { type: "list"; items: LegalListItem[] };
+  { type: "paragraph"; text: string } | { type: "list"; items: LegalListItem[] };
 
 export type LegalSection = {
   heading: string;

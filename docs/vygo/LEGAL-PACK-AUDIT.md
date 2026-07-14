@@ -2,10 +2,10 @@
 
 ## Published Documents
 
-| Path | Role | Effective date |
-| --- | --- | --- |
-| `terms-of-use.md` | Terms of Use with acceptable-use requirements | July 13, 2026 |
-| `privacy-policy.md` | Privacy Policy with cookie and analytics disclosures | July 13, 2026 |
+| Path                | Role                                                 | Effective date |
+| ------------------- | ---------------------------------------------------- | -------------- |
+| `terms-of-use.md`   | Terms of Use with acceptable-use requirements        | July 13, 2026  |
+| `privacy-policy.md` | Privacy Policy with cookie and analytics disclosures | July 13, 2026  |
 
 ## Publication Consistency
 

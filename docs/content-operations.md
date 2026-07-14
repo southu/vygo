@@ -4,18 +4,18 @@ Marketing copy lives in centralized typed modules under `apps/web/src/content/`,
 
 ## Content modules
 
-| File                                     | Purpose                                           |
-| ---------------------------------------- | ------------------------------------------------- |
-| `site.ts`                                | Brand metadata, primary/footer navigation         |
-| `ctas.ts`                                | Approved CTA vocabulary and hrefs                 |
-| `flags.ts`                               | Commercial feature flags                          |
-| `homepage.ts`                            | Homepage section copy                             |
-| `audit.ts` / `method.ts` / `security.ts` | Interior page copy                                |
-| `pricing.ts`                             | Audit, build tiers, Ops plans                     |
-| `faq.ts`                                 | FAQ items                                         |
-| `waitlist.ts`                            | Waitlist + thank-you copy                         |
-| `insights.ts`                            | Insight articles (`draft` \| `published`)         |
-| `legal.ts`                               | Published Privacy Policy and Terms of Use copy    |
+| File                                     | Purpose                                        |
+| ---------------------------------------- | ---------------------------------------------- |
+| `site.ts`                                | Brand metadata, primary/footer navigation      |
+| `ctas.ts`                                | Approved CTA vocabulary and hrefs              |
+| `flags.ts`                               | Commercial feature flags                       |
+| `homepage.ts`                            | Homepage section copy                          |
+| `audit.ts` / `method.ts` / `security.ts` | Interior page copy                             |
+| `pricing.ts`                             | Audit, build tiers, Ops plans                  |
+| `faq.ts`                                 | FAQ items                                      |
+| `waitlist.ts`                            | Waitlist + thank-you copy                      |
+| `insights.ts`                            | Insight articles (`draft` \| `published`)      |
+| `legal.ts`                               | Published Privacy Policy and Terms of Use copy |
 
 ## Principles
 

@@ -18,7 +18,10 @@ export function LegalDocumentView({ document }: Props) {
           </p>
           <p className="mt-6 text-sm leading-relaxed text-muted">
             {document.intro.beforeLink}
-            <Link href={document.intro.linkHref} className="font-medium text-ink underline underline-offset-2">
+            <Link
+              href={document.intro.linkHref}
+              className="font-medium text-ink underline underline-offset-2"
+            >
               {document.intro.linkLabel}
             </Link>
             {document.intro.afterLink}
@@ -31,7 +34,10 @@ export function LegalDocumentView({ document }: Props) {
                   {section.blocks.map((block, index) => {
                     if (block.type === "paragraph") {
                       return (
-                        <p key={`${section.heading}-p-${index}`} className="text-sm leading-relaxed text-muted">
+                        <p
+                          key={`${section.heading}-p-${index}`}
+                          className="text-sm leading-relaxed text-muted"
+                        >
                           {block.text}
                         </p>
                       );
@@ -46,7 +52,8 @@ export function LegalDocumentView({ document }: Props) {
                           <li key={`${section.heading}-li-${itemIndex}`}>
                             {item.lead ? (
                               <>
-                                <span className="font-medium text-ink">{item.lead}</span> {item.text}
+                                <span className="font-medium text-ink">{item.lead}</span>{" "}
+                                {item.text}
                               </>
                             ) : (
                               item.text
