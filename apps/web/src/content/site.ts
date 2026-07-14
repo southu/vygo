@@ -22,6 +22,9 @@ export const site = {
     securityTitle: "Security and Compliance Readiness for AI-Built Software",
     securityDescription:
       "Security controls, identity, data protection, offensive testing, and compliance readiness built into production engineering by vygo, operated by VYGO LLC. Client services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    whyVygoTitle: "Why vygo.ai",
+    whyVygoDescription:
+      "Why funded founders and enterprise buyers choose vygo.ai to turn AI-built products into secure, compliant production systems.",
     pricingTitle: "Engagement Pricing",
     pricingDescription:
       "Fixed-price Production Readiness Audit, Launch, Scale, and Enterprise rebuild engagements from vygo, operated by VYGO LLC, plus ongoing Ops plans. Services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
@@ -56,6 +59,7 @@ export function getPrimaryNav(): NavItem[] {
     { href: "/audit", label: "Audit" },
     { href: "/method", label: "Method" },
     { href: "/security", label: "Security" },
+    { href: "/why-vygo", label: "Why vygo.ai" },
   ];
 
   if (commercialFlags.showPublicPricing) {
@@ -79,6 +83,7 @@ export function getFooterNav(): NavItem[] {
     { href: "/audit", label: "Audit" },
     { href: "/method", label: "Method" },
     { href: "/security", label: "Security" },
+    { href: "/why-vygo", label: "Why vygo.ai" },
   ];
 
   if (commercialFlags.showPublicPricing) {
