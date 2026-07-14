@@ -31,14 +31,17 @@ test.describe("Site behavior preservation", () => {
     }
   });
 
-  test("home and pricing pages do not market an equity-for-discount option", async ({ page }) => {
+  test("marketing surfaces do not offer an equity-for-discount option", async ({ page }) => {
     // Equity deals are handled case-by-case offline and must not be marketed or
-    // offered in-product; guard against any equity-pricing copy reappearing.
-    for (const path of ["/", "/pricing"]) {
+    // offered in-product; guard against any equity-pricing copy or intake flow
+    // reappearing on the home page, pricing page, or FAQ-bearing audit page.
+    for (const path of ["/", "/pricing", "/audit"]) {
       await page.goto(path);
       const main = page.locator("#main-content");
       await expect(main).not.toContainText(/equity/i);
       await expect(main).not.toContainText(/cash[- ]?(?:only|vs\.?)/i);
+      // No new public "request equity deal" / "pay with equity" intake CTA.
+      await expect(main).not.toContainText(/(?:request|apply for|pay with|trade).{0,20}equity/i);
     }
   });
 
