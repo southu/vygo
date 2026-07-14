@@ -31,13 +31,19 @@ test.describe("Site behavior preservation", () => {
     }
   });
 
-  test("Why vygo.ai is discoverable and renders the complete marketing page", async ({ page }) => {
+  test("Why vygo.ai is discoverable and renders the complete marketing page", async ({
+    page,
+    request,
+  }) => {
     await page.goto("/");
 
     const footerLink = page.locator("footer").getByRole("link", { name: "Why vygo.ai" });
     await expect(footerLink).toHaveAttribute("href", "/why-vygo");
     await footerLink.click();
     await expect(page).toHaveURL(/\/why-vygo$/);
+
+    const whyPageFooterLink = page.locator("footer").getByRole("link", { name: "Why vygo.ai" });
+    await expect(whyPageFooterLink).toHaveAttribute("href", "/why-vygo");
 
     await expect(page).toHaveTitle(/Why vygo\.ai/);
     await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /.+/);
@@ -56,6 +62,17 @@ test.describe("Site behavior preservation", () => {
     await expect(main.locator('section[data-section="cta"]')).toContainText(
       "Apply for the next opening",
     );
+
+    const internalHrefs = await page
+      .locator('header a[href^="/"], main a[href^="/"], footer a[href^="/"]')
+      .evaluateAll((links) =>
+        [...new Set(links.map((link) => link.getAttribute("href")))].filter(Boolean),
+      );
+
+    for (const href of internalHrefs) {
+      const response = await request.get(href!);
+      expect(response.status(), `${href} should resolve`).toBe(200);
+    }
   });
 
   test("pricing update preserves audit, ops, and engagement terms", async ({ page }) => {
