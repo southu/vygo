@@ -168,9 +168,6 @@ export const homepage = {
   },
   pricingPreview: {
     heading: "Simple engagements. Fixed prices.",
-    // Editorial: exact equity % / cash premiums stay behind commercialFlags.showExactEquityTerms
-    // (and showCashOnlyPremium). Do not put author instructions in rendered note copy.
-    note: "Standard engagements can include an equity-aligned structure under a separately executed agreement with VYGO LLC. Cash-only pricing is available. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
     cta: { label: ctas.reviewEngagementDetails, href: ctaHrefs.pricing },
   },
   securityPreview: {
@@ -217,7 +214,7 @@ export const homepage = {
       },
       {
         title: "Aligned for the long term",
-        body: "Ongoing operations and optional equity alignment keep incentives connected under a separately executed agreement with VYGO LLC.",
+        body: "Ongoing operations keep incentives connected under a separately executed agreement with VYGO LLC.",
       },
     ].filter((p) => {
       if (p.title === "U.S.-based engineering" && !commercialFlags.showUsBasedClaim) return false;

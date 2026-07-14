@@ -76,7 +76,6 @@ export default function PricingPage() {
                   />
                 ))}
               </div>
-              <p className="mt-6 max-w-3xl text-sm text-muted">{pricingContent.equityNote}</p>
             </div>
           </section>
         </>

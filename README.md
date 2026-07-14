@@ -267,7 +267,7 @@ pnpm readiness
   exists. See
   [Provision outcome & deploy gate](docs/railway-backend-readiness.md#provision-outcome--deploy-gate-machine-readable).
 - Do not treat marketing claims (availability dates, pricing, U.S.-based /
-  senior-only language, SLA, equity terms) as verified — see the
+  senior-only language, SLA) as verified — see the
   [decision inventory](docs/credentials-and-decisions.md).
 
 ## License

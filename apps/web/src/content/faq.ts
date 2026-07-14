@@ -45,13 +45,6 @@ export const faqItems: FaqItem[] = [
       "Clients receive documentation, runbooks, and a full walkthrough. vygo Ops, operated by VYGO LLC, is available for monitoring, incident response, security updates, compliance-readiness upkeep, and ongoing engineering under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
   },
   {
-    question: "Can we pay cash and keep all of our equity?",
-    // Editorial: do not publish numeric premiums/equity % until counsel approves;
-    // gate numbers via commercialFlags.showExactEquityTerms / showCashOnlyPremium.
-    answer:
-      "A cash-only option is available under a separately executed agreement with VYGO LLC. Exact equity percentages and cash-only premiums are published only after legal counsel approves the public wording.",
-  },
-  {
     question: "What if we only need a small bug fix?",
     answer:
       "vygo, operated by VYGO LLC, is built for production risk, architecture, security, compliance readiness, and scale—not isolated low-cost patches. The audit may identify a smaller remediation path or determine that another provider is a better fit.",

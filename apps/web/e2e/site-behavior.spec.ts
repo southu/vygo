@@ -90,8 +90,6 @@ test.describe("Site behavior preservation", () => {
     await expect(main).toContainText("10–14 weeks");
     await expect(main).toContainText("16–20+ weeks");
     await expect(main).toContainText("Full IP handoff");
-    await expect(main).toContainText("equity-aligned structure");
-    await expect(main).toContainText("Cash-only pricing is available");
   });
 
   test("primary CTAs reach open-access or waitlist form", async ({ page }) => {

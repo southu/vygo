@@ -137,9 +137,6 @@ export default function HomePage() {
                 />
               ))}
             </div>
-            {!commercialFlags.showExactEquityTerms ? (
-              <p className="mt-6 max-w-3xl text-sm text-muted">{homepage.pricingPreview.note}</p>
-            ) : null}
             <div className="mt-8">
               <CtaLink href={homepage.pricingPreview.cta.href} variant="secondary">
                 {homepage.pricingPreview.cta.label}

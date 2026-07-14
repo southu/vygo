@@ -143,10 +143,9 @@ independent evidence. This mission **does not invent or approve** them.
 | **U.S.-based claims**                                                            | **Owner-supplied / unverified**                                                            | Only publish while operationally true    | `flags.showUsBasedClaim`                                                        |
 | **Senior-only claims**                                                           | **Owner-supplied / unverified**                                                            | Only publish while operationally true    | `flags.showSeniorOnlyClaim`                                                     |
 | **SLA language** (uptime %, response times, credits)                             | **Owner-supplied / unverified**; default **absent** from contractual promises in this repo | Legal exposure                           | Do not add customer SLA without counsel; incident doc is internal scaffold only |
-| **Equity terms** (percentages, structures)                                       | **Owner-supplied / unverified**; public display default **off**                            | Legal/confidential                       | `flags.showExactEquityTerms`, comments in `flags.ts`                            |
-| **Cash-only premium** wording/numbers                                            | **Owner-supplied / unverified**; default **off**                                           | Commercial/legal                         | `flags.showCashOnlyPremium`                                                     |
+| **Equity deals**                                                                 | **Not marketed or offered in-product**; handled case-by-case offline                       | Legal/confidential                       | Do not add equity-pricing UI or copy to public surfaces                         |
 | **Privacy policy & terms of service**                                            | **Legal review required** — pages marked draft                                             | Compliance                               | `legal.ts`, draft markers on deployed pages                                     |
-| **Legal review** overall (claims, contracts, privacy, employment, equity offers) | **Owner + counsel**                                                                        | Blocking for final public legal posture  | Entire commercial/legal surface                                                 |
+| **Legal review** overall (claims, contracts, privacy, employment)                | **Owner + counsel**                                                                        | Blocking for final public legal posture  | Entire commercial/legal surface                                                 |
 | **DMARC / email brand policy**                                                   | Owner                                                                                      | Deliverability + brand                   | DNS                                                                             |
 | **PII retention vs deletion period**                                             | Owner + counsel                                                                            | Backups vs erasure rights                | [backups.md](./backups.md), waitlist deletion runbook                           |
 | **On-call / incident comms channel**                                             | Owner                                                                                      | Detection → response                     | [incident-response.md](./incident-response.md)                                  |
@@ -157,7 +156,7 @@ independent evidence. This mission **does not invent or approve** them.
 
 - Do **not** flip claim flags to “true” without owner confirmation that the claim remains operationally accurate.
 - Do **not** hard-code scarcity, customer logos, certifications, or SLAs.
-- Do **not** publish exact equity or cash-premium figures without counsel.
+- Do **not** market or offer equity-for-pricing deals in-product; equity deals are handled case-by-case offline.
 - Do **not** remove legal draft disclaimers without counsel sign-off recorded by the owner.
 
 ---

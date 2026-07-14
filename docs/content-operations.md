@@ -23,7 +23,7 @@ Marketing copy lives in centralized typed modules under `apps/web/src/content/`,
 - No invented customers, testimonials, certifications, or capacity numbers.
 - Availability / next-opening values are operational data controlled via `pnpm availability:set` once the database is live — not hard-coded marketing fiction.
 - Prefer the approved CTA labels in `ctas.ts` site-wide.
-- Claims about **real availability, pricing, timelines, U.S.-based staffing, senior-only delivery, SLA language, and equity terms** are **owner-supplied and unverified** unless the owner records evidence. See [credentials-and-decisions.md](./credentials-and-decisions.md). Do not invent or approve them in code reviews without owner sign-off.
+- Claims about **real availability, pricing, timelines, U.S.-based staffing, senior-only delivery, and SLA language** are **owner-supplied and unverified** unless the owner records evidence. See [credentials-and-decisions.md](./credentials-and-decisions.md). Do not invent or approve them in code reviews without owner sign-off.
 
 ## Commercial feature flags
 
@@ -31,8 +31,6 @@ Edit `apps/web/src/content/flags.ts`:
 
 ```ts
 showPublicPricing: true;
-showExactEquityTerms: false;
-showCashOnlyPremium: false;
 showOpsPricing: true;
 showUsBasedClaim: true;
 showSeniorOnlyClaim: true;
@@ -40,7 +38,7 @@ showSeniorOnlyClaim: true;
 
 When a commercial capability is disabled, it must disappear from both navigation and page CTAs (no dead links).
 
-Exact equity percentages and cash-only premiums stay unpublished until counsel approves public wording (see comments in `flags.ts`). Flipping `showUsBasedClaim` or `showSeniorOnlyClaim` is an **owner operational decision** — only enable while true.
+Equity deals are not marketed or offered in-product; they are handled case-by-case offline. Flipping `showUsBasedClaim` or `showSeniorOnlyClaim` is an **owner operational decision** — only enable while true.
 
 ## Insights publishing
 

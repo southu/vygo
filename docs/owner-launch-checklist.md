@@ -137,7 +137,7 @@ Generate and store **separately** for staging and production:
 74. `[ ]` **Owner decision:** U.S.-based claim enabled only if operationally true.
 75. `[ ]` **Owner decision:** senior-only claim enabled only if operationally true.
 76. `[ ]` **Owner decision:** no customer-facing SLA language unless counsel-approved.
-77. `[ ]` **Owner decision:** equity terms remain unpublished unless counsel-approved (`showExactEquityTerms`).
+77. `[ ]` **Owner decision:** equity deals are handled case-by-case offline and are not marketed or offered in-product.
 78. `[ ]` **Owner decision:** privacy & terms pages approved for public presentation (or remain clearly draft).
 79. `[ ]` Legal review acknowledged for remaining open items.
 80. `[ ]` **Launch approval:** named owner signs off date/time (UTC) in private ops log to open production marketing/intake.
