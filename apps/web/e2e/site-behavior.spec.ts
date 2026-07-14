@@ -31,6 +31,22 @@ test.describe("Site behavior preservation", () => {
     }
   });
 
+  test("pricing update preserves audit, ops, and engagement terms", async ({ page }) => {
+    await page.goto("/pricing");
+    const main = page.locator("#main-content");
+
+    await expect(main).toContainText("$15K");
+    await expect(main).toContainText("$8K/month");
+    await expect(main).toContainText("$15K/month");
+    await expect(main).toContainText("$25K/month");
+    await expect(main).toContainText("6–8 weeks");
+    await expect(main).toContainText("10–14 weeks");
+    await expect(main).toContainText("16–20+ weeks");
+    await expect(main).toContainText("Full IP handoff");
+    await expect(main).toContainText("equity-aligned structure");
+    await expect(main).toContainText("Cash-only pricing is available");
+  });
+
   test("primary CTAs reach open-access or waitlist form", async ({ page }) => {
     await mockAvailability(page, "open");
     await page.goto("/");
