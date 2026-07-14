@@ -1,6 +1,12 @@
 import { commercialFlags } from "./flags";
 import { ctas, ctaHrefs } from "./ctas";
 
+const publicTierPrices = {
+  launch: "From $75K",
+  scale: "From $145K",
+  enterprise: "$275K+",
+} as const;
+
 export const pricingContent = {
   flags: commercialFlags,
   page: {
@@ -28,7 +34,7 @@ export const pricingContent = {
     {
       id: "launch",
       name: "Launch",
-      price: "From $75K",
+      price: publicTierPrices.launch,
       duration: "6–8 weeks",
       badge: null as string | null,
       summary:
@@ -44,7 +50,7 @@ export const pricingContent = {
     {
       id: "scale",
       name: "Scale",
-      price: "From $145K",
+      price: publicTierPrices.scale,
       duration: "10–14 weeks",
       badge: "Most common",
       summary:
@@ -62,7 +68,7 @@ export const pricingContent = {
     {
       id: "enterprise",
       name: "Enterprise",
-      price: "$275K+",
+      price: publicTierPrices.enterprise,
       duration: "16–20+ weeks",
       badge: null as string | null,
       summary:
