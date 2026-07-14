@@ -197,6 +197,7 @@ export const homepage = {
   },
   why: {
     heading: "Senior people on the work. Accountability after the launch.",
+    cta: { label: "Why vygo.ai", href: "/why-vygo" },
     points: [
       {
         title: "Senior-only delivery",

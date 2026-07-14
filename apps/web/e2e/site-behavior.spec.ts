@@ -31,6 +31,33 @@ test.describe("Site behavior preservation", () => {
     }
   });
 
+  test("Why vygo.ai is discoverable and renders the complete marketing page", async ({ page }) => {
+    await page.goto("/");
+
+    const footerLink = page.locator("footer").getByRole("link", { name: "Why vygo.ai" });
+    await expect(footerLink).toHaveAttribute("href", "/why-vygo");
+    await footerLink.click();
+    await expect(page).toHaveURL(/\/why-vygo$/);
+
+    await expect(page).toHaveTitle(/Why vygo\.ai/);
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /.+/);
+
+    const main = page.locator("#main-content");
+    await expect(main.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(main.getByText("$4.7–7.4B", { exact: true })).toBeVisible();
+    await expect(
+      main.getByRole("paragraph").filter({ hasText: /^Budget \/ tactical shops$/ }),
+    ).toBeVisible();
+    await expect(
+      main.getByRole("paragraph").filter({ hasText: /^Production engineering firms$/ }),
+    ).toBeVisible();
+    await expect(main.locator('section[data-section="comparison"] table')).toBeVisible();
+    await expect(main.locator('section[data-section="claims"] li')).toHaveCount(4);
+    await expect(main.locator('section[data-section="cta"]')).toContainText(
+      "Apply for the next opening",
+    );
+  });
+
   test("pricing update preserves audit, ops, and engagement terms", async ({ page }) => {
     await page.goto("/pricing");
     const main = page.locator("#main-content");

@@ -198,6 +198,11 @@ export default function HomePage() {
               </li>
             ))}
           </ol>
+          <div className="mt-8">
+            <CtaLink href={homepage.why.cta.href} variant="secondary">
+              {homepage.why.cta.label}
+            </CtaLink>
+          </div>
         </div>
       </section>
 

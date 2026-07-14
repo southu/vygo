@@ -45,4 +45,48 @@ export const whyVygoContent = {
       },
     ],
   },
+  comparison: {
+    heading: "Built for the path to enterprise production",
+    intro:
+      "A tactical patch can close a ticket. Production engineering closes the underlying gaps.",
+    columns: ["What buyers need", "Budget / tactical shops", "vygo.ai"],
+    rows: [
+      ["Production architecture", "Surface-level fixes", "Foundation rebuilt for scale"],
+      ["Security controls", "Point-in-time remediation", "Designed into the system"],
+      [
+        "Compliance readiness",
+        "Not typically included",
+        "Controls, evidence, and operating practices",
+      ],
+      ["Delivery team", "Mixed staffing", "Senior-only engineering"],
+      ["After launch", "Handoff at completion", "Ongoing operational accountability"],
+    ],
+  },
+  claims: {
+    heading: "Why teams choose vygo.ai",
+    items: [
+      {
+        title: "Senior people do the work",
+        body: "The engineers making the architecture decisions are the engineers building the system.",
+      },
+      {
+        title: "Scope becomes a fixed price",
+        body: "The Production Readiness Audit turns uncertainty into a prioritized plan and fixed-price rebuild scope.",
+      },
+      {
+        title: "Security is part of delivery",
+        body: "Controls, evidence, and compliance-ready operating practices are built in rather than added at the end.",
+      },
+      {
+        title: "Accountability continues after launch",
+        body: "The same team can remain responsible for uptime, security, and continued product delivery through vygo Ops.",
+      },
+    ],
+  },
+  cta: {
+    heading: "Turn the enterprise blocker into a production plan.",
+    body: "Tell us what the buyer needs, what is blocking the deal, and when the deadline matters.",
+    label: "Apply for the next opening",
+    href: "/waitlist",
+  },
 } as const;
