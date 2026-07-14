@@ -34,8 +34,17 @@ test.describe("Site behavior preservation", () => {
   test("marketing surfaces do not offer an equity-for-discount option", async ({ page }) => {
     // Equity deals are handled case-by-case offline and must not be marketed or
     // offered in-product; guard against any equity-pricing copy or intake flow
-    // reappearing in the visible marketing surfaces.
-    for (const path of ["/", "/pricing", "/audit"]) {
+    // reappearing in the visible marketing surfaces. Sweep every primary
+    // marketing page linked from the home page, not just pricing.
+    for (const path of [
+      "/",
+      "/pricing",
+      "/audit",
+      "/method",
+      "/why-vygo",
+      "/security",
+      "/insights",
+    ]) {
       await page.goto(path);
       const main = page.locator("#main-content");
       await expect(main).not.toContainText(/equity/i);
@@ -56,6 +65,7 @@ test.describe("Site behavior preservation", () => {
       "/method",
       "/why-vygo",
       "/security",
+      "/insights",
       "/privacy",
       "/terms",
       "/waitlist",
