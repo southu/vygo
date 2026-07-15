@@ -13,14 +13,14 @@ export const pricingContent = {
     eyebrow: "ENGAGEMENTS",
     heading: "Simple engagements. Fixed prices.",
     intro:
-      "Start with a Production Readiness Audit when you need a defensible plan. Choose Launch, Scale, or Enterprise when you are ready to rebuild on a fixed scope and price with vygo, operated by VYGO LLC. Services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+      "Start with a Production Readiness Audit when you need a defensible plan. Choose Launch, Scale, or Enterprise when you are ready to rebuild on a fixed scope and price with VYGO.",
   },
   audit: {
     name: "Production Readiness Audit",
     price: "$15K",
     duration: "2 weeks",
     summary:
-      "A two-week review of code, architecture, security, scalability, and compliance-readiness gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent vygo build. Submitting does not form a client relationship. Rebuild services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+      "A two-week review of code, architecture, security, scalability, and compliance-readiness gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent VYGO build.",
     outcomes: [
       "Codebase and architecture assessment",
       "Threat model and security findings",
@@ -120,7 +120,7 @@ export const pricingContent = {
         ],
       },
     ],
-    note: "Month-to-month after the initial commitment under a separately executed agreement with VYGO LLC. Everything remains documented so another qualified team can take over. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    note: "Month-to-month after the initial commitment. Everything remains documented so another qualified team can take over.",
   },
   cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
 } as const;

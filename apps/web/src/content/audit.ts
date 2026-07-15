@@ -3,7 +3,7 @@ import { ctas, ctaHrefs } from "./ctas";
 export const auditContent = {
   hero: {
     headline: "A two-week plan for getting your product safely into production.",
-    body: "Before you commit to a rebuild, senior engineers at vygo, operated by VYGO LLC, inspect the code, data model, access controls, infrastructure, deployment process, and operational risks. You leave with a prioritized report and a fixed-price path forward. Submitting does not form a client relationship. Rebuild services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    body: "Before you commit to a rebuild, senior engineers at VYGO inspect the code, data model, access controls, infrastructure, deployment process, and operational risks. You leave with a prioritized report and a fixed-price path forward.",
     price: "$15K · credited toward a subsequent vygo build",
     cta: { label: ctas.applyNextAuditOpening, href: ctaHrefs.waitlist },
   },
@@ -21,7 +21,7 @@ export const auditContent = {
     ],
   },
   reviews: {
-    heading: "What vygo, operated by VYGO LLC, reviews",
+    heading: "What VYGO reviews",
     categories: [
       "Product architecture",
       "Data model and migrations",
@@ -80,7 +80,7 @@ export const auditContent = {
   },
   scope: {
     heading: "How the fixed-price build scope is created",
-    body: "The audit converts findings into a concrete keep-versus-rebuild map, ordered workstreams, and a locked price. You decide whether to proceed; the report remains yours either way. Submitting does not form a client relationship. Rebuild services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    body: "The audit converts findings into a concrete keep-versus-rebuild map, ordered workstreams, and a locked price. You decide whether to proceed; the report remains yours either way.",
   },
   cta: { label: ctas.applyNextAuditOpening, href: ctaHrefs.waitlist },
 } as const;

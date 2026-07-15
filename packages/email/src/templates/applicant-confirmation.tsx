@@ -29,11 +29,9 @@ export function ApplicantConfirmationEmail(props: ApplicantConfirmationEmailProp
           <Heading style={h1}>Application received</Heading>
           <Text style={text}>Hi {name},</Text>
           <Text style={text}>
-            Thanks for applying to the next vygo production opening
-            {company ? ` for ${company}` : ""}. VYGO LLC will review your application against the
-            next available Production Readiness Audit or engineering opening and follow up by email.
-            Submitting does not form a client relationship. Services begin only under a separately
-            executed agreement with VYGO LLC.
+            Thanks for applying to the next VYGO production opening
+            {company ? ` for ${company}` : ""}. VYGO will review your application against the next
+            available Production Readiness Audit or engineering opening and follow up by email.
           </Text>
           {msg.display ? (
             <Section style={box}>
@@ -47,11 +45,8 @@ export function ApplicantConfirmationEmail(props: ApplicantConfirmationEmailProp
             </Section>
           ) : null}
           <Hr style={hr} />
-          <Text style={footer}>
-            Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are
-            effective when received.
-          </Text>
-          <Text style={footer}>— the vygo team (VYGO LLC)</Text>
+          <Text style={footer}>Questions may be sent to hello@vygo.ai.</Text>
+          <Text style={footer}>— the VYGO team</Text>
         </Container>
       </Body>
     </Html>
@@ -69,9 +64,8 @@ export function buildApplicantConfirmationText(payload: ApplicantConfirmationPay
   const lines = [
     `Hi ${name},`,
     "",
-    `Thanks for applying to the next vygo production opening${company ? ` for ${company}` : ""}.`,
-    "VYGO LLC will review your application against the next available Production Readiness Audit or engineering opening and follow up by email.",
-    "Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC.",
+    `Thanks for applying to the next VYGO production opening${company ? ` for ${company}` : ""}.`,
+    "VYGO will review your application against the next available Production Readiness Audit or engineering opening and follow up by email.",
   ];
   if (msg.display) {
     lines.push("", "Your note:", msg.display);
@@ -79,12 +73,7 @@ export function buildApplicantConfirmationText(payload: ApplicantConfirmationPay
       lines.push(`(truncated; original length ${msg.originalLength})`);
     }
   }
-  lines.push(
-    "",
-    "Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
-    "",
-    "— the vygo team (VYGO LLC)",
-  );
+  lines.push("", "Questions may be sent to hello@vygo.ai.", "", "— the VYGO team");
   return lines.join("\n");
 }
 
@@ -102,9 +91,9 @@ export function buildApplicantConfirmationHtmlFallback(
           : ""
       }`
     : "";
-  return `<!doctype html><html><body><h1>Application received</h1><p>Hi ${name},</p><p>Thanks for applying to the next vygo production opening${
+  return `<!doctype html><html><body><h1>Application received</h1><p>Hi ${name},</p><p>Thanks for applying to the next VYGO production opening${
     company ? ` for ${company}` : ""
-  }. VYGO LLC will review your application against the next available Production Readiness Audit or engineering opening and follow up by email. Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC.</p>${note}<p>Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.</p><p>— the vygo team (VYGO LLC)</p></body></html>`;
+  }. VYGO will review your application against the next available Production Readiness Audit or engineering opening and follow up by email.</p>${note}<p>Questions may be sent to hello@vygo.ai.</p><p>— the VYGO team</p></body></html>`;
 }
 
 const main = {

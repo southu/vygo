@@ -4,9 +4,9 @@ export const methodContent = {
   hero: {
     heading: "A fixed methodology, not open-ended consulting.",
     principle:
-      "The validated product remains visible throughout the rebuild. Customers of vygo, operated by VYGO LLC, receive weekly demos and staging access rather than waiting months for a reveal. Services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+      "The validated product remains visible throughout the rebuild. Customers of VYGO receive weekly demos and staging access rather than waiting months for a reveal.",
     cutoverNote:
-      "Cutover is planned with rollback procedures. Zero-downtime migration is not promised in all cases unless a separately executed agreement with VYGO LLC specifically guarantees it.",
+      "Cutover is planned with rollback procedures. Zero-downtime migration is not promised in all cases unless specifically guaranteed for the engagement.",
   },
   steps: [
     {
@@ -23,7 +23,7 @@ export const methodContent = {
       involvement: "Provide access, context, and commercial constraints; review interim findings.",
       deliverables: ["Findings report", "Keep-versus-rebuild map", "Fixed-price proposal"],
       risks: ["Incomplete access slows assessment", "Hidden production dependencies"],
-      gate: "Customer accepts, revises, or declines the rebuild plan. Rebuild services begin only under a separately executed agreement with VYGO LLC.",
+      gate: "Customer accepts, revises, or declines the rebuild plan.",
     },
     {
       title: "Architect",
@@ -89,9 +89,9 @@ export const methodContent = {
       title: "Operate",
       weeks: "Ongoing",
       objectives:
-        "Keep the platform secure, observable, and moving—with compliance-readiness upkeep through vygo Ops, operated by VYGO LLC.",
+        "Keep the platform secure, observable, and moving—with compliance-readiness upkeep through vygo Ops.",
       activities: [
-        "vygo Ops monitoring and response under a separately executed agreement with VYGO LLC",
+        "vygo Ops monitoring and response",
         "Security and compliance-readiness upkeep",
         "Continued feature engineering when contracted",
       ],
@@ -99,7 +99,7 @@ export const methodContent = {
         "Product prioritization and operational decision rights remain with the customer.",
       deliverables: ["Operational ownership", "Documented handoff-ready system"],
       risks: ["Unowned production decisions after launch"],
-      gate: "Customer may continue Ops under a separately executed agreement with VYGO LLC, or transfer to another qualified team.",
+      gate: "Customer may continue Ops with VYGO, or transfer to another qualified team.",
     },
   ],
   tierMatrix: {

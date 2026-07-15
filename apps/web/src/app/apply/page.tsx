@@ -6,7 +6,7 @@ import { NextAuditStartDate } from "@/components/NextAuditStartDate";
 export const metadata: Metadata = {
   title: "Apply — vygo.ai",
   description:
-    "Apply for the next Production Readiness Audit or production engineering opening with vygo, operated by VYGO LLC.",
+    "Apply for the next Production Readiness Audit or production engineering opening with VYGO.",
   robots: { index: false, follow: false },
 };
 
@@ -26,10 +26,8 @@ export default function ApplyPage() {
             Apply for the next opening
           </h1>
           <p className="mt-5 text-lg text-muted">
-            Tell us about your product and where you are headed. A senior engineer at vygo, operated
-            by VYGO LLC, reviews every application against available openings. Submitting this form
-            does not form a client relationship. Services begin only under a separately executed
-            agreement with VYGO LLC.
+            Tell us about your product and where you are headed. A senior engineer at VYGO reviews
+            every application against available openings.
           </p>
 
           <NextAuditStartDate />

@@ -1042,13 +1042,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
                 <a href="/terms" className="font-semibold text-purple underline">
                   Terms of Use
                 </a>{" "}
-                of VYGO LLC for application processing. Submitting does not form a client
-                relationship. Services begin only under a separately executed agreement with VYGO
-                LLC. Questions, privacy requests, or legal notices may be sent to{" "}
-                <a className="font-semibold text-purple underline" href="mailto:hello@vygo.ai">
-                  hello@vygo.ai
-                </a>
-                . Notices are effective when received. <span className="text-red">*</span>
+                of VYGO for application processing. <span className="text-red">*</span>
               </span>
             </label>
             {errors.privacyAccepted ? (

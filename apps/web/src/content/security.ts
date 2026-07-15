@@ -3,7 +3,7 @@ import { ctas, ctaHrefs } from "./ctas";
 export const securityContent = {
   hero: {
     headline: "The security controls buyers ask about, built into the product they are buying.",
-    body: "vygo, operated by VYGO LLC, treats security, evidence, and operations as engineering work—not paperwork added after launch. Client services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    body: "VYGO treats security, evidence, and operations as engineering work—not paperwork added after launch.",
   },
   sections: [
     {
@@ -71,7 +71,7 @@ export const securityContent = {
     },
   ],
   complianceNote:
-    "Certification and attestation decisions are made by independent auditors or certification bodies. vygo, operated by VYGO LLC, prepares the product and operating program for compliance readiness under a separately executed agreement with VYGO LLC; readiness work does not guarantee certification or attestation. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    "Certification and attestation decisions are made by independent auditors or certification bodies. VYGO prepares the product and operating program for compliance readiness; readiness work does not guarantee certification or attestation.",
   language: {
     use: [
       "SOC 2 readiness",
