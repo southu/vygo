@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { site } from "@/content/site";
+import { NextAuditStartDate } from "@/components/NextAuditStartDate";
 
 export const metadata: Metadata = {
   title: "Apply — vygo.ai",
@@ -30,6 +31,8 @@ export default function ApplyPage() {
             does not form a client relationship. Services begin only under a separately executed
             agreement with VYGO LLC.
           </p>
+
+          <NextAuditStartDate />
 
           <form className="mt-10 space-y-5" data-testid="apply-form" aria-label="Application form">
             <div>
