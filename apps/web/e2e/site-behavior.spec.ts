@@ -1,6 +1,21 @@
 import { test, expect } from "@playwright/test";
 import { mockAvailability } from "./helpers";
 
+// Equity-for-discount / dual cash-vs-equity pricing has been removed from the
+// product and marketing. These phrase patterns encode the acceptance-criteria
+// language so a regression that reintroduces the model — in visible copy, meta/
+// SEO, JSON-LD, or a new intake CTA — fails loudly.
+const EQUITY_PRICING_PATTERNS: RegExp[] = [
+  /equity/i,
+  /equity\s*(?:%|percent|percentage|stake|share|model)/i,
+  /equity[- ]?for[- ]?discount/i,
+  /cash[- ]?(?:only|vs\.?)/i,
+  // Dual cash-vs-equity option phrasing ("cash or equity", "equity or cash").
+  /\b(?:cash|equity)\s+or\s+(?:cash|equity)\b/i,
+  // Intake / offer CTAs ("request equity deal", "pay with equity", "trade equity").
+  /(?:request|apply for|pay with|trade|offer).{0,20}equity/i,
+];
+
 test.describe("Site behavior preservation", () => {
   test("home page returns content", async ({ page }) => {
     await page.goto("/");
@@ -47,12 +62,9 @@ test.describe("Site behavior preservation", () => {
     ]) {
       await page.goto(path);
       const main = page.locator("#main-content");
-      await expect(main).not.toContainText(/equity/i);
-      await expect(main).not.toContainText(/cash[- ]?(?:only|vs\.?)/i);
-      // Dual cash-vs-equity option phrasing ("cash or equity", "equity or cash").
-      await expect(main).not.toContainText(/\b(?:cash|equity)\s+or\s+(?:cash|equity)\b/i);
-      // No new public "request equity deal" / "pay with equity" intake CTA.
-      await expect(main).not.toContainText(/(?:request|apply for|pay with|trade).{0,20}equity/i);
+      for (const pattern of EQUITY_PRICING_PATTERNS) {
+        await expect(main, `${path} must not surface ${pattern}`).not.toContainText(pattern);
+      }
     }
   });
 
@@ -78,14 +90,12 @@ test.describe("Site behavior preservation", () => {
       expect(res.status(), `${path} should return 200`).toBe(200);
       const source = await res.text();
       expect(source.length, `${path} should serve non-empty HTML`).toBeGreaterThan(0);
-      // Any mention of equity, or dual cash-vs-equity pricing, in the raw markup.
-      expect(source, `${path} source must not mention equity`).not.toMatch(/equity/i);
-      expect(source, `${path} source must not offer cash-vs-equity pricing`).not.toMatch(
-        /cash[- ]?(?:only|vs\.?)/i,
-      );
-      expect(source, `${path} source must not offer a cash-or-equity option`).not.toMatch(
-        /\b(?:cash|equity)\s+or\s+(?:cash|equity)\b/i,
-      );
+      // Equity-pricing copy could hide in meta/SEO tags, JSON-LD, or a hidden
+      // intake CTA the visible-text guard never inspects — sweep the raw markup
+      // with the full acceptance-criteria pattern set.
+      for (const pattern of EQUITY_PRICING_PATTERNS) {
+        expect(source, `${path} source must not expose ${pattern}`).not.toMatch(pattern);
+      }
     }
   });
 
