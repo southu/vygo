@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { apiUrl } from "@/lib/api";
+import { formatOpeningDate } from "@/lib/availability";
+import { useAvailability } from "./AvailabilityProvider";
 
 type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
@@ -22,12 +24,22 @@ type ApplyErrorBody = {
   };
 };
 
+const SUCCESS_HEADING = "Thank you — your application is in.";
+const SUCCESS_BODY =
+  "A senior engineer at VYGO reviews every application against available openings, and we'll be in touch within one business day. Keep an eye on your inbox — the note will come from our team at vygo.ai.";
+
 /**
  * Client-side apply form. Submits to POST /api/apply (server-side only writes to
- * Postgres). Shows a visible success confirmation on 2xx and an error message on
- * 4xx/5xx. Never embeds database credentials.
+ * Postgres). On 2xx, replaces the form with an inline thank-you confirmation
+ * (no navigation). On non-2xx or network failure, keeps entered values and
+ * shows an inline error so the applicant can retry. Disables submit while the
+ * request is in flight.
  */
 export function ApplyForm() {
+  const { data, isBusy } = useAvailability();
+  const nextAuditDate = formatOpeningDate(data?.nextOpeningDate ?? null);
+  const nextAuditDisplay = nextAuditDate ?? (isBusy ? "Loading…" : "Check back soon");
+
   const [fullName, setFullName] = useState("");
   const [workEmail, setWorkEmail] = useState("");
   const [productUrl, setProductUrl] = useState("");
@@ -69,16 +81,10 @@ export function ApplyForm() {
         body = {};
       }
 
+      // Thank-you only after a confirmed 2xx store response (with application id).
       if (res.ok && typeof body.id === "string") {
         setStatus("success");
         setCreatedId(body.id);
-        setFeedback(
-          "Thank you — your application has been received. A senior engineer at VYGO will review it against available openings.",
-        );
-        setFullName("");
-        setWorkEmail("");
-        setProductUrl("");
-        setMessage("");
         return;
       }
 
@@ -95,9 +101,9 @@ export function ApplyForm() {
     }
   };
 
-  return (
-    <div className="mt-10">
-      {status === "success" ? (
+  if (status === "success") {
+    return (
+      <div className="mt-10">
         <div
           className="rounded-xl border border-purple/30 bg-purple-soft/40 p-5"
           role="status"
@@ -105,125 +111,129 @@ export function ApplyForm() {
           data-testid="apply-success"
           data-application-id={createdId ?? undefined}
         >
-          <p className="text-base font-semibold text-ink">Application received</p>
-          <p className="mt-2 text-sm text-muted" data-testid="apply-success-message">
-            {feedback}
+          <h2
+            className="font-display text-xl font-bold text-ink sm:text-2xl"
+            data-testid="apply-success-heading"
+          >
+            {SUCCESS_HEADING}
+          </h2>
+          <p className="mt-3 text-sm text-muted sm:text-base" data-testid="apply-success-message">
+            {SUCCESS_BODY}
+          </p>
+          <p className="mt-4 text-sm text-ink-soft" data-testid="apply-success-next-audit-date">
+            Next available audit start date:{" "}
+            <span className="font-semibold text-ink" data-next-audit-start-date>
+              {nextAuditDisplay}
+            </span>
           </p>
           {createdId ? (
             <p className="mt-2 text-xs text-ink-soft" data-testid="apply-success-id">
               Reference: {createdId}
             </p>
           ) : null}
-          <button
-            type="button"
-            className="btn-secondary mt-4"
-            onClick={() => {
-              setStatus("idle");
-              setFeedback("");
-              setCreatedId(null);
-            }}
-            data-testid="apply-submit-another"
-          >
-            Submit another application
-          </button>
         </div>
-      ) : (
-        <form
-          className="space-y-5"
-          data-testid="apply-form"
-          aria-label="Application form"
-          onSubmit={onSubmit}
-          noValidate
-        >
-          <div>
-            <label htmlFor="apply-name" className="block text-sm font-semibold text-ink">
-              Full name
-            </label>
-            <input
-              id="apply-name"
-              name="fullName"
-              type="text"
-              autoComplete="name"
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink"
-              placeholder="Your name"
-              data-testid="apply-full-name"
-            />
-          </div>
+      </div>
+    );
+  }
 
-          <div>
-            <label htmlFor="apply-email" className="block text-sm font-semibold text-ink">
-              Work email
-            </label>
-            <input
-              id="apply-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={workEmail}
-              onChange={(e) => setWorkEmail(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink"
-              placeholder="you@company.com"
-              data-testid="apply-work-email"
-            />
-          </div>
+  return (
+    <div className="mt-10">
+      <form
+        className="space-y-5"
+        data-testid="apply-form"
+        aria-label="Application form"
+        onSubmit={onSubmit}
+        noValidate
+      >
+        <div>
+          <label htmlFor="apply-name" className="block text-sm font-semibold text-ink">
+            Full name
+          </label>
+          <input
+            id="apply-name"
+            name="fullName"
+            type="text"
+            autoComplete="name"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="mt-2 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink"
+            placeholder="Your name"
+            data-testid="apply-full-name"
+          />
+        </div>
 
-          <div>
-            <label htmlFor="apply-product" className="block text-sm font-semibold text-ink">
-              Product URL
-            </label>
-            <input
-              id="apply-product"
-              name="productUrl"
-              type="url"
-              value={productUrl}
-              onChange={(e) => setProductUrl(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink"
-              placeholder="https://example.com"
-              data-testid="apply-product-url"
-            />
-          </div>
+        <div>
+          <label htmlFor="apply-email" className="block text-sm font-semibold text-ink">
+            Work email
+          </label>
+          <input
+            id="apply-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={workEmail}
+            onChange={(e) => setWorkEmail(e.target.value)}
+            className="mt-2 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink"
+            placeholder="you@company.com"
+            data-testid="apply-work-email"
+          />
+        </div>
 
-          <div>
-            <label htmlFor="apply-message" className="block text-sm font-semibold text-ink">
-              What are you trying to get into production?
-            </label>
-            <textarea
-              id="apply-message"
-              name="message"
-              rows={4}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink"
-              placeholder="A few sentences on your product, users, and timeline."
-              data-testid="apply-message"
-            />
-          </div>
+        <div>
+          <label htmlFor="apply-product" className="block text-sm font-semibold text-ink">
+            Product URL
+          </label>
+          <input
+            id="apply-product"
+            name="productUrl"
+            type="url"
+            value={productUrl}
+            onChange={(e) => setProductUrl(e.target.value)}
+            className="mt-2 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink"
+            placeholder="https://example.com"
+            data-testid="apply-product-url"
+          />
+        </div>
 
-          {status === "error" && feedback ? (
-            <div
-              className="rounded-xl border border-red bg-red/5 p-4 text-sm text-red"
-              role="alert"
-              aria-live="assertive"
-              data-testid="apply-error"
-            >
-              {feedback}
-            </div>
-          ) : null}
+        <div>
+          <label htmlFor="apply-message" className="block text-sm font-semibold text-ink">
+            What are you trying to get into production?
+          </label>
+          <textarea
+            id="apply-message"
+            name="message"
+            rows={4}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            className="mt-2 w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink"
+            placeholder="A few sentences on your product, users, and timeline."
+            data-testid="apply-message"
+          />
+        </div>
 
-          <button
-            type="submit"
-            className="btn-primary"
-            data-testid="apply-submit"
-            disabled={status === "submitting"}
+        {status === "error" && feedback ? (
+          <div
+            className="rounded-xl border border-red bg-red/5 p-4 text-sm text-red"
+            role="alert"
+            aria-live="assertive"
+            data-testid="apply-error"
           >
-            {status === "submitting" ? "Submitting…" : "Submit application"}
-          </button>
-        </form>
-      )}
+            {feedback}
+          </div>
+        ) : null}
+
+        <button
+          type="submit"
+          className="btn-primary"
+          data-testid="apply-submit"
+          disabled={status === "submitting"}
+          aria-disabled={status === "submitting"}
+        >
+          {status === "submitting" ? "Submitting…" : "Submit application"}
+        </button>
+      </form>
     </div>
   );
 }

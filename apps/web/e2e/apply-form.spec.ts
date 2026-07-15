@@ -3,8 +3,9 @@ import { mockAvailability } from "./helpers";
 
 /**
  * Locks the /apply form submit flow: posts only to the server-side /api/apply
- * endpoint, shows success confirmation on 2xx, and shows an error on 4xx.
- * Client never embeds DB credentials (asserted against page source + JS).
+ * endpoint, shows inline thank-you confirmation on 2xx (no navigation), and
+ * shows an error on 4xx while preserving entered values. Client never embeds
+ * DB credentials (asserted against page source + JS).
  */
 test.describe("Apply form persistence UI", () => {
   test.beforeEach(async ({ page }) => {
@@ -22,7 +23,9 @@ test.describe("Apply form persistence UI", () => {
     );
   });
 
-  test("successful submit shows visible confirmation and application id", async ({ page }) => {
+  test("successful submit shows inline thank-you with exact copy and audit date", async ({
+    page,
+  }) => {
     const createdId = "11111111-2222-4333-8444-555555555555";
     await page.route("**/api/apply", async (route) => {
       if (route.request().method() !== "POST") {
@@ -53,18 +56,38 @@ test.describe("Apply form persistence UI", () => {
     await page.goto("/apply");
     await page.getByTestId("apply-full-name").fill("Ratchet Tester");
     await page.getByTestId("apply-work-email").fill("ratchet-tester@example.com");
+
+    // Capture banner date before submit so confirmation can be matched to it.
+    const bannerDate = await page
+      .getByTestId("apply-next-audit-date")
+      .locator("[data-next-audit-start-date]")
+      .innerText();
+
     await page.getByTestId("apply-submit").click();
 
     await expect(page.getByTestId("apply-success")).toBeVisible();
-    await expect(page.getByTestId("apply-success-message")).toContainText(/received/i);
+    await expect(page.getByTestId("apply-success-heading")).toHaveText(
+      "Thank you — your application is in.",
+    );
+    await expect(page.getByTestId("apply-success-message")).toHaveText(
+      "A senior engineer at VYGO reviews every application against available openings, and we'll be in touch within one business day. Keep an eye on your inbox — the note will come from our team at vygo.ai.",
+    );
+    await expect(page.getByTestId("apply-success-next-audit-date")).toContainText(
+      /Next available audit start date/i,
+    );
+    await expect(
+      page.getByTestId("apply-success-next-audit-date").locator("[data-next-audit-start-date]"),
+    ).toHaveText(bannerDate);
     await expect(page.getByTestId("apply-success")).toHaveAttribute(
       "data-application-id",
       createdId,
     );
     await expect(page.getByTestId("apply-form")).toHaveCount(0);
+    // No full-page redirect — still on the apply page.
+    await expect(page).toHaveURL(/\/apply\/?$/);
   });
 
-  test("4xx response shows visible error and keeps the form", async ({ page }) => {
+  test("4xx response shows visible error and keeps form values", async ({ page }) => {
     await page.route("**/api/apply", async (route) => {
       if (route.request().method() !== "POST") {
         await route.continue();
@@ -85,11 +108,55 @@ test.describe("Apply form persistence UI", () => {
     await page.goto("/apply");
     await page.getByTestId("apply-full-name").fill("Ratchet Tester");
     await page.getByTestId("apply-work-email").fill("not-an-email");
+    await page.getByTestId("apply-product-url").fill("https://example.com");
     await page.getByTestId("apply-submit").click();
 
     await expect(page.getByTestId("apply-error")).toBeVisible();
-    await expect(page.getByTestId("apply-error")).toContainText(/work_email|valid/i);
+    await expect(page.getByTestId("apply-error")).toContainText(/work_email|valid|try again/i);
     await expect(page.getByTestId("apply-form")).toBeVisible();
+    await expect(page.getByTestId("apply-success")).toHaveCount(0);
+    // Entered values remain intact for retry.
+    await expect(page.getByTestId("apply-full-name")).toHaveValue("Ratchet Tester");
+    await expect(page.getByTestId("apply-work-email")).toHaveValue("not-an-email");
+    await expect(page.getByTestId("apply-product-url")).toHaveValue("https://example.com");
+    // Submit re-enabled after failure.
+    await expect(page.getByTestId("apply-submit")).toBeEnabled();
+  });
+
+  test("disables submit button while request is in flight", async ({ page }) => {
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    await page.route("**/api/apply", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      await gate;
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: { code: "INTERNAL", message: "Server error. Please try again." },
+        }),
+      });
+    });
+
+    await page.goto("/apply");
+    await page.getByTestId("apply-full-name").fill("Ratchet Tester");
+    await page.getByTestId("apply-work-email").fill("ratchet-tester@example.com");
+
+    const submitPromise = page.getByTestId("apply-submit").click();
+    await expect(page.getByTestId("apply-submit")).toBeDisabled();
+    await expect(page.getByTestId("apply-submit")).toHaveText(/Submitting/i);
+
+    release?.();
+    await submitPromise;
+
+    await expect(page.getByTestId("apply-error")).toBeVisible();
+    await expect(page.getByTestId("apply-submit")).toBeEnabled();
     await expect(page.getByTestId("apply-success")).toHaveCount(0);
   });
 
