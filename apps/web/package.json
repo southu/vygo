@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
-    "prebuild": "tsx ../../scripts/provision-railway.ts && tsx ../../scripts/generate-foundation-status.ts && tsx ../../scripts/generate-readiness.ts --assume-passed",
+    "prebuild": "node ./scripts/guard-equity-pricing.mjs && tsx ../../scripts/provision-railway.ts && tsx ../../scripts/generate-foundation-status.ts && tsx ../../scripts/generate-readiness.ts --assume-passed",
+    "guard:equity": "node ./scripts/guard-equity-pricing.mjs",
     "build": "next build",
     "postbuild": "node ./scripts/prune-draft-insights.mjs",
     "start": "next start --port 3000",
