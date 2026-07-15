@@ -25,7 +25,7 @@ import postgres from "postgres";
 import type { Sql } from "postgres";
 import { applyCorsAndMaybePreflight } from "./_lib/meta.js";
 import type { EdgeRequest, EdgeResponse } from "./_lib/http.js";
-import { resolveDatabaseUrl } from "./_lib/store.js";
+import { resolveDatabaseUrl, resolveUpstreamApiOrigin } from "./_lib/store.js";
 
 /**
  * Next available audit start date (ISO date). August 24 of the upcoming
@@ -160,11 +160,70 @@ async function readFromDatabase(sql: Sql, now: Date): Promise<PublicAvailability
   return toPublicAvailability(row, now);
 }
 
+/** A payload passes only when it carries a real availability status. */
+function coercePublicAvailability(value: unknown, now: Date): PublicAvailability | null {
+  if (typeof value !== "object" || value === null) return null;
+  const row = value as Record<string, unknown>;
+  if (typeof row.status !== "string" || !ALLOWED_STATUS.has(row.status)) return null;
+
+  const status = row.status as PublicAvailability["status"];
+  const engagementType =
+    typeof row.engagementType === "string" && ALLOWED_ENGAGEMENT.has(row.engagementType)
+      ? (row.engagementType as PublicAvailability["engagementType"])
+      : "audit";
+  const nextOpeningDate =
+    typeof row.nextOpeningDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row.nextOpeningDate)
+      ? row.nextOpeningDate
+      : null;
+  const availableStarts =
+    typeof row.availableStarts === "number" &&
+    Number.isFinite(row.availableStarts) &&
+    row.availableStarts >= 0
+      ? row.availableStarts
+      : null;
+
+  return {
+    status,
+    nextOpeningDate,
+    engagementType,
+    displayNote: typeof row.displayNote === "string" ? row.displayNote : null,
+    availableStarts,
+    updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : now.toISOString(),
+  };
+}
+
+/**
+ * Read the Postgres-backed value THROUGH the live Railway API (server-to-server,
+ * no CORS). The upstream `/v1/public/availability` reads Railway Postgres, so its
+ * `updatedAt` is the stored row's timestamp (stable across reads, changes only on
+ * an operator write) — never a per-request default. Returns null on any failure
+ * so the caller can fall back to the safe server default.
+ */
+async function readFromUpstream(origin: string, now: Date): Promise<PublicAvailability | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const upstream = await fetch(`${origin}/v1/public/availability`, {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!upstream.ok) return null;
+    const body = (await upstream.json()) as { data?: unknown };
+    return coercePublicAvailability(body?.data, now);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default async function handler(req: EdgeRequest, res: EdgeResponse): Promise<void> {
   if (applyCorsAndMaybePreflight(req, res)) return;
 
   res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=240");
+  res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=240");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Vary", "Origin, Accept-Encoding");
 
@@ -177,14 +236,29 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   const now = new Date();
   const url = resolveDatabaseUrl();
 
-  // Defense in depth: any unexpected throw collapses to the safe server default
-  // (still a data-backed contract shape) rather than Vercel's default error page.
+  // Source precedence (all are database-backed except the last safe default):
+  //   1. Local DATABASE_URL on this edge (direct Postgres read), else
+  //   2. the live Railway API (which reads Railway Postgres), else
+  //   3. the server-computed default so the surface never breaks.
+  // Any unexpected throw collapses to the safe default rather than an error page.
   try {
-    const data = url ? await readFromDatabase(getSql(url), now) : defaultAvailability(now);
-    res.status(200).json({ data });
+    if (url) {
+      res.setHeader("X-Availability-Source", "edge-postgres");
+      res.status(200).json({ data: await readFromDatabase(getSql(url), now) });
+      return;
+    }
+    const upstream = await readFromUpstream(resolveUpstreamApiOrigin(), now);
+    if (upstream) {
+      res.setHeader("X-Availability-Source", "railway-api");
+      res.status(200).json({ data: upstream });
+      return;
+    }
+    res.setHeader("X-Availability-Source", "server-default");
+    res.status(200).json({ data: defaultAvailability(now) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "availability lookup failed";
     console.error(JSON.stringify({ event: "availability_edge_error", message }));
+    res.setHeader("X-Availability-Source", "server-default");
     res.status(200).json({ data: defaultAvailability(now) });
   }
 }

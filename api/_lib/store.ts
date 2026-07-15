@@ -34,6 +34,44 @@ export function resolveDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string
   return trimmed === "" ? null : trimmed;
 }
 
+/**
+ * Documented Railway API cut-over target (public identifier, never a secret).
+ * This is where an operator points DNS; until that DNS is attached it may not
+ * resolve, so it is NOT used as the default upstream — see below.
+ */
+export const RAILWAY_API_TARGET_ORIGIN = "https://api.vygo.ai";
+
+/**
+ * Reachable Railway API origin serving the live, Postgres-backed availability
+ * surface (project `vygo`, service `api`). The marketing edge (www.vygo.ai) has
+ * no `DATABASE_URL` of its own, so its availability/readyz functions read the
+ * database-backed value THROUGH this upstream API (server-to-server, no CORS),
+ * which itself reads Railway Postgres. Operators change the next audit start
+ * date in Postgres and it flows through here with no static redeploy.
+ *
+ * Overridable via `RAILWAY_API_ORIGIN` (or `NEXT_PUBLIC_API_BASE_URL`) so that
+ * once DNS for the documented `api.vygo.ai` target is attached, an operator can
+ * point at it without a code change; the `api.vygo.ai` placeholder is ignored
+ * until it actually resolves so the edge never proxies to a dead origin.
+ */
+export const DEFAULT_RAILWAY_API_ORIGIN = "https://api-production-7f2d.up.railway.app";
+
+/**
+ * Resolve the upstream Railway API origin the edge proxies to when it has no
+ * local database. Returns a normalized https origin (no trailing slash), or the
+ * reachable default when unset/placeholder. Never returns the not-yet-resolving
+ * `api.vygo.ai` target unless explicitly and additionally reachable via env.
+ */
+export function resolveUpstreamApiOrigin(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = (env.RAILWAY_API_ORIGIN || env.NEXT_PUBLIC_API_BASE_URL || "").trim();
+  if (raw && /^https?:\/\//i.test(raw)) {
+    const origin = raw.replace(/\/+$/, "");
+    if (origin === RAILWAY_API_TARGET_ORIGIN) return DEFAULT_RAILWAY_API_ORIGIN;
+    return origin;
+  }
+  return DEFAULT_RAILWAY_API_ORIGIN;
+}
+
 export function createPgStore(sql: Sql): WaitlistStore {
   return {
     async upsert(value, source): Promise<UpsertResult> {

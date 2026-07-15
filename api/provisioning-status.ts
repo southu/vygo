@@ -15,9 +15,29 @@
  */
 import { applyCorsAndMaybePreflight, applyHealthHeaders, deployedGitSha } from "./_lib/meta.js";
 import { buildProvisioningStatus } from "./_lib/provisioning.js";
+import { resolveUpstreamApiOrigin } from "./_lib/store.js";
 import type { EdgeRequest, EdgeResponse } from "./_lib/http.js";
 
-export default function handler(req: EdgeRequest, res: EdgeResponse): void {
+/** Live liveness probe of the upstream Railway API (server-to-server). */
+async function railwayApiReachable(origin: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch(`${origin}/healthz`, {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export default async function handler(req: EdgeRequest, res: EdgeResponse): Promise<void> {
   if (applyCorsAndMaybePreflight(req, res)) return;
   applyHealthHeaders(res);
 
@@ -27,8 +47,11 @@ export default function handler(req: EdgeRequest, res: EdgeResponse): void {
     return;
   }
 
-  // Services are created only by a real (armed) provisioning run; this builder
-  // holds no Railway token and fails closed, so `servicesCreated` stays false.
-  const status = buildProvisioningStatus(deployedGitSha());
+  // Reflect reality: probe the live Railway API. When it responds, the Railway
+  // topology (Postgres + API) is live and the availability surface is
+  // database-backed, so report `railwayApiLive: true` — otherwise fail honest.
+  const origin = resolveUpstreamApiOrigin();
+  const live = await railwayApiReachable(origin);
+  const status = buildProvisioningStatus(deployedGitSha(), live, { reachableOrigin: origin });
   res.status(200).json(status);
 }

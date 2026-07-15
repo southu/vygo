@@ -3,19 +3,19 @@
  * rewritten from the static build-time stub to a live dependency check.
  *
  * The web edge is always serving (so `ready` reflects that it is up), but the
- * `database` field now reports the REAL state of the Railway-backed Postgres
- * the availability + waitlist functions read from, using the same
- * `resolveDatabaseUrl()` precedence and connection pattern:
+ * `database` field now reports the REAL state of the Railway-backed Postgres the
+ * audit-date data ultimately comes from:
  *
- *   - no DATABASE_URL/POSTGRES_URL configured → "not_configured"
- *   - configured and reachable (SELECT 1 + site_availability present) → "connected"
- *   - configured but unreachable / schema missing → "error"
+ *   - a local DATABASE_URL wired to this edge → probe it directly
+ *     (SELECT 1 + site_availability present) → "connected" / "error"
+ *   - otherwise → reflect the UPSTREAM Railway API's `/readyz` (it reads Railway
+ *     Postgres): its `database:"ok"` → "connected" (databaseSource:"railway-api");
+ *     reachable-but-not-ready → "error"; unreachable → "not_configured"
  *
  * Previously this path served a hard-coded `"database":"not_configured"` file
- * baked at build time, so a wired database was never reflected. Now, the moment
- * an operator points the edge at Railway Postgres (DATABASE_URL reference), this
- * surface reports `database:"connected"` with no code change — mirroring the
- * Fastify API's own dependency-aware /readyz (see packages/db readiness).
+ * baked at build time, so a wired database was never reflected. Now the web
+ * tier's readiness honestly tracks the Postgres-backed availability source —
+ * whether that Postgres is reached directly or through the Railway API.
  *
  * Never exposes DATABASE_URL, connection strings, SQL, or stack traces — only
  * booleans and identity/status strings.
@@ -24,15 +24,17 @@ import postgres from "postgres";
 import type { Sql } from "postgres";
 import { applyCorsAndMaybePreflight, applyHealthHeaders } from "./_lib/meta.js";
 import type { EdgeRequest, EdgeResponse } from "./_lib/http.js";
-import { resolveDatabaseUrl } from "./_lib/store.js";
+import { resolveDatabaseUrl, resolveUpstreamApiOrigin } from "./_lib/store.js";
 
 type DatabaseState = "not_configured" | "connected" | "error";
+type DatabaseSource = "edge-postgres" | "railway-api";
 
 type ReadyBody = {
   ready: boolean;
   status: "ready";
   service: "vygo-web";
   database: DatabaseState;
+  databaseSource?: DatabaseSource;
   checks: {
     web: { ready: true };
     database?: { ready: boolean; status: string };
@@ -67,7 +69,36 @@ async function probeDatabase(url: string): Promise<DatabaseState> {
   return "connected";
 }
 
-function bodyFor(database: DatabaseState): ReadyBody {
+/**
+ * Reflect the database readiness of the UPSTREAM Railway API when this edge has
+ * no local DATABASE_URL. The web tier's availability data dependency is that API
+ * (which reads Railway Postgres), so its `database:"ok"` is the honest readiness
+ * of the audit-date data source. Any failure to reach it degrades to
+ * "not_configured" (unreachable) or "error" (reachable but DB not ready) rather
+ * than falsely reporting "connected".
+ */
+async function probeUpstream(origin: string): Promise<DatabaseState> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const upstream = await fetch(`${origin}/readyz`, {
+      method: "GET",
+      headers: { accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!upstream.ok) return "error";
+    const body = (await upstream.json()) as { database?: unknown; ready?: unknown };
+    if (body?.database === "ok" || body?.database === "connected") return "connected";
+    return "error";
+  } catch {
+    return "not_configured";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function bodyFor(database: DatabaseState, source?: DatabaseSource): ReadyBody {
   const body: ReadyBody = {
     ready: true,
     status: "ready",
@@ -76,6 +107,7 @@ function bodyFor(database: DatabaseState): ReadyBody {
     checks: { web: { ready: true } },
   };
   if (database !== "not_configured") {
+    if (source) body.databaseSource = source;
     body.checks.database = {
       ready: database === "connected",
       status: database === "connected" ? "ok" : "error",
@@ -96,17 +128,21 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   }
 
   const url = resolveDatabaseUrl();
-  if (!url) {
-    // Backward-compatible with the former static stub: web is up, no DB wired.
-    res.status(200).json(bodyFor("not_configured"));
-    return;
-  }
 
-  // Defense in depth: an unreachable DB or unexpected throw reports database:
-  // "error" rather than a 5xx, so the readiness surface itself never breaks.
+  // Defense in depth: an unreachable DB or unexpected throw reports a degraded
+  // database state rather than a 5xx, so the readiness surface never breaks.
   try {
-    const database = await probeDatabase(url);
-    res.status(200).json(bodyFor(database));
+    if (url) {
+      // Local Postgres wired directly to this edge.
+      res.status(200).json(bodyFor(await probeDatabase(url), "edge-postgres"));
+      return;
+    }
+    // No local DB: reflect the upstream Railway API's Postgres readiness, which
+    // is the actual source of the audit-date data the web tier serves.
+    const database = await probeUpstream(resolveUpstreamApiOrigin());
+    res
+      .status(200)
+      .json(bodyFor(database, database === "not_configured" ? undefined : "railway-api"));
   } catch (error) {
     const message = error instanceof Error ? error.message : "readiness probe failed";
     console.error(JSON.stringify({ event: "readyz_edge_error", message }));

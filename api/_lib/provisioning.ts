@@ -126,8 +126,17 @@ const VERIFICATION_COMMANDS = {
  * provisioning run created the Railway services (default false — this builder
  * holds no Railway token and fails closed).
  */
-export function buildProvisioningStatus(commit: string, servicesCreated = false) {
+export function buildProvisioningStatus(
+  commit: string,
+  servicesCreated = false,
+  live: { reachableOrigin?: string } = {},
+) {
   const blocked = !servicesCreated;
+  const railwayApiLive = servicesCreated;
+  const reachableNow = railwayApiLive
+    ? (live.reachableOrigin ?? RAILWAY_API_TARGET_ORIGIN)
+    : EDGE_API_MIRROR_ORIGIN;
+  const reachableNowMode = railwayApiLive ? "railway-api" : "vercel-edge-mirror";
 
   return {
     artifact: "railway-provisioning-status",
@@ -215,16 +224,20 @@ export function buildProvisioningStatus(commit: string, servicesCreated = false)
     },
     // Reachable API origin today vs the documented Railway cut-over target.
     apiOrigin: {
-      reachableNow: EDGE_API_MIRROR_ORIGIN,
-      reachableNowMode: "vercel-edge-mirror",
+      reachableNow,
+      reachableNowMode,
       railwayTargetOrigin: RAILWAY_API_TARGET_ORIGIN,
-      railwayApiLive: servicesCreated,
+      railwayApiLive,
       apiBaseUrlEnv: "NEXT_PUBLIC_API_BASE_URL",
-      note:
-        "The API service is defined on Railway (project vygo). Until it is provisioned, the API's " +
-        "/health and /version are mirrored on the Vercel edge (www.vygo.ai), which is the origin " +
-        "the frontend's NEXT_PUBLIC_API_BASE_URL advertises. On cut-over, point that env at the " +
-        "Railway API's public HTTPS origin.",
+      note: railwayApiLive
+        ? "The Railway API (project vygo, service api) is live and serving the Postgres-backed " +
+          "availability surface. The marketing edge (www.vygo.ai) reads the next audit start date " +
+          "through this API, so the displayed value is database-backed and operator-editable with " +
+          "no static redeploy."
+        : "The API service is defined on Railway (project vygo). Until it is provisioned, the API's " +
+          "/health and /version are mirrored on the Vercel edge (www.vygo.ai), which is the origin " +
+          "the frontend's NEXT_PUBLIC_API_BASE_URL advertises. On cut-over, point that env at the " +
+          "Railway API's public HTTPS origin.",
     },
     // Criterion 9: frontend + marketing stay on Vercel; neither is a Railway service.
     frontend: {
