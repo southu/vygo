@@ -4,6 +4,7 @@ import {
   createDatabase,
   getWorkerHeartbeat,
   isWorkerHeartbeatFresh,
+  runMigrations,
   type DatabaseHandle,
 } from "@vygo/db";
 import {
@@ -23,6 +24,7 @@ import { registerAvailabilityRoutes } from "./routes/availability.js";
 import { registerDiagnosticsRoutes } from "./routes/diagnostics.js";
 import { registerTestSurfaceRoutes, TEST_SUPPORT_ROUTES } from "./routes/test-surface.js";
 import { registerWaitlistRoutes } from "./routes/waitlist.js";
+import { registerApplyRoutes } from "./routes/apply.js";
 import { registerResendWebhookRoutes } from "./routes/webhooks-resend.js";
 import {
   createRateLimitStore,
@@ -96,6 +98,18 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
 
   if (!options.skipDatabase && options.database === undefined && env.DATABASE_URL) {
     database = createDatabase(env.DATABASE_URL);
+    // Best-effort schema migrate so new tables (e.g. applications) exist after deploy.
+    // Failures are logged but do not block listen — handlers also CREATE TABLE IF NOT EXISTS.
+    try {
+      await runMigrations(env.DATABASE_URL);
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "startup_migrate_failed",
+          message: error instanceof Error ? error.message : "migrate failed",
+        }),
+      );
+    }
   }
 
   const rateLimitStore =
@@ -294,6 +308,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
     turnstile,
     getFaultOptions,
   });
+
+  registerApplyRoutes(app, { getDb });
 
   registerResendWebhookRoutes(app, {
     env,

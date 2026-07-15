@@ -35,6 +35,13 @@ export {
   type WaitlistRepositoryOptions,
 } from "./waitlist.js";
 export {
+  insertApplication,
+  findApplicationById,
+  toApplicationPublicRow,
+  type ApplicationInsertInput,
+  type ApplicationPublicRow,
+} from "./applications.js";
+export {
   OUTBOX_KINDS,
   applicantConfirmationIdempotencyKey,
   internalLeadNotificationIdempotencyKey,

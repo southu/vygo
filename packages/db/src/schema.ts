@@ -204,6 +204,27 @@ export const workerHeartbeats = pgTable("worker_heartbeats", {
   details: jsonb("details").notNull().default({}),
 });
 
+/**
+ * Lightweight apply-form submissions from the public /apply page.
+ * Distinct from waitlist_entries (which powers the fuller waitlist intake).
+ */
+export const applications = pgTable(
+  "applications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fullName: text("full_name").notNull(),
+    workEmail: text("work_email").notNull(),
+    productUrl: text("product_url"),
+    message: text("message"),
+    source: text("source").notNull().default("apply"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("applications_created_at_idx").on(table.createdAt),
+    index("applications_work_email_idx").on(table.workEmail),
+  ],
+);
+
 export type SiteAvailability = typeof siteAvailability.$inferSelect;
 export type NewSiteAvailability = typeof siteAvailability.$inferInsert;
 export type WaitlistEntry = typeof waitlistEntries.$inferSelect;
@@ -211,3 +232,5 @@ export type EmailOutboxJob = typeof emailOutbox.$inferSelect;
 export type EmailEvent = typeof emailEvents.$inferSelect;
 export type SubmissionIdempotency = typeof submissionIdempotency.$inferSelect;
 export type WorkerHeartbeatRow = typeof workerHeartbeats.$inferSelect;
+export type Application = typeof applications.$inferSelect;
+export type NewApplication = typeof applications.$inferInsert;
