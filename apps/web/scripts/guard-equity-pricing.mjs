@@ -4,7 +4,8 @@
  * Equity-for-discount / dual cash-vs-equity pricing is no longer marketed or
  * offered in-product; equity deals are handled case-by-case offline. This guard
  * fails the build if equity-pricing copy or UI re-enters the user-facing source
- * (content and app trees), so the live site can never show it again.
+ * (content, app, and statically-served public trees), so the live site can never
+ * show it again.
  *
  * It intentionally does NOT scan docs/ (internal policy that documents the
  * removal) or e2e/ (the live-site guard, which references the phrases on purpose).
@@ -16,10 +17,12 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(__dirname, "..");
 
-// User-facing source trees only.
+// User-facing source trees only: rendered source plus statically-served assets
+// (public/ ships verbatim to the site — docs, JSON, and HTML included).
 const scanRoots = [
   path.join(webRoot, "src/content"),
   path.join(webRoot, "src/app"),
+  path.join(webRoot, "public"),
 ];
 
 // Any equity reference in user-facing content is a regression: there is no
@@ -30,7 +33,7 @@ const EQUITY_PRICING_PATTERNS = [
   /(?:request|apply for|pay with|trade|offer)\b[\s\S]{0,20}equity/i,
 ];
 
-const SCAN_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".json", ".md", ".mdx"]);
+const SCAN_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".json", ".md", ".mdx", ".html"]);
 
 function collectFiles(dir) {
   let files = [];
