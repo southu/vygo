@@ -14,6 +14,7 @@ export const REQUIRED_MIGRATION_TAGS = [
   "0000_init",
   "0001_email_worker",
   "0002_waitlist_source",
+  "0003_seed_availability",
 ] as const;
 
 export async function runMigrations(databaseUrl: string): Promise<void> {
