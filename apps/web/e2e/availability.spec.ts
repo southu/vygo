@@ -2,26 +2,31 @@ import { test, expect } from "@playwright/test";
 import { mockAvailability } from "./helpers";
 
 test.describe("Availability UI states", () => {
-  test("open state shows enabled open-access CTA", async ({ page }) => {
+  test("open state shows Apply CTA that navigates to the application form", async ({ page }) => {
     await mockAvailability(page, "open");
     await page.goto("/");
     const bar = page.locator('[data-availability-ui="bar"]');
     await expect(bar).toHaveAttribute("data-availability-state", "open");
     await expect(bar.locator("[data-availability-message]")).not.toBeEmpty();
-    const cta = bar.locator('[data-availability-action="open-access"]');
+    const cta = bar.locator('[data-availability-action="apply"]');
     await expect(cta).toBeEnabled();
     await cta.click();
-    await expect(page).toHaveURL(/\/waitlist/);
+    await expect(page).toHaveURL(/\/apply/);
+    await expect(page.getByTestId("apply-form")).toBeVisible();
   });
 
-  test("waitlist state opens WaitlistForm", async ({ page }) => {
+  test("waitlist state shows Apply CTA that navigates to the application form", async ({
+    page,
+  }) => {
     await mockAvailability(page, "waitlist");
     await page.goto("/");
     const bar = page.locator('[data-availability-ui="bar"]');
     await expect(bar).toHaveAttribute("data-availability-state", "waitlist");
-    await bar.locator('[data-availability-action="open-waitlist"]').click();
-    await expect(page.getByTestId("waitlist-modal")).toBeVisible();
-    await expect(page.getByTestId("waitlist-form-heading")).toBeFocused();
+    const cta = bar.locator('[data-availability-action="apply"]');
+    await expect(cta).toBeVisible();
+    await cta.click();
+    await expect(page).toHaveURL(/\/apply/);
+    await expect(page.getByRole("heading", { name: /Apply for the next opening/i })).toBeVisible();
   });
 
   test("paused state explains pause and has no submission action", async ({ page }) => {
@@ -31,8 +36,7 @@ test.describe("Availability UI states", () => {
     await expect(card).toHaveAttribute("data-availability-state", "paused");
     await expect(card.locator("[data-paused-explanation]")).toBeVisible();
     await expect(card.locator('[data-availability-action="none"]')).toBeVisible();
-    await expect(card.locator('[data-availability-action="open-waitlist"]')).toHaveCount(0);
-    await expect(card.locator('[data-availability-action="open-access"]')).toHaveCount(0);
+    await expect(card.locator('[data-availability-action="apply"]')).toHaveCount(0);
 
     // AC7: /waitlist page must not expose an enabled application form while paused.
     const pageForm = page.getByTestId("waitlist-page-form");
@@ -59,22 +63,23 @@ test.describe("Availability UI states", () => {
     const bar = page.locator('[data-availability-ui="bar"]');
     await expect(bar).toHaveAttribute("data-availability-state", "loading", { timeout: 3_000 });
     await expect(bar).toHaveAttribute("aria-busy", "true");
-    await expect(bar.locator('[data-availability-action="open-access"]')).toHaveCount(0);
-    await expect(bar.locator('[data-availability-action="open-waitlist"]')).toHaveCount(0);
+    await expect(bar.locator('[data-availability-action="apply"]')).toHaveCount(0);
   });
 
-  test("API failure shows fallback message and retry without crashing page", async ({ page }) => {
+  test("API failure shows fallback message and Apply CTA without crashing page", async ({
+    page,
+  }) => {
     await mockAvailability(page, "error");
     await page.goto("/");
     const bar = page.locator('[data-availability-ui="bar"]');
     await expect(bar).toHaveAttribute("data-availability-state", "error");
     await expect(bar.locator("[data-availability-message]")).not.toBeEmpty();
-    await expect(bar.locator('[data-availability-action="retry"]')).toBeVisible();
+    await expect(bar.locator('[data-availability-action="apply"]')).toBeVisible();
     await expect(page.locator("#main-content")).toBeVisible();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
-  test("stale state retains last known data and offers refresh", async ({ page }) => {
+  test("stale state retains last known data and offers Apply", async ({ page }) => {
     let n = 0;
     await page.route("**/v1/public/availability**", async (route) => {
       n += 1;
@@ -110,12 +115,12 @@ test.describe("Availability UI states", () => {
     await expect(bar).toHaveAttribute("data-availability-state", "stale");
     await expect(bar.locator("text=Stale")).toBeVisible();
     await expect(bar.locator("[data-availability-message]")).toContainText(/waitlist|Last known/i);
-    const retry = bar.locator('[data-availability-action="retry"]');
-    await expect(retry).toBeVisible();
+    const apply = bar.locator('[data-availability-action="apply"]');
+    await expect(apply).toBeVisible();
 
-    // Retry triggers refresh (fails) → still retains last known (stale or error-with-data)
-    await retry.click();
-    await expect(bar).toHaveAttribute("data-availability-state", /stale|error|waitlist/);
+    // Apply navigates to the application form (does not re-run the retry action).
+    await apply.click();
+    await expect(page).toHaveURL(/\/apply/);
     await expect(page.locator("#main-content")).toBeVisible();
   });
 });

@@ -3,16 +3,14 @@
 import Link from "next/link";
 import { ctaHrefs } from "@/content/ctas";
 import { useAvailability } from "./AvailabilityProvider";
-import { useWaitlistModal } from "./WaitlistProvider";
 
 export function AvailabilityCard({ className = "" }: { className?: string }) {
-  const { uiState, isBusy, copy, refresh, data } = useAvailability();
-  const { openWaitlist } = useWaitlistModal();
+  const { uiState, isBusy, copy, data } = useAvailability();
 
-  const showAction = copy.action !== "none";
-  const isRetry = copy.action === "retry";
-  const isWaitlist = copy.action === "open-waitlist";
-  const isOpenAccess = copy.action === "open-access";
+  // Actionable availability states surface the Apply CTA, which navigates to the
+  // application form. Loading stays busy/non-actionable; paused shows no action.
+  const showApply =
+    uiState === "open" || uiState === "waitlist" || uiState === "stale" || uiState === "error";
 
   return (
     <aside
@@ -58,36 +56,15 @@ export function AvailabilityCard({ className = "" }: { className?: string }) {
       ) : null}
 
       <div className="mt-6">
-        {showAction ? (
-          isRetry ? (
-            <button
-              type="button"
-              className="btn-on-dark"
-              onClick={() => void refresh()}
-              data-availability-action="retry"
-            >
-              {copy.ctaLabel}
-            </button>
-          ) : isWaitlist ? (
-            <button
-              type="button"
-              className="btn-on-dark"
-              onClick={(e) => openWaitlist(e.currentTarget)}
-              data-availability-action="open-waitlist"
-              data-testid="availability-card-cta"
-            >
-              {copy.ctaLabel}
-            </button>
-          ) : isOpenAccess ? (
-            <Link
-              href={ctaHrefs.waitlist}
-              className="btn-on-dark"
-              data-availability-action="open-access"
-              data-testid="availability-card-cta"
-            >
-              {copy.ctaLabel}
-            </Link>
-          ) : null
+        {showApply ? (
+          <Link
+            href={ctaHrefs.apply}
+            className="btn-on-dark"
+            data-availability-action="apply"
+            data-testid="availability-card-cta"
+          >
+            Apply
+          </Link>
         ) : (
           <span
             className="btn-on-dark pointer-events-none opacity-60"

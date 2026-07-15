@@ -21,6 +21,7 @@ export type CtaKey = keyof typeof ctas;
 
 export const ctaHrefs = {
   waitlist: "/waitlist",
+  apply: "/apply",
   audit: "/audit",
   method: "/method",
   security: "/security",

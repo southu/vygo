@@ -3,16 +3,14 @@
 import Link from "next/link";
 import { ctaHrefs } from "@/content/ctas";
 import { useAvailability } from "./AvailabilityProvider";
-import { useWaitlistModal } from "./WaitlistProvider";
 
 export function AvailabilityBar() {
-  const { uiState, isBusy, copy, refresh, data } = useAvailability();
-  const { openWaitlist } = useWaitlistModal();
+  const { uiState, isBusy, copy, data } = useAvailability();
 
-  const showAction = copy.action !== "none";
-  const isRetry = copy.action === "retry";
-  const isWaitlist = copy.action === "open-waitlist";
-  const isOpenAccess = copy.action === "open-access";
+  // Actionable availability states surface the Apply CTA, which navigates to the
+  // application form. Loading stays busy/non-actionable; paused shows no action.
+  const showApply =
+    uiState === "open" || uiState === "waitlist" || uiState === "stale" || uiState === "error";
 
   return (
     <div
@@ -42,36 +40,15 @@ export function AvailabilityBar() {
           ) : null}
         </p>
 
-        {showAction ? (
-          isRetry ? (
-            <button
-              type="button"
-              className="inline-flex min-h-10 items-center rounded-lg bg-green px-4 py-2 text-sm font-semibold text-white hover:bg-green-dark"
-              onClick={() => void refresh()}
-              data-availability-action="retry"
-            >
-              {copy.ctaLabel} →
-            </button>
-          ) : isWaitlist ? (
-            <button
-              type="button"
-              className="inline-flex min-h-10 items-center rounded-lg bg-green px-4 py-2 text-sm font-semibold text-white hover:bg-green-dark"
-              onClick={(e) => openWaitlist(e.currentTarget)}
-              data-availability-action="open-waitlist"
-              data-testid="availability-bar-cta"
-            >
-              {copy.ctaLabel} →
-            </button>
-          ) : isOpenAccess ? (
-            <Link
-              href={ctaHrefs.waitlist}
-              className="inline-flex min-h-10 items-center rounded-lg bg-green px-4 py-2 text-sm font-semibold text-white hover:bg-green-dark"
-              data-availability-action="open-access"
-              data-testid="availability-bar-cta"
-            >
-              {copy.ctaLabel} →
-            </Link>
-          ) : null
+        {showApply ? (
+          <Link
+            href={ctaHrefs.apply}
+            className="inline-flex min-h-10 items-center rounded-lg bg-green px-4 py-2 text-sm font-semibold text-white hover:bg-green-dark"
+            data-availability-action="apply"
+            data-testid="availability-bar-cta"
+          >
+            Apply →
+          </Link>
         ) : (
           <span
             className="inline-flex min-h-10 items-center rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white/80"

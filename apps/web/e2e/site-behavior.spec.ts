@@ -160,16 +160,18 @@ test.describe("Site behavior preservation", () => {
     await expect(main).toContainText("Full IP handoff");
   });
 
-  test("primary CTAs reach open-access or waitlist form", async ({ page }) => {
+  test("availability Apply CTA reaches the application form", async ({ page }) => {
     await mockAvailability(page, "open");
     await page.goto("/");
     await page.getByTestId("availability-bar-cta").click();
-    await expect(page).toHaveURL(/\/waitlist/);
+    await expect(page).toHaveURL(/\/apply/);
+    await expect(page.getByTestId("apply-form")).toBeVisible();
 
     await mockAvailability(page, "waitlist");
     await page.goto("/");
     await page.getByTestId("availability-bar-cta").click();
-    await expect(page.getByTestId("waitlist-modal")).toBeVisible();
+    await expect(page).toHaveURL(/\/apply/);
+    await expect(page.getByTestId("apply-form")).toBeVisible();
   });
 
   test("mobile nav keyboard open/close, expanded state, no trap, links work", async ({

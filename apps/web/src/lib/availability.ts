@@ -70,16 +70,47 @@ export type AvailabilityCopy = {
   message: string;
   note?: string;
   /** Primary action kind for CTAs. */
-  action: "open-access" | "open-waitlist" | "none" | "retry";
+  action: "open-access" | "open-waitlist" | "none" | "apply";
   ctaLabel: string;
 };
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+/**
+ * Format a DB-supplied ISO date (YYYY-MM-DD) as a human, month-name date such as
+ * "August 24, 2026". Parsed positionally to avoid timezone drift. Returns null
+ * for a missing or malformed value so callers can fall back to prose.
+ */
+export function formatOpeningDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return `${MONTHS[month - 1]} ${day}, ${year}`;
+}
 
 export function availabilityCopy(
   uiState: AvailabilityUiState,
   data: PublicAvailability | null,
 ): AvailabilityCopy {
   const note = data?.displayNote ?? undefined;
-  const date = data?.nextOpeningDate;
+  const date = formatOpeningDate(data?.nextOpeningDate) ?? data?.nextOpeningDate ?? null;
 
   switch (uiState) {
     case "loading":
@@ -122,19 +153,20 @@ export function availabilityCopy(
       return {
         label: "AVAILABILITY MAY BE OUT OF DATE",
         message: data
-          ? `Last known status: ${data.status}. Refresh for the latest availability.`
-          : "Availability data may be out of date. Refresh to try again.",
+          ? `Last known status: ${data.status}. Apply for the next opening below.`
+          : "Availability data may be out of date. Apply for the next opening below.",
         note,
-        action: "retry",
-        ctaLabel: "Refresh availability",
+        action: "apply",
+        ctaLabel: "Apply",
       };
     case "error":
     default:
       return {
         label: "AVAILABILITY UNAVAILABLE",
-        message: "We could not load current availability. You can retry, or email hello@vygo.ai.",
-        action: "retry",
-        ctaLabel: "Retry",
+        message:
+          "We could not load current availability. You can still apply below, or email hello@vygo.ai.",
+        action: "apply",
+        ctaLabel: "Apply",
       };
   }
 }
