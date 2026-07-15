@@ -99,3 +99,62 @@ test.describe("Homepage approved copy", () => {
     await expect(page).toHaveURL(/\/waitlist/);
   });
 });
+
+/**
+ * Consumer marketing/product surfaces must never reintroduce entity operator
+ * phrasing or the legal P-handoff boilerplate. Privacy and terms pages are
+ * intentionally excluded — corporate entity language remains there only.
+ */
+const CONSUMER_PATHS = [
+  "/",
+  "/audit",
+  "/method",
+  "/security",
+  "/why-vygo",
+  "/pricing",
+  "/waitlist",
+  "/apply",
+  "/thank-you",
+  "/insights",
+] as const;
+
+const PROHIBITED_CONSUMER_PHRASES = [
+  /operated by VYGO LLC/i,
+  /VYGO LLC/i,
+  /operated by/i,
+  /separately executed agreement/i,
+  /does not form a client relationship/i,
+  /Services begin only under a separately executed agreement/i,
+  /Notices are effective when received/i,
+];
+
+test.describe("Consumer surfaces: no entity or P-handoff legal language", () => {
+  for (const path of CONSUMER_PATHS) {
+    test(`${path} HTML source has no prohibited entity/handoff phrasing`, async ({
+      request,
+    }) => {
+      const res = await request.get(path);
+      expect(res.status(), `${path} must return HTTP 200`).toBe(200);
+      const html = await res.text();
+      for (const pattern of PROHIBITED_CONSUMER_PHRASES) {
+        expect(html, `${path} must not match ${pattern}`).not.toMatch(pattern);
+      }
+    });
+  }
+
+  test("privacy and terms remain reachable with substantive legal content", async ({
+    request,
+  }) => {
+    const privacy = await request.get("/privacy");
+    expect(privacy.status()).toBe(200);
+    const privacyHtml = await privacy.text();
+    expect(privacyHtml).toMatch(/privacy/i);
+    expect(privacyHtml.length).toBeGreaterThan(500);
+
+    const terms = await request.get("/terms");
+    expect(terms.status()).toBe(200);
+    const termsHtml = await terms.text();
+    expect(termsHtml).toMatch(/terms/i);
+    expect(termsHtml.length).toBeGreaterThan(500);
+  });
+});
