@@ -487,17 +487,13 @@ function main() {
     status: "healthy",
     service: "vygo-web",
   };
-  const readyBody = {
-    ready: true,
-    status: "ready",
-    service: "vygo-web",
-    // Static edge deployment carries no database dependency; the API's /readyz
-    // performs the Postgres check when DATABASE_URL is set (see README).
-    database: "not_configured",
-    checks: { web: { ready: true } },
-  };
   writeFileSync(path.join(publicDir, "healthz"), `${JSON.stringify(healthBody)}\n`, "utf8");
-  writeFileSync(path.join(publicDir, "readyz"), `${JSON.stringify(readyBody)}\n`, "utf8");
+  // NOTE: /readyz is NOT a static stub. It is served by the `api/readyz.ts`
+  // edge function (see vercel.json rewrite), which performs a live Postgres
+  // dependency check via resolveDatabaseUrl() and reports database:"connected"
+  // when the Railway DB is wired. A static file here would shadow that rewrite
+  // and re-freeze the surface at "not_configured", so it is intentionally not
+  // written.
 
   // Ensure the directory is present for git
   const barrel = path.join(outDir, ".gitkeep");
@@ -507,7 +503,7 @@ function main() {
 
   console.log(`Wrote ${path.relative(root, outFile)} (ready=${report.ready})`);
   console.log(
-    `Wrote apps/web/public/version, apps/web/public/version.txt, apps/web/public/healthz, apps/web/public/readyz, and apps/web/public/api/readiness.json`,
+    `Wrote apps/web/public/version, apps/web/public/version.txt, apps/web/public/healthz, and apps/web/public/api/readiness.json (/readyz is served by the api/readyz.ts edge function)`,
   );
   if (!report.ready) {
     console.error("Readiness report is not ready=true; inspect checks above.");

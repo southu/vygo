@@ -9,6 +9,7 @@
     { "source": "/v1/waitlist", "destination": "/api/waitlist" },
     { "source": "/v1/public/availability", "destination": "/api/availability" },
     { "source": "/health", "destination": "/api/health" },
+    { "source": "/readyz", "destination": "/api/readyz" },
     { "source": "/worker", "destination": "/api/worker-status" },
     { "source": "/workerz", "destination": "/api/worker-status" },
     { "source": "/worker/status", "destination": "/api/worker-status" },
