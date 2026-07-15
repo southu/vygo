@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ctaHrefs, ctas } from "@/content/ctas";
+import type { InquiryOfferKey } from "@/content/inquiry-offers";
 import { useAvailability } from "./AvailabilityProvider";
 import { useWaitlistModal } from "./WaitlistProvider";
 
@@ -15,6 +16,11 @@ type ApplyCtaProps = {
   forceHref?: string;
   /** data-testid for Playwright. */
   testId?: string;
+  /**
+   * Preselect / identify inquiry offer (e.g. free vygo Harden assessment).
+   * Appended to the waitlist URL and passed into the modal form.
+   */
+  offer?: InquiryOfferKey | null;
 };
 
 const variants = {
@@ -23,6 +29,11 @@ const variants = {
   "on-dark": "btn-on-dark",
   "ghost-on-dark": "btn-ghost-on-dark",
 } as const;
+
+function waitlistHrefForOffer(offer?: InquiryOfferKey | null): string {
+  if (!offer) return ctaHrefs.waitlist;
+  return `${ctaHrefs.waitlist}?offer=${encodeURIComponent(offer)}`;
+}
 
 /**
  * Primary apply / waitlist CTA that respects live availability:
@@ -38,11 +49,13 @@ export function ApplyCta({
   className = "",
   forceHref,
   testId = "apply-cta",
+  offer = null,
 }: ApplyCtaProps) {
   const { uiState, copy } = useAvailability();
   const { openWaitlist } = useWaitlistModal();
   const classes = `${variants[variant]} ${className}`.trim();
   const label = children ?? ctas.applyNextOpening;
+  const openAccessHref = forceHref ?? waitlistHrefForOffer(offer);
 
   if (forceHref) {
     return (
@@ -62,6 +75,7 @@ export function ApplyCta({
         data-testid={testId}
         data-cta-mode="loading"
         data-availability-state="loading"
+        data-inquiry-offer={offer ?? undefined}
       >
         {label}
       </button>
@@ -78,6 +92,7 @@ export function ApplyCta({
         data-testid={testId}
         data-cta-mode="paused"
         data-availability-state="paused"
+        data-inquiry-offer={offer ?? undefined}
         title="Enrollment is paused"
       >
         Enrollment paused
@@ -93,7 +108,8 @@ export function ApplyCta({
         data-testid={testId}
         data-cta-mode="waitlist"
         data-availability-state="waitlist"
-        onClick={(event) => openWaitlist(event.currentTarget)}
+        data-inquiry-offer={offer ?? undefined}
+        onClick={(event) => openWaitlist(event.currentTarget, { offer: offer ?? null })}
       >
         {children ?? copy.ctaLabel ?? ctas.joinWaitlist}
       </button>
@@ -101,14 +117,14 @@ export function ApplyCta({
   }
 
   // open, stale (with last known open), error → open-access page remains safe destination
-  const href = ctaHrefs.waitlist;
   return (
     <Link
-      href={href}
+      href={openAccessHref}
       className={classes}
       data-testid={testId}
       data-cta-mode={uiState === "open" ? "open-access" : uiState}
       data-availability-state={uiState}
+      data-inquiry-offer={offer ?? undefined}
     >
       {label}
     </Link>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ctaHrefs } from "@/content/ctas";
+import { parseOfferFromHref } from "@/content/inquiry-offers";
 import { ApplyCta } from "./ApplyCta";
 
 type CtaLinkProps = {
@@ -36,8 +37,9 @@ function isWaitlistHref(href: string): boolean {
  */
 export function CtaLink({ href, children, variant = "primary", className = "" }: CtaLinkProps) {
   if (isWaitlistHref(href)) {
+    const offer = parseOfferFromHref(href);
     return (
-      <ApplyCta variant={variant} className={className}>
+      <ApplyCta variant={variant} className={className} offer={offer}>
         {children}
       </ApplyCta>
     );
@@ -47,6 +49,15 @@ export function CtaLink({ href, children, variant = "primary", className = "" }:
   const classes = `${variants[variant]} ${className}`;
 
   if (isExternal) {
+    return (
+      <a href={href} className={classes}>
+        {children}
+      </a>
+    );
+  }
+
+  // Hash-only anchors stay on the current page (e.g. #production-readiness-audit).
+  if (href.startsWith("#")) {
     return (
       <a href={href} className={classes}>
         {children}

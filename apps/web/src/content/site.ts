@@ -27,7 +27,7 @@ export const site = {
       "Why funded founders and enterprise buyers choose vygo.ai to turn AI-built products into secure, compliant production systems.",
     pricingTitle: "Engagement Pricing",
     pricingDescription:
-      "Fixed-price Production Readiness Audit, Launch, Scale, and Enterprise rebuild engagements from VYGO, plus ongoing Ops plans.",
+      "Fixed-price Production Readiness Audit, vygo Harden, Launch, Scale, and Enterprise rebuild engagements from vygo, plus ongoing Ops plans.",
     waitlistTitle: "Apply for the next production opening",
     waitlistDescription:
       "Apply for the next Production Readiness Audit or production engineering opening with VYGO. We review applications against available openings.",

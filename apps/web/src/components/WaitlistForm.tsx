@@ -12,6 +12,12 @@ import {
 } from "react";
 import Link from "next/link";
 import { waitlistContent } from "@/content/waitlist";
+import {
+  hardenInquiryCopy,
+  inquiryOfferOptions,
+  isInquiryOfferKey,
+  type InquiryOfferKey,
+} from "@/content/inquiry-offers";
 import { apiUrl } from "@/lib/api";
 import { trackAnalytics } from "@/lib/analytics";
 import { captureAttribution, type WaitlistAttribution } from "@/lib/attribution";
@@ -38,27 +44,32 @@ type FormState = {
   commercialDeadline: boolean;
   privacyAccepted: boolean;
   marketingConsent: boolean;
+  /** Selected inquiry offer when the form supports offer selection. */
+  offer: InquiryOfferKey | "";
   /** Honeypot — must stay empty. */
   website: string;
 };
 
-const initial: FormState = {
-  fullName: "",
-  email: "",
-  companyName: "",
-  productUrl: "",
-  role: "",
-  stage: "",
-  primaryBlocker: "",
-  desiredStartWindow: "",
-  message: "",
-  prototypePlatform: "",
-  budgetRange: "",
-  commercialDeadline: false,
-  privacyAccepted: false,
-  marketingConsent: false,
-  website: "",
-};
+function createInitialFormState(offer: InquiryOfferKey | null): FormState {
+  return {
+    fullName: "",
+    email: "",
+    companyName: "",
+    productUrl: "",
+    role: "",
+    stage: "",
+    primaryBlocker: "",
+    desiredStartWindow: "",
+    message: "",
+    prototypePlatform: "",
+    budgetRange: "",
+    commercialDeadline: false,
+    privacyAccepted: false,
+    marketingConsent: false,
+    offer: offer ?? "",
+    website: "",
+  };
+}
 
 type ApiErrorBody = {
   error?: {
@@ -122,6 +133,7 @@ const FIELD_LABELS: Record<string, string> = {
   message: "Short description",
   prototypePlatform: "Build tool / stack",
   budgetRange: "Budget range",
+  offer: "Offer of interest",
   privacyAccepted: "Privacy Policy and Terms of Use acceptance",
   turnstileToken: "Verification challenge",
 };
@@ -130,9 +142,16 @@ type WaitlistFormProps = {
   mode?: "page" | "modal";
   open?: boolean;
   onDismiss?: () => void;
+  /** Preselected inquiry offer (e.g. free vygo Harden assessment). */
+  offer?: InquiryOfferKey | null;
 };
 
-export function WaitlistForm({ mode = "page", open = true, onDismiss }: WaitlistFormProps) {
+export function WaitlistForm({
+  mode = "page",
+  open = true,
+  onDismiss,
+  offer = null,
+}: WaitlistFormProps) {
   const { form, success } = waitlistContent;
   const { uiState, copy: availabilityCopy } = useAvailability();
   const formId = useId();
@@ -140,9 +159,10 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
   const errorSummaryId = `${formId}-error-summary`;
   const liveAssertiveId = `${formId}-live-assertive`;
   const livePoliteId = `${formId}-live-polite`;
+  const isHardenAssessment = offer === "harden";
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [values, setValues] = useState<FormState>(initial);
+  const [values, setValues] = useState<FormState>(() => createInitialFormState(offer));
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "error" | "success" | "duplicate">(
     "idle",
@@ -172,17 +192,24 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
   };
 
   // Capture attribution once when the form mounts / modal opens; persists across steps.
+  // Reset offer preselection when the inquiry intent changes (e.g. Harden CTA).
   useEffect(() => {
     if (!open) return;
     formStartedAtRef.current = Date.now();
     attributionRef.current = captureAttribution();
-    trackAnalytics("waitlist_form_view", { mode, step: 1 });
+    setStep(1);
+    setValues(createInitialFormState(offer));
+    setErrors({});
+    setShowErrorSummary(false);
+    setStatus("idle");
+    setStatusMessage("");
+    trackAnalytics("waitlist_form_view", { mode, step: 1, offer: offer ?? "general" });
     // Focus heading when opened (modal or page mount).
     const t = window.setTimeout(() => {
       headingRef.current?.focus();
     }, 0);
     return () => window.clearTimeout(t);
-  }, [open, mode]);
+  }, [open, mode, offer]);
 
   useEffect(() => {
     trackAnalytics("waitlist_step_change", { step, mode });
@@ -476,6 +503,28 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
     const idempotencyKey = ensureIdempotencyKey();
     const attribution = attributionRef.current;
 
+    const selectedOffer = isInquiryOfferKey(values.offer) ? values.offer : offer;
+    const offerLabel =
+      selectedOffer === "harden"
+        ? hardenInquiryCopy.inquiryName
+        : selectedOffer
+          ? (inquiryOfferOptions.find((option) => option.value === selectedOffer)?.label ??
+            selectedOffer)
+          : null;
+    // Keep API payload on the existing schema; encode offer intent in message + UTM campaign.
+    const messageWithOffer =
+      offerLabel && !values.message.toLowerCase().includes(offerLabel.toLowerCase())
+        ? `[${offerLabel}] ${values.message}`
+        : values.message;
+    const utm = {
+      ...attribution.utm,
+      campaign:
+        selectedOffer === "harden"
+          ? "vygo-harden-assessment"
+          : (attribution.utm.campaign ?? null),
+      content: selectedOffer ?? attribution.utm.content ?? null,
+    };
+
     const payload: Record<string, unknown> = {
       fullName: values.fullName,
       email: values.email,
@@ -485,7 +534,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
       stage: values.stage,
       primaryBlocker: values.primaryBlocker,
       desiredStartWindow: values.desiredStartWindow,
-      message: values.message,
+      message: messageWithOffer,
       prototypePlatform: values.prototypePlatform.trim() || null,
       budgetRange: values.budgetRange || null,
       commercialDeadline: values.commercialDeadline,
@@ -496,7 +545,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
       formStartedAt: formStartedAtRef.current,
       landingPage: attribution.landingPage,
       referrer: attribution.referrer,
-      utm: attribution.utm,
+      utm,
       idempotencyKey,
     };
 
@@ -609,10 +658,21 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
     </>
   );
 
+  const successHeading = isHardenAssessment ? hardenInquiryCopy.successHeading : success.heading;
+  const successBody = isHardenAssessment ? hardenInquiryCopy.successBody : success.body;
+  const formHeading = isHardenAssessment
+    ? hardenInquiryCopy.heading
+    : mode === "modal"
+      ? "Join the waitlist"
+      : "Application form";
+  const formIntro = isHardenAssessment ? hardenInquiryCopy.body : null;
+  const submitLabel = isHardenAssessment ? hardenInquiryCopy.submitLabel : form.submitLabel;
+
   const successCard = (
     <div
       data-testid="waitlist-success-card"
       data-waitlist-outcome={status === "duplicate" ? "duplicate" : "success"}
+      data-inquiry-offer={offer ?? undefined}
       role="status"
     >
       {liveRegions}
@@ -622,15 +682,19 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
         tabIndex={-1}
         className="font-display text-2xl font-bold text-ink outline-none"
       >
-        {success.heading}
+        {successHeading}
       </h2>
-      <p className="mt-3 text-muted">{success.body}</p>
+      <p className="mt-3 text-muted">{successBody}</p>
       <p className="mt-2 text-sm text-ink-soft" data-success-message>
         {statusMessage || "Your application has been received."}
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link href={success.nextHref} className="btn-primary" data-testid="success-next-action">
-          {success.nextLinkLabel}
+        <Link
+          href={isHardenAssessment ? "/pricing#harden" : success.nextHref}
+          className="btn-primary"
+          data-testid="success-next-action"
+        >
+          {isHardenAssessment ? "Back to vygo Harden" : success.nextLinkLabel}
         </Link>
         {mode === "modal" && onDismiss ? (
           <button type="button" className="btn-secondary" onClick={onDismiss}>
@@ -652,9 +716,15 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
             tabIndex={-1}
             className="font-display text-xl font-bold text-ink outline-none sm:text-2xl"
             data-testid="waitlist-form-heading"
+            data-inquiry-offer={offer ?? undefined}
           >
-            {mode === "modal" ? "Join the waitlist" : "Application form"}
+            {formHeading}
           </h2>
+          {formIntro ? (
+            <p className="mt-2 text-sm text-muted" data-testid="waitlist-inquiry-intro">
+              {formIntro}
+            </p>
+          ) : null}
           <p className="mt-1 text-sm text-muted">
             Step {step} of 2 — {step === 1 ? form.step1Title : form.step2Title}
           </p>
@@ -725,6 +795,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
         aria-labelledby={headingId}
         data-testid="waitlist-form"
         data-waitlist-step={step}
+        data-inquiry-offer={offer ?? (values.offer || undefined)}
       >
         {/* Honeypot */}
         <div
@@ -752,6 +823,37 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
 
         {step === 1 ? (
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label htmlFor="offer" className="text-sm font-medium text-ink">
+                Offer of interest
+              </label>
+              <select
+                id="offer"
+                name="offer"
+                className={fieldClass}
+                value={values.offer}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  update("offer", isInquiryOfferKey(next) ? next : "");
+                }}
+                data-testid="waitlist-offer-select"
+                aria-describedby={isHardenAssessment ? "offer-help" : undefined}
+              >
+                <option value="">Select…</option>
+                {inquiryOfferOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {isHardenAssessment ? (
+                <p id="offer-help" className="mt-1.5 text-xs text-muted">
+                  Preselected for a free vygo Harden fit assessment (not the $15,000 Production
+                  Readiness Audit).
+                </p>
+              ) : null}
+            </div>
+
             <div className="sm:col-span-1">
               <label htmlFor="fullName" className="text-sm font-medium text-ink">
                 Full name <span className="text-red">*</span>
@@ -1133,7 +1235,7 @@ export function WaitlistForm({ mode = "page", open = true, onDismiss }: Waitlist
               aria-busy={status === "submitting" ? true : undefined}
               data-testid="waitlist-submit"
             >
-              {status === "submitting" ? "Submitting…" : form.submitLabel}
+              {status === "submitting" ? "Submitting…" : submitLabel}
             </button>
           )}
         </div>

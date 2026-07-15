@@ -7,20 +7,108 @@ const publicTierPrices = {
   enterprise: "$275K+",
 } as const;
 
+/** Inquiry offer key for free vygo Harden fit assessment. */
+export const hardenOfferKey = "harden" as const;
+
 export const pricingContent = {
   flags: commercialFlags,
   page: {
     eyebrow: "ENGAGEMENTS",
     heading: "Simple engagements. Fixed prices.",
     intro:
-      "Start with a Production Readiness Audit when you need a defensible plan. Choose Launch, Scale, or Enterprise when you are ready to rebuild on a fixed scope and price with VYGO.",
+      "Start with a Production Readiness Audit when you need a defensible plan. Choose Launch, Scale, or Enterprise when you are ready to rebuild on a fixed scope and price with vygo.",
+  },
+  /** Focused internal-tool engagement — not a full Launch/Scale/Enterprise tier. */
+  harden: {
+    id: "harden",
+    name: "vygo Harden",
+    eyebrow: "A SMALLER, FOCUSED ENGAGEMENT",
+    headline: "Make your internal tool team-ready.",
+    introduction: [
+      "Some tools do not need a complete production rebuild. They need the focused engineering work required to move from “the person who built it can use it” to “the team can depend on it.”",
+      "vygo Harden is a fixed-price engagement for working internal business tools with a clearly defined workflow and scope.",
+    ],
+    price: "$9,500",
+    priceLabel: "$9,500 fixed",
+    duration: "About two weeks",
+    cta: {
+      label: "Start the free assessment",
+      href: `${ctaHrefs.waitlist}?offer=${hardenOfferKey}`,
+    },
+    ctaSupport:
+      "We’ll review the tool and tell you whether it fits the vygo Harden scope before you spend anything.",
+    examplesIntro:
+      "Examples include the following use cases. These examples do not mean every tool or every stack qualifies for vygo Harden.",
+    examples: [
+      {
+        title: "Custom CRM",
+        summary: "Built around exactly how your team sells.",
+        body: "We can add team accounts, roles, permissions, and reliable hosting so the whole sales team can work from one shared system.",
+      },
+      {
+        title: "Operations tool",
+        summary: "Orders, purchasing, inventory, or other internal workflows in one place.",
+        body: "We can add access controls, audit history, backups, and deployment safeguards so the team can rely on it every day.",
+      },
+      {
+        title: "Workflow app",
+        summary: "Quotes, invoices, approvals, dashboards, or internal handoffs.",
+        body: "We can add permissions, recovery, monitoring, and documentation so one mistake does not bring the workflow down.",
+      },
+    ],
+    mayIncludeIntro:
+      "Depending on what the tool needs, a vygo Harden engagement may include:",
+    mayInclude: [
+      "Team accounts and login",
+      "User roles and permissions",
+      "Reliable cloud hosting and deployment",
+      "Database and configuration cleanup",
+      "Backups and basic recovery safeguards",
+      "Audit history where appropriate",
+      "Logging and basic monitoring",
+      "Testing of critical workflows",
+      "Technical documentation",
+      "Source-code handoff",
+    ],
+    mayIncludeNote:
+      "Scope is confirmed in the free assessment. Not every capability is included in every vygo Harden engagement.",
+    goodFit: {
+      title: "Good Fit",
+      items: [
+        "The core tool already works",
+        "It supports a specific internal workflow",
+        "A team is ready to use it",
+        "The required improvements are clearly defined",
+        "It does not require a major redesign or rebuild",
+      ],
+    },
+    fullerEngagement: {
+      title: "Needs a Fuller Engagement",
+      items: [
+        "Major new product features",
+        "Significant re-architecture",
+        "Complex integrations or migrations",
+        "Public applications with substantial scale requirements",
+        "Formal compliance-readiness work",
+        "Enterprise SSO, tenant architecture, or advanced security requirements",
+      ],
+    },
+    closing:
+      "Not sure which path fits? Start with the free assessment. If the tool needs more than vygo Harden, we’ll explain why and recommend the appropriate next step.",
+    secondaryCta: {
+      label: "Explore full production engagements",
+      href: "#production-readiness-audit",
+    },
+    qualificationNote:
+      "Qualification for vygo Harden is confirmed before you spend anything. Not every internal tool qualifies.",
   },
   audit: {
+    id: "production-readiness-audit",
     name: "Production Readiness Audit",
     price: "$15K",
     duration: "2 weeks",
     summary:
-      "A two-week review of code, architecture, security, scalability, and compliance-readiness gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent VYGO build.",
+      "A two-week review of code, architecture, security, scalability, and compliance-readiness gaps with a prioritized findings report and fixed-price plan. Credited toward a subsequent vygo build.",
     outcomes: [
       "Codebase and architecture assessment",
       "Threat model and security findings",
