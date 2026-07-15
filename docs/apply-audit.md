@@ -38,8 +38,10 @@
 
 ### Live verification notes
 
+- **Public hostname:** `https://www.vygo.ai` (Vercel production custom domain + TLS). Apex `https://vygo.ai` redirects to www; HTTP upgrades to HTTPS.
 - Marketing origin: `POST https://www.vygo.ai/api/apply` (Vercel edge → Railway Postgres, direct or via API proxy).
 - Read-back: `GET https://www.vygo.ai/api/apply/<uuid>`.
-- Railway service origin (reachable default): `https://api-production-7f2d.up.railway.app/api/apply`.
+- Railway service origin (reachable default): `https://api-production-7f2d.up.railway.app/api/apply` (project `vygo`, service `api`).
 - Invalid input returns HTTP 4xx JSON with no `id` and inserts nothing.
 - Playwright: `apps/web/e2e/apply-form.spec.ts` covers success confirmation, 4xx error UI, and asserts the client never embeds DB credentials.
+- Machine-readable audit: `GET https://www.vygo.ai/apply-audit.json` (no-store) with non-empty `previous_submit_handling` and `changed_to`.

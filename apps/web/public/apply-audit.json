@@ -1,9 +1,15 @@
 {
   "previous_submit_handling": "Before this mission, the /apply form was a plain static HTML <form> with no action, no method, and no JavaScript onSubmit handler. Browser default submit issued a same-page GET navigation that put field values into the URL query string (e.g. /apply?fullName=…&email=…). No server handler, third-party service, localStorage, or database received the submission — data was not durably stored anywhere.",
-  "changed_to": "The form now POSTs JSON to the server-side endpoint POST /api/apply. The edge function validates full_name and work_email, then inserts one row into the Railway Postgres applications table (directly when DATABASE_URL is present on the edge, otherwise via server-to-server proxy to the Railway API). The API responds with the created row (id, full_name, work_email, product_url, message, source, created_at). GET /api/apply/<id> reads the same row back. The client never writes to the database.",
+  "changed_to": "The form now POSTs JSON to the server-side endpoint POST /api/apply on https://www.vygo.ai. The edge function validates full_name and work_email, then inserts one row into the Railway Postgres applications table (directly when DATABASE_URL is present on the edge, otherwise via server-to-server proxy to the Railway API). The API responds with the created row (id, full_name, work_email, product_url, message, source, created_at). GET /api/apply/<id> reads the same row back. The client never writes to the database.",
+  "public_hostname": "https://www.vygo.ai",
   "form_path": "/apply",
   "submit_endpoint": "POST /api/apply",
   "read_endpoint": "GET /api/apply/:id",
   "table": "applications",
-  "database": "Railway project vygo Postgres"
+  "database": "Railway project vygo Postgres",
+  "topology": {
+    "marketing": "Vercel (www.vygo.ai TLS + static export + edge functions)",
+    "api": "Railway project vygo service api (Postgres-backed)",
+    "database": "Railway Postgres applications table"
+  }
 }
