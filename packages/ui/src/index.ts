@@ -5,10 +5,11 @@ export const brand = {
   domain: "vygo.ai",
   email: "hello@vygo.ai",
   tagline: "Your MVP proved the market. vygo makes it production-grade.",
-  promise:
-    "We keep the validated product and rebuild the foundation underneath it. Submitting an inquiry does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+  promise: "We keep the validated product and rebuild the foundation underneath it.",
   positioning:
-    "For teams whose AI-built product has proven demand but is not ready for scale, enterprise procurement, compliance readiness, or sustained operations, vygo, operated by VYGO LLC, provides senior U.S.-based production engineering that preserves the validated product, rebuilds the foundation beneath it, and hands off full IP under a separately executed agreement with VYGO LLC. Services begin only under that agreement. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    "For teams whose AI-built product has proven demand but is not ready for scale, enterprise procurement, compliance readiness, or sustained operations, vygo provides senior U.S.-based production engineering that preserves the validated product, rebuilds the foundation beneath it, and hands off full IP.",
+  footerDisclaimer:
+    "Submitting an inquiry does not create a client relationship. Services are provided only under a signed agreement. Questions, privacy requests, and legal notices may be sent to hello@vygo.ai.",
 } as const;
 
 export const colors = {

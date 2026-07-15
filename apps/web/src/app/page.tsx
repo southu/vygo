@@ -20,14 +20,18 @@ export default function HomePage() {
   return (
     <main id="main-content">
       {/* Hero */}
-      <section className="section-pad">
+      <section className="section-pad" data-section="hero">
         <div className="container-page grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-          <div>
+          <div className="min-w-0">
             <p className="eyebrow">{hero.eyebrow}</p>
-            <h1 className="mt-4 font-display text-4xl font-bold tracking-tight sm:text-5xl lg:text-[3.25rem]">
+            <h1 className="mt-4 max-w-full text-balance break-words font-display text-4xl font-bold tracking-tight sm:text-5xl lg:text-[3.25rem]">
               {hero.headline}
             </h1>
-            <p className="mt-5 max-w-xl text-lg text-muted">{hero.supporting}</p>
+            <div className="mt-5 max-w-xl space-y-4 text-lg text-muted">
+              {hero.bodyParagraphs.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
             <p className="mt-4 text-sm font-semibold text-ink-soft">{hero.proofLine}</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <CtaLink href={hero.primaryCta.href}>{hero.primaryCta.label}</CtaLink>

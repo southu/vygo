@@ -4,13 +4,14 @@ import { ctas, ctaHrefs } from "./ctas";
 export const homepage = {
   hero: {
     eyebrow: "PRODUCTION ENGINEERING FOR AI-BUILT SOFTWARE",
-    headline: "From working prototype to production-grade company.",
-    supporting: commercialFlags.showUsBasedClaim
-      ? "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit, senior U.S.-based delivery, and full IP handoff under a separately executed agreement with VYGO LLC—without erasing what already works. Submitting an inquiry does not form a client relationship. Services begin only under that agreement. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received."
-      : "You already proved people want the product. vygo, operated by VYGO LLC, preserves the UX and workflows your users validated, then re-engineers the foundation for security, scale, compliance readiness, and sustained operations. Fixed-price work after audit and full IP handoff under a separately executed agreement with VYGO LLC—without erasing what already works. Submitting an inquiry does not form a client relationship. Services begin only under that agreement. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
-    proofLine: commercialFlags.showUsBasedClaim
-      ? "Senior U.S.-based engineers · Fixed price after audit · 6–20 weeks · IP handoff under a separately executed agreement with VYGO LLC"
-      : "Senior engineers · Fixed price after audit · 6–20 weeks · IP handoff under a separately executed agreement with VYGO LLC",
+    headline: "Turn your working prototype into production-grade software.",
+    bodyParagraphs: [
+      "You have already proven the idea. We help you turn it into software that is secure, scalable, maintainable, and ready for real-world use.",
+      "vygo preserves the experience and workflows your users already value, then strengthens the foundation beneath them—from architecture and infrastructure to security, testing, observability, and deployment.",
+      "Every engagement begins with a technical audit. From there, you receive a fixed-price production plan, senior U.S.-based engineering, and a complete handoff of the finished product and source code.",
+    ],
+    proofLine:
+      "Senior U.S.-based engineers · Fixed price after audit · Typical delivery in 6–20 weeks · Full IP handoff",
     primaryCta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
     secondaryCta: { label: ctas.seeHowRebuildWorks, href: ctaHrefs.method },
     toolLine:
@@ -109,7 +110,7 @@ export const homepage = {
       },
       {
         title: "A codebase your team can own",
-        body: "Architecture documentation, runbooks, test suites, deployment instructions, and full ownership of the code, infrastructure, and IP at handoff under a separately executed agreement with VYGO LLC.",
+        body: "Architecture documentation, runbooks, test suites, deployment instructions, and full ownership of the code, infrastructure, and IP at handoff.",
       },
     ],
   },
@@ -144,7 +145,7 @@ export const homepage = {
       {
         title: "Operate",
         weeks: "Ongoing",
-        body: "Keep the platform secure, observable, and moving—with compliance-readiness upkeep through vygo Ops, operated by VYGO LLC.",
+        body: "Keep the platform secure, observable, and moving—with compliance-readiness upkeep through vygo Ops.",
       },
     ],
     cta: { label: ctas.viewFullMethod, href: ctaHrefs.method },
@@ -152,7 +153,7 @@ export const homepage = {
   auditOffer: {
     eyebrow: "START HERE",
     heading: "Know exactly what has to change before you fund the rebuild.",
-    body: "The Production Readiness Audit is a two-week review of your code, architecture, security, scalability, and compliance-readiness gaps from vygo, operated by VYGO LLC. You receive a prioritized findings report and a fixed-price plan. The report is yours to keep either way. Submitting does not form a client relationship. Rebuild services begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    body: "The Production Readiness Audit is a two-week review of your code, architecture, security, scalability, and compliance-readiness gaps. You receive a prioritized findings report and a fixed-price plan. The report is yours to keep either way.",
     priceLine: "$15K · credited toward your build",
     deliverables: [
       "Codebase and architecture assessment",
@@ -184,13 +185,13 @@ export const homepage = {
   },
   ops: {
     heading: "We do not disappear at launch.",
-    body: "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC. Ops engagements begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    body: "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops.",
     plans: [
       { name: "Keep It Running", price: "$8K/month" },
       { name: "Keep It Compliant", price: "$15K/month" },
       { name: "Keep It Growing", price: "$25K/month" },
     ],
-    note: "Month-to-month after the initial commitment under a separately executed agreement with VYGO LLC. Everything remains documented so another qualified team can take over. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+    note: "Month-to-month after the initial commitment. Everything remains documented so another qualified team can take over.",
   },
   why: {
     heading: "Senior people on the work. Accountability after the launch.",
@@ -206,7 +207,7 @@ export const homepage = {
       },
       {
         title: "Fixed price after audit",
-        body: "The audit defines the scope before the build begins. Services begin only under a separately executed agreement with VYGO LLC.",
+        body: "The audit defines the scope before the build begins.",
       },
       {
         title: "Security and compliance readiness",
@@ -214,7 +215,7 @@ export const homepage = {
       },
       {
         title: "Aligned for the long term",
-        body: "Ongoing operations keep incentives connected under a separately executed agreement with VYGO LLC.",
+        body: "Ongoing operations keep incentives connected after launch.",
       },
     ].filter((p) => {
       if (p.title === "U.S.-based engineering" && !commercialFlags.showUsBasedClaim) return false;
@@ -224,7 +225,7 @@ export const homepage = {
   },
   finalCta: {
     heading: "Your MVP earned a real launch.",
-    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. VYGO LLC reviews applications against the next available Production Readiness Audit and engineering opening. Submitting does not form a client relationship. Services begin only under a separately executed agreement with VYGO LLC. For hard commercial or security-review deadlines, or for questions, privacy requests, or legal notices, contact hello@vygo.ai. Notices are effective when received.",
+    body: "Tell us what you built, what is blocking the next stage, and when the deadline matters. We review applications against the next available Production Readiness Audit and engineering opening.",
     cta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
   },
 } as const;

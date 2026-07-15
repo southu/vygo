@@ -3,7 +3,6 @@ import { brand } from "@vygo/ui";
 import { getFooterNav } from "@/content/site";
 import { hasPublishedInsights } from "@/content/insights";
 import { ctas } from "@/content/ctas";
-import { legalMeta } from "@/content/legal";
 import { LogoText } from "./LogoText";
 import { ApplyCta } from "./ApplyCta";
 
@@ -26,19 +25,7 @@ export function SiteFooter() {
               {brand.email}
             </a>
           </p>
-          <p className="mt-2 text-xs text-muted">
-            Operated by {legalMeta.operator}, {legalMeta.operatorDescription}.
-          </p>
-          <p className="mt-1 text-xs text-muted">
-            Questions, privacy requests, or legal notices may be sent to{" "}
-            <a
-              href={`mailto:${legalMeta.contactEmail}`}
-              className="font-medium text-purple hover:text-purple-dark"
-            >
-              {legalMeta.contactEmail}
-            </a>
-            . Notices are effective when received.
-          </p>
+          <p className="mt-4 max-w-md text-xs text-muted">{brand.footerDisclaimer}</p>
         </div>
 
         <div>
@@ -92,17 +79,9 @@ export function SiteFooter() {
       <div className="border-t border-border">
         <div className="container-page flex flex-col gap-2 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {new Date().getFullYear()} {legalMeta.operator}, {legalMeta.operatorDescription}. All
-            rights reserved.
+            © {new Date().getFullYear()} {brand.name}. All rights reserved.
           </p>
-          <p>
-            Production engineering for AI-built software. Questions, privacy requests, or legal
-            notices may be sent to{" "}
-            <a href={`mailto:${brand.email}`} className="hover:text-purple">
-              {brand.email}
-            </a>
-            . Notices are effective when received.
-          </p>
+          <p>Production engineering for AI-built software.</p>
         </div>
       </div>
     </footer>

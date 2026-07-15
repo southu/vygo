@@ -44,7 +44,7 @@ export const pricingContent = {
         "Hardened infrastructure and authentication",
         "Automated tests and deployment pipeline",
         "Monitoring and operational runbooks",
-        "Full IP handoff under a separately executed agreement with VYGO LLC",
+        "Full IP handoff",
       ],
     },
     {
@@ -62,7 +62,7 @@ export const pricingContent = {
         "Penetration-test report and remediation",
         "Load testing and SLO dashboards",
         "SOC 2 Type I readiness program",
-        "Full IP handoff under a separately executed agreement with VYGO LLC",
+        "Full IP handoff",
       ],
     },
     {
@@ -80,14 +80,14 @@ export const pricingContent = {
         "Complex data and integration work",
         "Type II evidence program and auditor coordination",
         "ISO 27001 pathway where required",
-        "Full IP handoff under a separately executed agreement with VYGO LLC",
+        "Full IP handoff",
       ],
     },
   ],
   ops: {
     heading: "vygo Ops — after launch",
     intro:
-      "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops, operated by VYGO LLC. Ops engagements begin only under a separately executed agreement with VYGO LLC. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+      "The same team that rebuilt the product can stay accountable for uptime, security, compliance-readiness evidence, and continued feature delivery through vygo Ops.",
     plans: [
       {
         name: "Keep It Running",
