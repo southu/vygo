@@ -101,6 +101,7 @@ export function ApplyForm() {
         <div
           className="rounded-xl border border-purple/30 bg-purple-soft/40 p-5"
           role="status"
+          aria-live="polite"
           data-testid="apply-success"
           data-application-id={createdId ?? undefined}
         >
@@ -206,6 +207,7 @@ export function ApplyForm() {
             <div
               className="rounded-xl border border-red bg-red/5 p-4 text-sm text-red"
               role="alert"
+              aria-live="assertive"
               data-testid="apply-error"
             >
               {feedback}

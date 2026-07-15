@@ -45,7 +45,7 @@ describe("parseApplyBody", () => {
     }
   });
 
-  it("rejects empty full_name", () => {
+  it("rejects empty full_name with 4xx and no row id", () => {
     const result = parseApplyBody({
       full_name: "   ",
       work_email: "ratchet-tester@example.com",
@@ -54,10 +54,12 @@ describe("parseApplyBody", () => {
     if (!result.ok) {
       assert.equal(result.status, 400);
       assert.equal(result.body.error && (result.body.error as { code?: string }).code, "VALIDATION_ERROR");
+      // Invalid input must not look like a successful insert.
+      assert.equal("id" in result.body, false);
     }
   });
 
-  it("rejects implausible work_email", () => {
+  it("rejects implausible work_email with 4xx and no row id", () => {
     const result = parseApplyBody({
       full_name: "Ratchet Tester",
       work_email: "not-an-email",
@@ -65,6 +67,8 @@ describe("parseApplyBody", () => {
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.equal(result.status, 400);
+      assert.equal(result.body.error && (result.body.error as { code?: string }).code, "VALIDATION_ERROR");
+      assert.equal("id" in result.body, false);
     }
   });
 });
