@@ -10,6 +10,8 @@
   "topology": {
     "marketing": "Vercel (www.vygo.ai TLS + static export + edge functions)",
     "api": "Railway project vygo service api (Postgres-backed)",
-    "database": "Railway Postgres applications table"
-  }
+    "database": "Railway Postgres applications table",
+    "dns": "www.vygo.ai CNAME → Vercel; apex vygo.ai A → Vercel (308 to www); registrar NS domaincontrol.com"
+  },
+  "invalid_input": "POST /api/apply returns 4xx JSON (no id, no insert) for empty full_name, implausible work_email, and malformed JSON"
 }

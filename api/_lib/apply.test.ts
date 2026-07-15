@@ -4,6 +4,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { isPlausibleWorkEmail, parseApplyBody } from "./apply.js";
+import { readJsonBody } from "./http.js";
 
 describe("isPlausibleWorkEmail", () => {
   it("accepts typical work emails", () => {
@@ -53,7 +54,10 @@ describe("parseApplyBody", () => {
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.equal(result.status, 400);
-      assert.equal(result.body.error && (result.body.error as { code?: string }).code, "VALIDATION_ERROR");
+      assert.equal(
+        result.body.error && (result.body.error as { code?: string }).code,
+        "VALIDATION_ERROR",
+      );
       // Invalid input must not look like a successful insert.
       assert.equal("id" in result.body, false);
     }
@@ -67,8 +71,44 @@ describe("parseApplyBody", () => {
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.equal(result.status, 400);
-      assert.equal(result.body.error && (result.body.error as { code?: string }).code, "VALIDATION_ERROR");
+      assert.equal(
+        result.body.error && (result.body.error as { code?: string }).code,
+        "VALIDATION_ERROR",
+      );
       assert.equal("id" in result.body, false);
     }
+  });
+});
+
+describe("readJsonBody", () => {
+  it("returns ok for pre-parsed objects", () => {
+    const r = readJsonBody({ headers: {}, body: { full_name: "A" } });
+    assert.equal(r.ok, true);
+    if (r.ok) assert.deepEqual(r.value, { full_name: "A" });
+  });
+
+  it("parses valid JSON strings", () => {
+    const r = readJsonBody({ headers: {}, body: '{"full_name":"A"}' });
+    assert.equal(r.ok, true);
+  });
+
+  it("rejects malformed JSON strings without throwing", () => {
+    const r = readJsonBody({ headers: {}, body: "{malformed" });
+    assert.equal(r.ok, false);
+  });
+
+  it("rejects non-object primitives", () => {
+    assert.equal(readJsonBody({ headers: {}, body: 42 }).ok, false);
+    assert.equal(readJsonBody({ headers: {}, body: true }).ok, false);
+  });
+
+  it("treats body-access throws as malformed", () => {
+    const req = {
+      headers: {},
+      get body() {
+        throw new SyntaxError("Unexpected token");
+      },
+    };
+    assert.equal(readJsonBody(req as never).ok, false);
   });
 });

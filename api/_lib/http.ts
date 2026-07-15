@@ -78,18 +78,35 @@ export function evaluateOrigin(
 
 /**
  * Parse the request body to a JS value. Vercel pre-parses JSON bodies, but we
- * also accept a raw string (parsing it) and guard against malformed input.
+ * also accept a raw string (or Buffer) and always fail closed on malformed input
+ * — never throw (platform body-access quirks must surface as 4xx, not 500).
  */
 export function readJsonBody(req: EdgeRequest): { ok: true; value: unknown } | { ok: false } {
-  const { body } = req;
-  if (body == null) return { ok: true, value: {} };
-  if (typeof body === "string") {
-    if (body.trim() === "") return { ok: true, value: {} };
-    try {
-      return { ok: true, value: JSON.parse(body) };
-    } catch {
-      return { ok: false };
+  try {
+    let body: unknown = req.body;
+    if (body == null) return { ok: true, value: {} };
+
+    // Some runtimes surface raw bytes instead of a string.
+    if (typeof Buffer !== "undefined" && Buffer.isBuffer(body)) {
+      body = body.toString("utf8");
     }
+    if (body instanceof Uint8Array) {
+      body = new TextDecoder("utf-8").decode(body);
+    }
+
+    if (typeof body === "string") {
+      if (body.trim() === "") return { ok: true, value: {} };
+      try {
+        return { ok: true, value: JSON.parse(body) };
+      } catch {
+        return { ok: false };
+      }
+    }
+
+    // Already-parsed JSON objects / arrays. Anything else is not a JSON body.
+    if (typeof body === "object") return { ok: true, value: body };
+    return { ok: false };
+  } catch {
+    return { ok: false };
   }
-  return { ok: true, value: body };
 }

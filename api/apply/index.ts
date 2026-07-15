@@ -51,47 +51,73 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null): void {
 }
 
 async function handlePost(req: EdgeRequest): Promise<ApplyHandlerResult> {
-  const contentType = contentTypeBase(req.headers);
-  if (contentType && contentType !== "application/json") {
-    return {
-      status: 415,
-      body: {
-        error: {
-          code: "UNSUPPORTED_MEDIA_TYPE",
-          message: "Content-Type must be application/json.",
-        },
-      },
-    };
-  }
-
-  const parsedBody = readJsonBody(req);
-  if (!parsedBody.ok) {
-    return {
-      status: 400,
-      body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
-    };
-  }
-
-  const parsed = parseApplyBody(parsedBody.value);
-  if (!parsed.ok) {
-    return { status: parsed.status, body: parsed.body };
-  }
-
-  const url = resolveDatabaseUrl();
-  if (!url) {
-    return proxyApplyPost({
-      full_name: parsed.value.fullName,
-      work_email: parsed.value.workEmail,
-      product_url: parsed.value.productUrl,
-      message: parsed.value.message,
-    });
-  }
-
   try {
-    const sql = getSql(url);
-    const row = await insertApplicationRow(sql, parsed.value);
-    return { status: 201, body: row };
+    const contentType = contentTypeBase(req.headers);
+    if (contentType && contentType !== "application/json") {
+      return {
+        status: 415,
+        body: {
+          error: {
+            code: "UNSUPPORTED_MEDIA_TYPE",
+            message: "Content-Type must be application/json.",
+          },
+        },
+      };
+    }
+
+    const parsedBody = readJsonBody(req);
+    if (!parsedBody.ok) {
+      return {
+        status: 400,
+        body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+      };
+    }
+
+    const parsed = parseApplyBody(parsedBody.value);
+    if (!parsed.ok) {
+      return { status: parsed.status, body: parsed.body };
+    }
+
+    const url = resolveDatabaseUrl();
+    if (!url) {
+      return proxyApplyPost({
+        full_name: parsed.value.fullName,
+        work_email: parsed.value.workEmail,
+        product_url: parsed.value.productUrl,
+        message: parsed.value.message,
+      });
+    }
+
+    try {
+      const sql = getSql(url);
+      const row = await insertApplicationRow(sql, parsed.value);
+      return { status: 201, body: row };
+    } catch (error) {
+      return {
+        status: 500,
+        body: {
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "An unexpected error occurred. Please try again later.",
+          },
+        },
+        logError: error,
+      };
+    }
   } catch (error) {
+    // Body-access / parse failures from the platform must be client errors (4xx),
+    // not opaque 500s — malformed JSON is never an insert success path.
+    const message = error instanceof Error ? error.message : String(error);
+    const looksLikeClientBody =
+      /json|body|parse|unexpected token|content-type/i.test(message) ||
+      error instanceof SyntaxError;
+    if (looksLikeClientBody) {
+      return {
+        status: 400,
+        body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+        logError: error,
+      };
+    }
     return {
       status: 500,
       body: {
@@ -146,11 +172,25 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   } catch (error) {
     const message = error instanceof Error ? error.message : "apply handler failed";
     console.error(JSON.stringify({ event: "apply_edge_fatal", message }));
-    res.status(500).json({
+    // Platform body-parser failures (invalid JSON) must not become opaque 500s.
+    const clientBody =
+      error instanceof SyntaxError || /json|body|parse|unexpected token/i.test(message);
+    res.status(clientBody ? 400 : 500).json({
       error: {
-        code: "INTERNAL_ERROR",
-        message: "An unexpected error occurred. Please try again later.",
+        code: clientBody ? "BAD_REQUEST" : "INTERNAL_ERROR",
+        message: clientBody
+          ? "Request body must be valid JSON."
+          : "An unexpected error occurred. Please try again later.",
       },
     });
   }
 }
+
+/** Keep default JSON body parsing; handlers treat parse failures as 4xx. */
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "64kb",
+    },
+  },
+};
