@@ -35,3 +35,10 @@
 ### Summary string (`changed_to`)
 
 > The form now POSTs JSON to `POST /api/apply`. The server validates input, inserts into the Railway Postgres `applications` table, and returns the created row. `GET /api/apply/<id>` proves durable read-back. The client never writes to the database.
+
+### Live verification notes
+
+- Marketing origin: `POST https://www.vygo.ai/api/apply` (Vercel edge → Railway Postgres, direct or via API proxy).
+- Read-back: `GET https://www.vygo.ai/api/apply/<uuid>`.
+- Railway service origin (reachable default): `https://api-production-7f2d.up.railway.app/api/apply`.
+- Invalid input returns HTTP 4xx JSON with no `id` and inserts nothing.

@@ -132,6 +132,70 @@ Returned (still HTTP 200) when availability data is missing, malformed, stale
 Public responses never include database IDs, `updatedBy`, email addresses, stack
 traces, or SQL.
 
+## `POST /api/apply`
+
+Public apply-form intake for `/apply` (Full name, Work email, optional Product URL
+and message). Validates input, inserts one row into the Railway Postgres
+`applications` table, and returns the stored row. The browser posts only to this
+server endpoint — never directly to the database.
+
+> **Two deployments, one contract.** On `www.vygo.ai` this is the Vercel edge
+> function [`api/apply/index.ts`](../api/apply/index.ts). When the edge has no
+> `DATABASE_URL` it proxies server-to-server to the Railway Fastify route of the
+> same path ([`apps/api/src/routes/apply.ts`](../apps/api/src/routes/apply.ts)).
+> Audit notes: [apply-audit.md](./apply-audit.md) and `GET /apply-audit.json`.
+
+### Request body
+
+```json
+{
+  "full_name": "Ratchet Tester",
+  "work_email": "ratchet-tester@example.com",
+  "product_url": "https://example.com",
+  "message": "Optional product description"
+}
+```
+
+`full_name` / `fullName` and `work_email` / `workEmail` / `email` are accepted.
+`full_name` must be non-empty after trim. `work_email` must look like
+`local@domain.tld` (must include `@` and a domain with a dot).
+
+### Success
+
+HTTP 201:
+
+```json
+{
+  "id": "4ef82faa-2a39-4c34-8ee3-d44eb7e68a40",
+  "full_name": "Ratchet Tester",
+  "work_email": "ratchet-tester@example.com",
+  "product_url": null,
+  "message": null,
+  "source": "apply",
+  "created_at": "2026-07-15T23:10:59.424Z"
+}
+```
+
+### Validation errors
+
+HTTP 400 with no row `id` when `full_name` is empty or `work_email` is
+implausible (e.g. `not-an-email`):
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "full_name is required and must be non-empty."
+  }
+}
+```
+
+## `GET /api/apply/:id`
+
+Read-back of a stored applications row (proves durable persistence across
+independent requests). HTTP 200 with the same public row shape as POST success;
+HTTP 400 for a non-UUID id; HTTP 404 when missing.
+
 ## CORS
 
 Two classes of origin receive a reflected `Access-Control-Allow-Origin`
