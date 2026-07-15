@@ -170,6 +170,17 @@ export const homepage = {
   pricingPreview: {
     heading: "Simple engagements. Fixed prices.",
     cta: { label: ctas.reviewEngagementDetails, href: ctaHrefs.pricing },
+    /**
+     * Compact homepage callout for the focused vygo Harden offer.
+     * Distinct from Launch/Scale/Enterprise tier cards and from the method “Harden” phase.
+     */
+    hardenCallout: {
+      eyebrow: "FOR INTERNAL TOOLS",
+      headline: "Built an internal tool your team can’t rely on yet?",
+      body: "vygo Harden turns a working CRM, workflow app, dashboard, or operations tool into reliable, team-ready software without a full production rebuild",
+      offerLine: "$9,500 fixed · About two weeks · Starts with a free assessment",
+      cta: { label: "See vygo Harden", href: "/pricing#harden" },
+    },
   },
   securityPreview: {
     heading: "Security is not a handoff checklist. It is part of the build.",

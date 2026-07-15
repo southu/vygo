@@ -28,6 +28,13 @@ export const pricingContent = {
       "Some tools do not need a complete production rebuild. They need the focused engineering work required to move from “the person who built it can use it” to “the team can depend on it.”",
       "vygo Harden is a fixed-price engagement for working internal business tools with a clearly defined workflow and scope.",
     ],
+    /**
+     * Homepage callout supporting line (best-for framing). Mirrors the Launch /
+     * Scale / Enterprise “Best for …” summaries without making Harden a tier card.
+     * Derived from the Harden introduction + Good Fit criteria in this module.
+     */
+    bestFor:
+      "Best for working internal business tools with a clearly defined workflow and scope—not a major redesign or full production rebuild.",
     price: "$9,500",
     priceLabel: "$9,500 fixed",
     duration: "About two weeks",

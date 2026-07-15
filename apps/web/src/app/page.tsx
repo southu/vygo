@@ -11,6 +11,7 @@ import { CapabilityCard } from "@/components/CapabilityCard";
 import { MethodTimeline } from "@/components/MethodTimeline";
 import { AuditOfferCard } from "@/components/AuditOfferCard";
 import { EngagementCard } from "@/components/EngagementCard";
+import { HardenCallout } from "@/components/HardenCallout";
 import { OpsPlanCard } from "@/components/OpsPlanCard";
 import { FAQAccordion } from "@/components/FAQAccordion";
 
@@ -124,10 +125,10 @@ export default function HomePage() {
 
       {/* Pricing preview */}
       {commercialFlags.showPublicPricing ? (
-        <section className="section-pad">
+        <section className="section-pad" data-section="pricing-preview">
           <div className="container-page">
             <SectionHeading title={homepage.pricingPreview.heading} />
-            <div className="mt-10 grid gap-4 lg:grid-cols-3">
+            <div className="mt-10 grid gap-4 lg:grid-cols-3" data-section="engagement-tiers">
               {pricingContent.tiers.map((tier) => (
                 <EngagementCard
                   key={tier.id}
@@ -141,6 +142,10 @@ export default function HomePage() {
                 />
               ))}
             </div>
+            <HardenCallout
+              {...homepage.pricingPreview.hardenCallout}
+              bestFor={pricingContent.harden.bestFor}
+            />
             <div className="mt-8">
               <CtaLink href={homepage.pricingPreview.cta.href} variant="secondary">
                 {homepage.pricingPreview.cta.label}
