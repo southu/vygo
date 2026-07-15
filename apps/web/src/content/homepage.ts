@@ -177,7 +177,7 @@ export const homepage = {
     hardenCallout: {
       eyebrow: "FOR INTERNAL TOOLS",
       headline: "Built an internal tool your team can’t rely on yet?",
-      body: "vygo Harden turns a working CRM, workflow app, dashboard, or operations tool into reliable, team-ready software without a full production rebuild",
+      body: "vygo Harden turns a working CRM, workflow app, dashboard, or operations tool into reliable, team-ready software without a full production rebuild.",
       offerLine: "$9,500 fixed · About two weeks · Starts with a free assessment",
       cta: { label: "See vygo Harden", href: "/pricing#harden" },
     },

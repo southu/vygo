@@ -19,8 +19,17 @@ export default defineConfig({
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     {
+      name: "tablet",
+      // Harden release + site behavior must hold at mid-width viewports.
+      testMatch: /(?:site-behavior|harden-release)\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 768, height: 1024 },
+      },
+    },
+    {
       name: "mobile",
-      testMatch: /site-behavior\.spec\.ts/,
+      testMatch: /(?:site-behavior|harden-release)\.spec\.ts/,
       // Chromium + mobile viewport (avoids requiring WebKit browser binaries).
       use: { ...devices["Pixel 5"] },
     },

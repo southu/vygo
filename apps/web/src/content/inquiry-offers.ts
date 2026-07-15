@@ -37,9 +37,9 @@ export const inquiryOfferOptions: ReadonlyArray<{ value: InquiryOfferKey; label:
 export const hardenInquiryCopy = {
   inquiryName: "vygo Harden assessment",
   heading: "vygo Harden assessment",
-  body: "You are applying for a free fit assessment for vygo Harden—not the $15,000 Production Readiness Audit. We’ll review your tool and confirm whether it fits the Harden scope before you spend anything.",
+  body: "You are applying for a free fit assessment for vygo Harden—not the $15,000 Production Readiness Audit. We’ll review your tool and confirm whether it fits the vygo Harden scope before you spend anything.",
   submitLabel: "Submit free assessment",
   successHeading: "Assessment request received.",
   successBody:
-    "Thanks for applying for a free vygo Harden fit assessment. We’ll review your tool against the Harden scope and follow up with next steps. This is not an application for the $15,000 Production Readiness Audit.",
+    "Thanks for applying for a free vygo Harden fit assessment. We’ll review your tool against the vygo Harden scope and follow up with next steps. This is not an application for the $15,000 Production Readiness Audit.",
 } as const;
