@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { apiUrl } from "@/lib/api";
+import { APPLY_SUBMIT_TIMEOUT_MS } from "@/lib/apply-submit";
 import { formatOpeningDate } from "@/lib/availability";
 import { useAvailability } from "./AvailabilityProvider";
 
@@ -28,12 +29,19 @@ const SUCCESS_HEADING = "Thank you — your application is in.";
 const SUCCESS_BODY =
   "A senior engineer at VYGO reviews every application against available openings, and we'll be in touch within one business day. Keep an eye on your inbox — the note will come from our team at vygo.ai.";
 
+function isAbortError(err: unknown): boolean {
+  return (
+    (typeof DOMException !== "undefined" && err instanceof DOMException && err.name === "AbortError") ||
+    (err instanceof Error && err.name === "AbortError")
+  );
+}
+
 /**
  * Client-side apply form. Submits to POST /api/apply (server-side only writes to
  * Postgres). On 2xx, replaces the form with an inline thank-you confirmation
- * (no navigation). On non-2xx or network failure, keeps entered values and
- * shows an inline error so the applicant can retry. Disables submit while the
- * request is in flight.
+ * (no navigation). On non-2xx, network failure, or client timeout, keeps entered
+ * values and shows an inline error so the applicant can retry. Disables submit
+ * while the request is in flight; re-enables after any failure.
  */
 export function ApplyForm() {
   const { data, isBusy } = useAvailability();
@@ -63,6 +71,9 @@ export function ApplyForm() {
       message: message.trim() || null,
     };
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), APPLY_SUBMIT_TIMEOUT_MS);
+
     try {
       const res = await fetch(apiUrl("/api/apply"), {
         method: "POST",
@@ -72,6 +83,7 @@ export function ApplyForm() {
         },
         body: JSON.stringify(payload),
         credentials: "same-origin",
+        signal: controller.signal,
       });
 
       let body: ApplySuccessBody & ApplyErrorBody = {};
@@ -95,9 +107,15 @@ export function ApplyForm() {
           : "Something went wrong. Please try again or email hello@vygo.ai.");
       setStatus("error");
       setFeedback(errorMessage);
-    } catch {
+    } catch (err) {
       setStatus("error");
-      setFeedback("Network error. Please check your connection and try again.");
+      setFeedback(
+        isAbortError(err)
+          ? "The request timed out. Please try again."
+          : "Network error. Please check your connection and try again.",
+      );
+    } finally {
+      clearTimeout(timer);
     }
   };
 

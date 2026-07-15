@@ -1,11 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { APPLY_SUBMIT_TIMEOUT_MS } from "../src/lib/apply-submit";
 import { mockAvailability } from "./helpers";
 
 /**
  * Locks the /apply form submit flow: posts only to the server-side /api/apply
  * endpoint, shows inline thank-you confirmation on 2xx (no navigation), and
- * shows an error on 4xx while preserving entered values. Client never embeds
- * DB credentials (asserted against page source + JS).
+ * shows an error on 4xx / network / client timeout while preserving entered
+ * values. Client never embeds DB credentials (asserted against page source + JS).
  */
 test.describe("Apply form persistence UI", () => {
   test.beforeEach(async ({ page }) => {
@@ -87,6 +88,46 @@ test.describe("Apply form persistence UI", () => {
     await expect(page).toHaveURL(/\/apply\/?$/);
   });
 
+  test("delayed 2xx still shows thank-you only after response arrives", async ({ page }) => {
+    const createdId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    await page.route("**/api/apply", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      // Delay within the client timeout window — success must still win.
+      await new Promise((r) => setTimeout(r, 800));
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: createdId,
+          full_name: "Ratchet Tester",
+          work_email: "ratchet-tester@example.com",
+          product_url: null,
+          message: null,
+          source: "apply",
+          created_at: new Date().toISOString(),
+        }),
+      });
+    });
+
+    await page.goto("/apply");
+    await page.getByTestId("apply-full-name").fill("Ratchet Tester");
+    await page.getByTestId("apply-work-email").fill("ratchet-tester@example.com");
+    await page.getByTestId("apply-submit").click();
+
+    await expect(page.getByTestId("apply-submit")).toBeDisabled();
+    await expect(page.getByTestId("apply-submit")).toHaveText(/Submitting/i);
+    await expect(page.getByTestId("apply-success")).toBeVisible();
+    await expect(page.getByTestId("apply-success")).toHaveAttribute(
+      "data-application-id",
+      createdId,
+    );
+    await expect(page.getByTestId("apply-error")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/apply\/?$/);
+  });
+
   test("4xx response shows visible error and keeps form values", async ({ page }) => {
     await page.route("**/api/apply", async (route) => {
       if (route.request().method() !== "POST") {
@@ -120,6 +161,33 @@ test.describe("Apply form persistence UI", () => {
     await expect(page.getByTestId("apply-work-email")).toHaveValue("not-an-email");
     await expect(page.getByTestId("apply-product-url")).toHaveValue("https://example.com");
     // Submit re-enabled after failure.
+    await expect(page.getByTestId("apply-submit")).toBeEnabled();
+  });
+
+  test("rejected network shows error, keeps values, re-enables submit", async ({ page }) => {
+    await page.route("**/api/apply", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      await route.abort("failed");
+    });
+
+    await page.goto("/apply");
+    await page.getByTestId("apply-full-name").fill("Ratchet Tester");
+    await page.getByTestId("apply-work-email").fill("ratchet-tester@example.com");
+    await page.getByTestId("apply-product-url").fill("https://example.com/product");
+    await page.getByTestId("apply-message").fill("Ship AI feature X");
+    await page.getByTestId("apply-submit").click();
+
+    await expect(page.getByTestId("apply-error")).toBeVisible();
+    await expect(page.getByTestId("apply-error")).toContainText(/network|try again/i);
+    await expect(page.getByTestId("apply-success")).toHaveCount(0);
+    await expect(page.getByTestId("apply-form")).toBeVisible();
+    await expect(page.getByTestId("apply-full-name")).toHaveValue("Ratchet Tester");
+    await expect(page.getByTestId("apply-work-email")).toHaveValue("ratchet-tester@example.com");
+    await expect(page.getByTestId("apply-product-url")).toHaveValue("https://example.com/product");
+    await expect(page.getByTestId("apply-message")).toHaveValue("Ship AI feature X");
     await expect(page.getByTestId("apply-submit")).toBeEnabled();
   });
 
@@ -158,6 +226,48 @@ test.describe("Apply form persistence UI", () => {
     await expect(page.getByTestId("apply-error")).toBeVisible();
     await expect(page.getByTestId("apply-submit")).toBeEnabled();
     await expect(page.getByTestId("apply-success")).toHaveCount(0);
+  });
+
+  test("never-settling submit times out: error, form intact, button re-enabled", async ({
+    page,
+  }) => {
+    test.setTimeout(APPLY_SUBMIT_TIMEOUT_MS + 30_000);
+
+    // Hold the POST pending indefinitely — client abort must recover the UI.
+    await page.route("**/api/apply", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      await new Promise(() => {
+        /* never settle */
+      });
+    });
+
+    await page.goto("/apply");
+    await page.getByTestId("apply-full-name").fill("Ratchet Tester");
+    await page.getByTestId("apply-work-email").fill("ratchet-tester@example.com");
+    await page.getByTestId("apply-product-url").fill("https://example.com");
+    await page.getByTestId("apply-message").fill("Need production readiness review");
+    await page.getByTestId("apply-submit").click();
+
+    await expect(page.getByTestId("apply-submit")).toBeDisabled();
+    await expect(page.getByTestId("apply-submit")).toHaveText(/Submitting/i);
+
+    await expect(page.getByTestId("apply-error")).toBeVisible({
+      timeout: APPLY_SUBMIT_TIMEOUT_MS + 5_000,
+    });
+    await expect(page.getByTestId("apply-error")).toContainText(/timed out|try again/i);
+    await expect(page.getByTestId("apply-success")).toHaveCount(0);
+    await expect(page.getByTestId("apply-form")).toBeVisible();
+    await expect(page.getByTestId("apply-full-name")).toHaveValue("Ratchet Tester");
+    await expect(page.getByTestId("apply-work-email")).toHaveValue("ratchet-tester@example.com");
+    await expect(page.getByTestId("apply-product-url")).toHaveValue("https://example.com");
+    await expect(page.getByTestId("apply-message")).toHaveValue(
+      "Need production readiness review",
+    );
+    await expect(page.getByTestId("apply-submit")).toBeEnabled();
+    await expect(page).toHaveURL(/\/apply\/?$/);
   });
 
   test("page source and served scripts do not embed database credentials", async ({
