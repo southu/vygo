@@ -52,12 +52,18 @@ export {
   logReadinessLead,
   enqueueReadinessPromptEmail,
   purgeExpiredReadinessSubmissions,
+  listReadinessQuestionBank,
+  findLatestSubmissionBySessionToken,
+  appendSubmissionDiscrepancyFlags,
+  seedReadinessFollowupQuestions,
   type ReadinessSessionPublic,
   type CreateReadinessSessionInput,
   type PatchReadinessSessionInput,
   type InsertReadinessSubmissionInput,
   type LogReadinessLeadInput,
   type EnqueueReadinessPromptEmailInput,
+  type ReadinessQuestionBankRow,
+  type ReadinessSubmissionPublic,
 } from "./readiness-sessions.js";
 export {
   OUTBOX_KINDS,

@@ -1,27 +1,42 @@
 /**
- * Shared edge handler for readiness POST actions (Hobby function budget):
+ * Shared edge handler for readiness POST/GET actions (Hobby function budget):
  *   POST /api/readiness/lead
  *   POST /api/readiness/email-prompt
  *   POST /api/readiness/parse
+ *   POST /api/readiness/followups
+ *   POST /api/readiness/followups/answer  (op: followups-answer)
+ *   GET  /api/readiness/submission
  *
- * One Vercel serverless function covers all three paths so we stay under the
+ * One Vercel serverless function covers these paths so we stay under the
  * 12-function Hobby limit. Rewrites from /v1/readiness/* still apply.
  *
- * Prefer Railway Fastify when live; fall back to session-draft / mock paths.
- * Never returns secrets. Browser traffic is same-origin on www.vygo.ai only.
+ * Prefer Railway Fastify when live; fall back to deterministic edge parse +
+ * session-draft persistence. Never returns secrets. Browser traffic is
+ * same-origin on www.vygo.ai only.
  */
 import postgres from "postgres";
 import type { Sql } from "postgres";
+import { createHash } from "node:crypto";
 import {
   logLeadRow,
   proxyEmailPrompt,
+  proxyFollowups,
+  proxyFollowupsAnswer,
   proxyGetSession,
+  proxyGetSubmission,
   proxyLogLead,
   proxyParsePaste,
   proxyPatchSession,
   resolveDatabaseUrl,
+  resolveEdgeClientIp,
   type ReadinessHandlerResult,
 } from "../_lib/readiness.js";
+import {
+  edgeDetectDiscrepancies,
+  edgeParsePaste,
+  edgeRedactSecrets,
+  edgeSelectFollowups,
+} from "../_lib/readiness-stage34.js";
 import {
   contentTypeBase,
   evaluateOrigin,
@@ -32,7 +47,19 @@ import {
 } from "../_lib/http.js";
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
-const ALLOWED_OPS = new Set(["lead", "email-prompt", "parse"]);
+const ALLOWED_OPS = new Set([
+  "lead",
+  "email-prompt",
+  "parse",
+  "followups",
+  "followups-answer",
+  "submission",
+]);
+
+/** Shared readiness edge rate-limit budget (aligns with Railway ~20/60s). */
+const rlBuckets = new Map<string, { count: number; expiresAt: number }>();
+const RL_LIMIT = 20;
+const RL_WINDOW_MS = 60 * 1000;
 
 let cachedSql: Sql | null = null;
 let cachedUrl: string | null = null;
@@ -48,6 +75,74 @@ function getSql(url: string): Sql {
     cachedUrl = url;
   }
   return cachedSql;
+}
+
+function checkEdgeRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterSeconds: number } {
+  const raw = resolveEdgeClientIp(req.headers) || "unknown";
+  const ipPart = createHash("sha256").update(String(raw)).digest("hex").slice(0, 32);
+  const shard = raw === "unknown" ? Math.floor(Date.now() / RL_WINDOW_MS) : 0;
+  const key = `readiness:ops:${ipPart}:t${shard}`;
+  const now = Date.now();
+  const existing = rlBuckets.get(key);
+  if (!existing || existing.expiresAt <= now) {
+    rlBuckets.set(key, { count: 1, expiresAt: now + RL_WINDOW_MS });
+    if (rlBuckets.size > 500) {
+      for (const [k, v] of rlBuckets) {
+        if (v.expiresAt <= now) rlBuckets.delete(k);
+      }
+    }
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+  existing.count += 1;
+  if (existing.count > RL_LIMIT) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((existing.expiresAt - now) / 1000)),
+    };
+  }
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+function rateLimitedResult(retryAfterSeconds: number): ReadinessHandlerResult {
+  return {
+    status: 429,
+    body: {
+      error: {
+        code: "RATE_LIMITED",
+        message: "Too many attempts. Please try again later.",
+      },
+    },
+    retryAfterSeconds,
+  };
+}
+
+async function ensureSubmissionTables(sql: Sql): Promise<void> {
+  await sql`
+    CREATE TABLE IF NOT EXISTS readiness_submissions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      session_id uuid,
+      parsed_report jsonb,
+      raw_paste_redacted text,
+      scores jsonb,
+      bucket text,
+      discrepancy_flags jsonb DEFAULT '[]'::jsonb NOT NULL,
+      contact jsonb,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      retention_expires_at timestamp with time zone DEFAULT (now() + interval '90 days') NOT NULL
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS readiness_question_bank (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      question_key text NOT NULL,
+      prompt text NOT NULL,
+      category text DEFAULT 'general' NOT NULL,
+      sort_order integer DEFAULT 0 NOT NULL,
+      active boolean DEFAULT true NOT NULL,
+      metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
 }
 
 function applyBaseHeaders(res: EdgeResponse, origin: string | null): void {
@@ -350,152 +445,33 @@ async function handleEmailPrompt(req: EdgeRequest): Promise<ReadinessHandlerResu
 }
 
 // ---------------------------------------------------------------------------
-// parse (Stage 3 paste-back)
+// parse (Stage 3 paste-back) + followups (Stage 4) + submission read-back
 // ---------------------------------------------------------------------------
 
-function edgeScanHasSecrets(text: string): { dirty: boolean; lines: number[] } {
-  const patterns: RegExp[] = [
-    /\bsk[-_](?:live|test|proj|ant)?[-_]?[A-Za-z0-9]{16,}\b/,
-    /\bAKIA[0-9A-Z]{16}\b/,
-    /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/,
-    /\bpostgres(?:ql)?:\/\/[^/\s"'`]+:[^@\s"'`]+@/i,
-    /-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----/,
-    /\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client_secret)\s*[:=]\s*['"]?[A-Za-z0-9_\-+/=]{16,}['"]?/i,
-  ];
-  const lines: number[] = [];
-  const parts = text.replace(/\r\n/g, "\n").split("\n");
-  parts.forEach((line, idx) => {
-    for (const re of patterns) {
-      re.lastIndex = 0;
-      if (re.test(line)) {
-        lines.push(idx + 1);
-        break;
-      }
-    }
-  });
-  return { dirty: lines.length > 0, lines };
-}
-
-function edgeRedact(raw: string): string {
-  let out = raw;
-  out = out.replace(
-    /\b((?:postgres|postgresql|mysql|mongodb(?:\+srv)?|redis|amqp|rediss):\/\/)[^\s"'`]+/gi,
-    "$1[REDACTED]",
-  );
-  out = out.replace(/\bsk[-_](?:live|test|proj|ant)?[-_]?[A-Za-z0-9]{16,}\b/g, "[REDACTED]");
-  out = out.replace(/\bAKIA[0-9A-Z]{16}\b/g, "[REDACTED]");
-  out = out.replace(
-    /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
-    "[REDACTED]",
-  );
-  out = out.replace(
-    /-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----/g,
-    "[REDACTED PRIVATE KEY]",
-  );
-  out = out.replace(
-    /\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client_secret)\s*[:=]\s*['"]?[A-Za-z0-9_\-+/=]{16,}['"]?/gi,
-    "[REDACTED]",
-  );
-  return out;
-}
-
-function edgePartialReport(text: string): Record<string, unknown> {
-  const fields: Record<string, unknown> = {};
-  const known = new Set([
-    "summary",
-    "languages",
-    "size",
-    "structure",
-    "frontend",
-    "backend",
-    "database",
-    "tenancy",
-    "auth",
-    "authorization",
-    "row_level_security",
-    "environments",
-    "deploys",
-    "tests",
-    "background_jobs",
-    "integrations",
-    "secrets_pattern",
-    "logging",
-    "error_handling",
-    "pii_categories",
-    "api_surface",
-    "fragility_flags",
-    "confidence",
-  ]);
-  for (const line of text.replace(/\r\n/g, "\n").split("\n")) {
-    const trimmed = line.trim();
-    if (
-      !trimmed ||
-      trimmed.startsWith("#") ||
-      trimmed.startsWith("===") ||
-      trimmed.startsWith("```")
-    ) {
-      continue;
-    }
-    const colon = trimmed.indexOf(":");
-    if (colon <= 0) continue;
-    const key = trimmed.slice(0, colon).trim();
-    const value = trimmed.slice(colon + 1).trim();
-    if (!known.has(key) || !value) continue;
-    fields[key] = value;
-  }
-  return fields;
-}
-
-function edgeFindings(report: Record<string, unknown>): string[] {
-  const order: [string, string][] = [
-    ["Auth", "auth"],
-    ["Database", "database"],
-    ["Deploy", "deploys"],
-    ["Tests", "tests"],
-    ["Tenancy", "tenancy"],
-    ["Secrets", "secrets_pattern"],
-    ["Frontend", "frontend"],
-    ["Backend", "backend"],
-  ];
-  const out: string[] = [];
-  for (const [label, key] of order) {
-    const v = report[key];
-    if (typeof v === "string" && v.trim() && v.toUpperCase() !== "UNKNOWN") {
-      out.push(`${label}: ${v.trim()}`);
-    }
-    if (out.length >= 6) break;
-  }
-  return out;
-}
-
-function edgeStack(report: Record<string, unknown>): string {
-  const parts = [report.languages, report.frontend, report.backend]
-    .filter(
-      (p): p is string =>
-        typeof p === "string" && p.trim().length > 0 && p.toUpperCase() !== "UNKNOWN",
-    )
-    .map((p) => p.trim());
-  return parts.length > 0 ? [...new Set(parts)].join(" · ") : "Not yet determined";
-}
-
-function edgeSize(report: Record<string, unknown>): string {
-  const size = typeof report.size === "string" ? report.size.trim() : "";
-  return size && size.toUpperCase() !== "UNKNOWN" ? size : "Not yet determined";
-}
-
-async function parseViaSessionDraft(
+async function persistParseResult(
   token: string,
-  paste: string,
+  parsed: ReturnType<typeof edgeParsePaste>,
   req: EdgeRequest,
 ): Promise<ReadinessHandlerResult> {
-  const redacted = edgeRedact(paste).slice(0, 50_000);
-  const report = edgePartialReport(paste);
-  const parseStatus = Object.keys(report).length > 0 ? "partial" : "pending";
-  const stack = edgeStack(report);
-  const size = edgeSize(report);
-  const findings = edgeFindings(report);
+  if (parsed.didRedact) {
+    console.info(
+      JSON.stringify({
+        event: "readiness_paste_redacted",
+        hitCount: parsed.hitCount,
+        // Never log secret values — count only.
+      }),
+    );
+  }
 
+  const stage = parsed.routeToManual ? "manual" : "confirm";
   const existing = await proxyGetSession(token, process.env, req.headers);
+  if (existing.status === 404) {
+    return {
+      status: 404,
+      body: { error: { code: "NOT_FOUND", message: "Session not found." } },
+    };
+  }
+
   const baseDraft =
     existing.status >= 200 &&
     existing.status < 300 &&
@@ -505,57 +481,83 @@ async function parseViaSessionDraft(
       ? { ...(existing.body.draft as Record<string, unknown>) }
       : {};
 
+  let submissionId: string | null = null;
+  const dbUrl = resolveDatabaseUrl();
+  if (dbUrl) {
+    try {
+      const sql = getSql(dbUrl);
+      await ensureSubmissionTables(sql);
+      const sessions = await sql<{ id: string }[]>`
+        SELECT id FROM readiness_sessions WHERE token = ${token} LIMIT 1
+      `;
+      const sessionId = sessions[0]?.id ?? null;
+      const rows = await sql<{ id: string }[]>`
+        INSERT INTO readiness_submissions (
+          session_id, parsed_report, raw_paste_redacted, bucket, discrepancy_flags, contact
+        ) VALUES (
+          ${sessionId},
+          ${sql.json(parsed.report as never)},
+          ${parsed.redacted},
+          ${`paste:${parsed.parseStatus}`},
+          ${sql.json([] as never)},
+          ${sql.json({
+            source: "readiness_paste",
+            parseStatus: parsed.parseStatus,
+            routeToManual: parsed.routeToManual,
+            redacted: parsed.didRedact,
+          } as never)}
+        )
+        RETURNING id
+      `;
+      submissionId = rows[0]?.id ?? null;
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "readiness_submission_insert_edge_failed",
+          message: error instanceof Error ? error.message : "insert failed",
+        }),
+      );
+    }
+  }
+
   const draft = {
     ...baseDraft,
-    pasteText: redacted,
+    pasteText: parsed.redacted,
+    rawPasteRedacted: parsed.redacted,
     source: "paste",
-    report,
-    parseStatus,
+    report: parsed.report,
+    parseStatus: parsed.parseStatus,
+    routeToManual: parsed.routeToManual,
     parseUpdatedAt: new Date().toISOString(),
+    redaction: { didRedact: parsed.didRedact, hitCount: parsed.hitCount },
+    submissionId,
+    discrepancyFlags: Array.isArray(baseDraft.discrepancyFlags) ? baseDraft.discrepancyFlags : [],
   };
 
-  const patched = await proxyPatchSession(
-    token,
-    { stage: "confirm", draft },
-    process.env,
-    req.headers,
-  );
-
-  if (patched.status >= 200 && patched.status < 300) {
-    return {
-      status: 200,
-      body: {
-        token,
-        stage: "confirm",
-        parseStatus,
-        stack,
-        size,
-        findings,
-        report,
-        draft: patched.body.draft ?? draft,
-        path: "session_draft",
-      },
-    };
-  }
+  const patched = await proxyPatchSession(token, { stage, draft }, process.env, req.headers);
 
   return {
     status: 200,
     body: {
       token,
-      stage: "confirm",
-      parseStatus: "pending",
-      stack: "Not yet determined",
-      size: "Not yet determined",
-      findings: [],
-      report: {},
-      draft,
-      path: "edge_pending",
-      note: "Parse endpoint pending — draft saved locally when possible.",
+      stage: patched.status >= 200 && patched.status < 300 ? stage : stage,
+      parseStatus: parsed.parseStatus,
+      routeToManual: parsed.routeToManual,
+      stack: parsed.stack,
+      size: parsed.size,
+      findings: parsed.findings,
+      report: parsed.report,
+      submissionId,
+      draft: patched.status >= 200 && patched.status < 300 ? (patched.body.draft ?? draft) : draft,
+      path: "edge_deterministic",
     },
   };
 }
 
 async function handleParse(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
   const contentType = contentTypeBase(req.headers);
   if (contentType && contentType !== "application/json") {
     return {
@@ -596,40 +598,396 @@ async function handleParse(req: EdgeRequest): Promise<ReadinessHandlerResult> {
     };
   }
 
-  const scan = edgeScanHasSecrets(paste);
-  if (scan.dirty) {
-    return {
-      status: 400,
-      body: {
-        error: { code: "SECRETS_DETECTED", message: "Remove secrets before submitting." },
-        lines: scan.lines,
-      },
-    };
-  }
-
+  // Prefer Railway when the route exists; pass-through 429 / 400 validation.
   const upstream = await proxyParsePaste({ token, paste }, process.env, req.headers);
   if (upstream.status >= 200 && upstream.status < 300) {
     return upstream;
   }
-  if (upstream.status === 400 || upstream.status === 404) {
+  if (upstream.status === 429) {
+    return {
+      status: 429,
+      body: upstream.body,
+      retryAfterSeconds: upstream.retryAfterSeconds ?? 60,
+    };
+  }
+  if (upstream.status === 400) {
     const code = (upstream.body.error as { code?: string } | undefined)?.code;
-    if (code === "SECRETS_DETECTED" || code === "VALIDATION_ERROR" || code === "NOT_FOUND") {
-      return upstream;
+    // Upstream still rejects secrets — fall through to edge redact-and-accept.
+    if (code === "VALIDATION_ERROR") return upstream;
+    if (code === "NOT_FOUND") return upstream;
+  }
+  if (upstream.status === 404) {
+    const code = (upstream.body.error as { code?: string } | undefined)?.code;
+    if (code === "NOT_FOUND") {
+      // Session missing on Railway — surface it.
+      // Route-not-found from Fastify uses message "Route POST:..." without our code.
+      if (typeof upstream.body.error === "object" && upstream.body.error) {
+        const msg = String((upstream.body.error as { message?: string }).message || "");
+        if (msg.includes("Session not found")) return upstream;
+      }
     }
   }
 
-  if (
-    upstream.status === 404 ||
-    upstream.status === 405 ||
-    upstream.status === 501 ||
-    upstream.status === 502 ||
-    upstream.status === 503 ||
-    upstream.status >= 500
-  ) {
-    return parseViaSessionDraft(token, paste, req);
+  // Edge deterministic parse: redact secrets (accept), never 5xx for sloppy input.
+  const parsed = edgeParsePaste(paste);
+  return persistParseResult(token, parsed, req);
+}
+
+async function handleFollowups(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const contentType = contentTypeBase(req.headers);
+  if (contentType && contentType !== "application/json") {
+    return {
+      status: 415,
+      body: {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "Content-Type must be application/json.",
+        },
+      },
+    };
   }
 
-  return parseViaSessionDraft(token, paste, req);
+  const parsedBody = readJsonBody(req);
+  if (!parsedBody.ok) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+    };
+  }
+  const body = (parsedBody.value ?? {}) as Record<string, unknown>;
+  const token = typeof body.token === "string" ? body.token.trim().slice(0, 128) : "";
+  if (!token || !TOKEN_RE.test(token)) {
+    return {
+      status: 400,
+      body: {
+        error: { code: "VALIDATION_ERROR", message: "A valid session token is required." },
+      },
+    };
+  }
+
+  const upstream = await proxyFollowups({ token, report: body.report }, process.env, req.headers);
+  if (upstream.status >= 200 && upstream.status < 300) return upstream;
+  if (upstream.status === 429) {
+    return {
+      status: 429,
+      body: upstream.body,
+      retryAfterSeconds: upstream.retryAfterSeconds ?? 60,
+    };
+  }
+
+  const session = await proxyGetSession(token, process.env, req.headers);
+  if (session.status === 404) {
+    return {
+      status: 404,
+      body: { error: { code: "NOT_FOUND", message: "Session not found." } },
+    };
+  }
+  const draft =
+    session.body.draft &&
+    typeof session.body.draft === "object" &&
+    !Array.isArray(session.body.draft)
+      ? (session.body.draft as Record<string, unknown>)
+      : {};
+  const report =
+    draft.report && typeof draft.report === "object" && !Array.isArray(draft.report)
+      ? (draft.report as Record<string, unknown>)
+      : body.report && typeof body.report === "object" && !Array.isArray(body.report)
+        ? (body.report as Record<string, unknown>)
+        : {};
+
+  const questions = edgeSelectFollowups(report);
+  return {
+    status: 200,
+    body: {
+      token,
+      source: "readiness_question_bank",
+      questions,
+      path: "edge_seed",
+    },
+  };
+}
+
+async function handleFollowupsAnswer(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const contentType = contentTypeBase(req.headers);
+  if (contentType && contentType !== "application/json") {
+    return {
+      status: 415,
+      body: {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "Content-Type must be application/json.",
+        },
+      },
+    };
+  }
+
+  const parsedBody = readJsonBody(req);
+  if (!parsedBody.ok) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+    };
+  }
+  const body = (parsedBody.value ?? {}) as Record<string, unknown>;
+  const token = typeof body.token === "string" ? body.token.trim().slice(0, 128) : "";
+  const answers =
+    body.answers && typeof body.answers === "object" && !Array.isArray(body.answers)
+      ? (body.answers as Record<string, unknown>)
+      : null;
+  if (!token || !TOKEN_RE.test(token)) {
+    return {
+      status: 400,
+      body: {
+        error: { code: "VALIDATION_ERROR", message: "A valid session token is required." },
+      },
+    };
+  }
+  if (!answers || Object.keys(answers).length === 0) {
+    return {
+      status: 400,
+      body: { error: { code: "VALIDATION_ERROR", message: "answers are required." } },
+    };
+  }
+
+  const upstream = await proxyFollowupsAnswer({ token, answers }, process.env, req.headers);
+  if (upstream.status >= 200 && upstream.status < 300) return upstream;
+  if (upstream.status === 429) {
+    return {
+      status: 429,
+      body: upstream.body,
+      retryAfterSeconds: upstream.retryAfterSeconds ?? 60,
+    };
+  }
+
+  const session = await proxyGetSession(token, process.env, req.headers);
+  if (session.status === 404) {
+    return {
+      status: 404,
+      body: { error: { code: "NOT_FOUND", message: "Session not found." } },
+    };
+  }
+  const draft =
+    session.body.draft &&
+    typeof session.body.draft === "object" &&
+    !Array.isArray(session.body.draft)
+      ? { ...(session.body.draft as Record<string, unknown>) }
+      : {};
+  const report =
+    draft.report && typeof draft.report === "object" && !Array.isArray(draft.report)
+      ? (draft.report as Record<string, unknown>)
+      : {};
+
+  const flags = edgeDetectDiscrepancies(report, answers);
+  const prior = Array.isArray(draft.discrepancyFlags) ? draft.discrepancyFlags : [];
+  draft.discrepancyFlags = [...prior, ...flags];
+  draft.followupAnswers = { ...(draft.followupAnswers as object | undefined), ...answers };
+  draft.followupUpdatedAt = new Date().toISOString();
+
+  await proxyPatchSession(token, { stage: "followups", draft }, process.env, req.headers);
+
+  // Optional DB write when edge has DATABASE_URL.
+  const dbUrl = resolveDatabaseUrl();
+  if (dbUrl) {
+    try {
+      const sql = getSql(dbUrl);
+      await ensureSubmissionTables(sql);
+      const sessions = await sql<{ id: string }[]>`
+        SELECT id FROM readiness_sessions WHERE token = ${token} LIMIT 1
+      `;
+      const sessionId = sessions[0]?.id ?? null;
+      if (sessionId) {
+        const existing = await sql<{ id: string; discrepancy_flags: unknown }[]>`
+          SELECT id, discrepancy_flags FROM readiness_submissions
+          WHERE session_id = ${sessionId}
+          ORDER BY created_at DESC LIMIT 1
+        `;
+        if (existing[0]) {
+          const merged = [
+            ...(Array.isArray(existing[0].discrepancy_flags)
+              ? (existing[0].discrepancy_flags as unknown[])
+              : []),
+            ...flags,
+          ];
+          await sql`
+            UPDATE readiness_submissions
+            SET discrepancy_flags = ${sql.json(merged as never)}
+            WHERE id = ${existing[0].id}
+          `;
+        } else {
+          await sql`
+            INSERT INTO readiness_submissions (
+              session_id, parsed_report, raw_paste_redacted, bucket, discrepancy_flags, contact
+            ) VALUES (
+              ${sessionId},
+              ${sql.json(report as never)},
+              ${typeof draft.rawPasteRedacted === "string" ? draft.rawPasteRedacted : null},
+              ${"followups"},
+              ${sql.json(flags as never)},
+              ${sql.json({ source: "readiness_followups", answers } as never)}
+            )
+          `;
+        }
+      }
+    } catch {
+      // draft is source of truth
+    }
+  }
+
+  // User-facing body omits discrepancy flags.
+  return {
+    status: 200,
+    body: {
+      token,
+      accepted: true,
+      stage: "followups",
+      savedKeys: Object.keys(answers),
+      path: "edge_draft",
+    },
+  };
+}
+
+async function handleSubmissionGet(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  let token = "";
+  try {
+    const url = String((req as EdgeRequest & { url?: string }).url || "");
+    const q = url.includes("?") ? new URL(url, "https://www.vygo.ai").searchParams : null;
+    token = q?.get("token")?.trim().slice(0, 128) || "";
+  } catch {
+    token = "";
+  }
+  // Vercel may also put query on req.query
+  const qObj = (req as EdgeRequest & { query?: Record<string, string | string[]> }).query;
+  if (!token && qObj?.token) {
+    const raw = Array.isArray(qObj.token) ? qObj.token[0] : qObj.token;
+    token = typeof raw === "string" ? raw.trim().slice(0, 128) : "";
+  }
+
+  if (!token || !TOKEN_RE.test(token)) {
+    return {
+      status: 400,
+      body: {
+        error: { code: "VALIDATION_ERROR", message: "A valid session token is required." },
+      },
+    };
+  }
+
+  const upstream = await proxyGetSubmission(token, process.env, req.headers);
+  if (upstream.status >= 200 && upstream.status < 300) return upstream;
+  if (upstream.status === 429) {
+    return {
+      status: 429,
+      body: upstream.body,
+      retryAfterSeconds: upstream.retryAfterSeconds ?? 60,
+    };
+  }
+
+  // Edge read-back from session draft (+ optional DB).
+  const session = await proxyGetSession(token, process.env, req.headers);
+  if (session.status === 404) {
+    return {
+      status: 404,
+      body: { error: { code: "NOT_FOUND", message: "Session not found." } },
+    };
+  }
+  const draft =
+    session.body.draft &&
+    typeof session.body.draft === "object" &&
+    !Array.isArray(session.body.draft)
+      ? (session.body.draft as Record<string, unknown>)
+      : {};
+
+  type SubmissionRow = {
+    id: string;
+    parsed_report: unknown;
+    raw_paste_redacted: string | null;
+    discrepancy_flags: unknown;
+    bucket: string | null;
+    contact: unknown;
+    created_at: Date | string;
+  };
+  let dbRow: SubmissionRow | null = null;
+  const dbUrl = resolveDatabaseUrl();
+  if (dbUrl) {
+    try {
+      const sql = getSql(dbUrl);
+      await ensureSubmissionTables(sql);
+      const sessions = await sql<{ id: string }[]>`
+        SELECT id FROM readiness_sessions WHERE token = ${token} LIMIT 1
+      `;
+      const sessionId = sessions[0]?.id;
+      if (sessionId) {
+        const rows = await sql<SubmissionRow[]>`
+          SELECT id, parsed_report, raw_paste_redacted, discrepancy_flags, bucket, contact, created_at
+          FROM readiness_submissions
+          WHERE session_id = ${sessionId}
+          ORDER BY created_at DESC
+          LIMIT 1
+        `;
+        dbRow = rows[0] ?? null;
+      }
+    } catch {
+      dbRow = null;
+    }
+  }
+
+  const rawPaste =
+    dbRow?.raw_paste_redacted ||
+    (typeof draft.rawPasteRedacted === "string" ? draft.rawPasteRedacted : null) ||
+    (typeof draft.pasteText === "string" ? draft.pasteText : null);
+
+  if (!dbRow && !draft.report && !rawPaste) {
+    return {
+      status: 404,
+      body: { error: { code: "NOT_FOUND", message: "Submission not found." } },
+    };
+  }
+
+  const discrepancyFlags = dbRow
+    ? Array.isArray(dbRow.discrepancy_flags)
+      ? dbRow.discrepancy_flags
+      : []
+    : Array.isArray(draft.discrepancyFlags)
+      ? draft.discrepancyFlags
+      : [];
+
+  // Re-redact as a hard guard so API read-back never echoes planted secrets.
+  const finalPaste = rawPaste ? edgeRedactSecrets(rawPaste).redacted : null;
+
+  return {
+    status: 200,
+    body: {
+      id:
+        dbRow?.id ||
+        (typeof draft.submissionId === "string"
+          ? draft.submissionId
+          : `draft:${token.slice(0, 8)}`),
+      token,
+      parsedReport:
+        (dbRow?.parsed_report as Record<string, unknown> | null) ||
+        (draft.report as Record<string, unknown> | null) ||
+        null,
+      rawPasteRedacted: finalPaste,
+      discrepancyFlags,
+      bucket: dbRow?.bucket || (typeof draft.bucket === "string" ? draft.bucket : null),
+      contact: (dbRow?.contact as Record<string, unknown> | null) || null,
+      createdAt:
+        dbRow?.created_at instanceof Date
+          ? dbRow.created_at.toISOString()
+          : typeof dbRow?.created_at === "string"
+            ? dbRow.created_at
+            : new Date().toISOString(),
+      path: dbRow ? "edge_db" : "edge_draft",
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -644,7 +1002,7 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   if (req.method === "OPTIONS") {
     if (origin && allowed) {
       applyBaseHeaders(res, origin);
-      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
       res.setHeader("Access-Control-Max-Age", "600");
     }
@@ -653,12 +1011,6 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   }
 
   applyBaseHeaders(res, origin && allowed ? origin : null);
-
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST, OPTIONS");
-    res.status(405).json({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." } });
-    return;
-  }
 
   if (origin && !allowed) {
     res
@@ -674,16 +1026,44 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     return;
   }
 
+  // submission is GET; all other ops are POST
+  if (op === "submission") {
+    if (req.method !== "GET") {
+      res.setHeader("Allow", "GET, OPTIONS");
+      res
+        .status(405)
+        .json({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." } });
+      return;
+    }
+  } else if (req.method !== "POST") {
+    res.setHeader("Allow", "POST, OPTIONS");
+    res.status(405).json({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." } });
+    return;
+  }
+
   try {
     let result: ReadinessHandlerResult;
     if (op === "lead") {
       result = await handleLead(req);
     } else if (op === "email-prompt") {
       result = await handleEmailPrompt(req);
-    } else {
+    } else if (op === "parse") {
       result = await handleParse(req);
+    } else if (op === "followups") {
+      result = await handleFollowups(req);
+    } else if (op === "followups-answer") {
+      result = await handleFollowupsAnswer(req);
+    } else {
+      result = await handleSubmissionGet(req);
     }
 
+    if (result.status === 429) {
+      const retryAfter =
+        typeof result.retryAfterSeconds === "number" && result.retryAfterSeconds > 0
+          ? result.retryAfterSeconds
+          : Math.ceil(RL_WINDOW_MS / 1000);
+      res.setHeader("Retry-After", String(retryAfter));
+    }
     if (result.logError) {
       const message =
         result.logError instanceof Error ? result.logError.message : `readiness ${op} failed`;

@@ -61,6 +61,13 @@ export {
 } from "./paste-secrets.js";
 
 export {
+  REDACTED_PLACEHOLDER,
+  redactPasteSecrets,
+  assertNoSecretLeak,
+  type PasteRedactionResult,
+} from "./paste-redact.js";
+
+export {
   stripMarkdownFences,
   unwrapChatLineWrapping,
   ensureReportFooter,
@@ -71,6 +78,43 @@ export {
   describeStack,
   describeSize,
 } from "./paste-normalize.js";
+
+export {
+  fillUnknownFields,
+  recoverSloppyPaste,
+  runDeterministicParse,
+  tryLlmNormalizeReport,
+  type ParseRoute,
+  type ParsePipelineResult,
+} from "./parse-pipeline.js";
+
+export {
+  BUDGET_BUCKET_OPTIONS,
+  FOLLOWUP_QUESTION_SEED,
+  evaluateFollowupTriggers,
+  selectFollowupQuestions,
+  detectFollowupDiscrepancies,
+  followupSeedMetadata,
+  type BudgetBucket,
+  type FollowupQuestionType,
+  type FollowupTrigger,
+  type FollowupQuestionDef,
+  type PublicFollowupQuestion,
+  type DiscrepancyFlag,
+} from "./followups.js";
+
+export {
+  GOLDEN_CLEAN_FIELDS,
+  FIXTURE_CLEAN,
+  FIXTURE_CHAT_WRAPPED,
+  FIXTURE_FENCED,
+  FIXTURE_MISSING_FOOTER,
+  FIXTURE_SLOPPY,
+  buildPlantedSecretPaste,
+  GOLDEN_FIXTURE_NAMES,
+  getGoldenFixture,
+  type GoldenFixtureName,
+} from "./fixtures/golden-pastes.js";
 
 export {
   MANUAL_SOURCE,

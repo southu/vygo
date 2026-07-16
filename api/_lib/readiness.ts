@@ -355,6 +355,36 @@ export async function proxyParsePaste(
   return proxyJson("POST", "/v1/readiness/parse", body ?? {}, env, inboundHeaders);
 }
 
+export async function proxyFollowups(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/followups", body ?? {}, env, inboundHeaders);
+}
+
+export async function proxyFollowupsAnswer(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/followups/answer", body ?? {}, env, inboundHeaders);
+}
+
+export async function proxyGetSubmission(
+  token: string,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson(
+    "GET",
+    `/v1/readiness/submission?token=${encodeURIComponent(token)}`,
+    undefined,
+    env,
+    inboundHeaders,
+  );
+}
+
 /** Lightweight lead log when edge has direct DB (no secrets in body). */
 export async function logLeadRow(
   sql: Sql,

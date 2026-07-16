@@ -5,11 +5,12 @@
  * a documented stub until a scheduled job is wired.
  */
 import { randomBytes } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
 import { OUTBOX_KINDS, readinessPromptIdempotencyKey } from "./outbox.js";
 import {
   emailOutbox,
+  readinessQuestionBank,
   readinessSessions,
   readinessSubmissions,
   type NewReadinessSession,
@@ -337,4 +338,235 @@ export async function purgeExpiredReadinessSubmissions(
       ? (result as { count: number }).count
       : 0;
   return { deleted, stub: false };
+}
+
+/** Public question bank row for Stage 4 selection. */
+export type ReadinessQuestionBankRow = {
+  questionKey: string;
+  prompt: string;
+  category: string;
+  sortOrder: number;
+  active: boolean;
+  metadata: Record<string, unknown>;
+};
+
+/** List active question bank rows ordered for presentation. */
+export async function listReadinessQuestionBank(db: Db): Promise<ReadinessQuestionBankRow[]> {
+  const rows = await db
+    .select()
+    .from(readinessQuestionBank)
+    .where(eq(readinessQuestionBank.active, true));
+  return rows
+    .map((row) => ({
+      questionKey: row.questionKey,
+      prompt: row.prompt,
+      category: row.category,
+      sortOrder: row.sortOrder,
+      active: row.active,
+      metadata:
+        row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : {},
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+/**
+ * Test-scoped / token-scoped submission read-back.
+ * Returns redacted paste + parsed report + internal discrepancy flags.
+ * Never includes unredacted secrets (callers must have redacted before insert).
+ */
+export type ReadinessSubmissionPublic = {
+  id: string;
+  sessionToken: string | null;
+  parsedReport: Record<string, unknown> | null;
+  rawPasteRedacted: string | null;
+  discrepancyFlags: unknown[];
+  bucket: string | null;
+  contact: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+export async function findLatestSubmissionBySessionToken(
+  db: Db,
+  token: string,
+): Promise<ReadinessSubmissionPublic | null> {
+  const trimmed = token.trim();
+  if (!trimmed) return null;
+  const sessions = await db
+    .select()
+    .from(readinessSessions)
+    .where(eq(readinessSessions.token, trimmed))
+    .limit(1);
+  const session = sessions[0];
+  if (!session) return null;
+
+  const rows = await db
+    .select()
+    .from(readinessSubmissions)
+    .where(eq(readinessSubmissions.sessionId, session.id))
+    .orderBy(desc(readinessSubmissions.createdAt))
+    .limit(1);
+  const row = rows[0];
+  if (!row) {
+    // Fall back to draft-stored parse when submission row missing.
+    const draft =
+      session.draft && typeof session.draft === "object" && !Array.isArray(session.draft)
+        ? (session.draft as Record<string, unknown>)
+        : {};
+    if (!draft.report && !draft.pasteText && !draft.rawPasteRedacted) return null;
+    return {
+      id: typeof draft.submissionId === "string" ? draft.submissionId : `draft:${session.id}`,
+      sessionToken: session.token,
+      parsedReport:
+        draft.report && typeof draft.report === "object" && !Array.isArray(draft.report)
+          ? (draft.report as Record<string, unknown>)
+          : null,
+      rawPasteRedacted:
+        typeof draft.rawPasteRedacted === "string"
+          ? draft.rawPasteRedacted
+          : typeof draft.pasteText === "string"
+            ? draft.pasteText
+            : null,
+      discrepancyFlags: Array.isArray(draft.discrepancyFlags) ? draft.discrepancyFlags : [],
+      bucket: typeof draft.bucket === "string" ? draft.bucket : null,
+      contact:
+        draft.contact && typeof draft.contact === "object" && !Array.isArray(draft.contact)
+          ? (draft.contact as Record<string, unknown>)
+          : null,
+      createdAt: session.updatedAt.toISOString(),
+    };
+  }
+
+  return {
+    id: row.id,
+    sessionToken: session.token,
+    parsedReport:
+      row.parsedReport && typeof row.parsedReport === "object"
+        ? (row.parsedReport as Record<string, unknown>)
+        : null,
+    rawPasteRedacted: row.rawPasteRedacted,
+    discrepancyFlags: Array.isArray(row.discrepancyFlags) ? row.discrepancyFlags : [],
+    bucket: row.bucket,
+    contact:
+      row.contact && typeof row.contact === "object" && !Array.isArray(row.contact)
+        ? (row.contact as Record<string, unknown>)
+        : null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * Merge discrepancy flags onto the latest submission for a session.
+ * Also mirrors flags into the session draft for edge/read-back fallback.
+ */
+export async function appendSubmissionDiscrepancyFlags(
+  db: Db,
+  token: string,
+  flags: unknown[],
+  answers?: Record<string, unknown>,
+): Promise<ReadinessSubmissionPublic | null> {
+  const trimmed = token.trim();
+  if (!trimmed) return null;
+  const sessions = await db
+    .select()
+    .from(readinessSessions)
+    .where(eq(readinessSessions.token, trimmed))
+    .limit(1);
+  const session = sessions[0];
+  if (!session) return null;
+
+  const existing = await findLatestSubmissionBySessionToken(db, trimmed);
+  const mergedFlags = [
+    ...(Array.isArray(existing?.discrepancyFlags) ? existing!.discrepancyFlags : []),
+    ...flags,
+  ];
+
+  const draft =
+    session.draft && typeof session.draft === "object" && !Array.isArray(session.draft)
+      ? { ...(session.draft as Record<string, unknown>) }
+      : {};
+  draft.discrepancyFlags = mergedFlags;
+  if (answers && typeof answers === "object") {
+    draft.followupAnswers = { ...(draft.followupAnswers as object | undefined), ...answers };
+  }
+  draft.followupUpdatedAt = new Date().toISOString();
+
+  await db
+    .update(readinessSessions)
+    .set({ draft, stage: "followups", updatedAt: new Date() })
+    .where(eq(readinessSessions.token, trimmed));
+
+  if (existing && !String(existing.id).startsWith("draft:")) {
+    await db
+      .update(readinessSubmissions)
+      .set({ discrepancyFlags: mergedFlags })
+      .where(eq(readinessSubmissions.id, existing.id));
+  } else {
+    await insertReadinessSubmission(db, {
+      sessionId: session.id,
+      parsedReport:
+        draft.report && typeof draft.report === "object"
+          ? (draft.report as Record<string, unknown>)
+          : null,
+      rawPasteRedacted:
+        typeof draft.rawPasteRedacted === "string"
+          ? draft.rawPasteRedacted
+          : typeof draft.pasteText === "string"
+            ? draft.pasteText
+            : null,
+      discrepancyFlags: mergedFlags,
+      bucket: "followups",
+      contact: {
+        source: "readiness_followups",
+        answers: answers ?? null,
+      },
+    });
+  }
+
+  return findLatestSubmissionBySessionToken(db, trimmed);
+}
+
+/** Upsert Stage 4 question bank seed rows (idempotent). */
+export async function seedReadinessFollowupQuestions(
+  db: Db,
+  rows: Array<{
+    questionKey: string;
+    prompt: string;
+    category: string;
+    sortOrder: number;
+    metadata: Record<string, unknown>;
+  }>,
+): Promise<number> {
+  let n = 0;
+  for (const row of rows) {
+    const existing = await db
+      .select({ questionKey: readinessQuestionBank.questionKey })
+      .from(readinessQuestionBank)
+      .where(eq(readinessQuestionBank.questionKey, row.questionKey))
+      .limit(1);
+    if (existing[0]) {
+      await db
+        .update(readinessQuestionBank)
+        .set({
+          prompt: row.prompt,
+          category: row.category,
+          sortOrder: row.sortOrder,
+          active: true,
+          metadata: row.metadata,
+        })
+        .where(eq(readinessQuestionBank.questionKey, row.questionKey));
+    } else {
+      await db.insert(readinessQuestionBank).values({
+        questionKey: row.questionKey,
+        prompt: row.prompt,
+        category: row.category,
+        sortOrder: row.sortOrder,
+        active: true,
+        metadata: row.metadata,
+      });
+    }
+    n += 1;
+  }
+  return n;
 }

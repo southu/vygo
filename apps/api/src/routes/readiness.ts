@@ -6,7 +6,10 @@
  * PATCH  /v1/readiness/session/:token   — save draft/stage state
  * POST   /v1/readiness/lead             — log off-ramp / intake lead
  * POST   /v1/readiness/email-prompt     — email diagnostic prompt + resume link
- * POST   /v1/readiness/parse            — parse paste-back report (stage 3/4)
+ * POST   /v1/readiness/parse            — parse paste-back report (stage 3)
+ * POST   /v1/readiness/followups        — Stage 4 dynamic questions (from bank)
+ * POST   /v1/readiness/followups/answer — submit follow-up answers (+ discrepancy)
+ * GET    /v1/readiness/submission       — token-scoped read-back of stored submission
  *
  * All Postgres writes go through these server endpoints. Rate-limited by IP.
  * Never returns connection strings, DATABASE_URL, stack traces, or secrets.
@@ -20,16 +23,21 @@ import {
   enqueueReadinessPromptEmail,
   redactSensitivePaste,
   insertReadinessSubmission,
+  listReadinessQuestionBank,
+  findLatestSubmissionBySessionToken,
+  appendSubmissionDiscrepancyFlags,
+  seedReadinessFollowupQuestions,
   type DatabaseHandle,
 } from "@vygo/db";
 import {
-  buildConfirmationFindings,
-  describeSize,
-  describeStack,
-  normalizeReadinessPaste,
-  parseReadinessPastePartial,
-  parseReadinessReportV1,
-  scanPasteForSecrets,
+  detectFollowupDiscrepancies,
+  FOLLOWUP_QUESTION_SEED,
+  followupSeedMetadata,
+  redactPasteSecrets,
+  runDeterministicParse,
+  selectFollowupQuestions,
+  tryLlmNormalizeReport,
+  type ReadinessReportV1Partial,
 } from "@vygo/validation";
 import type { ApiEnv } from "@vygo/config";
 import { safeError } from "../errors.js";
@@ -125,6 +133,22 @@ export async function ensureReadinessTables(dbHandle: DatabaseHandle): Promise<v
     await dbHandle.sql`CREATE UNIQUE INDEX IF NOT EXISTS readiness_scoring_config_key_version_uidx ON readiness_scoring_config (config_key, version)`;
   } catch {
     // index races are non-fatal
+  }
+
+  // Seed Stage 4 follow-up questions (data-driven bank).
+  try {
+    await seedReadinessFollowupQuestions(
+      dbHandle.db,
+      FOLLOWUP_QUESTION_SEED.map((q) => ({
+        questionKey: q.questionKey,
+        prompt: q.prompt,
+        category: q.category,
+        sortOrder: q.sortOrder,
+        metadata: followupSeedMetadata(q),
+      })),
+    );
+  } catch {
+    // seed races are non-fatal
   }
 }
 
@@ -487,10 +511,180 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
   });
 
   /**
-   * Stage 3/4 paste-back parse. Client already ran a high-confidence secret
-   * scan; server re-checks, redacts, best-effort parses, and persists draft.
+   * Stage 3 paste-back parse.
+   * Server runs the same secret scan, REDACTS hits to [REDACTED] before storage
+   * and before any optional LLM call, then deterministic-parses. Never blocks
+   * the feature on a missing LLM key — fails closed to deterministic / manual.
    */
-  app.post("/v1/readiness/parse", async (request, reply) => {
+  app.post(
+    "/v1/readiness/parse",
+    {
+      // Pastes can exceed the default 64 KiB body budget.
+      bodyLimit: 128 * 1024,
+    },
+    async (request, reply) => {
+      if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+      if (!isJsonContentType(request.headers["content-type"])) {
+        return reply
+          .status(415)
+          .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+      }
+
+      const body = (request.body ?? {}) as Record<string, unknown>;
+      const token = typeof body.token === "string" ? body.token.trim().slice(0, 128) : "";
+      const paste = typeof body.paste === "string" ? body.paste.slice(0, 100_000) : "";
+      if (!token || !TOKEN_RE.test(token)) {
+        return reply
+          .status(400)
+          .send(safeError("VALIDATION_ERROR", "A valid session token is required."));
+      }
+      if (!paste || paste.trim().length < 8) {
+        return reply.status(400).send(safeError("VALIDATION_ERROR", "paste is required."));
+      }
+
+      const dbHandle = deps.getDb();
+      if (!dbHandle) {
+        return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+      }
+
+      try {
+        await ensureReadinessTables(dbHandle);
+        const session = await findReadinessSessionByToken(dbHandle.db, token);
+        if (!session) {
+          return reply.status(404).send(safeError("NOT_FOUND", "Session not found."));
+        }
+
+        // Same secret scan as client; REDACT (do not reject) before storage/LLM.
+        const redaction = redactPasteSecrets(paste);
+        if (redaction.didRedact || !redaction.scan.clean) {
+          request.log.info(
+            {
+              event: "readiness_paste_redacted",
+              hitCount: redaction.scan.hits.length,
+              kinds: redaction.scan.hits.map((h) => h.kind),
+              lines: redaction.scan.lines,
+              replacementCount: redaction.replacementCount,
+            },
+            "readiness paste secrets redacted",
+          );
+        }
+
+        // Defense in depth: also run durable env/connection-string redactor.
+        const redacted = redactSensitivePaste(redaction.redacted).slice(0, 50_000);
+
+        // Optional LLM only after redaction; fail closed when no key.
+        let llmReport: Awaited<ReturnType<typeof tryLlmNormalizeReport>> = null;
+        try {
+          llmReport = await tryLlmNormalizeReport(redacted, process.env);
+        } catch {
+          llmReport = null;
+        }
+
+        const pipeline = runDeterministicParse(redacted);
+        const finalReport = (llmReport ?? pipeline.report) as ReadinessReportV1Partial;
+        const parseStatus = llmReport ? "ok" : pipeline.parseStatus;
+        const routeToManual = llmReport ? false : pipeline.routeToManual;
+        const stage = routeToManual ? "manual" : "confirm";
+
+        const draft = {
+          ...session.draft,
+          pasteText: redacted,
+          rawPasteRedacted: redacted,
+          source: "paste",
+          report: finalReport as Record<string, unknown>,
+          parseStatus,
+          routeToManual,
+          parseSource: llmReport ? "llm" : pipeline.source,
+          parseUpdatedAt: new Date().toISOString(),
+          redaction: {
+            didRedact: redaction.didRedact || !redaction.scan.clean,
+            hitCount: redaction.scan.hits.length,
+            kinds: redaction.scan.hits.map((h) => h.kind),
+          },
+        };
+
+        const updated = await patchReadinessSessionByToken(dbHandle.db, token, {
+          stage,
+          draft,
+        });
+
+        let submissionId: string | null = null;
+        try {
+          const rows = await dbHandle.sql<{ id: string }[]>`
+            SELECT id FROM readiness_sessions WHERE token = ${token} LIMIT 1
+          `;
+          const sessionId = rows[0]?.id ?? null;
+          const inserted = await insertReadinessSubmission(dbHandle.db, {
+            sessionId,
+            parsedReport: finalReport as Record<string, unknown>,
+            rawPasteRedacted: redacted,
+            bucket: `paste:${parseStatus}`,
+            discrepancyFlags: [],
+            contact: {
+              source: "readiness_paste",
+              parseStatus,
+              routeToManual,
+              redacted: draft.redaction,
+            },
+          });
+          submissionId = inserted.id;
+          if (updated) {
+            await patchReadinessSessionByToken(dbHandle.db, token, {
+              draft: { ...draft, submissionId },
+            });
+          }
+        } catch {
+          // non-fatal — draft is the source of truth for resume
+        }
+
+        request.log.info(
+          {
+            event: "readiness_parse",
+            parseStatus,
+            routeToManual,
+            hasFindings: pipeline.findings.length > 0,
+            redacted: draft.redaction.didRedact,
+          },
+          "readiness paste parsed",
+        );
+
+        // Response must never echo unredacted secrets (use redacted report only).
+        return reply.status(200).send({
+          token,
+          stage: updated?.stage ?? stage,
+          parseStatus,
+          routeToManual,
+          stack: pipeline.stack,
+          size: pipeline.size,
+          findings: pipeline.findings,
+          report: finalReport,
+          submissionId,
+          draft: {
+            ...(updated?.draft ?? draft),
+            pasteText: redacted,
+            rawPasteRedacted: redacted,
+          },
+        });
+      } catch (error) {
+        request.log.error(
+          { event: "readiness_parse_failed" },
+          error instanceof Error ? error.message : "parse failed",
+        );
+        return reply
+          .status(500)
+          .send(
+            safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."),
+          );
+      }
+    },
+  );
+
+  /**
+   * Stage 4: return dynamic follow-up questions from readiness_question_bank
+   * (seeded), filtered by parsed-report trigger conditions.
+   */
+  app.post("/v1/readiness/followups", async (request, reply) => {
     if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
 
     if (!isJsonContentType(request.headers["content-type"])) {
@@ -501,26 +695,10 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
 
     const body = (request.body ?? {}) as Record<string, unknown>;
     const token = typeof body.token === "string" ? body.token.trim().slice(0, 128) : "";
-    const paste = typeof body.paste === "string" ? body.paste.slice(0, 100_000) : "";
     if (!token || !TOKEN_RE.test(token)) {
       return reply
         .status(400)
         .send(safeError("VALIDATION_ERROR", "A valid session token is required."));
-    }
-    if (!paste || paste.trim().length < 8) {
-      return reply.status(400).send(safeError("VALIDATION_ERROR", "paste is required."));
-    }
-
-    // Fail closed if secrets still present (client should have blocked).
-    const secretScan = scanPasteForSecrets(paste);
-    if (!secretScan.clean) {
-      return reply.status(400).send({
-        error: {
-          code: "SECRETS_DETECTED",
-          message: "Remove secrets before submitting.",
-        },
-        lines: secretScan.lines,
-      });
     }
 
     const dbHandle = deps.getDb();
@@ -535,65 +713,180 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         return reply.status(404).send(safeError("NOT_FOUND", "Session not found."));
       }
 
-      const normalized = normalizeReadinessPaste(paste);
-      const redacted = redactSensitivePaste(normalized);
-      const full = parseReadinessReportV1(normalized);
-      const partial = full ?? parseReadinessPastePartial(normalized);
-      const parseStatus = full ? "ok" : Object.keys(partial).length > 0 ? "partial" : "pending";
-      const stack = describeStack(partial);
-      const size = describeSize(partial);
-      const findings = buildConfirmationFindings(partial, 6);
+      const report =
+        session.draft.report &&
+        typeof session.draft.report === "object" &&
+        !Array.isArray(session.draft.report)
+          ? (session.draft.report as ReadinessReportV1Partial)
+          : body.report && typeof body.report === "object" && !Array.isArray(body.report)
+            ? (body.report as ReadinessReportV1Partial)
+            : {};
 
-      const draft = {
-        ...session.draft,
-        pasteText: redacted.slice(0, 50_000),
-        source: "paste",
-        report: partial as Record<string, unknown>,
-        parseStatus,
-        parseUpdatedAt: new Date().toISOString(),
-      };
-
-      const updated = await patchReadinessSessionByToken(dbHandle.db, token, {
-        stage: "confirm",
-        draft,
-      });
-
-      // Best-effort submission row (redacted paste only).
+      let bank: Awaited<ReturnType<typeof listReadinessQuestionBank>> = [];
       try {
-        const rows = await dbHandle.sql<{ id: string }[]>`
-          SELECT id FROM readiness_sessions WHERE token = ${token} LIMIT 1
-        `;
-        const sessionId = rows[0]?.id ?? null;
-        await insertReadinessSubmission(dbHandle.db, {
-          sessionId,
-          parsedReport: partial as Record<string, unknown>,
-          rawPasteRedacted: redacted.slice(0, 50_000),
-          bucket: `paste:${parseStatus}`,
-          contact: { source: "readiness_paste", parseStatus },
-        });
+        bank = await listReadinessQuestionBank(dbHandle.db);
       } catch {
-        // non-fatal — draft is the source of truth for resume
+        bank = [];
       }
 
+      const questions = selectFollowupQuestions(
+        report,
+        bank.map((row) => ({
+          questionKey: row.questionKey,
+          prompt: row.prompt,
+          category: row.category,
+          sortOrder: row.sortOrder,
+          active: row.active,
+          metadata: row.metadata,
+        })),
+      );
+
       request.log.info(
-        { event: "readiness_parse", parseStatus, hasFindings: findings.length > 0 },
-        "readiness paste parsed",
+        { event: "readiness_followups", count: questions.length },
+        "readiness follow-ups selected",
       );
 
       return reply.status(200).send({
         token,
-        stage: updated?.stage ?? "confirm",
-        parseStatus,
-        stack,
-        size,
-        findings,
-        report: partial,
-        draft: updated?.draft ?? draft,
+        source: bank.length > 0 ? "readiness_question_bank" : "seed",
+        questions,
       });
     } catch (error) {
       request.log.error(
-        { event: "readiness_parse_failed" },
-        error instanceof Error ? error.message : "parse failed",
+        { event: "readiness_followups_failed" },
+        error instanceof Error ? error.message : "followups failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  /**
+   * Stage 4 answer submit. Contradictions vs the parsed report set an INTERNAL
+   * discrepancy flag on the submission — never returned in this user-facing body.
+   */
+  app.post("/v1/readiness/followups/answer", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    if (!isJsonContentType(request.headers["content-type"])) {
+      return reply
+        .status(415)
+        .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const token = typeof body.token === "string" ? body.token.trim().slice(0, 128) : "";
+    const answers =
+      body.answers && typeof body.answers === "object" && !Array.isArray(body.answers)
+        ? (body.answers as Record<string, unknown>)
+        : null;
+    if (!token || !TOKEN_RE.test(token)) {
+      return reply
+        .status(400)
+        .send(safeError("VALIDATION_ERROR", "A valid session token is required."));
+    }
+    if (!answers || Object.keys(answers).length === 0) {
+      return reply.status(400).send(safeError("VALIDATION_ERROR", "answers are required."));
+    }
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+      const session = await findReadinessSessionByToken(dbHandle.db, token);
+      if (!session) {
+        return reply.status(404).send(safeError("NOT_FOUND", "Session not found."));
+      }
+
+      const report =
+        session.draft.report &&
+        typeof session.draft.report === "object" &&
+        !Array.isArray(session.draft.report)
+          ? (session.draft.report as ReadinessReportV1Partial)
+          : {};
+
+      const flags = detectFollowupDiscrepancies(report, answers);
+      await appendSubmissionDiscrepancyFlags(dbHandle.db, token, flags, answers);
+
+      request.log.info(
+        {
+          event: "readiness_followups_answered",
+          answerKeys: Object.keys(answers).length,
+          // Log count only — never surface flag details to clients here.
+          discrepancyCount: flags.length,
+        },
+        "readiness follow-up answers stored",
+      );
+
+      // User-facing response intentionally omits discrepancy flags.
+      return reply.status(200).send({
+        token,
+        accepted: true,
+        stage: "followups",
+        savedKeys: Object.keys(answers),
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_followups_answer_failed" },
+        error instanceof Error ? error.message : "followups answer failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  /**
+   * Authenticated-by-session-token read-back of the stored submission.
+   * Exposes redacted paste + discrepancy flags for live verification.
+   * Never returns unredacted secrets.
+   */
+  app.get("/v1/readiness/submission", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    const q = request.query as Record<string, unknown>;
+    const token = typeof q.token === "string" ? q.token.trim().slice(0, 128) : "";
+    if (!token || !TOKEN_RE.test(token)) {
+      return reply
+        .status(400)
+        .send(safeError("VALIDATION_ERROR", "A valid session token is required."));
+    }
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+      const submission = await findLatestSubmissionBySessionToken(dbHandle.db, token);
+      if (!submission) {
+        return reply.status(404).send(safeError("NOT_FOUND", "Submission not found."));
+      }
+
+      // Hard-guard: never echo high-confidence secret shapes if any slipped through.
+      const paste = submission.rawPasteRedacted ?? "";
+      const recheck = redactPasteSecrets(paste);
+      const safePaste = recheck.redacted;
+
+      return reply.status(200).send({
+        id: submission.id,
+        token: submission.sessionToken,
+        parsedReport: submission.parsedReport,
+        rawPasteRedacted: safePaste,
+        discrepancyFlags: submission.discrepancyFlags,
+        bucket: submission.bucket,
+        contact: submission.contact,
+        createdAt: submission.createdAt,
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_submission_read_failed" },
+        error instanceof Error ? error.message : "submission read failed",
       );
       return reply
         .status(500)

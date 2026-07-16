@@ -43,6 +43,13 @@
       "when": 1752681600000,
       "tag": "0005_readiness",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1752685200000,
+      "tag": "0006_readiness_followups",
+      "breakpoints": true
     }
   ]
 }

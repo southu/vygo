@@ -15,6 +15,12 @@
     { "source": "/v1/readiness/lead", "destination": "/api/readiness/lead" },
     { "source": "/v1/readiness/email-prompt", "destination": "/api/readiness/email-prompt" },
     { "source": "/v1/readiness/parse", "destination": "/api/readiness/parse" },
+    { "source": "/v1/readiness/followups", "destination": "/api/readiness/followups" },
+    {
+      "source": "/v1/readiness/followups/answer",
+      "destination": "/api/readiness/followups-answer"
+    },
+    { "source": "/v1/readiness/submission", "destination": "/api/readiness/submission" },
     { "source": "/v1/public/availability", "destination": "/api/availability" },
     { "source": "/health", "destination": "/api/health" },
     { "source": "/readyz", "destination": "/api/readyz" },
