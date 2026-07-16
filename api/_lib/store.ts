@@ -150,9 +150,7 @@ export function createPgStore(sql: Sql): WaitlistStore {
  * the Railway Fastify `POST /api/apply` route, which inserts into the production
  * `applications` table. Success is only returned after a 2xx with a durable id.
  */
-export function createUpstreamApplyStore(
-  env: NodeJS.ProcessEnv = process.env,
-): WaitlistStore {
+export function createUpstreamApplyStore(env: NodeJS.ProcessEnv = process.env): WaitlistStore {
   return {
     async upsert(value): Promise<UpsertResult> {
       const { proxyApplyPost } = await import("./apply.js");

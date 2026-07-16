@@ -196,10 +196,7 @@ export async function insertApplicationRow(
   };
 }
 
-export async function findApplicationRow(
-  sql: Sql,
-  id: string,
-): Promise<ApplyPublicRow | null> {
+export async function findApplicationRow(sql: Sql, id: string): Promise<ApplyPublicRow | null> {
   await ensureApplicationsTable(sql);
   const rows = await sql<
     {
@@ -230,8 +227,7 @@ export async function findApplicationRow(
   };
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function isUuid(id: string): boolean {
   return UUID_RE.test(id);

@@ -7,16 +7,11 @@
  * the formal Drizzle migration has not yet been applied via pnpm db:migrate.
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import {
-  findApplicationById,
-  insertApplication,
-  type DatabaseHandle,
-} from "@vygo/db";
+import { findApplicationById, insertApplication, type DatabaseHandle } from "@vygo/db";
 import { safeError } from "../errors.js";
 
 const SOURCE = "apply";
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type ApplyRouteDeps = {
   getDb: () => DatabaseHandle | null;
@@ -45,7 +40,9 @@ export type ParsedApplyBody = {
 
 export function parseApplyBody(
   body: unknown,
-): { ok: true; value: ParsedApplyBody } | { ok: false; status: number; error: ReturnType<typeof safeError> } {
+):
+  | { ok: true; value: ParsedApplyBody }
+  | { ok: false; status: number; error: ReturnType<typeof safeError> } {
   if (body == null || typeof body !== "object" || Array.isArray(body)) {
     return {
       ok: false,
