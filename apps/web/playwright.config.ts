@@ -29,7 +29,8 @@ export default defineConfig({
     },
     {
       name: "mobile",
-      testMatch: /(?:site-behavior|harden-release)\.spec\.ts/,
+      // mobile-drawer is the empty-drawer regression guard (viewport <= 480-class).
+      testMatch: /(?:site-behavior|harden-release|mobile-drawer)\.spec\.ts/,
       // Chromium + mobile viewport (avoids requiring WebKit browser binaries).
       use: { ...devices["Pixel 5"] },
     },
