@@ -38,19 +38,25 @@
       "whoami": "vault-provisioner-query whoami --folder vygo --run-id <run-id>",
       "sql": "vault-provisioner-query sql --folder vygo --run-id <run-id> --from-summary scratch/provision_summary_nonsecret.json --sql \"<SELECT...>\""
     },
-    "notes": "Harness stages scratch/provision_summary_nonsecret.json and scratch/vault_provisioner_interface.md for the tester. The CLI reads the Vault consumer key from the standard host path and never prints tokens, passwords, or connection strings."
+    "notes": "Harness stages scratch/provision_summary_nonsecret.json and scratch/vault_provisioner_interface.md for the tester. The CLI reads the Vault consumer key only from the standard host path (outside the repo; mode 0600). Fail closed on missing_consumer_key / vault_locked / consumer_not_armed / vault_access_denied. Never prints tokens, passwords, or connection strings."
+  },
+  "host_preconditions": {
+    "vault_folder": "vygo",
+    "consumer": "unlocked and armed",
+    "consumer_key": "installed at standard host path mode 0600 (e.g. ~/.config/ratchet/vault_consumer.key); never committed or written into TESTLOG/verdict",
+    "status_preflight": "vault-provisioner-query status must report ok, consumer_key_present, armed, vault_unlocked"
   },
   "connection_method": {
     "name": "vault-provisioner-lease-psql",
     "preferred_entrypoint": "vault-provisioner-query sql --from-summary <nonsecret.json> --sql '...'",
     "steps": [
-      "Confirm callable interface: `which vault-provisioner-query` (or vault-consumer) and `vault-provisioner-query status` (armed + unlocked + lease_api).",
+      "Confirm callable interface: `which vault-provisioner-query` (or vault-consumer) and `vault-provisioner-query status` (consumer_key_present + armed + unlocked + lease_api).",
       "register_run for folder=vygo and the mission run_id (performed by the CLI).",
       "Issue a short-lived consumer lease for RAILWAY_TOKEN (provider=railway) via POST /api/consumer/lease (performed by the CLI).",
       "Use Railway GraphQL variables for project_id + environment_id + service_id Postgres-0MtT (performed by the CLI).",
       "Connect with psql to DATABASE_PUBLIC_URL (not the .railway.internal DATABASE_URL) (performed by the CLI).",
       "Release the lease immediately after the SELECT (performed by the CLI).",
-      "Never write tokens, passwords, or secret-bearing connection strings into TESTLOG.md, verdicts, or commits."
+      "Never write tokens, passwords, consumer keys, or secret-bearing connection strings into TESTLOG.md, verdicts, or commits."
     ]
   },
   "approved_sql": {

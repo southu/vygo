@@ -2,17 +2,22 @@
 
 **Mission:** `vygo-apply-e2e-live-db-check`  
 **Date (UTC):** 2026-07-16  
-**Iteration:** 3 (callable Vault Provisioner CLI restored for tester; prior DB evidence retained)  
+**Iteration:** 4 (Vault UI consumer unlocked/armed for folder `vygo`; consumer key installed at the standard host path mode `0600` so tester preflight no longer returns `missing_consumer_key`; prior DB evidence retained)  
 **Live site:** https://www.vygo.ai  
 **Deploy SHA at verification:** see `GET /version` after this commit deploys (pre-push HEAD is recorded below at verification time)  
-**Scope:** End-to-end proof that live “Apply for the next opening” submissions are stored durably in the Railway Postgres `applications` table, with written evidence. No product or schema changes were required for persistence or validation.
+**Scope:** End-to-end proof that live “Apply for the next opening” submissions are stored durably in the Railway Postgres `applications` table, with written evidence. No product or schema changes were required for persistence or validation. Iteration 4 is a **provisioning/test-harness** fix only.
 
-**Secrets policy:** This document contains **no** tokens, passwords, or connection strings. Database credentials were obtained only through the Vault Provisioner path (armed consumer lease → Railway GraphQL variables for the Postgres plugin → ephemeral `psql` on `DATABASE_PUBLIC_URL`) and were never written to the repo, mission files, or this report.
+**Secrets policy:** This document contains **no** tokens, passwords, connection strings, or consumer key material. Database credentials are obtained only through the Vault Provisioner path (armed consumer lease → Railway GraphQL variables for the Postgres plugin → ephemeral `psql` on `DATABASE_PUBLIC_URL`) and are never written to the repo, mission files, TESTLOG, verdicts, or this report.
 
 **Public non-secret query metadata (for tester/harness):**  
 https://www.vygo.ai/api/railway-db-query-method.json
 
-**Callable Vault Provisioner interface (iteration 3):** `vault-provisioner-query` on `PATH` (alias `vault-consumer`). Preflight: `vault-provisioner-query status`. Approved SELECTs: `vault-provisioner-query sql --from-summary scratch/provision_summary_nonsecret.json --sql "…"`. The CLI never prints tokens, passwords, or connection strings.
+**Callable Vault Provisioner interface:** `vault-provisioner-query` on `PATH` (alias `vault-consumer`).
+
+- **Preflight (required before any live form or SQL check):** `vault-provisioner-query status` — expect `ok: true`, `consumer_key_present: true`, `armed: true`, `vault_unlocked: true`.
+- **Query:** `vault-provisioner-query sql --folder vygo --run-id <unique-id> --from-summary scratch/provision_summary_nonsecret.json --sql "<approved SELECT>"`.
+- **Host preconditions (iteration 4):** Vault consumer for folder `vygo` is unlocked and armed; the consumer key is installed at a **standard host path outside the repo** with mode `0600` (see Vault README: `~/.config/ratchet/vault_consumer.key`). The key is never staged into the product repository, tester workspace artifacts, or git history.
+- The CLI never prints tokens, passwords, or connection strings.
 
 ---
 
@@ -60,7 +65,7 @@ Both valid test rows are **left in place**. They are self-flagging as test data 
 | `GET https://www.vygo.ai/apply` | HTTP **200**; form fields present: `apply-form`, Full name (`apply-full-name`), Work email (`apply-work-email`), Submit application; heading “Apply for the next opening” |
 | `GET https://www.vygo.ai/api/readyz` | `ready: true`, `database: connected` / Railway API path healthy |
 | Railway API `GET /readyz` | `database: ok`, migrations applied |
-| Vault consumer | Armed + unlocked; `railway.whoami` and `list_services` succeed for project `vygo` |
+| Vault consumer | Armed + unlocked for folder `vygo`; consumer key present at standard host path (mode `0600`); `vault-provisioner-query status` / `whoami` / approved `sql` succeed (including under capability-dropped root matching the tester sandbox) |
 
 ---
 
