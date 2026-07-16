@@ -159,7 +159,10 @@ function confidenceOf(report: ReadinessReportV1Partial): number | null {
   // Labels may still be present if an older partial path stored a string.
   if (typeof report.confidence === "string") {
     const s = report.confidence.trim().toLowerCase();
-    if (/^(very\s+)?high\b|^strong\b|^good\b/.test(s) || (/\bhigh\b/.test(s) && !/\blow\b/.test(s))) {
+    if (
+      /^(very\s+)?high\b|^strong\b|^good\b/.test(s) ||
+      (/\bhigh\b/.test(s) && !/\blow\b/.test(s))
+    ) {
       return 0.85;
     }
     if (/^(med(ium)?|moderate|mid)\b/.test(s)) return 0.55;
@@ -184,8 +187,9 @@ export function isMultiTenantOrEnterpriseSignal(
 ): boolean {
   const t = textOf(tenancy);
   const authBlob = `${textOf(auth)} ${textOf(authorization)}`;
-  const single =
-    /single[-_\s]?tenant|solo(?:\s|$|,)|one[-_\s]?tenant|not\s+multi|no\s+multi/.test(t);
+  const single = /single[-_\s]?tenant|solo(?:\s|$|,)|one[-_\s]?tenant|not\s+multi|no\s+multi/.test(
+    t,
+  );
   const multi =
     /multi[-_\s]?tenant|\benterprise\b|\bb2b\b|\bworkspaces?\b|\borg[_-]?id\b|\borgs\b/.test(t);
   const ssoAuth = /\bsaml\b|\bsso\b/.test(authBlob);
@@ -233,7 +237,8 @@ export function evaluateFollowupTriggers(
   const testsClearlyGated =
     /every deploy|on every deploy|on deploy|required in ci|ci gate|gated on every|gate(d)? on every|tests?\s+gate/.test(
       tests,
-    ) || (/ci/.test(tests) && /every|gate|required/.test(tests));
+    ) ||
+    (/ci/.test(tests) && /every|gate|required/.test(tests));
   const testsAmbiguous =
     !tests ||
     tests === "unknown" ||
@@ -242,7 +247,10 @@ export function evaluateFollowupTriggers(
 
   // Strip common negations so "no payment card or health records" is not a hit.
   const piiForPositive = pii
-    .replace(/no\s+payment(?:\s+card)?(?:\s+or\s+health(?:\s+records?)?)?(?:\s+in\s+prod(?:uction)?)?/gi, " ")
+    .replace(
+      /no\s+payment(?:\s+card)?(?:\s+or\s+health(?:\s+records?)?)?(?:\s+in\s+prod(?:uction)?)?/gi,
+      " ",
+    )
     .replace(/no\s+health(?:\s+records?|pii)?(?:\s+in\s+prod(?:uction)?)?/gi, " ")
     .replace(/neither\s+payment\s+nor\s+health[^,;.]*/gi, " ")
     .replace(/without\s+(?:payment|health|phi|pci)[^,;.]*/gi, " ")
@@ -269,7 +277,8 @@ export function evaluateFollowupTriggers(
   return {
     security_questionnaire: mentionsSecurityAsk,
     tests_on_deploy: testsAmbiguous,
-    payment_health_pii: hasPaymentOrHealthHint || ((!pii || /unknown/.test(pii)) && !piiExplicitlyNone),
+    payment_health_pii:
+      hasPaymentOrHealthHint || ((!pii || /unknown/.test(pii)) && !piiExplicitlyNone),
     sso_saml: multiTenantOrEnterprise,
     who_deploys: whoDeploysTrigger,
     repo_access: lowConfidence || whoDeploysTrigger,
@@ -383,7 +392,9 @@ export function detectFollowupDiscrepancies(
   if (testsAnswer) {
     const reportSaysYes =
       /every deploy|on every|required in ci|ci gate|gated on every|gate(d)? on every/.test(tests) ||
-      (/ci/.test(tests) && /every|gate|required/.test(tests) && !/no test|not really|none/.test(tests));
+      (/ci/.test(tests) &&
+        /every|gate|required/.test(tests) &&
+        !/no test|not really|none/.test(tests));
     const reportSaysNo = /no test|none|not really|manual|no automated|ad-?hoc/.test(tests);
     const answerSaysNo = /^(no|sometimes|not sure)/.test(testsAnswer);
     const answerSaysYes = /^yes/.test(testsAnswer);
@@ -407,8 +418,10 @@ export function detectFollowupDiscrepancies(
 
   const who = textOf(answers.who_deploys);
   if (who) {
-    const reportAutomated = hasAutomatedDeploySignal(deploys) && !hasManualOrOneClickDeploySignal(deploys);
-    const reportManual = hasManualOrOneClickDeploySignal(deploys) && !hasAutomatedDeploySignal(deploys);
+    const reportAutomated =
+      hasAutomatedDeploySignal(deploys) && !hasManualOrOneClickDeploySignal(deploys);
+    const reportManual =
+      hasManualOrOneClickDeploySignal(deploys) && !hasAutomatedDeploySignal(deploys);
     // Mixed phrases like "manual one-click" still count as manual even if no CI keywords.
     const reportManualLoose = hasManualOrOneClickDeploySignal(deploys);
     const answerManual = /manual|one-click|one-?click|ssh|console|agency|engineer clicks/.test(who);

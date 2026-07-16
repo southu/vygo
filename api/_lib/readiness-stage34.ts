@@ -479,8 +479,9 @@ export function edgeIsMultiTenantOrEnterprise(
 ): boolean {
   const t = textOf(tenancy);
   const authBlob = `${textOf(auth)} ${textOf(authorization)}`;
-  const single =
-    /single[-_\s]?tenant|solo(?:\s|$|,)|one[-_\s]?tenant|not\s+multi|no\s+multi/.test(t);
+  const single = /single[-_\s]?tenant|solo(?:\s|$|,)|one[-_\s]?tenant|not\s+multi|no\s+multi/.test(
+    t,
+  );
   const multi =
     /multi[-_\s]?tenant|\benterprise\b|\bb2b\b|\bworkspaces?\b|\borg[_-]?id\b|\borgs\b/.test(t);
   const ssoAuth = /\bsaml\b|\bsso\b/.test(authBlob);
@@ -519,7 +520,8 @@ export function edgeEvaluateTriggers(report: Record<string, unknown>): Record<st
   const testsClearlyGated =
     /every deploy|on every deploy|on deploy|required in ci|ci gate|gated on every|gate(d)? on every|tests?\s+gate/.test(
       tests,
-    ) || (/ci/.test(tests) && /every|gate|required/.test(tests));
+    ) ||
+    (/ci/.test(tests) && /every|gate|required/.test(tests));
   const testsAmbiguous =
     !tests ||
     tests === "unknown" ||
@@ -527,7 +529,10 @@ export function edgeEvaluateTriggers(report: Record<string, unknown>): Record<st
     !testsClearlyGated;
   // Strip common negations so "no payment card or health records" is not a hit.
   const piiForPositive = pii
-    .replace(/no\s+payment(?:\s+card)?(?:\s+or\s+health(?:\s+records?)?)?(?:\s+in\s+prod(?:uction)?)?/gi, " ")
+    .replace(
+      /no\s+payment(?:\s+card)?(?:\s+or\s+health(?:\s+records?)?)?(?:\s+in\s+prod(?:uction)?)?/gi,
+      " ",
+    )
     .replace(/no\s+health(?:\s+records?|pii)?(?:\s+in\s+prod(?:uction)?)?/gi, " ")
     .replace(/neither\s+payment\s+nor\s+health[^,;.]*/gi, " ")
     .replace(/without\s+(?:payment|health|phi|pci)[^,;.]*/gi, " ")
@@ -595,7 +600,9 @@ export function edgeDetectDiscrepancies(
   if (testsAnswer) {
     const reportSaysYes =
       /every deploy|on every|required in ci|ci gate|gated on every|gate(d)? on every/.test(tests) ||
-      (/ci/.test(tests) && /every|gate|required/.test(tests) && !/no test|not really|none/.test(tests));
+      (/ci/.test(tests) &&
+        /every|gate|required/.test(tests) &&
+        !/no test|not really|none/.test(tests));
     const reportSaysNo = /no test|none|not really|manual|no automated|ad-?hoc/.test(tests);
     const answerSaysNo = /^(no|sometimes|not sure)/.test(testsAnswer);
     const answerSaysYes = /^yes/.test(testsAnswer);
