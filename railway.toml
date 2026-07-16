@@ -14,10 +14,14 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# API binds 0.0.0.0:$PORT; graceful shutdown on SIGTERM/SIGINT.
-startCommand = "pnpm --filter @vygo/api start"
+# Both Railway services (api + worker) share this root config and the same
+# Dockerfile. Dispatch on RAILWAY_SERVICE_NAME so the worker process starts when
+# the service is named "worker"; everything else (including "api") runs the API.
+# Worker-specific config also lives at deploy/railway/worker/railway.toml for
+# services that set Config-as-code to that path.
+startCommand = "sh -c 'if [ \"${RAILWAY_SERVICE_NAME}\" = \"worker\" ]; then exec pnpm --filter @vygo/worker start; else exec pnpm --filter @vygo/api start; fi'"
 # Liveness (no dependency checks). /readyz additionally verifies Postgres +
-# migrations once DATABASE_URL is wired.
+# migrations once DATABASE_URL is wired. Worker health-server also serves /healthz.
 healthcheckPath = "/healthz"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
