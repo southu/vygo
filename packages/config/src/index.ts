@@ -191,8 +191,16 @@ export function loadWorkerEnv(env: NodeJS.ProcessEnv = process.env): WorkerEnv {
 }
 
 export function getDeployedGitSha(env: NodeJS.ProcessEnv = process.env): string {
+  // Prefer platform-native SHAs first (Vercel / Railway), then generic build-time vars.
+  // Railway injects RAILWAY_GIT_COMMIT_SHA on GitHub-sourced deploys; without it
+  // GET /version returns "unknown" even when the image is current.
   const sha =
-    env.VERCEL_GIT_COMMIT_SHA || env.COMMIT_SHA || env.GIT_COMMIT_SHA || env.GITHUB_SHA || "";
+    env.VERCEL_GIT_COMMIT_SHA ||
+    env.RAILWAY_GIT_COMMIT_SHA ||
+    env.COMMIT_SHA ||
+    env.GIT_COMMIT_SHA ||
+    env.GITHUB_SHA ||
+    "";
   return sha.trim();
 }
 

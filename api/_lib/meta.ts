@@ -20,8 +20,14 @@ import {
  * health SHA matches `/version` (and the deploy gate's `version.txt`).
  */
 export function deployedGitSha(env: NodeJS.ProcessEnv = process.env): string {
+  // Keep precedence aligned with packages/config getDeployedGitSha (incl. Railway).
   const sha =
-    env.VERCEL_GIT_COMMIT_SHA || env.COMMIT_SHA || env.GIT_COMMIT_SHA || env.GITHUB_SHA || "";
+    env.VERCEL_GIT_COMMIT_SHA ||
+    env.RAILWAY_GIT_COMMIT_SHA ||
+    env.COMMIT_SHA ||
+    env.GIT_COMMIT_SHA ||
+    env.GITHUB_SHA ||
+    "";
   return sha.trim();
 }
 

@@ -253,4 +253,45 @@ describe("readiness routes without database", () => {
     assert.notEqual(create.statusCode, 429);
     assert.ok(create.statusCode === 503 || create.statusCode === 201);
   });
+
+  it("POST /v1/readiness/score is registered (not 404) and rejects missing gate fields", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/score",
+      headers: { "content-type": "application/json" },
+      payload: {
+        token: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        // intentionally omit name, email, privacy consent
+        turnstileToken: "XXXX",
+      },
+    });
+    // Must not be Fastify's unregistered-route 404.
+    assert.notEqual(res.statusCode, 404);
+    assert.equal(res.statusCode, 400);
+    const body = res.json() as {
+      error?: { code?: string; fields?: Record<string, string> };
+      scores?: unknown;
+      dimensions?: unknown;
+      snapshotId?: string;
+    };
+    assert.equal(body.error?.code, "VALIDATION_ERROR");
+    assert.ok(body.error?.fields?.name || body.error?.fields?.email || body.error?.fields?.privacyAccepted);
+    // No scored results when gate is incomplete.
+    assert.equal(body.scores, undefined);
+    assert.equal(body.dimensions, undefined);
+    assert.equal(body.snapshotId, undefined);
+  });
+
+  it("GET /v1/readiness/snapshot/:id is registered and validates id shape", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/v1/readiness/snapshot/not-a-uuid",
+    });
+    assert.notEqual(res.statusCode, 404);
+    assert.equal(res.statusCode, 400);
+    const body = res.json() as { error?: { code?: string } };
+    assert.equal(body.error?.code, "BAD_REQUEST");
+  });
 });
