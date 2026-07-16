@@ -4,6 +4,8 @@
  * POST   /v1/readiness/session          — create session, return resumable token
  * GET    /v1/readiness/session/:token   — resume draft/stage state
  * PATCH  /v1/readiness/session/:token   — save draft/stage state
+ * POST   /v1/readiness/lead             — log off-ramp / intake lead
+ * POST   /v1/readiness/email-prompt     — email diagnostic prompt + resume link
  *
  * All Postgres writes go through these server endpoints. Rate-limited by IP.
  * Never returns connection strings, DATABASE_URL, stack traces, or secrets.
@@ -13,6 +15,8 @@ import {
   createReadinessSession,
   findReadinessSessionByToken,
   patchReadinessSessionByToken,
+  logReadinessLead,
+  enqueueReadinessPromptEmail,
   type DatabaseHandle,
 } from "@vygo/db";
 import type { ApiEnv } from "@vygo/config";
@@ -341,6 +345,129 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       request.log.error(
         { event: "readiness_session_patch_failed" },
         error instanceof Error ? error.message : "patch failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  app.post("/v1/readiness/lead", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    const ct = request.headers["content-type"];
+    if (ct && !isJsonContentType(ct)) {
+      return reply
+        .status(415)
+        .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const reasonRaw = typeof body.reason === "string" ? body.reason.trim() : "";
+    if (!reasonRaw || reasonRaw.length > 64) {
+      return reply
+        .status(400)
+        .send(safeError("VALIDATION_ERROR", "reason is required (max 64 chars)."));
+    }
+    const token =
+      typeof body.token === "string" && body.token.trim() ? body.token.trim().slice(0, 128) : null;
+    const email =
+      typeof body.email === "string" && body.email.trim()
+        ? body.email.trim().toLowerCase().slice(0, 254)
+        : null;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return reply.status(400).send(safeError("VALIDATION_ERROR", "Invalid email address."));
+    }
+    const answers =
+      body.answers && typeof body.answers === "object" && !Array.isArray(body.answers)
+        ? (body.answers as Record<string, unknown>)
+        : null;
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+      const result = await logReadinessLead(dbHandle.db, {
+        token,
+        reason: reasonRaw,
+        answers,
+        email,
+      });
+      request.log.info(
+        { event: "readiness_lead_logged", reason: reasonRaw, hasToken: Boolean(token) },
+        "readiness lead logged",
+      );
+      return reply.status(201).send({ accepted: true, id: result.id });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_lead_failed" },
+        error instanceof Error ? error.message : "lead failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  app.post("/v1/readiness/email-prompt", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    if (!isJsonContentType(request.headers["content-type"])) {
+      return reply
+        .status(415)
+        .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const email =
+      typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 254) : "";
+    const token = typeof body.token === "string" ? body.token.trim().slice(0, 128) : "";
+    const prompt = typeof body.prompt === "string" ? body.prompt.slice(0, 50_000) : "";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return reply.status(400).send(safeError("VALIDATION_ERROR", "A valid email is required."));
+    }
+    if (!token || !TOKEN_RE.test(token)) {
+      return reply.status(400).send(safeError("VALIDATION_ERROR", "A valid session token is required."));
+    }
+    if (!prompt || prompt.trim().length < 20) {
+      return reply.status(400).send(safeError("VALIDATION_ERROR", "prompt is required."));
+    }
+
+    const origin =
+      (deps.env as { PUBLIC_WEB_ORIGIN?: string }).PUBLIC_WEB_ORIGIN?.trim() ||
+      "https://www.vygo.ai";
+    const resumeUrl = `${origin.replace(/\/$/, "")}/readiness?token=${encodeURIComponent(token)}`;
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+      const result = await enqueueReadinessPromptEmail(dbHandle.db, {
+        email,
+        token,
+        prompt,
+        resumeUrl,
+      });
+      request.log.info(
+        { event: "readiness_prompt_email_queued", hasToken: true },
+        "readiness prompt email queued",
+      );
+      return reply.status(202).send({
+        accepted: true,
+        queued: true,
+        resumeUrl,
+        idempotencyKey: result.idempotencyKey,
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_email_prompt_failed" },
+        error instanceof Error ? error.message : "email prompt failed",
       );
       return reply
         .status(500)

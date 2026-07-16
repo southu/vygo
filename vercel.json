@@ -12,6 +12,8 @@
       "source": "/v1/readiness/session/:token",
       "destination": "/api/readiness/session/:token"
     },
+    { "source": "/v1/readiness/lead", "destination": "/api/readiness/lead" },
+    { "source": "/v1/readiness/email-prompt", "destination": "/api/readiness/email-prompt" },
     { "source": "/v1/public/availability", "destination": "/api/availability" },
     { "source": "/health", "destination": "/api/health" },
     { "source": "/readyz", "destination": "/api/readyz" },

@@ -2,8 +2,8 @@
   "ready": false,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "59e545489db39aae1fd4c6571e13299a2a0380c3",
-  "generatedAt": "2026-07-12T21:48:41.631Z",
+  "gitSha": "5a3f99d85f7ff35f9f219872994cde252eb185e6",
+  "generatedAt": "2026-07-16T16:56:48.835Z",
   "railwayFoundation": {
     "statusUrl": "/api/railway-foundation",
     "project": "vygo",
@@ -89,8 +89,8 @@
   "tooling": {
     "node": {
       "major": 24,
-      "version": "25.8.1",
-      "runtimeMajor": 25,
+      "version": "22.22.1",
+      "runtimeMajor": 22,
       "activeLtsMajor": 24,
       "lts": false,
       "configured": true,

@@ -80,6 +80,41 @@ async function renderForJob(
     return { subject: rendered.subject, html: rendered.html, text: rendered.text };
   }
 
+  if (kind === OUTBOX_KINDS.readinessPrompt || kind === "readiness_prompt") {
+    const resumeUrl = String(payload.resumeUrl ?? "https://www.vygo.ai/readiness");
+    const prompt = String(payload.prompt ?? "");
+    const subject = "Your vygo readiness diagnostic prompt";
+    const text = [
+      "Here is your vygo readiness diagnostic prompt.",
+      "",
+      "Resume your check anytime:",
+      resumeUrl,
+      "",
+      "— Prompt (read-only; never includes secrets) —",
+      prompt,
+      "",
+      "— End prompt —",
+      "",
+      "This email was sent because you requested it on vygo.ai.",
+    ].join("\n");
+    const escapedPrompt = prompt
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const escapedResume = resumeUrl
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+    const html = [
+      "<p>Here is your <strong>vygo</strong> readiness diagnostic prompt.</p>",
+      `<p><a href="${escapedResume}">Resume your check</a></p>`,
+      "<p>This prompt is read-only and never asks the AI to change code or include secrets.</p>",
+      `<pre style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;background:#f6f6f4;padding:12px;border-radius:8px;">${escapedPrompt}</pre>`,
+      "<p style=\"color:#64748b;font-size:12px;\">Sent because you requested it on vygo.ai.</p>",
+    ].join("");
+    return { subject, html, text };
+  }
+
   // Unknown kind: still produce a minimal transactional shell so the job can complete or fail cleanly.
   const subject = `Vygo notification (${kind})`;
   const text = "Transactional notification.";

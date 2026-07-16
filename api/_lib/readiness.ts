@@ -333,4 +333,96 @@ export async function proxyPatchSession(
   );
 }
 
+export async function proxyLogLead(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/lead", body ?? {}, env, inboundHeaders);
+}
+
+export async function proxyEmailPrompt(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/email-prompt", body ?? {}, env, inboundHeaders);
+}
+
+/** Lightweight lead log when edge has direct DB (no secrets in body). */
+export async function logLeadRow(
+  sql: Sql,
+  input: {
+    token?: string | null;
+    reason: string;
+    answers?: Record<string, unknown> | null;
+    email?: string | null;
+  },
+): Promise<{ id: string; accepted: true }> {
+  await ensureReadinessTables(sql);
+  await sql`
+    CREATE TABLE IF NOT EXISTS readiness_submissions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      session_id uuid,
+      parsed_report jsonb,
+      raw_paste_redacted text,
+      scores jsonb,
+      bucket text,
+      discrepancy_flags jsonb DEFAULT '[]'::jsonb NOT NULL,
+      contact jsonb,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      retention_expires_at timestamp with time zone DEFAULT (now() + interval '90 days') NOT NULL
+    )
+  `;
+
+  let sessionId: string | null = null;
+  const token = input.token?.trim() || null;
+  if (token) {
+    const sessions = await sql<{ id: string; draft: unknown }[]>`
+      SELECT id, draft FROM readiness_sessions WHERE token = ${token} LIMIT 1
+    `;
+    const row = sessions[0];
+    if (row) {
+      sessionId = row.id;
+      const draft =
+        row.draft && typeof row.draft === "object" && !Array.isArray(row.draft)
+          ? { ...(row.draft as Record<string, unknown>) }
+          : {};
+      draft.offRamp = { kind: input.reason, loggedAt: new Date().toISOString() };
+      if (input.email?.trim()) {
+        draft.email = input.email.trim().toLowerCase().slice(0, 254);
+      }
+      await sql`
+        UPDATE readiness_sessions
+        SET draft = ${sql.json(draft as never)}, updated_at = now()
+        WHERE token = ${token}
+      `;
+    }
+  }
+
+  const contact: Record<string, unknown> = {
+    source: "readiness_off_ramp",
+    reason: input.reason.slice(0, 64),
+    loggedAt: new Date().toISOString(),
+  };
+  if (input.email?.trim()) {
+    contact.email = input.email.trim().toLowerCase().slice(0, 254);
+  }
+  const bucket = `off_ramp:${input.reason.slice(0, 48)}`;
+  const answers = input.answers ?? null;
+  const rows = await sql<{ id: string }[]>`
+    INSERT INTO readiness_submissions (session_id, parsed_report, bucket, contact)
+    VALUES (
+      ${sessionId},
+      ${answers ? sql.json(answers as never) : null},
+      ${bucket},
+      ${sql.json(contact as never)}
+    )
+    RETURNING id
+  `;
+  const id = rows[0]?.id;
+  if (!id) throw new Error("readiness lead insert returned no id");
+  return { id, accepted: true };
+}
+
 export { resolveDatabaseUrl };

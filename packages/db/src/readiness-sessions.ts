@@ -7,7 +7,9 @@
 import { randomBytes } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
+import { OUTBOX_KINDS, readinessPromptIdempotencyKey } from "./outbox.js";
 import {
+  emailOutbox,
   readinessSessions,
   readinessSubmissions,
   type NewReadinessSession,
@@ -196,6 +198,120 @@ export async function insertReadinessSubmission(
     throw new Error("readiness submission insert returned no row");
   }
   return inserted;
+}
+
+export type LogReadinessLeadInput = {
+  /** Optional session token for correlation. */
+  token?: string | null;
+  reason: "not_built_yet" | "features_only" | string;
+  answers?: Record<string, unknown> | null;
+  email?: string | null;
+};
+
+/**
+ * Persist an off-ramp / intake lead server-side (no secrets).
+ * Uses readiness_submissions.contact + bucket; never stores raw secrets.
+ */
+export async function logReadinessLead(
+  db: Db,
+  input: LogReadinessLeadInput,
+): Promise<{ id: string; accepted: true }> {
+  let sessionId: string | null = null;
+  const token = input.token?.trim() || null;
+  if (token) {
+    const rows = await db
+      .select()
+      .from(readinessSessions)
+      .where(eq(readinessSessions.token, token))
+      .limit(1);
+    const row = rows[0];
+    if (row) {
+      sessionId = row.id;
+      const draft =
+        row.draft && typeof row.draft === "object" && !Array.isArray(row.draft)
+          ? { ...(row.draft as Record<string, unknown>) }
+          : {};
+      draft.offRamp = {
+        kind: input.reason,
+        loggedAt: new Date().toISOString(),
+      };
+      if (input.email?.trim()) {
+        draft.email = input.email.trim().toLowerCase().slice(0, 254);
+      }
+      await db
+        .update(readinessSessions)
+        .set({ draft, updatedAt: new Date() })
+        .where(eq(readinessSessions.token, token));
+    }
+  }
+
+  const email = input.email?.trim().toLowerCase().slice(0, 254) || null;
+  const contact: Record<string, unknown> = {
+    source: "readiness_off_ramp",
+    reason: String(input.reason).slice(0, 64),
+    loggedAt: new Date().toISOString(),
+  };
+  if (email) contact.email = email;
+
+  const inserted = await insertReadinessSubmission(db, {
+    sessionId,
+    parsedReport: input.answers && typeof input.answers === "object" ? input.answers : null,
+    bucket: `off_ramp:${String(input.reason).slice(0, 48)}`,
+    contact,
+  });
+  return { id: inserted.id, accepted: true };
+}
+
+export type EnqueueReadinessPromptEmailInput = {
+  email: string;
+  token: string;
+  prompt: string;
+  resumeUrl: string;
+};
+
+/**
+ * Queue a readiness diagnostic prompt email via the transactional outbox.
+ * Worker delivers via Resend when configured; mock transport when RESEND_API_KEY is empty.
+ */
+export async function enqueueReadinessPromptEmail(
+  db: Db,
+  input: EnqueueReadinessPromptEmailInput,
+): Promise<{ queued: true; idempotencyKey: string }> {
+  const email = input.email.trim().toLowerCase();
+  const token = input.token.trim();
+  const prompt = input.prompt.slice(0, 50_000);
+  const resumeUrl = input.resumeUrl.slice(0, 500);
+  const idempotencyKey = readinessPromptIdempotencyKey(token, email);
+  const now = new Date();
+
+  // Capture email on the session draft for resume.
+  const session = await findReadinessSessionByToken(db, token);
+  if (session) {
+    const draft = { ...session.draft, email };
+    await patchReadinessSessionByToken(db, token, { draft });
+  }
+
+  await db
+    .insert(emailOutbox)
+    .values({
+      waitlistEntryId: null,
+      kind: OUTBOX_KINDS.readinessPrompt,
+      recipient: email,
+      payload: {
+        kind: OUTBOX_KINDS.readinessPrompt,
+        email,
+        token,
+        prompt,
+        resumeUrl,
+      },
+      idempotencyKey,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing();
+
+  return { queued: true, idempotencyKey };
 }
 
 /**

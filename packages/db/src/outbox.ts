@@ -7,7 +7,18 @@ export const OUTBOX_KINDS = {
   internalLeadNotification: "internal_lead_notification",
   /** Legacy kind from earlier waitlist mission; still deliverable. */
   waitlistConfirmation: "waitlist_confirmation",
+  /** Readiness Check: email diagnostic prompt + resume link. */
+  readinessPrompt: "readiness_prompt",
 } as const;
+
+/** Stable non-secret idempotency key for readiness prompt emails. */
+export function readinessPromptIdempotencyKey(sessionToken: string, email: string): string {
+  const e = email.trim().toLowerCase().slice(0, 120);
+  const t = sessionToken.trim().slice(0, 80);
+  // Include a coarse time bucket (hour) so re-sends after an hour are allowed.
+  const hour = Math.floor(Date.now() / (60 * 60 * 1000));
+  return `readiness-prompt:${t}:${e}:h${hour}`;
+}
 
 export type OutboxKind = (typeof OUTBOX_KINDS)[keyof typeof OUTBOX_KINDS];
 
