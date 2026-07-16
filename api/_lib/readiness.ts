@@ -1,0 +1,298 @@
+/**
+ * Shared readiness-session helpers for the marketing edge (www.vygo.ai).
+ * Prefer local DATABASE_URL when configured; otherwise proxy server-to-server
+ * to the Railway Fastify API which owns Postgres. Never returns secrets.
+ */
+import type { Sql } from "postgres";
+import { randomBytes } from "node:crypto";
+import { resolveDatabaseUrl, resolveUpstreamApiOrigin } from "./store.js";
+
+export type ReadinessSessionPublic = {
+  token: string;
+  stage: string;
+  draft: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReadinessHandlerResult = {
+  status: number;
+  body: Record<string, unknown>;
+  logError?: unknown;
+};
+
+const DEFAULT_STAGE = "intake";
+const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+
+export function isValidReadinessToken(token: string): boolean {
+  return TOKEN_RE.test(token.trim());
+}
+
+export function generateReadinessToken(): string {
+  return randomBytes(24).toString("base64url");
+}
+
+function toIso(value: Date | string): string {
+  if (value instanceof Date) return value.toISOString();
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
+export async function ensureReadinessTables(sql: Sql): Promise<void> {
+  await sql`
+    CREATE TABLE IF NOT EXISTS readiness_sessions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      token text NOT NULL,
+      stage text DEFAULT 'intake' NOT NULL,
+      draft jsonb DEFAULT '{}'::jsonb NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
+  try {
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS readiness_sessions_token_uidx ON readiness_sessions (token)`;
+    await sql`CREATE INDEX IF NOT EXISTS readiness_sessions_updated_at_idx ON readiness_sessions (updated_at)`;
+  } catch {
+    // ignore
+  }
+}
+
+function rowToPublic(row: {
+  token: string;
+  stage: string;
+  draft: unknown;
+  created_at: Date | string;
+  updated_at: Date | string;
+}): ReadinessSessionPublic {
+  const draft =
+    row.draft && typeof row.draft === "object" && !Array.isArray(row.draft)
+      ? (row.draft as Record<string, unknown>)
+      : {};
+  return {
+    token: String(row.token),
+    stage: String(row.stage),
+    draft,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
+export async function createSessionRow(
+  sql: Sql,
+  input: { stage?: string; draft?: Record<string, unknown> },
+): Promise<ReadinessSessionPublic> {
+  await ensureReadinessTables(sql);
+  const token = generateReadinessToken();
+  const stage =
+    typeof input.stage === "string" && input.stage.trim()
+      ? input.stage.trim().slice(0, 64)
+      : DEFAULT_STAGE;
+  const draft = input.draft && typeof input.draft === "object" ? input.draft : {};
+  const rows = await sql<
+    {
+      token: string;
+      stage: string;
+      draft: unknown;
+      created_at: Date | string;
+      updated_at: Date | string;
+    }[]
+  >`
+    INSERT INTO readiness_sessions (token, stage, draft)
+    VALUES (${token}, ${stage}, ${sql.json(draft as never)})
+    RETURNING token, stage, draft, created_at, updated_at
+  `;
+  const row = rows[0];
+  if (!row) throw new Error("readiness session insert returned no row");
+  return rowToPublic(row);
+}
+
+export async function findSessionRow(
+  sql: Sql,
+  token: string,
+): Promise<ReadinessSessionPublic | null> {
+  await ensureReadinessTables(sql);
+  const rows = await sql<
+    {
+      token: string;
+      stage: string;
+      draft: unknown;
+      created_at: Date | string;
+      updated_at: Date | string;
+    }[]
+  >`
+    SELECT token, stage, draft, created_at, updated_at
+    FROM readiness_sessions
+    WHERE token = ${token}
+    LIMIT 1
+  `;
+  const row = rows[0];
+  return row ? rowToPublic(row) : null;
+}
+
+export async function patchSessionRow(
+  sql: Sql,
+  token: string,
+  input: { stage?: string; draft?: Record<string, unknown> },
+): Promise<ReadinessSessionPublic | null> {
+  await ensureReadinessTables(sql);
+  const existing = await findSessionRow(sql, token);
+  if (!existing) return null;
+  const stage =
+    input.stage !== undefined ? (input.stage.trim() || DEFAULT_STAGE).slice(0, 64) : existing.stage;
+  const draft = input.draft !== undefined ? input.draft : existing.draft;
+  const rows = await sql<
+    {
+      token: string;
+      stage: string;
+      draft: unknown;
+      created_at: Date | string;
+      updated_at: Date | string;
+    }[]
+  >`
+    UPDATE readiness_sessions
+    SET stage = ${stage},
+        draft = ${sql.json(draft as never)},
+        updated_at = now()
+    WHERE token = ${token}
+    RETURNING token, stage, draft, created_at, updated_at
+  `;
+  const row = rows[0];
+  return row ? rowToPublic(row) : null;
+}
+
+export function parseSessionBody(
+  body: unknown,
+):
+  | { ok: true; stage?: string; draft?: Record<string, unknown> }
+  | { ok: false; status: number; body: Record<string, unknown> } {
+  if (body == null || body === "") return { ok: true };
+  if (typeof body !== "object" || Array.isArray(body)) {
+    return {
+      ok: false,
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Request body must be a JSON object." } },
+    };
+  }
+  const record = body as Record<string, unknown>;
+  let stage: string | undefined;
+  let draft: Record<string, unknown> | undefined;
+  if (record.stage !== undefined) {
+    if (typeof record.stage !== "string") {
+      return {
+        ok: false,
+        status: 400,
+        body: { error: { code: "VALIDATION_ERROR", message: "stage must be a string." } },
+      };
+    }
+    stage = record.stage;
+  }
+  if (record.draft !== undefined) {
+    if (record.draft == null || typeof record.draft !== "object" || Array.isArray(record.draft)) {
+      return {
+        ok: false,
+        status: 400,
+        body: { error: { code: "VALIDATION_ERROR", message: "draft must be a JSON object." } },
+      };
+    }
+    draft = record.draft as Record<string, unknown>;
+  }
+  return { ok: true, stage, draft };
+}
+
+async function proxyJson(
+  method: string,
+  path: string,
+  body: unknown | undefined,
+  env: NodeJS.ProcessEnv,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  const origin = resolveUpstreamApiOrigin(env);
+  try {
+    const headers: Record<string, string> = {
+      accept: "application/json",
+    };
+    if (body !== undefined) {
+      headers["content-type"] = "application/json";
+    }
+    // Forward client IP for upstream rate limiting when present.
+    const xff = inboundHeaders?.["x-forwarded-for"];
+    if (typeof xff === "string" && xff.trim()) {
+      headers["x-forwarded-for"] = xff.trim();
+    } else if (Array.isArray(xff) && xff[0]) {
+      headers["x-forwarded-for"] = String(xff[0]);
+    }
+    const xri = inboundHeaders?.["x-real-ip"];
+    if (typeof xri === "string" && xri.trim()) {
+      headers["x-real-ip"] = xri.trim();
+    }
+
+    const upstream = await fetch(`${origin}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body ?? {}) : undefined,
+      cache: "no-store",
+    });
+    let payload: Record<string, unknown> = {};
+    try {
+      payload = (await upstream.json()) as Record<string, unknown>;
+    } catch {
+      payload = {
+        error: {
+          code: "UPSTREAM_ERROR",
+          message: "Upstream returned a non-JSON response.",
+        },
+      };
+    }
+    return { status: upstream.status, body: payload };
+  } catch (error) {
+    return {
+      status: 503,
+      body: {
+        error: {
+          code: "UNAVAILABLE",
+          message: "Service temporarily unavailable. Please try again later.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
+export async function proxyCreateSession(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/session", body ?? {}, env, inboundHeaders);
+}
+
+export async function proxyGetSession(
+  token: string,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson(
+    "GET",
+    `/v1/readiness/session/${encodeURIComponent(token)}`,
+    undefined,
+    env,
+    inboundHeaders,
+  );
+}
+
+export async function proxyPatchSession(
+  token: string,
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson(
+    "PATCH",
+    `/v1/readiness/session/${encodeURIComponent(token)}`,
+    body ?? {},
+    env,
+    inboundHeaders,
+  );
+}
+
+export { resolveDatabaseUrl };

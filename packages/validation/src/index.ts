@@ -1,6 +1,21 @@
 import { z } from "zod";
 
-/** Shared Zod schemas for web and API (waitlist, availability). */
+/** Shared Zod schemas for web and API (waitlist, availability, readiness report). */
+
+export {
+  READINESS_REPORT_CONTRACT_VERSION,
+  READINESS_REPORT_V1_END,
+  READINESS_REPORT_V1_FIELDS,
+  READINESS_REPORT_V1_START,
+  extractReadinessReportV1Block,
+  formatReadinessReportV1,
+  parseReadinessReportV1,
+  readinessReportV1PartialSchema,
+  readinessReportV1Schema,
+  type ReadinessReportV1,
+  type ReadinessReportV1Field,
+  type ReadinessReportV1Partial,
+} from "./report-schema.js";
 
 export const availabilityStatusSchema = z.enum(["open", "waitlist", "paused"]);
 

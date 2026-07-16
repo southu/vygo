@@ -234,3 +234,99 @@ export type SubmissionIdempotency = typeof submissionIdempotency.$inferSelect;
 export type WorkerHeartbeatRow = typeof workerHeartbeats.$inferSelect;
 export type Application = typeof applications.$inferSelect;
 export type NewApplication = typeof applications.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Readiness Check (internal name: readiness)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resumable readiness session: stage + draft JSON keyed by a high-entropy token.
+ * Clients never write Postgres directly; only the API mutates these rows.
+ */
+export const readinessSessions = pgTable(
+  "readiness_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    token: text("token").notNull(),
+    stage: text("stage").notNull().default("intake"),
+    draft: jsonb("draft").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("readiness_sessions_token_uidx").on(table.token),
+    index("readiness_sessions_updated_at_idx").on(table.updatedAt),
+  ],
+);
+
+/**
+ * Stored readiness submissions. Raw pastes must be redacted before insert.
+ * retention_expires_at encodes a 90-day retention intent (purge job may be a stub).
+ */
+export const readinessSubmissions = pgTable(
+  "readiness_submissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id").references(() => readinessSessions.id, {
+      onDelete: "set null",
+    }),
+    parsedReport: jsonb("parsed_report").$type<Record<string, unknown> | null>(),
+    rawPasteRedacted: text("raw_paste_redacted"),
+    scores: jsonb("scores").$type<Record<string, unknown> | null>(),
+    bucket: text("bucket"),
+    discrepancyFlags: jsonb("discrepancy_flags").$type<unknown[]>().notNull().default([]),
+    contact: jsonb("contact").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    retentionExpiresAt: timestamp("retention_expires_at", { withTimezone: true })
+      .notNull()
+      .default(sql`now() + interval '90 days'`),
+  },
+  (table) => [
+    index("readiness_submissions_session_id_idx").on(table.sessionId),
+    index("readiness_submissions_retention_idx").on(table.retentionExpiresAt),
+    index("readiness_submissions_created_at_idx").on(table.createdAt),
+  ],
+);
+
+/** Versioned question prompts for the readiness flow (data-driven, not hardcoded). */
+export const readinessQuestionBank = pgTable(
+  "readiness_question_bank",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    questionKey: text("question_key").notNull(),
+    prompt: text("prompt").notNull(),
+    category: text("category").notNull().default("general"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    active: boolean("active").notNull().default(true),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("readiness_question_bank_key_uidx").on(table.questionKey),
+    index("readiness_question_bank_category_idx").on(table.category, table.sortOrder),
+  ],
+);
+
+/** Scoring rules/weights stored as data (seeded via migration). */
+export const readinessScoringConfig = pgTable(
+  "readiness_scoring_config",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    configKey: text("config_key").notNull(),
+    version: integer("version").notNull().default(1),
+    rules: jsonb("rules").$type<Record<string, unknown>>().notNull().default({}),
+    weights: jsonb("weights").$type<Record<string, unknown>>().notNull().default({}),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("readiness_scoring_config_key_version_uidx").on(table.configKey, table.version),
+  ],
+);
+
+export type ReadinessSession = typeof readinessSessions.$inferSelect;
+export type NewReadinessSession = typeof readinessSessions.$inferInsert;
+export type ReadinessSubmission = typeof readinessSubmissions.$inferSelect;
+export type NewReadinessSubmission = typeof readinessSubmissions.$inferInsert;
+export type ReadinessQuestion = typeof readinessQuestionBank.$inferSelect;
+export type ReadinessScoringConfigRow = typeof readinessScoringConfig.$inferSelect;
