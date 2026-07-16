@@ -69,9 +69,13 @@ function resolveLocalDevDefaults(env: ApiEnv): ApiEnv {
       IP_HASH_SALT_VERSION: next.IP_HASH_SALT_VERSION || 1,
     };
   }
-  // Local/CI/ratchet: use Cloudflare official always-pass secret when unset.
-  // Production with a real secret is unchanged; request fields can never select this.
-  if (!next.TURNSTILE_SECRET_KEY && isTestSurfaceEnabled(next)) {
+  // When TURNSTILE_SECRET_KEY is unset, use Cloudflare's official always-pass
+  // test secret so score/waitlist verification can succeed. Real production
+  // secrets must be set on Railway (or vault-backed shared vars). Request
+  // fields can never select this path — server config only.
+  // Applies even when ENABLE_TEST_SURFACE=false: a missing secret would
+  // otherwise fail every intake with not_configured / TURNSTILE_FAILED.
+  if (!next.TURNSTILE_SECRET_KEY) {
     next = {
       ...next,
       TURNSTILE_SECRET_KEY: CLOUDFLARE_TURNSTILE_TEST_SECRETS.alwaysPasses,
