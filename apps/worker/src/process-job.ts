@@ -97,10 +97,7 @@ async function renderForJob(
       "",
       "This email was sent because you requested it on vygo.ai.",
     ].join("\n");
-    const escapedPrompt = prompt
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    const escapedPrompt = prompt.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const escapedResume = resumeUrl
       .replace(/&/g, "&amp;")
       .replace(/"/g, "&quot;")
@@ -110,7 +107,7 @@ async function renderForJob(
       `<p><a href="${escapedResume}">Resume your check</a></p>`,
       "<p>This prompt is read-only and never asks the AI to change code or include secrets.</p>",
       `<pre style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;background:#f6f6f4;padding:12px;border-radius:8px;">${escapedPrompt}</pre>`,
-      "<p style=\"color:#64748b;font-size:12px;\">Sent because you requested it on vygo.ai.</p>",
+      '<p style="color:#64748b;font-size:12px;">Sent because you requested it on vygo.ai.</p>',
     ].join("");
     return { subject, html, text };
   }

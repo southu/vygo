@@ -67,8 +67,7 @@ export async function getReadinessSession(token: string): Promise<SessionRespons
   });
   const body = await parseJson(res);
   if (!res.ok || typeof body.token !== "string") {
-    const msg =
-      (body.error as { message?: string } | undefined)?.message || "Session not found.";
+    const msg = (body.error as { message?: string } | undefined)?.message || "Session not found.";
     throw new Error(msg);
   }
   return body as unknown as SessionResponse;
@@ -109,8 +108,7 @@ export async function logReadinessLead(input: {
   });
   if (!res.ok) {
     const body = await parseJson(res);
-    const msg =
-      (body.error as { message?: string } | undefined)?.message || "Could not log lead.";
+    const msg = (body.error as { message?: string } | undefined)?.message || "Could not log lead.";
     throw new Error(msg);
   }
   return { ok: true, status: res.status };
@@ -212,8 +210,7 @@ export function stage1FromDraft(draft: Record<string, unknown>): Partial<Readine
     builtWith: typeof draft.builtWith === "string" ? (draft.builtWith as never) : undefined,
     blockers: Array.isArray(draft.blockers) ? (draft.blockers as never) : undefined,
     deadline: typeof draft.deadline === "string" ? (draft.deadline as never) : undefined,
-    deadlineDetail:
-      typeof draft.deadlineDetail === "string" ? draft.deadlineDetail : undefined,
+    deadlineDetail: typeof draft.deadlineDetail === "string" ? draft.deadlineDetail : undefined,
   };
 }
 

@@ -25,18 +25,18 @@ https://www.vygo.ai/api/railway-db-query-method.json
 
 From the Vault Provisioner run for this mission (`shared/provision_summary.json`, project `vygo`, `ok: true` for Postgres/Redis reuse):
 
-| Field | Value |
-| --- | --- |
-| Provider | `railway` |
-| Project name | `vygo` |
-| Project id | `1b8abe52-f665-4e07-9a99-f6aa36a62610` |
-| Environment | `production` (`39b57aef-2574-4d8e-bbd2-673e91eb9768`) |
-| Dashboard | `https://railway.app/project/1b8abe52-f665-4e07-9a99-f6aa36a62610` |
-| Postgres service | `Postgres-0MtT` (`7e3b44d3-f9d4-4afd-a367-2fde98bd510f`) |
-| Database name | `railway` |
-| Public proxy host/port | `tokaido.proxy.rlwy.net` / `14610` (names only; no password) |
-| Table | `applications` |
-| Columns | `id`, `full_name`, `work_email`, `product_url`, `message`, `source`, `created_at` |
+| Field                  | Value                                                                             |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| Provider               | `railway`                                                                         |
+| Project name           | `vygo`                                                                            |
+| Project id             | `1b8abe52-f665-4e07-9a99-f6aa36a62610`                                            |
+| Environment            | `production` (`39b57aef-2574-4d8e-bbd2-673e91eb9768`)                             |
+| Dashboard              | `https://railway.app/project/1b8abe52-f665-4e07-9a99-f6aa36a62610`                |
+| Postgres service       | `Postgres-0MtT` (`7e3b44d3-f9d4-4afd-a367-2fde98bd510f`)                          |
+| Database name          | `railway`                                                                         |
+| Public proxy host/port | `tokaido.proxy.rlwy.net` / `14610` (names only; no password)                      |
+| Table                  | `applications`                                                                    |
+| Columns                | `id`, `full_name`, `work_email`, `product_url`, `message`, `source`, `created_at` |
 
 **Approved connection method:** Prefer the callable CLI **`vault-provisioner-query`** (on `PATH`; alias `vault-consumer`), which performs: Vault consumer `register_run` (folder `vygo`) → short-lived `lease` for `RAILWAY_TOKEN` → Railway GraphQL `variables` for service `Postgres-0MtT` → `psql` against **`DATABASE_PUBLIC_URL`** (not the internal `*.railway.internal` URL) → `release` lease. Credentials never leave the Vault/lease path into artifacts.
 
@@ -44,11 +44,11 @@ From the Vault Provisioner run for this mission (`shared/provision_summary.json`
 
 ## Run markers (iteration 2)
 
-| Path | Name | Email |
-| --- | --- | --- |
-| Primary success (form-equivalent POST) | `Ratchet E2E Test` | `e2e-test+20260716-000703-i2@vygo.ai` |
-| Real browser form (Playwright) | `Ratchet E2E Test` | `e2e-test+20260716-000703-i2-ui@vygo.ai` |
-| Failure path | `Ratchet E2E Test` | `not-an-email` |
+| Path                                   | Name               | Email                                    |
+| -------------------------------------- | ------------------ | ---------------------------------------- |
+| Primary success (form-equivalent POST) | `Ratchet E2E Test` | `e2e-test+20260716-000703-i2@vygo.ai`    |
+| Real browser form (Playwright)         | `Ratchet E2E Test` | `e2e-test+20260716-000703-i2-ui@vygo.ai` |
+| Failure path                           | `Ratchet E2E Test` | `not-an-email`                           |
 
 Both valid test rows are **left in place**. They are self-flagging as test data by the name **`Ratchet E2E Test`** and the **`e2e-test+…@vygo.ai`** email pattern so operators can follow up without deleting production applicants.
 
@@ -58,14 +58,14 @@ Both valid test rows are **left in place**. They are self-flagging as test data 
 
 ## Regression checks
 
-| Check | Result |
-| --- | --- |
-| `GET https://www.vygo.ai/` | HTTP **200**; home content renders |
-| `GET https://www.vygo.ai/version` | HTTP **200**; body is deployed git SHA |
-| `GET https://www.vygo.ai/apply` | HTTP **200**; form fields present: `apply-form`, Full name (`apply-full-name`), Work email (`apply-work-email`), Submit application; heading “Apply for the next opening” |
-| `GET https://www.vygo.ai/api/readyz` | `ready: true`, `database: connected` / Railway API path healthy |
-| Railway API `GET /readyz` | `database: ok`, migrations applied |
-| Vault consumer | Armed + unlocked for folder `vygo`; consumer key present at standard host path (mode `0600`); `vault-provisioner-query status` / `whoami` / approved `sql` succeed (including under capability-dropped root matching the tester sandbox) |
+| Check                                | Result                                                                                                                                                                                                                                   |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET https://www.vygo.ai/`           | HTTP **200**; home content renders                                                                                                                                                                                                       |
+| `GET https://www.vygo.ai/version`    | HTTP **200**; body is deployed git SHA                                                                                                                                                                                                   |
+| `GET https://www.vygo.ai/apply`      | HTTP **200**; form fields present: `apply-form`, Full name (`apply-full-name`), Work email (`apply-work-email`), Submit application; heading “Apply for the next opening”                                                                |
+| `GET https://www.vygo.ai/api/readyz` | `ready: true`, `database: connected` / Railway API path healthy                                                                                                                                                                          |
+| Railway API `GET /readyz`            | `database: ok`, migrations applied                                                                                                                                                                                                       |
+| Vault consumer                       | Armed + unlocked for folder `vygo`; consumer key present at standard host path (mode `0600`); `vault-provisioner-query status` / `whoami` / approved `sql` succeed (including under capability-dropped root matching the tester sandbox) |
 
 ---
 
@@ -121,7 +121,7 @@ Independent read-back `GET /api/apply/<id>` returns the same stored columns.
 ## Railway database query evidence
 
 Credentials: Vault Provisioner path only (see connection method above).  
-Host/db/table names from provision inventory + GraphQL variable *names* (values never logged).
+Host/db/table names from provision inventory + GraphQL variable _names_ (values never logged).
 
 ### SQL used (valid primary marker — expect exactly one row)
 
@@ -142,15 +142,15 @@ WHERE full_name = 'Ratchet E2E Test'
 
 **Result:** `n = 1`. Full stored row (all columns):
 
-| Column | Value |
-| --- | --- |
-| `id` | `d47662b1-89d2-4f69-a31b-a9e9e8a5a35f` |
-| `full_name` | `Ratchet E2E Test` |
-| `work_email` | `e2e-test+20260716-000703-i2@vygo.ai` |
-| `product_url` | `https://example.com/e2e-ratchet-i2` |
-| `message` | `Ratchet E2E live DB check run 20260716-000703-i2 — leave in place as test data.` |
-| `source` | `apply` |
-| `created_at` | `2026-07-16 00:17:44.266413+00` |
+| Column        | Value                                                                             |
+| ------------- | --------------------------------------------------------------------------------- |
+| `id`          | `d47662b1-89d2-4f69-a31b-a9e9e8a5a35f`                                            |
+| `full_name`   | `Ratchet E2E Test`                                                                |
+| `work_email`  | `e2e-test+20260716-000703-i2@vygo.ai`                                             |
+| `product_url` | `https://example.com/e2e-ratchet-i2`                                              |
+| `message`     | `Ratchet E2E live DB check run 20260716-000703-i2 — leave in place as test data.` |
+| `source`      | `apply`                                                                           |
+| `created_at`  | `2026-07-16 00:17:44.266413+00`                                                   |
 
 Timestamp matches the submission (`2026-07-16T00:17:44Z`), well inside the 10-minute window.
 
@@ -166,15 +166,15 @@ WHERE full_name = 'Ratchet E2E Test'
 
 **Result:** `n = 1`. Full stored row:
 
-| Column | Value |
-| --- | --- |
-| `id` | `8f653e3e-5fbf-4577-b692-7432482caf78` |
-| `full_name` | `Ratchet E2E Test` |
-| `work_email` | `e2e-test+20260716-000703-i2-ui@vygo.ai` |
-| `product_url` | `https://example.com/e2e-ratchet-i2-ui` |
-| `message` | `UI E2E live DB check 20260716-000703-i2-ui` |
-| `source` | `apply` |
-| `created_at` | `2026-07-16 00:18:48.40363+00` |
+| Column        | Value                                        |
+| ------------- | -------------------------------------------- |
+| `id`          | `8f653e3e-5fbf-4577-b692-7432482caf78`       |
+| `full_name`   | `Ratchet E2E Test`                           |
+| `work_email`  | `e2e-test+20260716-000703-i2-ui@vygo.ai`     |
+| `product_url` | `https://example.com/e2e-ratchet-i2-ui`      |
+| `message`     | `UI E2E live DB check 20260716-000703-i2-ui` |
+| `source`      | `apply`                                      |
+| `created_at`  | `2026-07-16 00:18:48.40363+00`               |
 
 ---
 

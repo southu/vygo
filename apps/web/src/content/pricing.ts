@@ -63,8 +63,7 @@ export const pricingContent = {
         body: "We can add permissions, recovery, monitoring, and documentation so one mistake does not bring the workflow down.",
       },
     ],
-    mayIncludeIntro:
-      "Depending on what the tool needs, a vygo Harden engagement may include:",
+    mayIncludeIntro: "Depending on what the tool needs, a vygo Harden engagement may include:",
     mayInclude: [
       "Team accounts and login",
       "User roles and permissions",

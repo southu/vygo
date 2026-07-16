@@ -8,13 +8,7 @@ export type PasteSecretHit = {
   /** 1-based line number in the original paste. */
   line: number;
   /** Pattern family for diagnostics (never include the secret value). */
-  kind:
-    | "sk_key"
-    | "aws_akia"
-    | "jwt"
-    | "postgres_url"
-    | "private_key"
-    | "secret_assignment";
+  kind: "sk_key" | "aws_akia" | "jwt" | "postgres_url" | "private_key" | "secret_assignment";
   /** Start index of the line within the full text (for UI highlighting). */
   lineStart: number;
   /** End index (exclusive) of the line within the full text. */

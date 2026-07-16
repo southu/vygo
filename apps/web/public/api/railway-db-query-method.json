@@ -17,15 +17,7 @@
   },
   "table": {
     "name": "applications",
-    "columns": [
-      "id",
-      "full_name",
-      "work_email",
-      "product_url",
-      "message",
-      "source",
-      "created_at"
-    ]
+    "columns": ["id", "full_name", "work_email", "product_url", "message", "source", "created_at"]
   },
   "callable_interface": {
     "name": "vault-provisioner-query",

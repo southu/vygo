@@ -70,16 +70,7 @@ const PROHIBITED_PATTERNS = [
   },
 ];
 
-const SCAN_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".json",
-  ".md",
-  ".mdx",
-  ".html",
-]);
+const SCAN_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".json", ".md", ".mdx", ".html"]);
 
 function collectFiles(dir) {
   let files = [];
@@ -113,9 +104,8 @@ const violations = [];
 for (const root of scanRoots) {
   for (const file of collectFiles(root)) {
     if (isExcludedPath(file)) continue;
-    const relative =
-      file.startsWith(webRoot) ?
-        path.relative(webRoot, file)
+    const relative = file.startsWith(webRoot)
+      ? path.relative(webRoot, file)
       : path.relative(repoRoot, file);
     const lines = readFileSync(file, "utf8").split("\n");
     lines.forEach((line, index) => {

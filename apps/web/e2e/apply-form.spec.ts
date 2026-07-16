@@ -263,9 +263,7 @@ test.describe("Apply form persistence UI", () => {
     await expect(page.getByTestId("apply-full-name")).toHaveValue("Ratchet Tester");
     await expect(page.getByTestId("apply-work-email")).toHaveValue("ratchet-tester@example.com");
     await expect(page.getByTestId("apply-product-url")).toHaveValue("https://example.com");
-    await expect(page.getByTestId("apply-message")).toHaveValue(
-      "Need production readiness review",
-    );
+    await expect(page.getByTestId("apply-message")).toHaveValue("Need production readiness review");
     await expect(page.getByTestId("apply-submit")).toBeEnabled();
     await expect(page).toHaveURL(/\/apply\/?$/);
   });

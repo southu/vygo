@@ -15,9 +15,7 @@ export function WaitlistPageIntro() {
 
   return (
     <div className="max-w-2xl">
-      <p className="eyebrow">
-        {isHarden ? "FREE FIT ASSESSMENT" : waitlistContent.page.eyebrow}
-      </p>
+      <p className="eyebrow">{isHarden ? "FREE FIT ASSESSMENT" : waitlistContent.page.eyebrow}</p>
       <h1 className="mt-4 font-display text-4xl font-bold sm:text-5xl">
         {isHarden ? hardenInquiryCopy.heading : waitlistContent.page.headline}
       </h1>

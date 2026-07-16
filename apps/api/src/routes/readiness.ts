@@ -35,10 +35,7 @@ import type { ApiEnv } from "@vygo/config";
 import { safeError } from "../errors.js";
 import { resolveClientIp } from "../services/client-ip.js";
 import { hashIpAddress } from "../services/ip-hash.js";
-import {
-  checkRateLimit,
-  type RateLimitStore,
-} from "../services/rate-limit.js";
+import { checkRateLimit, type RateLimitStore } from "../services/rate-limit.js";
 
 /** Resumable tokens are base64url of 24 bytes (32 chars) or legacy UUID. */
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
@@ -442,7 +439,9 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       return reply.status(400).send(safeError("VALIDATION_ERROR", "A valid email is required."));
     }
     if (!token || !TOKEN_RE.test(token)) {
-      return reply.status(400).send(safeError("VALIDATION_ERROR", "A valid session token is required."));
+      return reply
+        .status(400)
+        .send(safeError("VALIDATION_ERROR", "A valid session token is required."));
     }
     if (!prompt || prompt.trim().length < 20) {
       return reply.status(400).send(safeError("VALIDATION_ERROR", "prompt is required."));

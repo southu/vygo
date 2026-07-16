@@ -31,7 +31,9 @@ const SUCCESS_BODY =
 
 function isAbortError(err: unknown): boolean {
   return (
-    (typeof DOMException !== "undefined" && err instanceof DOMException && err.name === "AbortError") ||
+    (typeof DOMException !== "undefined" &&
+      err instanceof DOMException &&
+      err.name === "AbortError") ||
     (err instanceof Error && err.name === "AbortError")
   );
 }

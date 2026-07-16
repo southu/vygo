@@ -30,11 +30,14 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
   const [offer, setOffer] = useState<InquiryOfferKey | null>(null);
   const invokerRef = useRef<HTMLElement | null>(null);
 
-  const openWaitlist = useCallback((invoker?: HTMLElement | null, options?: OpenWaitlistOptions) => {
-    invokerRef.current = invoker ?? (document.activeElement as HTMLElement | null);
-    setOffer(options?.offer ?? null);
-    setIsOpen(true);
-  }, []);
+  const openWaitlist = useCallback(
+    (invoker?: HTMLElement | null, options?: OpenWaitlistOptions) => {
+      invokerRef.current = invoker ?? (document.activeElement as HTMLElement | null);
+      setOffer(options?.offer ?? null);
+      setIsOpen(true);
+    },
+    [],
+  );
 
   const closeWaitlist = useCallback(() => {
     setIsOpen(false);

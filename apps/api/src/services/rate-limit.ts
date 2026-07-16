@@ -269,7 +269,9 @@ export async function checkRateLimit(
     remaining: Math.max(0, limit - count),
     // Prefer remaining key TTL so clients are not told to wait a full hour
     // after a short window (or a residual long-TTL key we just capped).
-    retryAfterSeconds: allowed ? 0 : Math.max(1, Math.min(ttlSeconds || windowSeconds, windowSeconds)),
+    retryAfterSeconds: allowed
+      ? 0
+      : Math.max(1, Math.min(ttlSeconds || windowSeconds, windowSeconds)),
   };
 }
 

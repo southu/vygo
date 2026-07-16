@@ -37,10 +37,7 @@ export default function PricingPage() {
         <div className="container-page">
           <div className="max-w-3xl">
             <p className="eyebrow">{harden.eyebrow}</p>
-            <h2
-              id="harden-heading"
-              className="mt-4 font-display text-3xl font-bold sm:text-4xl"
-            >
+            <h2 id="harden-heading" className="mt-4 font-display text-3xl font-bold sm:text-4xl">
               {harden.headline}
             </h2>
             <div className="mt-5 space-y-4 text-lg text-muted">
@@ -86,7 +83,9 @@ export default function PricingPage() {
           </div>
 
           <div className="mt-12">
-            <h3 className="font-display text-xl font-bold text-ink">What vygo Harden may include</h3>
+            <h3 className="font-display text-xl font-bold text-ink">
+              What vygo Harden may include
+            </h3>
             <p className="mt-2 max-w-3xl text-sm text-muted">{harden.mayIncludeIntro}</p>
             <ul className="mt-6 grid gap-2 sm:grid-cols-2">
               {harden.mayInclude.map((item) => (

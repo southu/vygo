@@ -32,8 +32,7 @@ function fieldChecklist(): string {
 }
 
 function contextBlock(answers: ReadinessStage1Answers): string {
-  const blockers =
-    answers.blockers.length > 0 ? answers.blockers.join("; ") : "UNKNOWN";
+  const blockers = answers.blockers.length > 0 ? answers.blockers.join("; ") : "UNKNOWN";
   const deadline =
     answers.deadline === "Yes within 30 days" || answers.deadline === "Yes within 90 days"
       ? `${answers.deadline}${answers.deadlineDetail?.trim() ? ` — ${answers.deadlineDetail.trim()}` : ""}`

@@ -171,10 +171,7 @@ export function parseReadinessPastePartial(raw: string): ReadinessReportV1Partia
 }
 
 /** Build 4–6 human findings from a partial report for the confirmation screen. */
-export function buildConfirmationFindings(
-  report: ReadinessReportV1Partial,
-  max = 6,
-): string[] {
+export function buildConfirmationFindings(report: ReadinessReportV1Partial, max = 6): string[] {
   const findings: string[] = [];
   const push = (label: string, value: unknown) => {
     if (findings.length >= max) return;

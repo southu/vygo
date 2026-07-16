@@ -46,9 +46,7 @@ export function ManualQuestionnaire() {
     "loading",
   );
   const [errorMessage, setErrorMessage] = useState("");
-  const [savedMeta, setSavedMeta] = useState<{ source: string; confidence: string } | null>(
-    null,
-  );
+  const [savedMeta, setSavedMeta] = useState<{ source: string; confidence: string } | null>(null);
 
   const persistLocal = useCallback(
     (next: ManualAnswers, sessionToken: string | null, stage: string) => {
@@ -162,8 +160,7 @@ export function ManualQuestionnaire() {
         draft: sessionDraft,
       });
       persistLocal(answers, token, "manual_submitted");
-      const src =
-        typeof updated.draft?.source === "string" ? updated.draft.source : MANUAL_SOURCE;
+      const src = typeof updated.draft?.source === "string" ? updated.draft.source : MANUAL_SOURCE;
       const conf =
         typeof updated.draft?.confidence === "string"
           ? updated.draft.confidence
@@ -197,9 +194,7 @@ export function ManualQuestionnaire() {
   }
 
   if (status === "done") {
-    const resumeHref = token
-      ? `/readiness?token=${encodeURIComponent(token)}`
-      : "/readiness";
+    const resumeHref = token ? `/readiness?token=${encodeURIComponent(token)}` : "/readiness";
     return (
       <div className="card mt-8" data-testid="manual-questionnaire-done">
         <h2 className="font-display text-2xl font-bold text-ink">{c.successTitle}</h2>

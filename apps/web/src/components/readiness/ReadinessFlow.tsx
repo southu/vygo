@@ -105,9 +105,7 @@ export function ReadinessFlow() {
   const [errorMessage, setErrorMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [email, setEmail] = useState("");
-  const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "success" | "error">(
-    "idle",
-  );
+  const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [emailFeedback, setEmailFeedback] = useState("");
 
   // Stage 3 paste-back
@@ -633,11 +631,7 @@ export function ReadinessFlow() {
       <div className="card mt-8 border-red/30" role="alert" data-testid="readiness-error">
         <p className="font-semibold text-ink">We could not start the check.</p>
         <p className="mt-2 text-sm text-muted">{errorMessage}</p>
-        <button
-          type="button"
-          className="btn-primary mt-4"
-          onClick={() => window.location.reload()}
-        >
+        <button type="button" className="btn-primary mt-4" onClick={() => window.location.reload()}>
           Retry
         </button>
       </div>
@@ -757,7 +751,9 @@ export function ReadinessFlow() {
       aria-hidden={view === "stage3" ? undefined : true}
     >
       <p className="eyebrow">{c.stage3.progressLabel}</p>
-      <h2 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">{c.stage3.title}</h2>
+      <h2 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">
+        {c.stage3.title}
+      </h2>
       <p className="mt-3 text-base text-muted">{c.stage3.body}</p>
 
       <div className="mt-6">
@@ -1002,7 +998,11 @@ export function ReadinessFlow() {
             <legend className="font-display text-xl font-bold text-ink sm:text-2xl">
               {q.whoUses.label}
             </legend>
-            <div className="mt-4 flex flex-col gap-2" role="radiogroup" aria-label={q.whoUses.label}>
+            <div
+              className="mt-4 flex flex-col gap-2"
+              role="radiogroup"
+              aria-label={q.whoUses.label}
+            >
               {WHO_USES_OPTIONS.map((opt) => (
                 <label
                   key={opt}

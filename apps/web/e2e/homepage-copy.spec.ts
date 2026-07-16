@@ -130,9 +130,7 @@ const PROHIBITED_CONSUMER_PHRASES = [
 
 test.describe("Consumer surfaces: no entity or P-handoff legal language", () => {
   for (const path of CONSUMER_PATHS) {
-    test(`${path} HTML source has no prohibited entity/handoff phrasing`, async ({
-      request,
-    }) => {
+    test(`${path} HTML source has no prohibited entity/handoff phrasing`, async ({ request }) => {
       const res = await request.get(path);
       expect(res.status(), `${path} must return HTTP 200`).toBe(200);
       const html = await res.text();
@@ -142,9 +140,7 @@ test.describe("Consumer surfaces: no entity or P-handoff legal language", () => 
     });
   }
 
-  test("privacy and terms remain reachable with substantive legal content", async ({
-    request,
-  }) => {
+  test("privacy and terms remain reachable with substantive legal content", async ({ request }) => {
     const privacy = await request.get("/privacy");
     expect(privacy.status()).toBe(200);
     const privacyHtml = await privacy.text();

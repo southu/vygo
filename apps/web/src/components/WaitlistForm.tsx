@@ -519,9 +519,7 @@ export function WaitlistForm({
     const utm = {
       ...attribution.utm,
       campaign:
-        selectedOffer === "harden"
-          ? "vygo-harden-assessment"
-          : (attribution.utm.campaign ?? null),
+        selectedOffer === "harden" ? "vygo-harden-assessment" : (attribution.utm.campaign ?? null),
       content: selectedOffer ?? attribution.utm.content ?? null,
     };
 

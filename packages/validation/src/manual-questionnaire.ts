@@ -52,7 +52,12 @@ export const MANUAL_QUESTIONNAIRE: readonly ManualQuestion[] = [
     reportField: "size",
     label: "Roughly how big is the codebase?",
     type: "single",
-    options: ["Small (solo / MVP)", "Medium (small team)", "Large (many services or modules)", "Not sure"],
+    options: [
+      "Small (solo / MVP)",
+      "Medium (small team)",
+      "Large (many services or modules)",
+      "Not sure",
+    ],
     required: true,
   },
   {
@@ -112,12 +117,7 @@ export const MANUAL_QUESTIONNAIRE: readonly ManualQuestion[] = [
     reportField: "tests",
     label: "Do you have automated tests?",
     type: "single",
-    options: [
-      "Yes — meaningful coverage",
-      "A few smoke tests",
-      "No automated tests",
-      "Not sure",
-    ],
+    options: ["Yes — meaningful coverage", "A few smoke tests", "No automated tests", "Not sure"],
     required: true,
   },
   {

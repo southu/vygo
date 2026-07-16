@@ -11,7 +11,11 @@ import { scanPasteForSecrets, PASTE_SECRETS_BLOCK_MESSAGE } from "./paste-secret
 // Assemble fixtures without storing full high-confidence literals as single tokens.
 const SK_TEST = ["sk", "test", "abcdef1234567890abcdef"].join("-");
 const AKIA = "AKIA" + "0" + "EXAMPLEKEY12345"; // 16 chars after AKIA
-const JWT = ["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "eyJzdWIiOiIxMjM0NTY3ODkwIn0", "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"].join(".");
+const JWT = [
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+  "eyJzdWIiOiIxMjM0NTY3ODkwIn0",
+  "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
+].join(".");
 const PG = "postgres" + "://" + "user:pass@" + "host:5432/db";
 const PEM_BEGIN = "-----BEGIN " + "RSA " + "PRIVATE KEY-----";
 const API_ASSIGN = "api" + "_key = " + '"abcdefghijklmnopqrstuvwxyz12"';
@@ -56,8 +60,7 @@ describe("scanPasteForSecrets", () => {
   });
 
   it("does NOT block benign discussion of secrets", () => {
-    const text =
-      "We have an API key stored in our vault and the service uses tokens for auth";
+    const text = "We have an API key stored in our vault and the service uses tokens for auth";
     const r = scanPasteForSecrets(text);
     assert.equal(r.clean, true);
     assert.deepEqual(r.hits, []);

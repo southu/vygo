@@ -274,9 +274,7 @@ async function proxyJson(
     }
     const retryHeader = upstream.headers.get("retry-after");
     const retryAfterSeconds =
-      retryHeader && /^\d+$/.test(retryHeader.trim())
-        ? Number(retryHeader.trim())
-        : undefined;
+      retryHeader && /^\d+$/.test(retryHeader.trim()) ? Number(retryHeader.trim()) : undefined;
     return {
       status: upstream.status,
       body: payload,
