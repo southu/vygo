@@ -205,9 +205,9 @@ export function runDeterministicParse(redactedPaste: string): ParsePipelineResul
  */
 export async function tryLlmNormalizeReport(
   _redactedPaste: string,
-  env: { ANTHROPIC_API_KEY?: string; LLM_API_KEY?: string } = process.env,
+  env: NodeJS.ProcessEnv | { ANTHROPIC_API_KEY?: string; LLM_API_KEY?: string } = process.env,
 ): Promise<ReadinessReportV1 | null> {
-  const key = (env.ANTHROPIC_API_KEY || env.LLM_API_KEY || "").trim();
+  const key = String(env.ANTHROPIC_API_KEY || env.LLM_API_KEY || "").trim();
   if (!key) return null;
   // Provider wiring is intentional no-op until a vault-backed key is present
   // and an owner enables it. Deterministic parse remains the default path.
