@@ -153,6 +153,63 @@ describe("stage 4 follow-up question selection", () => {
     assert.ok(mKeys.has("payment_health_pii_prod"));
   });
 
+  it("minimal high-confidence automated report yields ONLY always questions", () => {
+    // Live repro matrix: single-tenant, fully automated, hard test gate, no PII, no SSO.
+    const minimal = {
+      tenancy: "single-tenant only; not multi-tenant; not enterprise",
+      deploys: "fully automated CI/CD auto-deploy on every merge; no manual steps",
+      tests: "unit integration and e2e tests are a hard gate on every deploy",
+      pii_categories:
+        "names and work emails only; explicitly no payment cards; no health PHI; no medical",
+      auth: "email magic link only; SSO not used; SAML not used",
+      authorization: "role-based within single org",
+      confidence: "high" as unknown as number,
+      summary: "Internal single-tenant tool",
+    };
+    const triggers = evaluateFollowupTriggers(minimal as typeof GOLDEN_CLEAN_FIELDS);
+    assert.equal(triggers.payment_health_pii, false, "payment_health_pii");
+    assert.equal(triggers.sso_saml, false, "sso_saml");
+    assert.equal(triggers.who_deploys, false, "who_deploys");
+    assert.equal(triggers.repo_access, false, "repo_access");
+    assert.equal(triggers.tests_on_deploy, false, "tests_on_deploy");
+    assert.equal(triggers.security_questionnaire, false, "security_questionnaire");
+    const keys = selectFollowupQuestions(minimal as typeof GOLDEN_CLEAN_FIELDS).map(
+      (q) => q.questionKey,
+    );
+    assert.deepEqual(keys, ["users_today", "users_12_months", "done_looks_like", "budget"]);
+  });
+
+  it("full-trigger report includes tests_on_every_deploy and applicable conditionals", () => {
+    // Live repro matrix: multi-tenant enterprise, manual deploys, tests never on deploy, PII, SSO, low conf.
+    const full = {
+      tenancy: "multi-tenant enterprise SaaS",
+      deploys: "manual one-click promote by founder; not automated",
+      tests: "unit tests exist but never run on deploy; no CI gate",
+      pii_categories: "production stores payment card PAN and HIPAA health PHI",
+      auth: "enterprise customers require SSO SAML",
+      authorization: "org-scoped roles",
+      confidence: "low" as unknown as number,
+      summary: "Multi-tenant enterprise SaaS with payment and health data",
+    };
+    const triggers = evaluateFollowupTriggers(full as typeof GOLDEN_CLEAN_FIELDS);
+    assert.equal(triggers.tests_on_deploy, true, "tests_on_deploy must fire");
+    assert.equal(triggers.payment_health_pii, true, "payment_health_pii");
+    assert.equal(triggers.sso_saml, true, "sso_saml");
+    assert.equal(triggers.who_deploys, true, "who_deploys");
+    assert.equal(triggers.repo_access, true, "repo_access");
+    assert.equal(triggers.security_questionnaire, true, "security_questionnaire (HIPAA)");
+    const keys = new Set(
+      selectFollowupQuestions(full as typeof GOLDEN_CLEAN_FIELDS).map((q) => q.questionKey),
+    );
+    assert.ok(keys.has("users_today"));
+    assert.ok(keys.has("tests_on_every_deploy"));
+    assert.ok(keys.has("security_framework"));
+    assert.ok(keys.has("payment_health_pii_prod"));
+    assert.ok(keys.has("sso_saml"));
+    assert.ok(keys.has("who_deploys"));
+    assert.ok(keys.has("repo_access_audit"));
+  });
+
   it("contradicting follow-up answers set internal discrepancy flags", () => {
     const report = {
       ...GOLDEN_CLEAN_FIELDS,

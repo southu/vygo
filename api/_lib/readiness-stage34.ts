@@ -464,6 +464,30 @@ function textOf(value: unknown): string {
   return String(value).toLowerCase();
 }
 
+/** Remove negated keyword phrases so residual text is not a false positive. */
+function stripNegatedKeywordPhrases(text: string, keywordSource: string): string {
+  const kw = keywordSource;
+  return text
+    .replace(
+      new RegExp(
+        `\\b(?:explicitly\\s+|clearly\\s+)?(?:no|not|never|without)\\s+(?:\\w+[\\s/-]+){0,3}(?:${kw})(?:[\\s/-]+\\w+){0,3}`,
+        "gi",
+      ),
+      " ",
+    )
+    .replace(
+      new RegExp(
+        `\\b(?:${kw})\\b(?:\\s+\\w+){0,3}\\s+(?:not\\s+used|unused|disabled|not\\s+required|not\\s+enabled|absent|none)\\b`,
+        "gi",
+      ),
+      " ",
+    );
+}
+
+function hasUnnegatedMatch(text: string, keywordSource: string, pattern: RegExp): boolean {
+  return pattern.test(stripNegatedKeywordPhrases(text, keywordSource));
+}
+
 function edgeConfidenceOf(report: Record<string, unknown>): number | null {
   if (typeof report.confidence === "number" && Number.isFinite(report.confidence)) {
     return report.confidence;
@@ -471,7 +495,7 @@ function edgeConfidenceOf(report: Record<string, unknown>): number | null {
   return edgeParseConfidence(report.confidence);
 }
 
-/** Multi-tenant / enterprise — must not treat "single-tenant" as multi. */
+/** Multi-tenant / enterprise — must not treat "single-tenant" / "SSO not used" as multi. */
 export function edgeIsMultiTenantOrEnterprise(
   tenancy: unknown,
   auth: unknown,
@@ -482,21 +506,75 @@ export function edgeIsMultiTenantOrEnterprise(
   const single = /single[-_\s]?tenant|solo(?:\s|$|,)|one[-_\s]?tenant|not\s+multi|no\s+multi/.test(
     t,
   );
-  const multi =
-    /multi[-_\s]?tenant|\benterprise\b|\bb2b\b|\bworkspaces?\b|\borg[_-]?id\b|\borgs\b/.test(t);
-  const ssoAuth = /\bsaml\b|\bsso\b/.test(authBlob);
-  const enterpriseAuth = /\benterprise\b/.test(authBlob);
+  const multiKw = "multi[-_\\s]?tenant|enterprise|b2b|workspaces?|org[_-]?id|orgs";
+  const multi = hasUnnegatedMatch(
+    t,
+    multiKw,
+    /multi[-_\s]?tenant|\benterprise\b|\bb2b\b|\bworkspaces?\b|\borg[_-]?id\b|\borgs\b/,
+  );
+  const ssoAuth = hasUnnegatedMatch(authBlob, "saml|sso", /\bsaml\b|\bsso\b/);
+  const enterpriseAuth = hasUnnegatedMatch(authBlob, "enterprise", /\benterprise\b/);
   if (single && !ssoAuth && !enterpriseAuth) return false;
   return multi || ssoAuth || enterpriseAuth;
 }
 
 function hasAutomatedDeploySignal(deploys: string): boolean {
-  return /ci\/?cd|github actions|automated|pipeline/.test(deploys);
+  return hasUnnegatedMatch(
+    deploys,
+    "ci\\/?cd|github actions|automated|auto-deploy|pipeline|fully auto",
+    /ci\/?cd|github actions|automated|auto-deploy|pipeline|fully auto/,
+  );
 }
 
 function hasManualOrOneClickDeploySignal(deploys: string): boolean {
-  return /manual|one-?click|click deploy|ssh|console|someone clicks|vercel dashboard|railway dashboard/.test(
+  return hasUnnegatedMatch(
     deploys,
+    "manual|one-?click|click deploy|ssh|console|someone clicks|vercel dashboard|railway dashboard",
+    /manual|one-?click|click deploy|ssh|console|someone clicks|vercel dashboard|railway dashboard/,
+  );
+}
+
+function testsAreHardGateOnDeploy(tests: string): boolean {
+  if (!tests || tests === "unknown") return false;
+  if (
+    /never\s+run\s+on\s+(?:every\s+)?deploy|not\s+run\s+on\s+(?:every\s+)?deploy|do\s+not\s+run\s+on\s+deploy|no\s+(?:ci\s+)?gate|without\s+(?:a\s+)?(?:ci\s+)?gate|tests?\s+(?:are\s+)?not\s+(?:a\s+)?(?:hard\s+)?gate|no\s+automated\s+tests|not\s+really\s+automated/.test(
+      tests,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /(?:hard\s+)?gate(?:d)?\s+on\s+every(?:\s+deploy)?|on\s+every\s+deploy|required\s+(?:in\s+)?ci|ci\s+gate|tests?\s+gate|every\s+deploy\s+via\s+ci|via\s+ci\b/.test(
+      tests,
+    )
+  ) {
+    return true;
+  }
+  if (/ci/.test(tests) && /every|gate|required/.test(tests) && !/no\s+ci/.test(tests)) {
+    return true;
+  }
+  return false;
+}
+
+function hasPaymentOrHealthPiiSignal(pii: string, summary: string): boolean {
+  const piiKw =
+    "payment(?:\\s+cards?)?|cards?|pci|stripe|billing|health(?:\\s+(?:records?|pii|phi))?|hipaa|phi|medical|patient";
+  const piiForPositive = stripNegatedKeywordPhrases(pii, piiKw)
+    .replace(/neither\s+payment\s+nor\s+health[^,;.]*/gi, " ")
+    .replace(/\bnames?\s+and\s+work\s+emails?\s+only\b/gi, " ")
+    .replace(/\bemail,?\s*name\b/gi, " ");
+  const summaryForPositive = stripNegatedKeywordPhrases(summary, piiKw);
+  return (
+    /payment|card|pci|stripe|billing|health|hipaa|phi|medical|patient/.test(piiForPositive) ||
+    /payment|health|hipaa|phi|medical|patient/.test(summaryForPositive)
+  );
+}
+
+function piiIsExplicitlyNone(pii: string): boolean {
+  if (!pii) return false;
+  if (/^(none|n\/a|na|no|unknown)$/.test(pii.trim())) return true;
+  return /no payment|no health|no medical|no phi|no hipaa|neither payment nor health|no payment card or health|no pii|explicitly no payment|names?\s+and\s+work\s+emails?\s+only|email,?\s*name(?:;|,|\s)*no payment/.test(
+    pii,
   );
 }
 
@@ -512,49 +590,35 @@ export function edgeEvaluateTriggers(report: Record<string, unknown>): Record<st
   const summary = textOf(report.summary);
 
   const multiTenantOrEnterprise = edgeIsMultiTenantOrEnterprise(tenancy, auth, authorization);
-  // Security questionnaire only for compliance/framework context — not multi-tenant alone.
+  const securityBlob = stripNegatedKeywordPhrases(
+    `${summary} ${fragility} ${pii} ${tenancy}`,
+    "soc\\s*2|iso\\s*27001|hipaa|pci\\s*dss|fedramp|compliance|questionnaire|security framework|security questionnaire|phi|medical",
+  );
   const mentionsSecurityAsk =
     /soc\s*2|iso\s*27001|hipaa|pci\s*dss|fedramp|compliance|questionnaire|security framework|security questionnaire/.test(
-      `${summary} ${fragility} ${pii} ${tenancy}`,
+      securityBlob,
     );
-  const testsClearlyGated =
-    /every deploy|on every deploy|on deploy|required in ci|ci gate|gated on every|gate(d)? on every|tests?\s+gate/.test(
-      tests,
-    ) ||
-    (/ci/.test(tests) && /every|gate|required/.test(tests));
-  const testsAmbiguous =
+  const testsClearlyGated = testsAreHardGateOnDeploy(tests);
+  const testsMissingOrWeak =
     !tests ||
     tests === "unknown" ||
-    /no test|none|manual|not really|ad-?hoc|sometimes|partial/.test(tests) ||
-    !testsClearlyGated;
-  // Strip common negations so "no payment card or health records" is not a hit.
-  const piiForPositive = pii
-    .replace(
-      /no\s+payment(?:\s+card)?(?:\s+or\s+health(?:\s+records?)?)?(?:\s+in\s+prod(?:uction)?)?/gi,
-      " ",
-    )
-    .replace(/no\s+health(?:\s+records?|pii)?(?:\s+in\s+prod(?:uction)?)?/gi, " ")
-    .replace(/neither\s+payment\s+nor\s+health[^,;.]*/gi, " ")
-    .replace(/without\s+(?:payment|health|phi|pci)[^,;.]*/gi, " ")
-    .replace(/no\s+pii[^,;.]*/gi, " ");
-  const hasPaymentOrHealthHint =
-    /payment|card|pci|stripe|billing|health|hipaa|phi|medical|patient/.test(piiForPositive) ||
-    /payment|health|hipaa|phi/.test(summary);
-  const piiExplicitlyNone =
-    /^(none|n\/a|na|no|unknown)$/.test(pii.trim()) ||
-    /no payment|no health|neither payment nor health|no payment card or health|no pii/.test(pii);
+    /no test|none|manual|not really|ad-?hoc|sometimes|partial|never\s+run|not\s+run\s+on\s+deploy|no\s+(?:ci\s+)?gate/.test(
+      tests,
+    );
+  const testsAmbiguous = testsMissingOrWeak || !testsClearlyGated;
+  const hasPaymentOrHealthHint = hasPaymentOrHealthPiiSignal(pii, summary);
+  const piiExplicitlyNone = piiIsExplicitlyNone(pii);
   const automated = hasAutomatedDeploySignal(deploys);
   const manualHint = hasManualOrOneClickDeploySignal(deploys);
-  const manualOrOneClickDeploy =
-    !deploys || deploys === "unknown" || manualHint || (!automated && !/fully auto/.test(deploys));
-  const whoDeploysTrigger = manualOrOneClickDeploy && !(automated && !manualHint);
+  const whoDeploysTrigger =
+    (!deploys || deploys === "unknown" || manualHint || !automated) && !(automated && !manualHint);
   const lowConfidence = conf == null || conf < 0.5;
 
   return {
     security_questionnaire: mentionsSecurityAsk,
     tests_on_deploy: testsAmbiguous,
     payment_health_pii:
-      hasPaymentOrHealthHint || ((!pii || /unknown/.test(pii)) && !piiExplicitlyNone),
+      !piiExplicitlyNone && (hasPaymentOrHealthHint || !pii || /unknown/.test(pii)),
     sso_saml: multiTenantOrEnterprise,
     who_deploys: whoDeploysTrigger,
     repo_access: lowConfidence || whoDeploysTrigger,
