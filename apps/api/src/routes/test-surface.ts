@@ -545,8 +545,8 @@ async function handleIntegrationReport(
     const mem = new MemoryRateLimitStore();
     let limited = false;
     for (let i = 0; i < 5; i++) {
-      const c = await mem.incr("rl:ip:test", 60);
-      if (c > 3) limited = true;
+      const { count } = await mem.incr("rl:ip:test", 60);
+      if (count > 3) limited = true;
     }
     record("rate_limiting", limited);
   }

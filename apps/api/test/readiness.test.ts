@@ -177,6 +177,7 @@ describe("readiness routes without database", () => {
     rateLimitStore.clear();
     let saw429 = false;
     let successes = 0;
+    let retryAfter: number | null = null;
     for (let i = 0; i < 35; i += 1) {
       const res = await ctx.app.inject({
         method: "POST",
@@ -191,8 +192,15 @@ describe("readiness routes without database", () => {
         saw429 = true;
         const body = res.json() as { error?: { code?: string } };
         assert.equal(body.error?.code, "RATE_LIMITED");
-        // Create bucket should allow a normal multi-step flow (several creates headroom).
+        // Create budget should allow a normal multi-step flow (several ops headroom).
         assert.ok(successes >= 5, `expected headroom before 429, got ${successes}`);
+        const raw = res.headers["retry-after"];
+        retryAfter = typeof raw === "string" ? Number(raw) : Number(raw);
+        // Short window — never a 1-hour hard lockout.
+        assert.ok(
+          Number.isFinite(retryAfter) && retryAfter > 0 && retryAfter <= 120,
+          `expected short Retry-After, got ${raw}`,
+        );
         break;
       }
       if (res.statusCode === 503 || res.statusCode === 201) {
@@ -200,26 +208,39 @@ describe("readiness routes without database", () => {
       }
     }
     assert.equal(saw429, true);
+    assert.ok(retryAfter !== null);
   });
 
-  it("create rate limit is independent of token route traffic", async () => {
+  it("multi-step create+GET+PATCH stays under the shared readiness budget", async () => {
     rateLimitStore.clear();
-    // Exhaust token-route budget with GETs.
-    for (let i = 0; i < 45; i += 1) {
-      await ctx.app.inject({
+    const ip = "203.0.113.88";
+    // Simulate a normal interactive session: create then several resume/save ops.
+    for (let i = 0; i < 8; i += 1) {
+      const create = await ctx.app.inject({
+        method: "POST",
+        url: "/v1/readiness/session",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": ip,
+        },
+        payload: {},
+      });
+      // Without DB this is 503, but must not be 429 for ordinary multi-step use.
+      assert.notEqual(create.statusCode, 429, `create #${i} should not be rate limited`);
+      assert.ok(create.statusCode === 503 || create.statusCode === 201);
+
+      const get = await ctx.app.inject({
         method: "GET",
         url: "/v1/readiness/session/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        headers: { "x-forwarded-for": "203.0.113.77" },
+        headers: { "x-forwarded-for": ip },
       });
+      assert.notEqual(get.statusCode, 429, `get #${i} should not be rate limited`);
     }
-    const limitedToken = await ctx.app.inject({
-      method: "GET",
-      url: "/v1/readiness/session/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      headers: { "x-forwarded-for": "203.0.113.77" },
-    });
-    assert.equal(limitedToken.statusCode, 429);
+  });
 
-    // Create for the same IP must still be allowed (separate bucket).
+  it("waitlist-style IP limits do not gate readiness session create", async () => {
+    rateLimitStore.clear();
+    // Even with a tight waitlist IP budget configured, readiness uses its own key.
     const create = await ctx.app.inject({
       method: "POST",
       url: "/v1/readiness/session",

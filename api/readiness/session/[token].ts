@@ -33,11 +33,12 @@ let cachedUrl: string | null = null;
 
 /**
  * Coarse in-process rate limit for the local-DB path only.
- * Headroom for multi-step resume/save; 30+ burst still 429s.
+ * Shared budget with create (same window/limit class) so resume cannot be
+ * locked while create still works. Proxy path: Railway owns counters.
  */
 const rlBuckets = new Map<string, { count: number; expiresAt: number }>();
-const RL_LIMIT = 40;
-const RL_WINDOW_MS = 120 * 1000;
+const RL_LIMIT = 20;
+const RL_WINDOW_MS = 60 * 1000;
 
 function getSql(url: string): Sql {
   if (!cachedSql || cachedUrl !== url) {

@@ -35,11 +35,12 @@ let cachedUrl: string | null = null;
 
 /**
  * Coarse in-process rate limit used ONLY for the local-DB path (per warm isolate).
- * Headroom for a few creates; short window so a prior run cannot block for an hour.
+ * Aligns with Railway readiness budget: ~20 ops / 60s, never a 1-hour lockout.
+ * Proxy path does not double-limit — Railway Redis owns counters.
  */
 const rlBuckets = new Map<string, { count: number; expiresAt: number }>();
-const RL_LIMIT = 30;
-const RL_WINDOW_MS = 120 * 1000;
+const RL_LIMIT = 20;
+const RL_WINDOW_MS = 60 * 1000;
 
 function getSql(url: string): Sql {
   if (!cachedSql || cachedUrl !== url) {

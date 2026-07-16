@@ -13,12 +13,19 @@ export type RateLimitResult = {
   count: number;
   limit: number;
   remaining: number;
+  /** Seconds until the window resets (0 when allowed). Prefer remaining TTL. */
   retryAfterSeconds: number;
 };
 
+export type RateLimitIncrResult = {
+  count: number;
+  /** Remaining TTL in seconds for the key (>= 1 when known, else windowSeconds). */
+  ttlSeconds: number;
+};
+
 export type RateLimitStore = {
-  /** Increment key and return current count within the TTL window. */
-  incr(key: string, windowSeconds: number): Promise<number>;
+  /** Increment key and return current count + remaining TTL within the window. */
+  incr(key: string, windowSeconds: number): Promise<RateLimitIncrResult>;
   /** Current count without incrementing (0 if missing/expired). */
   get(key: string): Promise<number>;
   close?: () => Promise<void>;
@@ -35,15 +42,16 @@ export class MemoryRateLimitStore implements RateLimitStore {
     return existing.count;
   }
 
-  async incr(key: string, windowSeconds: number): Promise<number> {
+  async incr(key: string, windowSeconds: number): Promise<RateLimitIncrResult> {
     const now = Date.now();
     const existing = this.buckets.get(key);
     if (!existing || existing.expiresAt <= now) {
       this.buckets.set(key, { count: 1, expiresAt: now + windowSeconds * 1000 });
-      return 1;
+      return { count: 1, ttlSeconds: windowSeconds };
     }
     existing.count += 1;
-    return existing.count;
+    const ttlSeconds = Math.max(1, Math.ceil((existing.expiresAt - now) / 1000));
+    return { count: existing.count, ttlSeconds };
   }
 
   /** Test helper: clear all counters. */
@@ -58,7 +66,9 @@ export class MemoryRateLimitStore implements RateLimitStore {
 
 /**
  * Minimal Redis client using the RESP protocol over TCP.
- * Avoids an extra dependency; supports INCR + EXPIRE (on first hit) + PING.
+ * Avoids an extra dependency; supports INCR + EXPIRE + TTL + PING.
+ * Commands are serialized through a single queue so concurrent requests cannot
+ * interleave RESP replies (which previously could poison counts / TTLs).
  */
 export class RedisRateLimitStore implements RateLimitStore {
   private socket: Socket | null = null;
@@ -70,6 +80,8 @@ export class RedisRateLimitStore implements RateLimitStore {
     lines: string[];
   }> = [];
   private readonly url: URL;
+  /** Serialize all Redis commands on this connection. */
+  private chain: Promise<unknown> = Promise.resolve();
 
   constructor(redisUrl: string) {
     this.url = new URL(redisUrl);
@@ -95,11 +107,11 @@ export class RedisRateLimitStore implements RateLimitStore {
     this.socket = socket;
 
     if (this.url.password) {
-      await this.send(["AUTH", decodeURIComponent(this.url.password)]);
+      await this.sendUnlocked(["AUTH", decodeURIComponent(this.url.password)]);
     }
     if (this.url.pathname && this.url.pathname !== "/") {
       const db = this.url.pathname.replace(/^\//, "");
-      if (db) await this.send(["SELECT", db]);
+      if (db) await this.sendUnlocked(["SELECT", db]);
     }
     return socket;
   }
@@ -129,7 +141,7 @@ export class RedisRateLimitStore implements RateLimitStore {
         if (w.lines.length >= w.expected) w.resolve(w.lines);
         continue;
       }
-      // bulk / array — not needed for INCR/EXPIRE/AUTH
+      // bulk / array — not needed for INCR/EXPIRE/AUTH/TTL integers
       const end = text.indexOf("\r\n");
       if (end < 0) return;
       const line = text.slice(0, end);
@@ -140,7 +152,7 @@ export class RedisRateLimitStore implements RateLimitStore {
     }
   }
 
-  private async send(parts: string[]): Promise<string[]> {
+  private async sendUnlocked(parts: string[]): Promise<string[]> {
     const socket = await this.ensureConnected();
     const payload =
       `*${parts.length}\r\n` + parts.map((p) => `$${Buffer.byteLength(p)}\r\n${p}\r\n`).join("");
@@ -148,6 +160,17 @@ export class RedisRateLimitStore implements RateLimitStore {
       this.waiters.push({ resolve, reject, expected: 1, lines: [] });
       socket.write(payload);
     });
+  }
+
+  /** Public send: serialized so concurrent handlers never interleave RESP. */
+  private send(parts: string[]): Promise<string[]> {
+    const run = this.chain.then(() => this.sendUnlocked(parts));
+    // Keep the chain alive even when a command fails.
+    this.chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
   }
 
   async get(key: string): Promise<number> {
@@ -168,33 +191,47 @@ export class RedisRateLimitStore implements RateLimitStore {
     }
   }
 
-  async incr(key: string, windowSeconds: number): Promise<number> {
+  async incr(key: string, windowSeconds: number): Promise<RateLimitIncrResult> {
     const replies = await this.send(["INCR", key]);
     const raw = replies[0] ?? ":0";
     const count = Number(raw.startsWith(":") ? raw.slice(1) : raw);
-    // Always ensure a TTL. EXPIRE on first hit is the happy path; if a legacy
-    // key has no TTL (or EXPIRE previously failed), repair it so counters cannot
-    // stick forever and permanently 429 legitimate clients.
-    if (count === 1) {
-      await this.send(["EXPIRE", key, String(windowSeconds)]);
-    } else {
-      try {
+
+    // Always ensure a finite, short TTL. Never leave counters without expiry, and
+    // never leave a legacy multi-hour TTL that blocks resume for an hour.
+    let ttlSeconds = windowSeconds;
+    try {
+      if (count === 1) {
+        await this.send(["EXPIRE", key, String(windowSeconds)]);
+        ttlSeconds = windowSeconds;
+      } else {
         const ttlReplies = await this.send(["TTL", key]);
         const ttlRaw = ttlReplies[0] ?? ":-2";
         const ttl = Number(ttlRaw.startsWith(":") ? ttlRaw.slice(1) : ttlRaw);
-        // -1 = no expiry, -2 = missing (race). Both need a finite window.
         if (!Number.isFinite(ttl) || ttl < 0) {
+          // -1 = no expiry, -2 = missing (race). Repair to the current window.
           await this.send(["EXPIRE", key, String(windowSeconds)]);
-        }
-      } catch {
-        try {
+          ttlSeconds = windowSeconds;
+        } else if (ttl > windowSeconds) {
+          // Cap residual long lockouts (e.g. prior 3600s windows) to the new window.
           await this.send(["EXPIRE", key, String(windowSeconds)]);
-        } catch {
-          // best-effort; next request will retry repair
+          ttlSeconds = windowSeconds;
+        } else {
+          ttlSeconds = Math.max(1, ttl);
         }
       }
+    } catch {
+      try {
+        await this.send(["EXPIRE", key, String(windowSeconds)]);
+      } catch {
+        // best-effort; next request will retry repair
+      }
+      ttlSeconds = windowSeconds;
     }
-    return count;
+
+    return {
+      count: Number.isFinite(count) ? count : 0,
+      ttlSeconds,
+    };
   }
 
   async close(): Promise<void> {
@@ -223,14 +260,16 @@ export async function checkRateLimit(
   limit: number,
   windowSeconds: number,
 ): Promise<RateLimitResult> {
-  const count = await store.incr(key, windowSeconds);
+  const { count, ttlSeconds } = await store.incr(key, windowSeconds);
   const allowed = count <= limit;
   return {
     allowed,
     count,
     limit,
     remaining: Math.max(0, limit - count),
-    retryAfterSeconds: allowed ? 0 : windowSeconds,
+    // Prefer remaining key TTL so clients are not told to wait a full hour
+    // after a short window (or a residual long-TTL key we just capped).
+    retryAfterSeconds: allowed ? 0 : Math.max(1, Math.min(ttlSeconds || windowSeconds, windowSeconds)),
   };
 }
 
