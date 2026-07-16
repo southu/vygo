@@ -6,24 +6,54 @@
   "framework": null,
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/v1/analytics", "destination": "/api/analytics" },
-    { "source": "/v1/waitlist", "destination": "/api/waitlist" },
-    { "source": "/v1/readiness/session", "destination": "/api/readiness/session" },
+    {
+      "source": "/v1/analytics",
+      "destination": "/api/analytics"
+    },
+    {
+      "source": "/v1/waitlist",
+      "destination": "/api/waitlist"
+    },
+    {
+      "source": "/v1/readiness/session",
+      "destination": "/api/readiness/session"
+    },
     {
       "source": "/v1/readiness/session/:token",
       "destination": "/api/readiness/session/:token"
     },
-    { "source": "/v1/readiness/lead", "destination": "/api/readiness/lead" },
-    { "source": "/v1/readiness/email-prompt", "destination": "/api/readiness/email-prompt" },
-    { "source": "/v1/readiness/parse", "destination": "/api/readiness/parse" },
-    { "source": "/v1/readiness/followups", "destination": "/api/readiness/followups" },
+    {
+      "source": "/v1/readiness/lead",
+      "destination": "/api/readiness/lead"
+    },
+    {
+      "source": "/v1/readiness/email-prompt",
+      "destination": "/api/readiness/email-prompt"
+    },
+    {
+      "source": "/v1/readiness/parse",
+      "destination": "/api/readiness/parse"
+    },
+    {
+      "source": "/v1/readiness/followups",
+      "destination": "/api/readiness/followups"
+    },
     {
       "source": "/v1/readiness/followups/answer",
       "destination": "/api/readiness/followups-answer"
     },
-    { "source": "/v1/readiness/submission", "destination": "/api/readiness/submission" },
-    { "source": "/v1/readiness/brief", "destination": "/api/readiness/brief" },
-    { "source": "/v1/readiness/score", "destination": "/api/readiness/score" },
+    {
+      "source": "/v1/readiness/submission",
+      "destination": "/api/readiness/submission"
+    },
+    {
+      "source": "/v1/readiness/brief",
+      "destination": "/api/readiness/brief"
+    },
+    {
+      "source": "/v1/readiness/score",
+      "destination": "/api/readiness/score"
+    },
     {
       "source": "/v1/readiness/snapshot/:id/email",
       "destination": "/api/readiness/snapshot-email?id=:id"
@@ -32,108 +62,236 @@
       "source": "/v1/readiness/snapshot/:id",
       "destination": "/api/readiness/snapshot?id=:id"
     },
-    { "source": "/v1/public/availability", "destination": "/api/availability" },
-    { "source": "/v1/ops/readiness/export", "destination": "/api/ops/readiness?export=1" },
-    { "source": "/v1/ops/readiness/:id", "destination": "/api/ops/readiness?id=:id" },
-    { "source": "/v1/ops/readiness", "destination": "/api/ops/readiness" },
-    { "source": "/health", "destination": "/api/health" },
-    { "source": "/readyz", "destination": "/api/readyz" },
-    { "source": "/worker", "destination": "/api/worker-status" },
-    { "source": "/workerz", "destination": "/api/worker-status" },
-    { "source": "/worker/status", "destination": "/api/worker-status" },
-    { "source": "/worker/health", "destination": "/api/worker-status" },
-    { "source": "/api/worker", "destination": "/api/worker-status" },
-    { "source": "/api/readiness", "destination": "/api/readiness.json" },
-    { "source": "/api/railway-foundation", "destination": "/api/railway-foundation.json" },
-    { "source": "/api/provision", "destination": "/api/provision.json" },
-    { "source": "/provisioning-status", "destination": "/api/provisioning-status" },
-    { "source": "/provisioning", "destination": "/api/provisioning-status" }
+    {
+      "source": "/v1/public/availability",
+      "destination": "/api/availability"
+    },
+    {
+      "source": "/v1/ops/readiness/export",
+      "destination": "/api/ops/readiness?export=1"
+    },
+    {
+      "source": "/v1/ops/readiness/:id",
+      "destination": "/api/ops/readiness?id=:id"
+    },
+    {
+      "source": "/v1/ops/readiness",
+      "destination": "/api/ops/readiness"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/health"
+    },
+    {
+      "source": "/readyz",
+      "destination": "/api/readyz"
+    },
+    {
+      "source": "/api/worker-status",
+      "destination": "/api/health?role=worker"
+    },
+    {
+      "source": "/worker",
+      "destination": "/api/health?role=worker"
+    },
+    {
+      "source": "/workerz",
+      "destination": "/api/health?role=worker"
+    },
+    {
+      "source": "/worker/status",
+      "destination": "/api/health?role=worker"
+    },
+    {
+      "source": "/worker/health",
+      "destination": "/api/health?role=worker"
+    },
+    {
+      "source": "/api/worker",
+      "destination": "/api/health?role=worker"
+    },
+    {
+      "source": "/api/readiness",
+      "destination": "/api/readiness.json"
+    },
+    {
+      "source": "/api/railway-foundation",
+      "destination": "/api/railway-foundation.json"
+    },
+    {
+      "source": "/api/provision",
+      "destination": "/api/provision.json"
+    },
+    {
+      "source": "/provisioning-status",
+      "destination": "/api/provisioning-status"
+    },
+    {
+      "source": "/provisioning",
+      "destination": "/api/provisioning-status"
+    }
   ],
   "headers": [
     {
       "source": "/version",
       "headers": [
-        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/version.txt",
       "headers": [
-        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/apply-audit.json",
       "headers": [
-        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/healthz",
       "headers": [
-        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/readyz",
       "headers": [
-        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/api/readiness",
       "headers": [
-        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/api/readiness.json",
       "headers": [
-        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/api/railway-foundation",
       "headers": [
-        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/api/railway-foundation.json",
       "headers": [
-        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/api/provision",
       "headers": [
-        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/api/provision.json",
       "headers": [
-        { "key": "Content-Type", "value": "application/json; charset=utf-8" },
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/provisioning-status",
-      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
     },
     {
       "source": "/provisioning",
-      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
     }
   ]
 }
