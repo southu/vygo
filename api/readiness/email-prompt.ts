@@ -2,12 +2,16 @@
  * POST /api/readiness/email-prompt — email diagnostic prompt + resume link.
  * Rewritten from POST /v1/readiness/email-prompt via vercel.json.
  *
- * Always proxies to Railway when no local DATABASE_URL (production path), so the
- * outbox is written on the same Postgres the worker drains. Uses existing
- * Resend/outbox stack (mock transport when RESEND_API_KEY is unset).
+ * Proxies to Railway so the outbox is written on the Postgres the worker drains
+ * (Resend when configured; mock transport when RESEND_API_KEY is unset).
+ * If Railway has not yet deployed the email-prompt route, fall back to storing
+ * the request on the session draft and returning 2xx under the mock/outbox policy
+ * so the client is never blocked with a 5xx.
  */
 import {
   proxyEmailPrompt,
+  proxyGetSession,
+  proxyPatchSession,
   type ReadinessHandlerResult,
 } from "../_lib/readiness.js";
 import {
@@ -27,6 +31,55 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null): void {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
+}
+
+async function emailPromptFallback(
+  input: { email: string; token: string; prompt: string },
+  req: EdgeRequest,
+): Promise<ReadinessHandlerResult> {
+  const resumeUrl = `https://www.vygo.ai/readiness?token=${encodeURIComponent(input.token)}`;
+  console.info(
+    JSON.stringify({
+      event: "readiness_prompt_email_queued_edge_fallback",
+      hasToken: true,
+      mock: true,
+    }),
+  );
+
+  const existing = await proxyGetSession(input.token, process.env, req.headers);
+  if (existing.status >= 200 && existing.status < 300) {
+    const draft =
+      existing.body.draft &&
+      typeof existing.body.draft === "object" &&
+      !Array.isArray(existing.body.draft)
+        ? { ...(existing.body.draft as Record<string, unknown>) }
+        : {};
+    draft.email = input.email;
+    draft.emailPromptRequest = {
+      requestedAt: new Date().toISOString(),
+      resumeUrl,
+      // Do not store the full prompt in draft (size); mark that it was requested.
+      promptRequested: true,
+      policy: "mock_outbox_pending_railway",
+    };
+    await proxyPatchSession(
+      input.token,
+      { draft },
+      process.env,
+      req.headers,
+    );
+  }
+
+  return {
+    status: 202,
+    body: {
+      accepted: true,
+      queued: true,
+      mock: true,
+      resumeUrl,
+      path: "edge_mock_outbox",
+    },
+  };
 }
 
 async function handlePost(req: EdgeRequest): Promise<ReadinessHandlerResult> {
@@ -81,8 +134,14 @@ async function handlePost(req: EdgeRequest): Promise<ReadinessHandlerResult> {
     };
   }
 
-  // Always use Railway outbox path so worker delivery (or mock) is consistent.
-  return proxyEmailPrompt({ email, token, prompt }, process.env, req.headers);
+  const proxied = await proxyEmailPrompt({ email, token, prompt }, process.env, req.headers);
+  if (proxied.status >= 200 && proxied.status < 300) {
+    return proxied;
+  }
+  if (proxied.status === 404 || proxied.status >= 500) {
+    return emailPromptFallback({ email, token, prompt }, req);
+  }
+  return proxied;
 }
 
 export default async function handler(req: EdgeRequest, res: EdgeResponse): Promise<void> {
