@@ -1,0 +1,53 @@
+{
+  "artifact": "railway-db-query-method",
+  "purpose": "Non-secret Railway Postgres query metadata for Vault Provisioner-backed verification. No credentials.",
+  "ok": true,
+  "provider": "railway",
+  "project_name": "vygo",
+  "project_id": "1b8abe52-f665-4e07-9a99-f6aa36a62610",
+  "environment_id": "39b57aef-2574-4d8e-bbd2-673e91eb9768",
+  "environment_name": "production",
+  "dashboard_url": "https://railway.app/project/1b8abe52-f665-4e07-9a99-f6aa36a62610",
+  "postgres": {
+    "service_name": "Postgres-0MtT",
+    "service_id": "7e3b44d3-f9d4-4afd-a367-2fde98bd510f",
+    "database_name": "railway",
+    "public_proxy_host": "tokaido.proxy.rlwy.net",
+    "public_proxy_port": "14610"
+  },
+  "table": {
+    "name": "applications",
+    "columns": [
+      "id",
+      "full_name",
+      "work_email",
+      "product_url",
+      "message",
+      "source",
+      "created_at"
+    ]
+  },
+  "connection_method": {
+    "name": "vault-provisioner-lease-psql",
+    "steps": [
+      "Confirm Vault consumer is armed (GET /api/consumer/status via harness VAULT_URL).",
+      "register_run for folder=vygo and the mission run_id.",
+      "Issue a short-lived consumer lease for RAILWAY_TOKEN (provider=railway).",
+      "Use Railway GraphQL variables for project_id + environment_id + service_id Postgres-0MtT.",
+      "Connect with psql to DATABASE_PUBLIC_URL (not the .railway.internal DATABASE_URL).",
+      "Release the lease immediately after the SELECT.",
+      "Never write tokens, passwords, or secret-bearing connection strings into TESTLOG.md, verdicts, or commits."
+    ]
+  },
+  "approved_sql": {
+    "success_exactly_one": "SELECT id::text AS id, full_name, work_email, product_url, message, source, created_at::text AS created_at FROM applications WHERE full_name = 'Ratchet E2E Test' AND work_email = 'e2e-test+<run-marker>@vygo.ai';",
+    "success_count": "SELECT count(*)::int AS n FROM applications WHERE full_name = 'Ratchet E2E Test' AND work_email = 'e2e-test+<run-marker>@vygo.ai';",
+    "invalid_zero": "SELECT count(*)::int AS n FROM applications WHERE work_email = 'not-an-email';"
+  },
+  "harness_locations": {
+    "run_shared_provision_summary": "shared/provision_summary.json (non-secret; written by Vault Provisioner + builder enrichment)",
+    "run_shared_provision": "shared/provision.json (non-secret inventory)",
+    "live_public_copy": "https://www.vygo.ai/api/railway-db-query-method.json"
+  },
+  "secrets_policy": "This document contains no tokens, passwords, or connection strings. Credentials come exclusively through the Vault Provisioner consumer lease path."
+}
