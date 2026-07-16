@@ -153,12 +153,13 @@ function textOf(value: unknown): string {
 }
 
 function confidenceOf(report: ReadinessReportV1Partial): number | null {
-  if (typeof report.confidence === "number" && Number.isFinite(report.confidence)) {
-    return report.confidence;
+  const raw: unknown = report.confidence;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
   }
   // Labels may still be present if an older partial path stored a string.
-  if (typeof report.confidence === "string") {
-    const s = report.confidence.trim().toLowerCase();
+  if (typeof raw === "string") {
+    const s = raw.trim().toLowerCase();
     if (
       /^(very\s+)?high\b|^strong\b|^good\b/.test(s) ||
       (/\bhigh\b/.test(s) && !/\blow\b/.test(s))
