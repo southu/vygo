@@ -26,6 +26,7 @@ import { registerTestSurfaceRoutes, TEST_SUPPORT_ROUTES } from "./routes/test-su
 import { registerWaitlistRoutes } from "./routes/waitlist.js";
 import { registerApplyRoutes } from "./routes/apply.js";
 import { registerReadinessRoutes } from "./routes/readiness.js";
+import { registerOpsRoutes } from "./routes/ops.js";
 import { registerResendWebhookRoutes } from "./routes/webhooks-resend.js";
 import {
   createRateLimitStore,
@@ -321,6 +322,12 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
     getDb,
     rateLimitStore,
     turnstile,
+  });
+
+  // Internal ops (readiness list / brief / CSV) — Basic Auth via OPS_BASIC_AUTH_*.
+  registerOpsRoutes(app, {
+    env,
+    getDb,
   });
 
   registerResendWebhookRoutes(app, {

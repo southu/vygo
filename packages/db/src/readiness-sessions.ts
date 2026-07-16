@@ -5,7 +5,7 @@
  * a documented stub until a scheduled job is wired.
  */
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
 import {
   OUTBOX_KINDS,
@@ -933,6 +933,238 @@ export async function findReadinessBriefBySubmissionId(
     .where(eq(readinessBriefs.submissionId, id))
     .limit(1);
   return rows[0] ? toBriefPublic(rows[0]) : null;
+}
+
+/** Ops list filters — bucket exact match + inclusive created_at date range (UTC day). */
+export type ListOpsReadinessFilters = {
+  bucket?: string | null;
+  /** Inclusive start (YYYY-MM-DD or ISO). */
+  from?: string | null;
+  /** Inclusive end (YYYY-MM-DD or ISO). */
+  to?: string | null;
+  limit?: number;
+};
+
+/** Safe list row for internal ops — no raw paste, no credential-shaped fields. */
+export type OpsReadinessListRow = {
+  id: string;
+  bucket: string | null;
+  createdAt: string;
+  contactName: string | null;
+  contactEmail: string | null;
+  company: string | null;
+  overallScore: number | null;
+  dimensionScores: Record<string, number> | null;
+  discrepancyFlagCount: number;
+  hasBrief: boolean;
+};
+
+export type OpsReadinessDetail = {
+  id: string;
+  bucket: string | null;
+  createdAt: string;
+  scores: Record<string, unknown> | null;
+  discrepancyFlags: unknown[];
+  contact: Record<string, unknown> | null;
+  parsedReport: Record<string, unknown> | null;
+  /** Already-redacted paste only; never unredacted secrets. */
+  rawPasteRedacted: string | null;
+  brief: ReadinessBriefPublic | null;
+};
+
+function parseOpsDayStart(value: string): Date | null {
+  const t = value.trim();
+  if (!t) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    const d = new Date(`${t}T00:00:00.000Z`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function parseOpsDayEnd(value: string): Date | null {
+  const t = value.trim();
+  if (!t) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    const d = new Date(`${t}T23:59:59.999Z`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function contactNameFrom(contact: Record<string, unknown> | null): string | null {
+  if (!contact) return null;
+  for (const key of ["name", "fullName", "full_name"]) {
+    const v = contact[key];
+    if (typeof v === "string" && v.trim()) return v.trim().slice(0, 120);
+  }
+  return null;
+}
+
+function contactEmailFrom(contact: Record<string, unknown> | null): string | null {
+  if (!contact) return null;
+  const v = contact.email;
+  if (typeof v === "string" && v.trim()) return v.trim().toLowerCase().slice(0, 254);
+  return null;
+}
+
+function companyFrom(
+  contact: Record<string, unknown> | null,
+  brief: Record<string, unknown> | null,
+): string | null {
+  for (const source of [brief, contact]) {
+    if (!source) continue;
+    for (const key of ["company", "companyName", "company_name"]) {
+      const v = source[key];
+      if (typeof v === "string" && v.trim()) return v.trim().slice(0, 200);
+    }
+  }
+  return null;
+}
+
+function overallFromScores(scores: Record<string, unknown> | null): number | null {
+  if (!scores) return null;
+  for (const key of ["overall", "overallScore", "total"]) {
+    const v = scores[key];
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+function dimensionsFromScores(scores: Record<string, unknown> | null): Record<string, number> | null {
+  if (!scores) return null;
+  const dims = scores.dimensions;
+  if (!dims || typeof dims !== "object" || Array.isArray(dims)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(dims as Record<string, unknown>)) {
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * Internal ops list of readiness submissions with optional bucket + date filters.
+ * Sorted newest-first. Never returns raw/unredacted paste content.
+ */
+export async function listOpsReadinessSubmissions(
+  db: Db,
+  filters: ListOpsReadinessFilters = {},
+): Promise<OpsReadinessListRow[]> {
+  const limit = Math.max(1, Math.min(filters.limit ?? 200, 500));
+  const conditions = [];
+
+  const bucket = filters.bucket?.trim();
+  if (bucket) {
+    conditions.push(eq(readinessSubmissions.bucket, bucket.slice(0, 64)));
+  }
+  if (filters.from?.trim()) {
+    const from = parseOpsDayStart(filters.from);
+    if (from) conditions.push(gte(readinessSubmissions.createdAt, from));
+  }
+  if (filters.to?.trim()) {
+    const to = parseOpsDayEnd(filters.to);
+    if (to) conditions.push(lte(readinessSubmissions.createdAt, to));
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const rows = await db
+    .select({
+      id: readinessSubmissions.id,
+      bucket: readinessSubmissions.bucket,
+      createdAt: readinessSubmissions.createdAt,
+      scores: readinessSubmissions.scores,
+      discrepancyFlags: readinessSubmissions.discrepancyFlags,
+      contact: readinessSubmissions.contact,
+      briefId: readinessBriefs.id,
+      briefBody: readinessBriefs.brief,
+      briefScoreSummary: readinessBriefs.scoreSummary,
+    })
+    .from(readinessSubmissions)
+    .leftJoin(readinessBriefs, eq(readinessBriefs.submissionId, readinessSubmissions.id))
+    .where(where)
+    .orderBy(desc(readinessSubmissions.createdAt))
+    .limit(limit);
+
+  return rows.map((row) => {
+    const contact =
+      row.contact && typeof row.contact === "object" && !Array.isArray(row.contact)
+        ? (row.contact as Record<string, unknown>)
+        : null;
+    const briefBody =
+      row.briefBody && typeof row.briefBody === "object" && !Array.isArray(row.briefBody)
+        ? (row.briefBody as Record<string, unknown>)
+        : null;
+    const scores =
+      row.scores && typeof row.scores === "object" && !Array.isArray(row.scores)
+        ? (row.scores as Record<string, unknown>)
+        : row.briefScoreSummary &&
+            typeof row.briefScoreSummary === "object" &&
+            !Array.isArray(row.briefScoreSummary)
+          ? (row.briefScoreSummary as Record<string, unknown>)
+          : null;
+    const flags = Array.isArray(row.discrepancyFlags) ? row.discrepancyFlags : [];
+    return {
+      id: row.id,
+      bucket: row.bucket,
+      createdAt: row.createdAt.toISOString(),
+      contactName: contactNameFrom(contact),
+      contactEmail: contactEmailFrom(contact),
+      company: companyFrom(contact, briefBody),
+      overallScore: overallFromScores(scores),
+      dimensionScores: dimensionsFromScores(scores),
+      discrepancyFlagCount: flags.length,
+      hasBrief: Boolean(row.briefId),
+    };
+  });
+}
+
+/**
+ * Internal ops detail for one submission + linked brief.
+ * Raw paste is returned only in already-redacted form (raw_paste_redacted column).
+ */
+export async function getOpsReadinessSubmissionDetail(
+  db: Db,
+  submissionId: string,
+): Promise<OpsReadinessDetail | null> {
+  const id = submissionId.trim();
+  if (!id) return null;
+
+  const rows = await db
+    .select()
+    .from(readinessSubmissions)
+    .where(eq(readinessSubmissions.id, id))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+
+  const brief = await findReadinessBriefBySubmissionId(db, id);
+
+  return {
+    id: row.id,
+    bucket: row.bucket,
+    createdAt: row.createdAt.toISOString(),
+    scores:
+      row.scores && typeof row.scores === "object" && !Array.isArray(row.scores)
+        ? (row.scores as Record<string, unknown>)
+        : brief?.scoreSummary ?? null,
+    discrepancyFlags: Array.isArray(row.discrepancyFlags) ? row.discrepancyFlags : [],
+    contact:
+      row.contact && typeof row.contact === "object" && !Array.isArray(row.contact)
+        ? (row.contact as Record<string, unknown>)
+        : null,
+    parsedReport:
+      row.parsedReport && typeof row.parsedReport === "object" && !Array.isArray(row.parsedReport)
+        ? (row.parsedReport as Record<string, unknown>)
+        : brief?.brief &&
+            typeof (brief.brief as Record<string, unknown>).parsedTechReport === "object"
+          ? ((brief.brief as Record<string, unknown>).parsedTechReport as Record<string, unknown>)
+          : null,
+    rawPasteRedacted: row.rawPasteRedacted ?? null,
+    brief,
+  };
 }
 
 /**

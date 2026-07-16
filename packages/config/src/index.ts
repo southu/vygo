@@ -150,6 +150,13 @@ export const apiEnvSchema = z.object({
   WORKER_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   /** Max age of worker heartbeat for GET /health (ms). */
   WORKER_HEARTBEAT_MAX_AGE_MS: z.coerce.number().int().positive().default(60_000),
+  /**
+   * HTTP Basic Auth for internal ops routes (readiness list / brief / CSV).
+   * Fail closed when password is unset: ops handlers return 401.
+   * Never embed these values in client code or page source.
+   */
+  OPS_BASIC_AUTH_USER: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  OPS_BASIC_AUTH_PASSWORD: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
 });
 
 export const workerEnvSchema = z.object({
