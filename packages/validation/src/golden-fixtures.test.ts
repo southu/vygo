@@ -116,14 +116,25 @@ describe("stage 4 follow-up question selection", () => {
       deploys: "GitHub Actions CI/CD automated",
       pii_categories: "email, name; no payment card or health records in prod",
       tenancy: "single-tenant",
+      auth: "none",
+      authorization: "none",
       confidence: 0.9,
       summary: "Internal tool for one company",
     };
     const triggers = evaluateFollowupTriggers(automated);
-    // High-confidence automated single-tenant with clear PII should suppress some conditionals
+    assert.equal(triggers.sso_saml, false);
+    assert.equal(triggers.who_deploys, false);
+    assert.equal(triggers.security_questionnaire, false);
+    assert.equal(triggers.repo_access, false);
+    assert.equal(triggers.tests_on_deploy, false);
+    assert.equal(triggers.payment_health_pii, false);
     const questions = selectFollowupQuestions(automated);
     const keys = new Set(questions.map((q) => q.questionKey));
     assert.ok(keys.has("users_today"));
+    assert.ok(!keys.has("sso_saml"));
+    assert.ok(!keys.has("who_deploys"));
+    assert.ok(!keys.has("security_framework"));
+    assert.ok(!keys.has("repo_access_audit"));
     // Manual / low-confidence report should ask who deploys + repo access
     const manualReport = {
       summary: "MVP",
@@ -140,8 +151,6 @@ describe("stage 4 follow-up question selection", () => {
     assert.ok(mKeys.has("tests_on_every_deploy"));
     assert.ok(mKeys.has("sso_saml"));
     assert.ok(mKeys.has("payment_health_pii_prod"));
-    // silence unused when tree-shaken checks
-    assert.ok(triggers);
   });
 
   it("contradicting follow-up answers set internal discrepancy flags", () => {
@@ -160,5 +169,42 @@ describe("stage 4 follow-up question selection", () => {
     assert.ok(flags.every((f) => f.internal === true));
     assert.ok(flags.some((f) => f.questionKey === "tests_on_every_deploy"));
     assert.ok(flags.some((f) => f.questionKey === "who_deploys"));
+  });
+
+  it("reverse contradictions (answer vs report) also set discrepancy flags", () => {
+    const report = {
+      summary: "Multi-tenant enterprise SaaS with payment and health PII",
+      tests: "no automated tests",
+      deploys: "manual one-click deploy on Vercel",
+      pii_categories: "payment card data and health records",
+      tenancy: "multi-tenant enterprise",
+      confidence: 0.25,
+    };
+    const flags = detectFollowupDiscrepancies(report, {
+      payment_health_pii_prod: "Neither",
+      who_deploys: "Automated CI/CD only",
+      tests_on_every_deploy: "Yes, required in CI",
+    });
+    assert.ok(flags.length >= 3, `expected >=3 flags, got ${JSON.stringify(flags)}`);
+    assert.ok(flags.some((f) => f.questionKey === "payment_health_pii_prod"));
+    assert.ok(flags.some((f) => f.questionKey === "who_deploys"));
+    assert.ok(flags.some((f) => f.questionKey === "tests_on_every_deploy"));
+    assert.ok(flags.every((f) => f.internal === true));
+  });
+});
+
+describe("confidence label parsing", () => {
+  it("maps confidence: high and confidence: low to schema-valid numbers", () => {
+    const highPaste = FIXTURE_CLEAN.replace("confidence: 0.82", "confidence: high");
+    const lowPaste = FIXTURE_CLEAN.replace("confidence: 0.82", "confidence: low");
+    const high = runDeterministicParse(highPaste);
+    const low = runDeterministicParse(lowPaste);
+    assert.equal(high.parseStatus, "ok");
+    assert.equal(low.parseStatus, "ok");
+    assert.ok(typeof high.report.confidence === "number");
+    assert.ok(typeof low.report.confidence === "number");
+    assert.ok((high.report.confidence as number) >= 0.5, String(high.report.confidence));
+    assert.ok((low.report.confidence as number) < 0.5, String(low.report.confidence));
+    assert.notEqual(high.report.confidence, 0);
   });
 });

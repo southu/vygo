@@ -5,6 +5,7 @@
 import {
   READINESS_REPORT_V1_END,
   READINESS_REPORT_V1_START,
+  parseConfidenceValue,
   parseReadinessReportV1,
   type ReadinessReportV1,
   type ReadinessReportV1Partial,
@@ -151,8 +152,8 @@ export function parseReadinessPastePartial(raw: string): ReadinessReportV1Partia
     const rawValue = trimmed.slice(colon + 1).trim();
     if (!known.has(key) || !rawValue) continue;
     if (key === "confidence") {
-      const n = Number(rawValue);
-      if (Number.isFinite(n)) fields.confidence = Math.min(1, Math.max(0, n));
+      const n = parseConfidenceValue(rawValue);
+      if (n != null) fields.confidence = n;
     } else if (key === "fragility_flags") {
       if (rawValue.startsWith("[")) {
         try {

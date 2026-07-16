@@ -156,7 +156,53 @@ function confidenceOf(report: ReadinessReportV1Partial): number | null {
   if (typeof report.confidence === "number" && Number.isFinite(report.confidence)) {
     return report.confidence;
   }
+  // Labels may still be present if an older partial path stored a string.
+  if (typeof report.confidence === "string") {
+    const s = report.confidence.trim().toLowerCase();
+    if (/^(very\s+)?high\b|^strong\b|^good\b/.test(s) || (/\bhigh\b/.test(s) && !/\blow\b/.test(s))) {
+      return 0.85;
+    }
+    if (/^(med(ium)?|moderate|mid)\b/.test(s)) return 0.55;
+    if (/^(very\s+)?low\b|^weak\b|^poor\b/.test(s) || /\blow\b/.test(s)) return 0.25;
+    const n = Number(s);
+    if (Number.isFinite(n)) {
+      if (n > 1 && n <= 100) return Math.min(1, Math.max(0, n / 100));
+      return Math.min(1, Math.max(0, n));
+    }
+  }
   return null;
+}
+
+/**
+ * Multi-tenant / enterprise signal for SSO+SAML follow-ups.
+ * Must NOT treat "single-tenant" as multi (substring "tenant" was a false positive).
+ */
+export function isMultiTenantOrEnterpriseSignal(
+  tenancy: unknown,
+  auth: unknown,
+  authorization: unknown,
+): boolean {
+  const t = textOf(tenancy);
+  const authBlob = `${textOf(auth)} ${textOf(authorization)}`;
+  const single =
+    /single[-_\s]?tenant|solo(?:\s|$|,)|one[-_\s]?tenant|not\s+multi|no\s+multi/.test(t);
+  const multi =
+    /multi[-_\s]?tenant|\benterprise\b|\bb2b\b|\bworkspaces?\b|\borg[_-]?id\b|\borgs\b/.test(t);
+  const ssoAuth = /\bsaml\b|\bsso\b/.test(authBlob);
+  const enterpriseAuth = /\benterprise\b/.test(authBlob);
+  // Explicit single-tenant without SSO/enterprise auth is not multi-tenant.
+  if (single && !ssoAuth && !enterpriseAuth) return false;
+  return multi || ssoAuth || enterpriseAuth;
+}
+
+function hasAutomatedDeploySignal(deploys: string): boolean {
+  return /ci\/?cd|github actions|automated|pipeline/.test(deploys);
+}
+
+function hasManualOrOneClickDeploySignal(deploys: string): boolean {
+  return /manual|one-?click|click deploy|ssh|console|someone clicks|vercel dashboard|railway dashboard/.test(
+    deploys,
+  );
 }
 
 /**
@@ -175,43 +221,58 @@ export function evaluateFollowupTriggers(
   const authorization = textOf(r.authorization);
   const fragility = textOf(r.fragility_flags);
   const conf = confidenceOf(r);
+  const summary = textOf(r.summary);
 
+  // Security questionnaire only when compliance / framework context is present —
+  // not merely multi-tenant or "enterprise" marketing copy.
   const mentionsSecurityAsk =
-    /soc\s*2|iso\s*27001|hipaa|compliance|questionnaire|audit/.test(
-      `${textOf(r.summary)} ${textOf(r.error_handling)} ${fragility} ${pii}`,
-    ) || /enterprise|b2b/.test(textOf(r.summary));
+    /soc\s*2|iso\s*27001|hipaa|pci\s*dss|fedramp|compliance|questionnaire|security framework|security questionnaire/.test(
+      `${summary} ${textOf(r.error_handling)} ${fragility} ${pii} ${tenancy}`,
+    );
 
+  const testsClearlyGated =
+    /every deploy|on every deploy|on deploy|required in ci|ci gate|gated on every|gate(d)? on every|tests?\s+gate/.test(
+      tests,
+    ) || (/ci/.test(tests) && /every|gate|required/.test(tests));
   const testsAmbiguous =
     !tests ||
     tests === "unknown" ||
     /no test|none|manual|not really|ad-?hoc|sometimes|partial/.test(tests) ||
-    !/every deploy|on deploy|ci|required|gate/.test(tests);
+    !testsClearlyGated;
 
+  // Strip common negations so "no payment card or health records" is not a hit.
+  const piiForPositive = pii
+    .replace(/no\s+payment(?:\s+card)?(?:\s+or\s+health(?:\s+records?)?)?(?:\s+in\s+prod(?:uction)?)?/gi, " ")
+    .replace(/no\s+health(?:\s+records?|pii)?(?:\s+in\s+prod(?:uction)?)?/gi, " ")
+    .replace(/neither\s+payment\s+nor\s+health[^,;.]*/gi, " ")
+    .replace(/without\s+(?:payment|health|phi|pci)[^,;.]*/gi, " ")
+    .replace(/no\s+pii[^,;.]*/gi, " ");
   const hasPaymentOrHealthHint =
-    /payment|card|pci|stripe|billing|health|hipaa|phi|medical|patient/.test(pii) ||
-    /payment|health|hipaa|phi/.test(textOf(r.summary));
+    /payment|card|pci|stripe|billing|health|hipaa|phi|medical|patient/.test(piiForPositive) ||
+    /payment|health|hipaa|phi/.test(summary);
+  // "none" / explicit no-payment-or-health should NOT open the PII follow-up.
+  const piiExplicitlyNone =
+    /^(none|n\/a|na|no|unknown)$/.test(pii.trim()) ||
+    /no payment|no health|neither payment nor health|no payment card or health|no pii/.test(pii);
 
-  const multiTenantOrEnterprise =
-    /multi|org|tenant|enterprise|b2b|workspace/.test(tenancy) ||
-    /saml|sso|enterprise/.test(`${auth} ${authorization}`);
+  const multiTenantOrEnterprise = isMultiTenantOrEnterpriseSignal(tenancy, auth, authorization);
 
+  const automated = hasAutomatedDeploySignal(deploys);
+  const manualHint = hasManualOrOneClickDeploySignal(deploys);
   const manualOrOneClickDeploy =
-    !deploys ||
-    deploys === "unknown" ||
-    /manual|one-?click|click deploy|ssh|console|someone clicks|vercel dashboard|railway dashboard/.test(
-      deploys,
-    ) ||
-    !/ci\/?cd|github actions|automated|pipeline/.test(deploys);
+    !deploys || deploys === "unknown" || manualHint || (!automated && !/fully auto/.test(deploys));
+  // When deploy text clearly says automated CI/CD (and not also manual), skip who_deploys.
+  const whoDeploysTrigger = manualOrOneClickDeploy && !(automated && !manualHint);
 
-  const lowConfidence = conf == null || conf < 0.5 || /low/.test(textOf(r.confidence));
+  const lowConfidence = conf == null || conf < 0.5;
 
   return {
-    security_questionnaire: mentionsSecurityAsk || multiTenantOrEnterprise,
+    security_questionnaire: mentionsSecurityAsk,
     tests_on_deploy: testsAmbiguous,
-    payment_health_pii: hasPaymentOrHealthHint || /unknown/.test(pii) || !pii,
+    payment_health_pii: hasPaymentOrHealthHint || ((!pii || /unknown/.test(pii)) && !piiExplicitlyNone),
     sso_saml: multiTenantOrEnterprise,
-    who_deploys: manualOrOneClickDeploy,
-    repo_access: lowConfidence || manualOrOneClickDeploy,
+    who_deploys: whoDeploysTrigger,
+    repo_access: lowConfidence || whoDeploysTrigger,
   };
 }
 
@@ -320,7 +381,10 @@ export function detectFollowupDiscrepancies(
 
   const testsAnswer = textOf(answers.tests_on_every_deploy);
   if (testsAnswer) {
-    const reportSaysYes = /every deploy|on every|required in ci|ci gate/.test(tests);
+    const reportSaysYes =
+      /every deploy|on every|required in ci|ci gate|gated on every|gate(d)? on every/.test(tests) ||
+      (/ci/.test(tests) && /every|gate|required/.test(tests) && !/no test|not really|none/.test(tests));
+    const reportSaysNo = /no test|none|not really|manual|no automated|ad-?hoc/.test(tests);
     const answerSaysNo = /^(no|sometimes|not sure)/.test(testsAnswer);
     const answerSaysYes = /^yes/.test(testsAnswer);
     if (reportSaysYes && answerSaysNo) {
@@ -331,7 +395,7 @@ export function detectFollowupDiscrepancies(
         internal: true,
       });
     }
-    if (!reportSaysYes && /no test|none|not really|manual/.test(tests) && answerSaysYes) {
+    if (reportSaysNo && answerSaysYes) {
       flags.push({
         questionKey: "tests_on_every_deploy",
         reason: "answer_contradicts_report_tests",
@@ -343,9 +407,12 @@ export function detectFollowupDiscrepancies(
 
   const who = textOf(answers.who_deploys);
   if (who) {
-    const reportAutomated = /ci\/?cd|github actions|automated|pipeline/.test(deploys);
-    const answerManual = /manual|one-click|ssh|console|agency|engineer clicks/.test(who);
-    const answerAuto = /automated ci\/?cd only/.test(who);
+    const reportAutomated = hasAutomatedDeploySignal(deploys) && !hasManualOrOneClickDeploySignal(deploys);
+    const reportManual = hasManualOrOneClickDeploySignal(deploys) && !hasAutomatedDeploySignal(deploys);
+    // Mixed phrases like "manual one-click" still count as manual even if no CI keywords.
+    const reportManualLoose = hasManualOrOneClickDeploySignal(deploys);
+    const answerManual = /manual|one-click|one-?click|ssh|console|agency|engineer clicks/.test(who);
+    const answerAuto = /automated ci\/?cd only|automated only|ci\/?cd only/.test(who);
     if (reportAutomated && answerManual) {
       flags.push({
         questionKey: "who_deploys",
@@ -354,7 +421,7 @@ export function detectFollowupDiscrepancies(
         internal: true,
       });
     }
-    if (!reportAutomated && /manual|one-?click|click/.test(deploys) && answerAuto) {
+    if ((reportManual || reportManualLoose) && answerAuto) {
       flags.push({
         questionKey: "who_deploys",
         reason: "answer_contradicts_report_deploys",
@@ -369,9 +436,13 @@ export function detectFollowupDiscrepancies(
     const reportHasPayment = /payment|card|pci|stripe|billing/.test(pii);
     const reportHasHealth = /health|hipaa|phi|medical|patient/.test(pii);
     const reportNeither =
-      /no payment|no health|none|email, name|no payment card or health/.test(pii) ||
+      /no payment|no health|none|email, name|no payment card or health|neither/.test(pii) ||
       (!reportHasPayment && !reportHasHealth && pii.length > 0 && pii !== "unknown");
-    if (reportNeither && /payment|health|both/.test(piiAnswer) && !/neither/.test(piiAnswer)) {
+    const answerClaimsPii =
+      /^(payment|health|both)/.test(piiAnswer) ||
+      (/\b(payment|health|both)\b/.test(piiAnswer) && !/neither|not sure|no\b/.test(piiAnswer));
+    const answerNeither = /^neither/.test(piiAnswer) || piiAnswer === "neither";
+    if (reportNeither && answerClaimsPii && !answerNeither) {
       flags.push({
         questionKey: "payment_health_pii_prod",
         reason: "answer_contradicts_report_pii",
@@ -379,7 +450,7 @@ export function detectFollowupDiscrepancies(
         internal: true,
       });
     }
-    if ((reportHasPayment || reportHasHealth) && /^neither/.test(piiAnswer)) {
+    if ((reportHasPayment || reportHasHealth) && answerNeither) {
       flags.push({
         questionKey: "payment_health_pii_prod",
         reason: "answer_contradicts_report_pii",

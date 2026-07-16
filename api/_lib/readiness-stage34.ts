@@ -218,6 +218,37 @@ function normalize(raw: string): string {
   return ensureFooter(stripFences(raw)).trim();
 }
 
+/**
+ * Parse confidence: numeric 0–1, percentages, or high/medium/low labels.
+ * Labels must not collapse to 0 (that falsely trips low-confidence triggers).
+ */
+export function edgeParseConfidence(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    if (raw > 1 && raw <= 100) return Math.min(1, Math.max(0, raw / 100));
+    return Math.min(1, Math.max(0, raw));
+  }
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (!s) return null;
+  const pct = s.match(/^(\d+(?:\.\d+)?)\s*%$/);
+  if (pct) {
+    const n = Number(pct[1]);
+    if (Number.isFinite(n)) return Math.min(1, Math.max(0, n / 100));
+  }
+  const n = Number(s);
+  if (Number.isFinite(n)) {
+    if (n > 1 && n <= 100) return Math.min(1, Math.max(0, n / 100));
+    return Math.min(1, Math.max(0, n));
+  }
+  if (/^(very\s+)?high\b|^strong\b|^good\b/.test(s)) return 0.85;
+  if (/^(med(ium)?|moderate|mid)\b/.test(s)) return 0.55;
+  if (/^(very\s+)?low\b|^weak\b|^poor\b/.test(s)) return 0.25;
+  if (/\bhigh\b/.test(s) && !/\blow\b/.test(s)) return 0.85;
+  if (/\blow\b/.test(s)) return 0.25;
+  if (/\bmed(ium)?\b/.test(s)) return 0.55;
+  return null;
+}
+
 function parseFields(body: string): Record<string, unknown> {
   const fields: Record<string, unknown> = {};
   const known = new Set<string>(REPORT_FIELDS);
@@ -230,8 +261,8 @@ function parseFields(body: string): Record<string, unknown> {
     const rawValue = trimmed.slice(colon + 1).trim();
     if (!known.has(key) || !rawValue) continue;
     if (key === "confidence") {
-      const n = Number(rawValue);
-      fields[key] = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : rawValue;
+      const n = edgeParseConfidence(rawValue);
+      fields[key] = n != null ? n : rawValue;
     } else if (key === "fragility_flags") {
       if (rawValue.startsWith("[")) {
         try {
@@ -260,7 +291,10 @@ function fillUnknown(partial: Record<string, unknown>): Record<string, unknown> 
   const out = { ...partial };
   for (const key of REPORT_FIELDS) {
     if (key === "confidence") {
-      if (typeof out.confidence !== "number") out.confidence = 0;
+      if (typeof out.confidence !== "number" || !Number.isFinite(out.confidence as number)) {
+        const coerced = edgeParseConfidence(out.confidence);
+        out.confidence = coerced != null ? coerced : 0;
+      }
       continue;
     }
     if (out[key] == null || out[key] === "") out[key] = "UNKNOWN";
@@ -294,7 +328,14 @@ function recoverSloppy(raw: string): Record<string, unknown> {
       grab(/tests?\s*:\s*(.+)/i) ||
       (/not really|no automated|none/i.test(text) ? "not really automated" : "unknown");
   }
-  if (/confidence\s+low|low confidence/i.test(text)) fields.confidence = 0.25;
+  if (/confidence\s*:\s*([^\n]+)/i.test(text)) {
+    const coerced = edgeParseConfidence(RegExp.$1.trim());
+    if (coerced != null) fields.confidence = coerced;
+  } else if (/confidence\s+low|low confidence/i.test(text)) {
+    fields.confidence = 0.25;
+  } else if (/confidence\s+high|high confidence/i.test(text)) {
+    fields.confidence = 0.85;
+  }
   return fields;
 }
 
@@ -423,6 +464,41 @@ function textOf(value: unknown): string {
   return String(value).toLowerCase();
 }
 
+function edgeConfidenceOf(report: Record<string, unknown>): number | null {
+  if (typeof report.confidence === "number" && Number.isFinite(report.confidence)) {
+    return report.confidence;
+  }
+  return edgeParseConfidence(report.confidence);
+}
+
+/** Multi-tenant / enterprise — must not treat "single-tenant" as multi. */
+export function edgeIsMultiTenantOrEnterprise(
+  tenancy: unknown,
+  auth: unknown,
+  authorization: unknown,
+): boolean {
+  const t = textOf(tenancy);
+  const authBlob = `${textOf(auth)} ${textOf(authorization)}`;
+  const single =
+    /single[-_\s]?tenant|solo(?:\s|$|,)|one[-_\s]?tenant|not\s+multi|no\s+multi/.test(t);
+  const multi =
+    /multi[-_\s]?tenant|\benterprise\b|\bb2b\b|\bworkspaces?\b|\borg[_-]?id\b|\borgs\b/.test(t);
+  const ssoAuth = /\bsaml\b|\bsso\b/.test(authBlob);
+  const enterpriseAuth = /\benterprise\b/.test(authBlob);
+  if (single && !ssoAuth && !enterpriseAuth) return false;
+  return multi || ssoAuth || enterpriseAuth;
+}
+
+function hasAutomatedDeploySignal(deploys: string): boolean {
+  return /ci\/?cd|github actions|automated|pipeline/.test(deploys);
+}
+
+function hasManualOrOneClickDeploySignal(deploys: string): boolean {
+  return /manual|one-?click|click deploy|ssh|console|someone clicks|vercel dashboard|railway dashboard/.test(
+    deploys,
+  );
+}
+
 export function edgeEvaluateTriggers(report: Record<string, unknown>): Record<string, boolean> {
   const tests = textOf(report.tests);
   const deploys = textOf(report.deploys);
@@ -431,39 +507,52 @@ export function edgeEvaluateTriggers(report: Record<string, unknown>): Record<st
   const auth = textOf(report.auth);
   const authorization = textOf(report.authorization);
   const fragility = textOf(report.fragility_flags);
-  const conf = typeof report.confidence === "number" ? report.confidence : null;
+  const conf = edgeConfidenceOf(report);
+  const summary = textOf(report.summary);
 
-  const multiTenantOrEnterprise =
-    /multi|org|tenant|enterprise|b2b|workspace/.test(tenancy) ||
-    /saml|sso|enterprise/.test(`${auth} ${authorization}`);
+  const multiTenantOrEnterprise = edgeIsMultiTenantOrEnterprise(tenancy, auth, authorization);
+  // Security questionnaire only for compliance/framework context — not multi-tenant alone.
   const mentionsSecurityAsk =
-    /soc\s*2|iso\s*27001|hipaa|compliance|questionnaire|audit/.test(
-      `${textOf(report.summary)} ${fragility} ${pii}`,
-    ) || /enterprise|b2b/.test(textOf(report.summary));
+    /soc\s*2|iso\s*27001|hipaa|pci\s*dss|fedramp|compliance|questionnaire|security framework|security questionnaire/.test(
+      `${summary} ${fragility} ${pii} ${tenancy}`,
+    );
+  const testsClearlyGated =
+    /every deploy|on every deploy|on deploy|required in ci|ci gate|gated on every|gate(d)? on every|tests?\s+gate/.test(
+      tests,
+    ) || (/ci/.test(tests) && /every|gate|required/.test(tests));
   const testsAmbiguous =
     !tests ||
     tests === "unknown" ||
     /no test|none|manual|not really|ad-?hoc|sometimes|partial/.test(tests) ||
-    !/every deploy|on deploy|ci|required|gate/.test(tests);
+    !testsClearlyGated;
+  // Strip common negations so "no payment card or health records" is not a hit.
+  const piiForPositive = pii
+    .replace(/no\s+payment(?:\s+card)?(?:\s+or\s+health(?:\s+records?)?)?(?:\s+in\s+prod(?:uction)?)?/gi, " ")
+    .replace(/no\s+health(?:\s+records?|pii)?(?:\s+in\s+prod(?:uction)?)?/gi, " ")
+    .replace(/neither\s+payment\s+nor\s+health[^,;.]*/gi, " ")
+    .replace(/without\s+(?:payment|health|phi|pci)[^,;.]*/gi, " ")
+    .replace(/no\s+pii[^,;.]*/gi, " ");
   const hasPaymentOrHealthHint =
-    /payment|card|pci|stripe|billing|health|hipaa|phi|medical|patient/.test(pii) ||
-    /payment|health|hipaa|phi/.test(textOf(report.summary));
+    /payment|card|pci|stripe|billing|health|hipaa|phi|medical|patient/.test(piiForPositive) ||
+    /payment|health|hipaa|phi/.test(summary);
+  const piiExplicitlyNone =
+    /^(none|n\/a|na|no|unknown)$/.test(pii.trim()) ||
+    /no payment|no health|neither payment nor health|no payment card or health|no pii/.test(pii);
+  const automated = hasAutomatedDeploySignal(deploys);
+  const manualHint = hasManualOrOneClickDeploySignal(deploys);
   const manualOrOneClickDeploy =
-    !deploys ||
-    deploys === "unknown" ||
-    /manual|one-?click|click deploy|ssh|console|someone clicks|vercel dashboard|railway dashboard/.test(
-      deploys,
-    ) ||
-    !/ci\/?cd|github actions|automated|pipeline/.test(deploys);
+    !deploys || deploys === "unknown" || manualHint || (!automated && !/fully auto/.test(deploys));
+  const whoDeploysTrigger = manualOrOneClickDeploy && !(automated && !manualHint);
   const lowConfidence = conf == null || conf < 0.5;
 
   return {
-    security_questionnaire: mentionsSecurityAsk || multiTenantOrEnterprise,
+    security_questionnaire: mentionsSecurityAsk,
     tests_on_deploy: testsAmbiguous,
-    payment_health_pii: hasPaymentOrHealthHint || /unknown/.test(pii) || !pii,
+    payment_health_pii:
+      hasPaymentOrHealthHint || ((!pii || /unknown/.test(pii)) && !piiExplicitlyNone),
     sso_saml: multiTenantOrEnterprise,
-    who_deploys: manualOrOneClickDeploy,
-    repo_access: lowConfidence || manualOrOneClickDeploy,
+    who_deploys: whoDeploysTrigger,
+    repo_access: lowConfidence || whoDeploysTrigger,
   };
 }
 
@@ -504,9 +593,21 @@ export function edgeDetectDiscrepancies(
 
   const testsAnswer = textOf(answers.tests_on_every_deploy);
   if (testsAnswer) {
-    const reportSaysYes = /every deploy|on every|required in ci|ci gate/.test(tests);
+    const reportSaysYes =
+      /every deploy|on every|required in ci|ci gate|gated on every|gate(d)? on every/.test(tests) ||
+      (/ci/.test(tests) && /every|gate|required/.test(tests) && !/no test|not really|none/.test(tests));
+    const reportSaysNo = /no test|none|not really|manual|no automated|ad-?hoc/.test(tests);
     const answerSaysNo = /^(no|sometimes|not sure)/.test(testsAnswer);
+    const answerSaysYes = /^yes/.test(testsAnswer);
     if (reportSaysYes && answerSaysNo) {
+      flags.push({
+        questionKey: "tests_on_every_deploy",
+        reason: "answer_contradicts_report_tests",
+        reportField: "tests",
+        internal: true,
+      });
+    }
+    if (reportSaysNo && answerSaysYes) {
       flags.push({
         questionKey: "tests_on_every_deploy",
         reason: "answer_contradicts_report_tests",
@@ -518,9 +619,20 @@ export function edgeDetectDiscrepancies(
 
   const who = textOf(answers.who_deploys);
   if (who) {
-    const reportAutomated = /ci\/?cd|github actions|automated|pipeline/.test(deploys);
-    const answerManual = /manual|one-click|ssh|console|agency|engineer clicks/.test(who);
+    const reportAutomated =
+      hasAutomatedDeploySignal(deploys) && !hasManualOrOneClickDeploySignal(deploys);
+    const reportManualLoose = hasManualOrOneClickDeploySignal(deploys);
+    const answerManual = /manual|one-click|one-?click|ssh|console|agency|engineer clicks/.test(who);
+    const answerAuto = /automated ci\/?cd only|automated only|ci\/?cd only/.test(who);
     if (reportAutomated && answerManual) {
+      flags.push({
+        questionKey: "who_deploys",
+        reason: "answer_contradicts_report_deploys",
+        reportField: "deploys",
+        internal: true,
+      });
+    }
+    if (reportManualLoose && answerAuto) {
       flags.push({
         questionKey: "who_deploys",
         reason: "answer_contradicts_report_deploys",
@@ -535,9 +647,21 @@ export function edgeDetectDiscrepancies(
     const reportHasPayment = /payment|card|pci|stripe|billing/.test(pii);
     const reportHasHealth = /health|hipaa|phi|medical|patient/.test(pii);
     const reportNeither =
-      /no payment|no health|none|email, name|no payment card or health/.test(pii) ||
+      /no payment|no health|none|email, name|no payment card or health|neither/.test(pii) ||
       (!reportHasPayment && !reportHasHealth && pii.length > 0 && pii !== "unknown");
-    if (reportNeither && /payment|health|both/.test(piiAnswer) && !/neither/.test(piiAnswer)) {
+    const answerClaimsPii =
+      /^(payment|health|both)/.test(piiAnswer) ||
+      (/\b(payment|health|both)\b/.test(piiAnswer) && !/neither|not sure|no\b/.test(piiAnswer));
+    const answerNeither = /^neither/.test(piiAnswer) || piiAnswer === "neither";
+    if (reportNeither && answerClaimsPii && !answerNeither) {
+      flags.push({
+        questionKey: "payment_health_pii_prod",
+        reason: "answer_contradicts_report_pii",
+        reportField: "pii_categories",
+        internal: true,
+      });
+    }
+    if ((reportHasPayment || reportHasHealth) && answerNeither) {
       flags.push({
         questionKey: "payment_health_pii_prod",
         reason: "answer_contradicts_report_pii",

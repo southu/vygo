@@ -9,6 +9,7 @@ export {
   READINESS_REPORT_V1_START,
   extractReadinessReportV1Block,
   formatReadinessReportV1,
+  parseConfidenceValue,
   parseReadinessReportV1,
   readinessReportV1PartialSchema,
   readinessReportV1Schema,

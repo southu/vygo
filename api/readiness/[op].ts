@@ -951,13 +951,12 @@ async function handleSubmissionGet(req: EdgeRequest): Promise<ReadinessHandlerRe
     };
   }
 
-  const discrepancyFlags = dbRow
-    ? Array.isArray(dbRow.discrepancy_flags)
-      ? dbRow.discrepancy_flags
-      : []
-    : Array.isArray(draft.discrepancyFlags)
-      ? draft.discrepancyFlags
-      : [];
+  // Prefer draft flags when present (answer path writes draft first; DB may lag
+  // or still hold the empty array from the initial parse insert).
+  const fromDraft = Array.isArray(draft.discrepancyFlags) ? draft.discrepancyFlags : [];
+  const fromDb =
+    dbRow && Array.isArray(dbRow.discrepancy_flags) ? (dbRow.discrepancy_flags as unknown[]) : [];
+  const discrepancyFlags = fromDraft.length > 0 ? fromDraft : fromDb;
 
   // Re-redact as a hard guard so API read-back never echoes planted secrets.
   const finalPaste = rawPaste ? edgeRedactSecrets(rawPaste).redacted : null;

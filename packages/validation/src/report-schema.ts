@@ -51,6 +51,43 @@ export const READINESS_REPORT_V1_FIELDS = [
 
 export type ReadinessReportV1Field = (typeof READINESS_REPORT_V1_FIELDS)[number];
 
+/**
+ * Parse the confidence field from paste text.
+ * Accepts numeric 0–1, percentages (0–100 or "85%"), and qualitative labels
+ * (high / medium / low). Returns null when the value cannot be interpreted.
+ */
+export function parseConfidenceValue(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    if (raw > 1 && raw <= 100) return Math.min(1, Math.max(0, raw / 100));
+    return Math.min(1, Math.max(0, raw));
+  }
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (!s) return null;
+
+  const pct = s.match(/^(\d+(?:\.\d+)?)\s*%$/);
+  if (pct) {
+    const n = Number(pct[1]);
+    if (Number.isFinite(n)) return Math.min(1, Math.max(0, n / 100));
+  }
+
+  const n = Number(s);
+  if (Number.isFinite(n)) {
+    if (n > 1 && n <= 100) return Math.min(1, Math.max(0, n / 100));
+    return Math.min(1, Math.max(0, n));
+  }
+
+  // Qualitative labels used in free-form / sloppy pastes.
+  if (/^(very\s+)?high\b|^strong\b|^good\b/.test(s)) return 0.85;
+  if (/^(med(ium)?|moderate|mid)\b/.test(s)) return 0.55;
+  if (/^(very\s+)?low\b|^weak\b|^poor\b/.test(s)) return 0.25;
+  // Loose substring fallbacks (e.g. "confidence high", "pretty high").
+  if (/\bhigh\b/.test(s) && !/\blow\b/.test(s)) return 0.85;
+  if (/\blow\b/.test(s)) return 0.25;
+  if (/\bmed(ium)?\b/.test(s)) return 0.55;
+  return null;
+}
+
 /** Free-text / structured string fields (most of the report). */
 const reportTextField = z.string();
 
@@ -149,8 +186,8 @@ export function parseReadinessReportV1(text: string): ReadinessReportV1 | null {
     const rawValue = trimmed.slice(colon + 1).trim();
     if (!(READINESS_REPORT_V1_FIELDS as readonly string[]).includes(key)) continue;
     if (key === "confidence") {
-      const n = Number(rawValue);
-      fields[key] = Number.isFinite(n) ? n : rawValue;
+      const n = parseConfidenceValue(rawValue);
+      fields[key] = n != null ? n : rawValue;
     } else if (key === "fragility_flags") {
       if (rawValue.startsWith("[")) {
         try {

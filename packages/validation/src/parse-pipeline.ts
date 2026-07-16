@@ -12,6 +12,7 @@ import {
 } from "./paste-normalize.js";
 import {
   READINESS_REPORT_V1_FIELDS,
+  parseConfidenceValue,
   parseReadinessReportV1,
   type ReadinessReportV1,
   type ReadinessReportV1Partial,
@@ -45,7 +46,8 @@ export function fillUnknownFields(partial: ReadinessReportV1Partial): ReadinessR
   for (const key of READINESS_REPORT_V1_FIELDS) {
     if (key === "confidence") {
       if (typeof out.confidence !== "number" || !Number.isFinite(out.confidence as number)) {
-        out.confidence = 0;
+        const coerced = parseConfidenceValue(out.confidence);
+        out.confidence = coerced != null ? coerced : 0;
       }
       continue;
     }
@@ -108,11 +110,13 @@ export function recoverSloppyPaste(raw: string): ReadinessReportV1Partial {
       grab(/tests?\s*:\s*(.+)/i) ||
       (/not really|no automated|none/i.test(text) ? "not really automated" : "unknown");
   }
-  if (/confidence\s+low|low confidence/i.test(text)) {
+  if (/confidence\s*:\s*([^\n]+)/i.test(text)) {
+    const coerced = parseConfidenceValue(RegExp.$1.trim());
+    if (coerced != null) fields.confidence = coerced;
+  } else if (/confidence\s+low|low confidence/i.test(text)) {
     fields.confidence = 0.25;
-  } else if (/confidence\s*:\s*([0-9.]+)/i.test(text)) {
-    const n = Number(RegExp.$1);
-    if (Number.isFinite(n)) fields.confidence = Math.min(1, Math.max(0, n));
+  } else if (/confidence\s+high|high confidence/i.test(text)) {
+    fields.confidence = 0.85;
   }
 
   return fields;
