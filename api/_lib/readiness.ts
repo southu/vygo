@@ -385,6 +385,23 @@ export async function proxyGetSubmission(
   );
 }
 
+export async function proxyGetBrief(
+  query: { submissionId?: string; token?: string },
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  const params = new URLSearchParams();
+  if (query.submissionId) params.set("submissionId", query.submissionId);
+  if (query.token) params.set("token", query.token);
+  return proxyJson(
+    "GET",
+    `/v1/readiness/brief?${params.toString()}`,
+    undefined,
+    env,
+    inboundHeaders,
+  );
+}
+
 export async function proxyScore(
   body: unknown,
   env: NodeJS.ProcessEnv = process.env,

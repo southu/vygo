@@ -8,8 +8,29 @@
 
 - Applicant confirmation emails (transactional outbox kind `applicant_confirmation`)
 - Internal lead notifications (`internal_lead_notification`)
+- Readiness Check: diagnostic prompt + resume link (`readiness_prompt`)
+- Readiness Check: applicant snapshot copy on score completion (`readiness_snapshot`)
+- Readiness Check: internal ops lead brief on score completion (`readiness_ops_brief`)
 - Provider delivery events via Resend webhooks (Svix signatures)
 - Worker drains `email_outbox` with retries, exponential backoff + jitter, and dead-letter
+
+### Readiness completion side-effects
+
+On successful `POST /v1/readiness/score`:
+
+1. Persist the scored submission row.
+2. Build a **template-first** internal lead brief (company/contact/source, product one-liner,
+   build tool, blockers, deadline, five-dimension score summary + bucket + reasoning,
+   parsed tech report summary, follow-up answers/budget, discrepancy flags, 3 talking points).
+3. Optionally LLM-polish talking points **only** when `ANTHROPIC_API_KEY` or `LLM_API_KEY` is
+   present in the environment; missing key fails closed to the pure template and **never**
+   blocks scoring or email enqueue.
+4. Store the brief as a durable `readiness_briefs` row linked to the submission.
+5. Enqueue applicant snapshot + ops brief outbox jobs (queryable via
+   `GET /v1/readiness/submission?token=` → `outbox` / `brief`, or `GET /v1/readiness/brief`).
+
+Non-production / empty `RESEND_API_KEY`: worker uses mock transport; jobs remain
+visible in `email_outbox` with status `sent` (mock) or `pending` until drained.
 
 ## Accounts and sender
 

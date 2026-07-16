@@ -57,6 +57,13 @@
       "when": 1752688800000,
       "tag": "0007_readiness_scoring_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1752692400000,
+      "tag": "0008_readiness_briefs",
+      "breakpoints": true
     }
   ]
 }

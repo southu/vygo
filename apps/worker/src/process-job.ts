@@ -14,8 +14,10 @@ import {
   EMAIL_KINDS,
   renderApplicantConfirmation,
   renderInternalLeadNotification,
+  renderReadinessOpsBrief,
   type ApplicantConfirmationPayload,
   type InternalLeadNotificationPayload,
+  type ReadinessOpsBriefPayload,
 } from "@vygo/email";
 import type { EmailTransport } from "./transport.js";
 import { safeLog } from "./redact.js";
@@ -149,6 +151,31 @@ async function renderForJob(
       .filter(Boolean)
       .join("");
     return { subject, html, text };
+  }
+
+  if (kind === OUTBOX_KINDS.readinessOpsBrief || kind === "readiness_ops_brief") {
+    if (typeof payload.html === "string" && payload.html.trim()) {
+      const subject =
+        typeof payload.subject === "string" && payload.subject.trim()
+          ? String(payload.subject)
+          : "Readiness lead brief";
+      const text =
+        typeof payload.text === "string" && payload.text.trim()
+          ? String(payload.text)
+          : "Readiness lead brief (see HTML).";
+      return { subject, html: String(payload.html), text };
+    }
+    const brief =
+      payload.brief && typeof payload.brief === "object" && !Array.isArray(payload.brief)
+        ? (payload.brief as Record<string, unknown>)
+        : {};
+    const p: ReadinessOpsBriefPayload = {
+      submissionId: payload.submissionId == null ? null : String(payload.submissionId).slice(0, 80),
+      briefId: payload.briefId == null ? null : String(payload.briefId).slice(0, 80),
+      brief,
+    };
+    const rendered = await renderReadinessOpsBrief(p);
+    return { subject: rendered.subject, html: rendered.html, text: rendered.text };
   }
 
   // Unknown kind: still produce a minimal transactional shell so the job can complete or fail cleanly.

@@ -11,6 +11,7 @@ export {
   type EmailKind,
   type ApplicantConfirmationPayload,
   type InternalLeadNotificationPayload,
+  type ReadinessOpsBriefPayload,
   type RenderedEmail,
 } from "./types.js";
 
@@ -31,8 +32,16 @@ export {
 } from "./templates/internal-lead-notification.js";
 
 export {
+  ReadinessOpsBriefEmail,
+  buildReadinessOpsBriefSubject,
+  buildReadinessOpsBriefText,
+  buildReadinessOpsBriefHtmlFallback,
+} from "./templates/readiness-ops-brief.js";
+
+export {
   renderApplicantConfirmation,
   renderInternalLeadNotification,
+  renderReadinessOpsBrief,
   runEmailRenderSuite,
 } from "./render.js";
 

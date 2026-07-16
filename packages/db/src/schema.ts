@@ -324,9 +324,38 @@ export const readinessScoringConfig = pgTable(
   ],
 );
 
+/**
+ * Durable internal lead brief linked 1:1 to a readiness submission.
+ * Generated from structured submission data (template-first); optional LLM polish
+ * is applied only when a vault-backed key is present and never blocks scoring.
+ */
+export const readinessBriefs = pgTable(
+  "readiness_briefs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    submissionId: uuid("submission_id")
+      .notNull()
+      .references(() => readinessSubmissions.id, { onDelete: "cascade" }),
+    brief: jsonb("brief").$type<Record<string, unknown>>().notNull(),
+    talkingPoints: jsonb("talking_points").$type<string[]>().notNull().default([]),
+    scoreSummary: jsonb("score_summary").$type<Record<string, unknown> | null>(),
+    bucket: text("bucket"),
+    discrepancyFlags: jsonb("discrepancy_flags").$type<unknown[]>().notNull().default([]),
+    llmPolished: boolean("llm_polished").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("readiness_briefs_submission_uidx").on(table.submissionId),
+    index("readiness_briefs_created_at_idx").on(table.createdAt),
+  ],
+);
+
 export type ReadinessSession = typeof readinessSessions.$inferSelect;
 export type NewReadinessSession = typeof readinessSessions.$inferInsert;
 export type ReadinessSubmission = typeof readinessSubmissions.$inferSelect;
 export type NewReadinessSubmission = typeof readinessSubmissions.$inferInsert;
+export type ReadinessBrief = typeof readinessBriefs.$inferSelect;
+export type NewReadinessBrief = typeof readinessBriefs.$inferInsert;
 export type ReadinessQuestion = typeof readinessQuestionBank.$inferSelect;
 export type ReadinessScoringConfigRow = typeof readinessScoringConfig.$inferSelect;

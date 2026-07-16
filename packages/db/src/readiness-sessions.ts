@@ -9,17 +9,22 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
 import {
   OUTBOX_KINDS,
+  readinessOpsBriefIdempotencyKey,
   readinessPromptIdempotencyKey,
   readinessSnapshotIdempotencyKey,
+  toSafeOutboxJobView,
+  type SafeOutboxJobView,
 } from "./outbox.js";
 import {
   emailOutbox,
+  readinessBriefs,
   readinessQuestionBank,
   readinessScoringConfig,
   readinessSessions,
   readinessSubmissions,
   type NewReadinessSession,
   type NewReadinessSubmission,
+  type ReadinessBrief,
   type ReadinessSession,
   type ReadinessSubmission,
 } from "./schema.js";
@@ -766,6 +771,252 @@ export async function enqueueReadinessSnapshotEmail(
     .onConflictDoNothing();
 
   return { queued: true, idempotencyKey };
+}
+
+export type EnqueueReadinessOpsBriefEmailInput = {
+  submissionId: string;
+  briefId: string;
+  recipient: string;
+  /** Safe structured brief payload for the worker (no secrets). */
+  brief: Record<string, unknown>;
+  subject?: string;
+  html?: string;
+  text?: string;
+};
+
+/** Queue internal ops lead-brief email for a completed readiness submission. */
+export async function enqueueReadinessOpsBriefEmail(
+  db: Db,
+  input: EnqueueReadinessOpsBriefEmailInput,
+): Promise<{ queued: true; idempotencyKey: string }> {
+  const recipient = input.recipient.trim().toLowerCase();
+  const submissionId = input.submissionId.trim();
+  const briefId = input.briefId.trim();
+  const idempotencyKey = readinessOpsBriefIdempotencyKey(submissionId, recipient);
+  const now = new Date();
+
+  await db
+    .insert(emailOutbox)
+    .values({
+      waitlistEntryId: null,
+      kind: OUTBOX_KINDS.readinessOpsBrief,
+      recipient,
+      payload: {
+        kind: OUTBOX_KINDS.readinessOpsBrief,
+        submissionId,
+        briefId,
+        // Structured brief for worker render — never include API keys / RESEND_*.
+        brief: input.brief,
+        subject: input.subject ?? null,
+        html: input.html ?? null,
+        text: input.text ?? null,
+      },
+      idempotencyKey,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing();
+
+  return { queued: true, idempotencyKey };
+}
+
+export type ReadinessBriefPublic = {
+  id: string;
+  submissionId: string;
+  brief: Record<string, unknown>;
+  talkingPoints: string[];
+  scoreSummary: Record<string, unknown> | null;
+  bucket: string | null;
+  discrepancyFlags: unknown[];
+  llmPolished: boolean;
+  createdAt: string;
+};
+
+export type UpsertReadinessBriefInput = {
+  submissionId: string;
+  brief: Record<string, unknown>;
+  talkingPoints: string[];
+  scoreSummary?: Record<string, unknown> | null;
+  bucket?: string | null;
+  discrepancyFlags?: unknown[];
+  llmPolished?: boolean;
+};
+
+function toBriefPublic(row: ReadinessBrief): ReadinessBriefPublic {
+  return {
+    id: row.id,
+    submissionId: row.submissionId,
+    brief:
+      row.brief && typeof row.brief === "object" && !Array.isArray(row.brief)
+        ? (row.brief as Record<string, unknown>)
+        : {},
+    talkingPoints: Array.isArray(row.talkingPoints)
+      ? row.talkingPoints.filter((t): t is string => typeof t === "string").slice(0, 10)
+      : [],
+    scoreSummary:
+      row.scoreSummary && typeof row.scoreSummary === "object" && !Array.isArray(row.scoreSummary)
+        ? (row.scoreSummary as Record<string, unknown>)
+        : null,
+    bucket: row.bucket,
+    discrepancyFlags: Array.isArray(row.discrepancyFlags) ? row.discrepancyFlags : [],
+    llmPolished: Boolean(row.llmPolished),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** Upsert durable brief linked to a submission (1:1). */
+export async function upsertReadinessBrief(
+  db: Db,
+  input: UpsertReadinessBriefInput,
+): Promise<ReadinessBriefPublic> {
+  const submissionId = input.submissionId.trim();
+  const now = new Date();
+  const talkingPoints = input.talkingPoints
+    .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+    .map((t) => t.slice(0, 500))
+    .slice(0, 10);
+
+  const existing = await db
+    .select()
+    .from(readinessBriefs)
+    .where(eq(readinessBriefs.submissionId, submissionId))
+    .limit(1);
+
+  if (existing[0]) {
+    await db
+      .update(readinessBriefs)
+      .set({
+        brief: input.brief,
+        talkingPoints,
+        scoreSummary: input.scoreSummary ?? null,
+        bucket: input.bucket ?? null,
+        discrepancyFlags: input.discrepancyFlags ?? [],
+        llmPolished: Boolean(input.llmPolished),
+        updatedAt: now,
+      })
+      .where(eq(readinessBriefs.id, existing[0].id));
+    const rows = await db
+      .select()
+      .from(readinessBriefs)
+      .where(eq(readinessBriefs.id, existing[0].id))
+      .limit(1);
+    return toBriefPublic(rows[0]!);
+  }
+
+  const inserted = await db
+    .insert(readinessBriefs)
+    .values({
+      submissionId,
+      brief: input.brief,
+      talkingPoints,
+      scoreSummary: input.scoreSummary ?? null,
+      bucket: input.bucket ?? null,
+      discrepancyFlags: input.discrepancyFlags ?? [],
+      llmPolished: Boolean(input.llmPolished),
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+  return toBriefPublic(inserted[0]!);
+}
+
+export async function findReadinessBriefBySubmissionId(
+  db: Db,
+  submissionId: string,
+): Promise<ReadinessBriefPublic | null> {
+  const id = submissionId.trim();
+  if (!id) return null;
+  const rows = await db
+    .select()
+    .from(readinessBriefs)
+    .where(eq(readinessBriefs.submissionId, id))
+    .limit(1);
+  return rows[0] ? toBriefPublic(rows[0]) : null;
+}
+
+/**
+ * List readiness-related outbox jobs for a submission / token / recipient email.
+ * Safe view only (no raw payload bodies or secrets).
+ */
+export async function listReadinessOutboxJobs(
+  db: Db,
+  options: {
+    submissionId?: string | null;
+    token?: string | null;
+    email?: string | null;
+    limit?: number;
+  },
+): Promise<SafeOutboxJobView[]> {
+  const limit = Math.max(1, Math.min(options.limit ?? 20, 50));
+  const submissionId = options.submissionId?.trim() || null;
+  const token = options.token?.trim() || null;
+  const email = options.email?.trim().toLowerCase() || null;
+
+  // Prefer payload match + recipient when available. All readiness kinds use null waitlist_entry_id.
+  const rows = await db.execute(sql`
+    SELECT
+      id,
+      kind,
+      recipient,
+      status,
+      attempt_count,
+      idempotency_key,
+      next_attempt_at,
+      created_at,
+      sent_at
+    FROM email_outbox
+    WHERE kind IN (
+      ${OUTBOX_KINDS.readinessPrompt},
+      ${OUTBOX_KINDS.readinessSnapshot},
+      ${OUTBOX_KINDS.readinessOpsBrief}
+    )
+    AND (
+      (${submissionId}::text IS NOT NULL AND (
+        payload->>'submissionId' = ${submissionId}
+        OR payload->>'snapshotId' = ${submissionId}
+      ))
+      OR (${token}::text IS NOT NULL AND payload->>'token' = ${token})
+      OR (${email}::text IS NOT NULL AND lower(recipient) = ${email})
+    )
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `);
+
+  const list = Array.isArray(rows)
+    ? (rows as Record<string, unknown>[])
+    : rows && typeof rows === "object" && Array.isArray((rows as { rows?: unknown }).rows)
+      ? (rows as { rows: Record<string, unknown>[] }).rows
+      : Array.from((rows as ArrayLike<Record<string, unknown>>) ?? []);
+
+  return list.map((row) => {
+    const attemptCount = row.attemptCount ?? row.attempt_count;
+    const nextAttemptAt = row.nextAttemptAt ?? row.next_attempt_at;
+    const createdAt = row.createdAt ?? row.created_at;
+    const sentAt = row.sentAt ?? row.sent_at;
+    const idempotencyKey = row.idempotencyKey ?? row.idempotency_key;
+    return toSafeOutboxJobView({
+      id: String(row.id),
+      kind: String(row.kind),
+      status: String(row.status),
+      attemptCount: Number(attemptCount ?? 0),
+      idempotencyKey: String(idempotencyKey ?? ""),
+      recipient: row.recipient == null ? null : String(row.recipient),
+      nextAttemptAt:
+        nextAttemptAt instanceof Date
+          ? nextAttemptAt
+          : nextAttemptAt
+            ? new Date(String(nextAttemptAt))
+            : null,
+      createdAt:
+        createdAt instanceof Date
+          ? createdAt
+          : createdAt
+            ? new Date(String(createdAt))
+            : new Date(),
+      sentAt: sentAt instanceof Date ? sentAt : sentAt ? new Date(String(sentAt)) : null,
+    });
+  });
 }
 
 /**

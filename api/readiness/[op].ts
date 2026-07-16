@@ -22,6 +22,7 @@ import {
   proxyEmailPrompt,
   proxyFollowups,
   proxyFollowupsAnswer,
+  proxyGetBrief,
   proxyGetSession,
   proxyGetSnapshot,
   proxyGetSubmission,
@@ -58,6 +59,7 @@ const ALLOWED_OPS = new Set([
   "followups",
   "followups-answer",
   "submission",
+  "brief",
   "score",
   "snapshot",
   "snapshot-email",
@@ -351,11 +353,65 @@ async function emailPromptFallback(
   req: EdgeRequest,
 ): Promise<ReadinessHandlerResult> {
   const resumeUrl = `https://www.vygo.ai/readiness?token=${encodeURIComponent(input.token)}`;
+  const hour = Math.floor(Date.now() / (60 * 60 * 1000));
+  const idempotencyKey = `readiness-prompt:${input.token.slice(0, 80)}:${input.email.slice(0, 120)}:h${hour}`;
+  let outboxQueued = false;
+
+  // Prefer durable outbox when edge has DATABASE_URL (same Postgres as Railway).
+  const dbUrl = resolveDatabaseUrl();
+  if (dbUrl) {
+    try {
+      const sql = getSql(dbUrl);
+      await sql`
+        CREATE TABLE IF NOT EXISTS email_outbox (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          waitlist_entry_id uuid,
+          kind text NOT NULL,
+          recipient text NOT NULL,
+          payload jsonb NOT NULL,
+          idempotency_key text NOT NULL,
+          status text DEFAULT 'pending' NOT NULL,
+          attempt_count integer DEFAULT 0 NOT NULL,
+          next_attempt_at timestamp with time zone DEFAULT now() NOT NULL,
+          locked_at timestamp with time zone,
+          locked_by text,
+          last_error text,
+          sent_at timestamp with time zone,
+          created_at timestamp with time zone DEFAULT now() NOT NULL,
+          updated_at timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `;
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS email_outbox_idempotency_uidx ON email_outbox (idempotency_key)`;
+      await sql`
+        INSERT INTO email_outbox (waitlist_entry_id, kind, recipient, payload, idempotency_key, status)
+        VALUES (
+          NULL,
+          'readiness_prompt',
+          ${input.email},
+          ${JSON.stringify({
+            kind: "readiness_prompt",
+            email: input.email,
+            token: input.token,
+            prompt: input.prompt.slice(0, 50_000),
+            resumeUrl,
+          })}::jsonb,
+          ${idempotencyKey},
+          'pending'
+        )
+        ON CONFLICT (idempotency_key) DO NOTHING
+      `;
+      outboxQueued = true;
+    } catch {
+      outboxQueued = false;
+    }
+  }
+
   console.info(
     JSON.stringify({
       event: "readiness_prompt_email_queued_edge_fallback",
       hasToken: true,
-      mock: true,
+      outboxQueued,
+      mock: !outboxQueued,
     }),
   );
 
@@ -372,7 +428,8 @@ async function emailPromptFallback(
       requestedAt: new Date().toISOString(),
       resumeUrl,
       promptRequested: true,
-      policy: "mock_outbox_pending_railway",
+      policy: outboxQueued ? "edge_outbox" : "mock_outbox_pending_railway",
+      idempotencyKey,
     };
     await proxyPatchSession(input.token, { draft }, process.env, req.headers);
   }
@@ -382,9 +439,10 @@ async function emailPromptFallback(
     body: {
       accepted: true,
       queued: true,
-      mock: true,
+      mock: !outboxQueued,
       resumeUrl,
-      path: "edge_mock_outbox",
+      idempotencyKey,
+      path: outboxQueued ? "edge_outbox" : "edge_mock_outbox",
     },
   };
 }
@@ -997,6 +1055,34 @@ async function handleSubmissionGet(req: EdgeRequest): Promise<ReadinessHandlerRe
 }
 
 // ---------------------------------------------------------------------------
+// brief read-back — proxy to Railway (source of truth)
+// ---------------------------------------------------------------------------
+
+async function handleBriefGet(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const submissionId = queryParam(req, "submissionId") || queryParam(req, "id");
+  const token = queryParam(req, "token");
+  if (!submissionId && !token) {
+    return {
+      status: 400,
+      body: {
+        error: { code: "VALIDATION_ERROR", message: "Provide submissionId or token." },
+      },
+    };
+  }
+  return proxyGetBrief(
+    {
+      submissionId: submissionId || undefined,
+      token: token || undefined,
+    },
+    process.env,
+    req.headers,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // score / snapshot (Stage 5) — proxy to Railway (source of truth)
 // ---------------------------------------------------------------------------
 
@@ -1125,8 +1211,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     return;
   }
 
-  // submission + snapshot are GET; score / snapshot-email / others are POST
-  const getOps = new Set(["submission", "snapshot"]);
+  // submission / brief / snapshot are GET; score / snapshot-email / others are POST
+  const getOps = new Set(["submission", "brief", "snapshot"]);
   if (getOps.has(op)) {
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET, OPTIONS");
@@ -1159,6 +1245,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleSnapshotGet(req);
     } else if (op === "snapshot-email") {
       result = await handleSnapshotEmail(req);
+    } else if (op === "brief") {
+      result = await handleBriefGet(req);
     } else {
       result = await handleSubmissionGet(req);
     }

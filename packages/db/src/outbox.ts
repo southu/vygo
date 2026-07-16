@@ -11,6 +11,8 @@ export const OUTBOX_KINDS = {
   readinessPrompt: "readiness_prompt",
   /** Readiness Check: email a scored snapshot copy (HTML). */
   readinessSnapshot: "readiness_snapshot",
+  /** Readiness Check: internal ops lead brief email. */
+  readinessOpsBrief: "readiness_ops_brief",
 } as const;
 
 /** Stable non-secret idempotency key for readiness prompt emails. */
@@ -26,8 +28,15 @@ export function readinessPromptIdempotencyKey(sessionToken: string, email: strin
 export function readinessSnapshotIdempotencyKey(snapshotId: string, email: string): string {
   const e = email.trim().toLowerCase().slice(0, 120);
   const id = snapshotId.trim().slice(0, 80);
-  const hour = Math.floor(Date.now() / (60 * 60 * 1000));
-  return `readiness-snapshot:${id}:${e}:h${hour}`;
+  // One durable snapshot email per snapshot+recipient (completion path).
+  return `readiness-snapshot:${id}:${e}`;
+}
+
+/** Stable non-secret idempotency key for readiness ops brief emails. */
+export function readinessOpsBriefIdempotencyKey(submissionId: string, recipient: string): string {
+  const e = recipient.trim().toLowerCase().slice(0, 120);
+  const id = submissionId.trim().slice(0, 80);
+  return `readiness-ops-brief:${id}:${e}`;
 }
 
 export type OutboxKind = (typeof OUTBOX_KINDS)[keyof typeof OUTBOX_KINDS];

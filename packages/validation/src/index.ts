@@ -132,6 +132,17 @@ export {
 } from "./manual-questionnaire.js";
 
 export {
+  buildLeadBrief,
+  buildTalkingPoints,
+  tryLlmPolishBrief,
+  toPublicLeadBrief,
+  type LeadBrief,
+  type LeadBriefInput,
+  type LeadBriefContact,
+  type LeadBriefScoreSummary,
+} from "./lead-brief.js";
+
+export {
   READINESS_DIMENSIONS,
   DEFAULT_SCORING_CONFIG,
   computeReadinessScore,

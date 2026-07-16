@@ -21,6 +21,7 @@
       "destination": "/api/readiness/followups-answer"
     },
     { "source": "/v1/readiness/submission", "destination": "/api/readiness/submission" },
+    { "source": "/v1/readiness/brief", "destination": "/api/readiness/brief" },
     { "source": "/v1/readiness/score", "destination": "/api/readiness/score" },
     {
       "source": "/v1/readiness/snapshot/:id/email",

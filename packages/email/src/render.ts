@@ -13,9 +13,16 @@ import {
   buildInternalLeadNotificationText,
 } from "./templates/internal-lead-notification.js";
 import {
+  ReadinessOpsBriefEmail,
+  buildReadinessOpsBriefHtmlFallback,
+  buildReadinessOpsBriefSubject,
+  buildReadinessOpsBriefText,
+} from "./templates/readiness-ops-brief.js";
+import {
   EMAIL_KINDS,
   type ApplicantConfirmationPayload,
   type InternalLeadNotificationPayload,
+  type ReadinessOpsBriefPayload,
   type RenderedEmail,
 } from "./types.js";
 
@@ -69,6 +76,31 @@ export async function renderInternalLeadNotification(
   }
   return {
     kind: EMAIL_KINDS.internalLeadNotification,
+    subject,
+    html,
+    text,
+  };
+}
+
+export async function renderReadinessOpsBrief(
+  payload: ReadinessOpsBriefPayload,
+): Promise<RenderedEmail> {
+  const subject = buildReadinessOpsBriefSubject(payload);
+  const text = buildReadinessOpsBriefText(payload);
+  let html: string;
+  try {
+    html = await renderReactToHtml(React.createElement(ReadinessOpsBriefEmail, payload));
+  } catch {
+    html = buildReadinessOpsBriefHtmlFallback(payload);
+  }
+  if (!html || !html.trim()) {
+    html = buildReadinessOpsBriefHtmlFallback(payload);
+  }
+  if (!text || !text.trim()) {
+    throw new Error("readiness ops brief plain-text render produced empty output");
+  }
+  return {
+    kind: EMAIL_KINDS.readinessOpsBrief,
     subject,
     html,
     text,
@@ -162,6 +194,43 @@ export async function runEmailRenderSuite(): Promise<{
     );
   } catch (e) {
     record("internal_lead_notification_long", false, e instanceof Error ? e.message : "error");
+  }
+
+  const opsBrief: ReadinessOpsBriefPayload = {
+    submissionId: "00000000-0000-4000-8000-000000000099",
+    briefId: "00000000-0000-4000-8000-0000000000aa",
+    brief: {
+      company: "Analytical Engines",
+      bucket: "Harden",
+      source: "readiness_score_gate",
+      productOneLiner: "Analytics for mid-market ops",
+      buildTool: "Cursor",
+      blockers: ["security questionnaire or review blocking a deal"],
+      deadline: "Yes within 30 days",
+      budget: "25k_75k",
+      scoreSummary: {
+        dimensions: { Security: 42, Reliability: 55 },
+        reasoning: "Security needs work before launch.",
+      },
+      talkingPoints: ["Point one", "Point two", "Point three"],
+      discrepancyFlags: [{ type: "auth_mismatch" }],
+      reasoning: "Security needs work before launch.",
+    },
+  };
+  try {
+    const a = await renderReadinessOpsBrief(opsBrief);
+    record(
+      "readiness_ops_brief_normal",
+      Boolean(
+        a.html &&
+        a.text.trim().length > 0 &&
+        a.text.includes("Talking points") &&
+        a.subject.includes("Analytical"),
+      ),
+      `htmlLen=${a.html.length},textLen=${a.text.length}`,
+    );
+  } catch (e) {
+    record("readiness_ops_brief_normal", false, e instanceof Error ? e.message : "error");
   }
 
   const ready = results.every((r) => r.pass);

@@ -3,6 +3,7 @@
 export const EMAIL_KINDS = {
   applicantConfirmation: "applicant_confirmation",
   internalLeadNotification: "internal_lead_notification",
+  readinessOpsBrief: "readiness_ops_brief",
 } as const;
 
 export type EmailKind = (typeof EMAIL_KINDS)[keyof typeof EMAIL_KINDS];
@@ -27,8 +28,15 @@ export type InternalLeadNotificationPayload = {
   applicationId?: string | null;
 };
 
+/** Internal ops brief for a completed readiness submission (no secrets). */
+export type ReadinessOpsBriefPayload = {
+  submissionId?: string | null;
+  briefId?: string | null;
+  brief: Record<string, unknown>;
+};
+
 export type RenderedEmail = {
-  kind: EmailKind;
+  kind: EmailKind | string;
   subject: string;
   html: string;
   text: string;

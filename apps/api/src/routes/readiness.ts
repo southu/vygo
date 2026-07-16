@@ -25,6 +25,10 @@ import {
   logReadinessLead,
   enqueueReadinessPromptEmail,
   enqueueReadinessSnapshotEmail,
+  enqueueReadinessOpsBriefEmail,
+  upsertReadinessBrief,
+  findReadinessBriefBySubmissionId,
+  listReadinessOutboxJobs,
   redactSensitivePaste,
   insertReadinessSubmission,
   listReadinessQuestionBank,
@@ -38,6 +42,7 @@ import {
   type DatabaseHandle,
 } from "@vygo/db";
 import {
+  buildLeadBrief,
   computeReadinessScore,
   containsRemediationDetail,
   defaultScoringRulesJson,
@@ -50,11 +55,15 @@ import {
   runDeterministicParse,
   scoringConfigFromDbRow,
   selectFollowupQuestions,
+  toPublicLeadBrief,
   tryLlmNormalizeReport,
+  tryLlmPolishBrief,
+  type LeadBrief,
   type ReadinessReportV1Partial,
   type ReadinessScorePayload,
   type ReadinessStage1Answers,
 } from "@vygo/validation";
+import { renderReadinessOpsBrief, type ReadinessOpsBriefPayload } from "@vygo/email";
 import type { ApiEnv } from "@vygo/config";
 import { safeError } from "../errors.js";
 import { resolveClientIp } from "../services/client-ip.js";
@@ -283,6 +292,204 @@ export async function ensureReadinessTables(dbHandle: DatabaseHandle): Promise<v
   } catch {
     // seed races are non-fatal
   }
+
+  // Bootstrap briefs table when formal migrate has not run yet.
+  await dbHandle.sql`
+    CREATE TABLE IF NOT EXISTS readiness_briefs (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      submission_id uuid NOT NULL,
+      brief jsonb NOT NULL,
+      talking_points jsonb DEFAULT '[]'::jsonb NOT NULL,
+      score_summary jsonb,
+      bucket text,
+      discrepancy_flags jsonb DEFAULT '[]'::jsonb NOT NULL,
+      llm_polished boolean DEFAULT false NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
+  try {
+    await dbHandle.sql`CREATE UNIQUE INDEX IF NOT EXISTS readiness_briefs_submission_uidx ON readiness_briefs (submission_id)`;
+    await dbHandle.sql`CREATE INDEX IF NOT EXISTS readiness_briefs_created_at_idx ON readiness_briefs (created_at)`;
+  } catch {
+    // index races are non-fatal
+  }
+}
+
+/**
+ * After score persistence: build template brief, optional LLM polish (fail closed),
+ * store durable brief row, enqueue applicant snapshot + ops brief emails.
+ * Never throws — scoring success must not fail because of brief/email issues.
+ */
+async function finalizeSubmissionSideEffects(
+  db: DatabaseHandle["db"],
+  options: {
+    submissionId: string;
+    token: string;
+    email: string;
+    name: string;
+    company: string;
+    bucket: string;
+    scores: Record<string, unknown>;
+    contact: Record<string, unknown>;
+    report: Record<string, unknown>;
+    draft: Record<string, unknown>;
+    discrepancyFlags: unknown[];
+    leadNotificationEmail: string;
+    publicOrigin: string;
+    log: {
+      info: (obj: Record<string, unknown>, msg?: string) => void;
+      warn: (obj: Record<string, unknown>, msg?: string) => void;
+    };
+  },
+): Promise<{ briefId: string | null; snapshotQueued: boolean; opsBriefQueued: boolean }> {
+  let briefId: string | null = null;
+  let snapshotQueued = false;
+  let opsBriefQueued = false;
+
+  try {
+    const stage1 =
+      options.draft.stage1 &&
+      typeof options.draft.stage1 === "object" &&
+      !Array.isArray(options.draft.stage1)
+        ? (options.draft.stage1 as Record<string, unknown>)
+        : null;
+    const followupAnswers =
+      options.draft.followupAnswers &&
+      typeof options.draft.followupAnswers === "object" &&
+      !Array.isArray(options.draft.followupAnswers)
+        ? (options.draft.followupAnswers as Record<string, unknown>)
+        : null;
+
+    let brief: LeadBrief = buildLeadBrief({
+      submissionId: options.submissionId,
+      contact: options.contact,
+      scores: options.scores,
+      bucket: options.bucket,
+      discrepancyFlags: options.discrepancyFlags,
+      parsedReport: options.report,
+      stage1,
+      followupAnswers,
+      draft: options.draft,
+    });
+
+    // Optional LLM polish only when a vault-backed key is present; never block.
+    try {
+      const polished = await tryLlmPolishBrief(brief, process.env);
+      if (polished) {
+        brief = { ...polished, llmPolished: true };
+      }
+    } catch {
+      // fail closed to pure template
+    }
+
+    const publicBrief = toPublicLeadBrief(brief);
+    const stored = await upsertReadinessBrief(db, {
+      submissionId: options.submissionId,
+      brief: publicBrief,
+      talkingPoints: [...brief.talkingPoints],
+      scoreSummary: brief.scoreSummary as unknown as Record<string, unknown>,
+      bucket: brief.bucket,
+      discrepancyFlags: brief.discrepancyFlags,
+      llmPolished: brief.llmPolished,
+    });
+    briefId = stored.id;
+
+    const origin = options.publicOrigin.replace(/\/$/, "") || "https://www.vygo.ai";
+    const snapshotUrl = `${origin}/readiness/snapshot?id=${encodeURIComponent(options.submissionId)}`;
+
+    const snapshotText = [
+      "Your vygo readiness snapshot is ready.",
+      "",
+      `Bucket: ${options.bucket || "—"}`,
+      options.name ? `Hi ${options.name},` : "",
+      `View online: ${snapshotUrl}`,
+      "",
+      typeof options.scores.reasoning === "string" ? options.scores.reasoning : "",
+      "",
+      "This email was sent because you completed a readiness check on vygo.ai.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const snapshotHtml = [
+      "<p>Your <strong>vygo</strong> readiness snapshot is ready.</p>",
+      options.name ? `<p>Hi ${esc(options.name)},</p>` : "",
+      `<p><strong>Bucket:</strong> ${esc(options.bucket || "—")}</p>`,
+      `<p><a href="${esc(snapshotUrl)}">Open your snapshot</a></p>`,
+      '<p style="color:#64748b;font-size:12px;">Sent because you completed a readiness check on vygo.ai.</p>',
+    ]
+      .filter(Boolean)
+      .join("");
+
+    await enqueueReadinessSnapshotEmail(db, {
+      snapshotId: options.submissionId,
+      email: options.email,
+      snapshotUrl,
+      subject: "Your vygo readiness snapshot",
+      html: snapshotHtml,
+      text: snapshotText,
+      bucket: options.bucket || null,
+      name: options.name || null,
+    });
+    snapshotQueued = true;
+
+    const opsRecipient =
+      (options.leadNotificationEmail || "hello@vygo.ai").trim().toLowerCase() || "hello@vygo.ai";
+    const opsPayload: ReadinessOpsBriefPayload = {
+      submissionId: options.submissionId,
+      briefId: stored.id,
+      brief: publicBrief,
+    };
+    let opsHtml: string | undefined;
+    let opsText: string | undefined;
+    let opsSubject: string | undefined;
+    try {
+      const rendered = await renderReadinessOpsBrief(opsPayload);
+      opsHtml = rendered.html;
+      opsText = rendered.text;
+      opsSubject = rendered.subject;
+    } catch {
+      // Worker can re-render from structured brief payload.
+    }
+
+    await enqueueReadinessOpsBriefEmail(db, {
+      submissionId: options.submissionId,
+      briefId: stored.id,
+      recipient: opsRecipient,
+      brief: publicBrief,
+      subject: opsSubject,
+      html: opsHtml,
+      text: opsText,
+    });
+    opsBriefQueued = true;
+
+    options.log.info(
+      {
+        event: "readiness_brief_finalized",
+        submissionId: options.submissionId,
+        briefId: stored.id,
+        snapshotQueued,
+        opsBriefQueued,
+        llmPolished: brief.llmPolished,
+      },
+      "readiness brief stored and emails enqueued",
+    );
+  } catch (error) {
+    options.log.warn(
+      {
+        event: "readiness_brief_finalize_failed",
+        submissionId: options.submissionId,
+        // Never log secrets or full error bodies with PII.
+        reason: error instanceof Error ? error.message.slice(0, 200) : "finalize_failed",
+      },
+      "brief/email finalize failed (non-blocking)",
+    );
+  }
+
+  return { briefId, snapshotQueued, opsBriefQueued };
 }
 
 async function enforceScoreRateLimit(
@@ -1048,6 +1255,17 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       const recheck = redactPasteSecrets(paste);
       const safePaste = recheck.redacted;
 
+      const brief = await findReadinessBriefBySubmissionId(dbHandle.db, submission.id);
+      const contactEmail =
+        submission.contact && typeof submission.contact.email === "string"
+          ? submission.contact.email
+          : null;
+      const outbox = await listReadinessOutboxJobs(dbHandle.db, {
+        submissionId: submission.id,
+        token,
+        email: contactEmail,
+      });
+
       return reply.status(200).send({
         id: submission.id,
         token: submission.sessionToken,
@@ -1058,11 +1276,96 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         bucket: submission.bucket,
         contact: submission.contact,
         createdAt: submission.createdAt,
+        // Linked internal brief (template-first; includes talking points + score summary).
+        brief: brief
+          ? {
+              id: brief.id,
+              submissionId: brief.submissionId,
+              talkingPoints: brief.talkingPoints,
+              scoreSummary: brief.scoreSummary,
+              bucket: brief.bucket,
+              discrepancyFlags: brief.discrepancyFlags,
+              llmPolished: brief.llmPolished,
+              // Full structured brief body for ops verification (no secrets).
+              body: brief.brief,
+              createdAt: brief.createdAt,
+            }
+          : null,
+        // Queryable outbox jobs for this submission (snapshot + ops brief + prompt).
+        outbox,
       });
     } catch (error) {
       request.log.error(
         { event: "readiness_submission_read_failed" },
         error instanceof Error ? error.message : "submission read failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  /**
+   * Query durable internal brief by submission id (or session token).
+   * Used by live verification; never returns secrets.
+   */
+  app.get("/v1/readiness/brief", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    const q = request.query as Record<string, unknown>;
+    const submissionId =
+      typeof q.submissionId === "string"
+        ? q.submissionId.trim()
+        : typeof q.id === "string"
+          ? q.id.trim()
+          : "";
+    const token = typeof q.token === "string" ? q.token.trim().slice(0, 128) : "";
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+      let resolvedSubmissionId = submissionId;
+      if (
+        (!resolvedSubmissionId || !UUID_RE.test(resolvedSubmissionId)) &&
+        token &&
+        TOKEN_RE.test(token)
+      ) {
+        const submission = await findLatestSubmissionBySessionToken(dbHandle.db, token);
+        if (!submission) {
+          return reply.status(404).send(safeError("NOT_FOUND", "Submission not found."));
+        }
+        resolvedSubmissionId = submission.id;
+      }
+      if (!resolvedSubmissionId || !UUID_RE.test(resolvedSubmissionId)) {
+        return reply
+          .status(400)
+          .send(safeError("VALIDATION_ERROR", "Provide submissionId or token."));
+      }
+
+      const brief = await findReadinessBriefBySubmissionId(dbHandle.db, resolvedSubmissionId);
+      if (!brief) {
+        return reply.status(404).send(safeError("NOT_FOUND", "Brief not found."));
+      }
+
+      return reply.status(200).send({
+        id: brief.id,
+        submissionId: brief.submissionId,
+        talkingPoints: brief.talkingPoints,
+        scoreSummary: brief.scoreSummary,
+        bucket: brief.bucket,
+        discrepancyFlags: brief.discrepancyFlags,
+        llmPolished: brief.llmPolished,
+        body: brief.brief,
+        createdAt: brief.createdAt,
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_brief_read_failed" },
+        error instanceof Error ? error.message : "brief read failed",
       );
       return reply
         .status(500)
@@ -1249,6 +1552,33 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         contact,
         parsedReport: report,
         rawPasteRedacted: pasteRedacted,
+        discrepancyFlags: Array.isArray(draft.discrepancyFlags) ? draft.discrepancyFlags : [],
+      });
+
+      // Template brief + dual email enqueue (applicant snapshot + ops brief).
+      // Fail closed on missing LLM; never block the scored response.
+      const origin =
+        (deps.env as { PUBLIC_WEB_ORIGIN?: string }).PUBLIC_WEB_ORIGIN?.trim() ||
+        "https://www.vygo.ai";
+      const side = await finalizeSubmissionSideEffects(dbHandle.db, {
+        submissionId: saved.id,
+        token,
+        email,
+        name,
+        company,
+        bucket: payload.bucket,
+        scores: scoresJson,
+        contact,
+        report,
+        draft,
+        discrepancyFlags: Array.isArray(saved.discrepancyFlags)
+          ? saved.discrepancyFlags
+          : Array.isArray(draft.discrepancyFlags)
+            ? draft.discrepancyFlags
+            : [],
+        leadNotificationEmail: deps.env.LEAD_NOTIFICATION_EMAIL || "hello@vygo.ai",
+        publicOrigin: origin,
+        log: request.log,
       });
 
       request.log.info(
@@ -1257,6 +1587,9 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           bucket: payload.bucket,
           source,
           snapshotId: saved.id,
+          briefId: side.briefId,
+          snapshotQueued: side.snapshotQueued,
+          opsBriefQueued: side.opsBriefQueued,
         },
         "readiness scored",
       );
@@ -1279,6 +1612,11 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         pricing: payload.pricing,
         source: payload.source,
         snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(saved.id)}`,
+        briefId: side.briefId,
+        email: {
+          snapshotQueued: side.snapshotQueued,
+          opsBriefQueued: side.opsBriefQueued,
+        },
       });
     } catch (error) {
       request.log.error(
