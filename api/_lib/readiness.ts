@@ -349,6 +349,14 @@ export async function proxyEmailPrompt(
   return proxyJson("POST", "/v1/readiness/email-prompt", body ?? {}, env, inboundHeaders);
 }
 
+export async function proxyParsePaste(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/parse", body ?? {}, env, inboundHeaders);
+}
+
 /** Lightweight lead log when edge has direct DB (no secrets in body). */
 export async function logLeadRow(
   sql: Sql,

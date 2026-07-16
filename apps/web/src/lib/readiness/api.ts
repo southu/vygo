@@ -1,9 +1,9 @@
 /**
  * Browser client for readiness APIs. All calls are same-origin on www.vygo.ai
- * (never api.vygo.ai) via apiUrl().
+ * via apiUrl() — never a separate API host.
  */
 import { apiUrl } from "@/lib/api";
-import type { ReadinessStage1Answers } from "@vygo/validation";
+import type { ManualAnswers, ReadinessStage1Answers } from "@vygo/validation";
 
 export type SessionResponse = {
   token: string;
@@ -11,6 +11,18 @@ export type SessionResponse = {
   draft: Record<string, unknown>;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type ParseResponse = {
+  token?: string;
+  stage?: string;
+  parseStatus: "ok" | "partial" | "pending" | "error" | string;
+  stack: string;
+  size: string;
+  findings: string[];
+  report?: Record<string, unknown>;
+  draft?: Record<string, unknown>;
+  note?: string;
 };
 
 export type ApiErrorBody = {
@@ -129,6 +141,54 @@ export async function emailReadinessPrompt(input: {
   };
 }
 
+/**
+ * Submit paste for server-side parse. On network/endpoint failure the caller
+ * should show a graceful pending confirmation from the client-side partial parse.
+ * Never call this with text that failed the client secret scan.
+ */
+export async function parseReadinessPaste(input: {
+  token: string;
+  paste: string;
+}): Promise<ParseResponse> {
+  const res = await fetch(apiUrl("/v1/readiness/parse"), {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ token: input.token, paste: input.paste }),
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  const body = await parseJson(res);
+  if (!res.ok) {
+    const code = (body.error as { code?: string } | undefined)?.code;
+    const msg =
+      (body.error as { message?: string } | undefined)?.message || "Could not parse paste.";
+    const err = new Error(msg) as Error & { status?: number; code?: string; lines?: number[] };
+    err.status = res.status;
+    err.code = code;
+    if (Array.isArray(body.lines)) err.lines = body.lines as number[];
+    throw err;
+  }
+  return {
+    token: typeof body.token === "string" ? body.token : input.token,
+    stage: typeof body.stage === "string" ? body.stage : "confirm",
+    parseStatus: typeof body.parseStatus === "string" ? body.parseStatus : "pending",
+    stack: typeof body.stack === "string" ? body.stack : "Not yet determined",
+    size: typeof body.size === "string" ? body.size : "Not yet determined",
+    findings: Array.isArray(body.findings)
+      ? (body.findings as unknown[]).filter((f): f is string => typeof f === "string")
+      : [],
+    report:
+      body.report && typeof body.report === "object" && !Array.isArray(body.report)
+        ? (body.report as Record<string, unknown>)
+        : undefined,
+    draft:
+      body.draft && typeof body.draft === "object" && !Array.isArray(body.draft)
+        ? (body.draft as Record<string, unknown>)
+        : undefined,
+    note: typeof body.note === "string" ? body.note : undefined,
+  };
+}
+
 export function draftFromStage1(
   stage1: Partial<ReadinessStage1Answers>,
   extra?: Record<string, unknown>,
@@ -155,4 +215,16 @@ export function stage1FromDraft(draft: Record<string, unknown>): Partial<Readine
     deadlineDetail:
       typeof draft.deadlineDetail === "string" ? draft.deadlineDetail : undefined,
   };
+}
+
+export function pasteTextFromDraft(draft: Record<string, unknown>): string {
+  return typeof draft.pasteText === "string" ? draft.pasteText : "";
+}
+
+export function manualAnswersFromDraft(draft: Record<string, unknown>): ManualAnswers | null {
+  const m = draft.manualAnswers;
+  if (m && typeof m === "object" && !Array.isArray(m)) {
+    return m as ManualAnswers;
+  }
+  return null;
 }

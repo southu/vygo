@@ -6,6 +6,7 @@
  * PATCH  /v1/readiness/session/:token   — save draft/stage state
  * POST   /v1/readiness/lead             — log off-ramp / intake lead
  * POST   /v1/readiness/email-prompt     — email diagnostic prompt + resume link
+ * POST   /v1/readiness/parse            — parse paste-back report (stage 3/4)
  *
  * All Postgres writes go through these server endpoints. Rate-limited by IP.
  * Never returns connection strings, DATABASE_URL, stack traces, or secrets.
@@ -17,8 +18,19 @@ import {
   patchReadinessSessionByToken,
   logReadinessLead,
   enqueueReadinessPromptEmail,
+  redactSensitivePaste,
+  insertReadinessSubmission,
   type DatabaseHandle,
 } from "@vygo/db";
+import {
+  buildConfirmationFindings,
+  describeSize,
+  describeStack,
+  normalizeReadinessPaste,
+  parseReadinessPastePartial,
+  parseReadinessReportV1,
+  scanPasteForSecrets,
+} from "@vygo/validation";
 import type { ApiEnv } from "@vygo/config";
 import { safeError } from "../errors.js";
 import { resolveClientIp } from "../services/client-ip.js";
@@ -468,6 +480,121 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       request.log.error(
         { event: "readiness_email_prompt_failed" },
         error instanceof Error ? error.message : "email prompt failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  /**
+   * Stage 3/4 paste-back parse. Client already ran a high-confidence secret
+   * scan; server re-checks, redacts, best-effort parses, and persists draft.
+   */
+  app.post("/v1/readiness/parse", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    if (!isJsonContentType(request.headers["content-type"])) {
+      return reply
+        .status(415)
+        .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const token = typeof body.token === "string" ? body.token.trim().slice(0, 128) : "";
+    const paste = typeof body.paste === "string" ? body.paste.slice(0, 100_000) : "";
+    if (!token || !TOKEN_RE.test(token)) {
+      return reply
+        .status(400)
+        .send(safeError("VALIDATION_ERROR", "A valid session token is required."));
+    }
+    if (!paste || paste.trim().length < 8) {
+      return reply.status(400).send(safeError("VALIDATION_ERROR", "paste is required."));
+    }
+
+    // Fail closed if secrets still present (client should have blocked).
+    const secretScan = scanPasteForSecrets(paste);
+    if (!secretScan.clean) {
+      return reply.status(400).send({
+        error: {
+          code: "SECRETS_DETECTED",
+          message: "Remove secrets before submitting.",
+        },
+        lines: secretScan.lines,
+      });
+    }
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+      const session = await findReadinessSessionByToken(dbHandle.db, token);
+      if (!session) {
+        return reply.status(404).send(safeError("NOT_FOUND", "Session not found."));
+      }
+
+      const normalized = normalizeReadinessPaste(paste);
+      const redacted = redactSensitivePaste(normalized);
+      const full = parseReadinessReportV1(normalized);
+      const partial = full ?? parseReadinessPastePartial(normalized);
+      const parseStatus = full ? "ok" : Object.keys(partial).length > 0 ? "partial" : "pending";
+      const stack = describeStack(partial);
+      const size = describeSize(partial);
+      const findings = buildConfirmationFindings(partial, 6);
+
+      const draft = {
+        ...session.draft,
+        pasteText: redacted.slice(0, 50_000),
+        source: "paste",
+        report: partial as Record<string, unknown>,
+        parseStatus,
+        parseUpdatedAt: new Date().toISOString(),
+      };
+
+      const updated = await patchReadinessSessionByToken(dbHandle.db, token, {
+        stage: "confirm",
+        draft,
+      });
+
+      // Best-effort submission row (redacted paste only).
+      try {
+        const rows = await dbHandle.sql<{ id: string }[]>`
+          SELECT id FROM readiness_sessions WHERE token = ${token} LIMIT 1
+        `;
+        const sessionId = rows[0]?.id ?? null;
+        await insertReadinessSubmission(dbHandle.db, {
+          sessionId,
+          parsedReport: partial as Record<string, unknown>,
+          rawPasteRedacted: redacted.slice(0, 50_000),
+          bucket: `paste:${parseStatus}`,
+          contact: { source: "readiness_paste", parseStatus },
+        });
+      } catch {
+        // non-fatal — draft is the source of truth for resume
+      }
+
+      request.log.info(
+        { event: "readiness_parse", parseStatus, hasFindings: findings.length > 0 },
+        "readiness paste parsed",
+      );
+
+      return reply.status(200).send({
+        token,
+        stage: updated?.stage ?? "confirm",
+        parseStatus,
+        stack,
+        size,
+        findings,
+        report: partial,
+        draft: updated?.draft ?? draft,
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_parse_failed" },
+        error instanceof Error ? error.message : "parse failed",
       );
       return reply
         .status(500)

@@ -7,7 +7,7 @@ export const readinessContent = {
     body: "Answer a few questions. We’ll generate a read-only diagnostic prompt tailored to how you build — no secrets, no code changes.",
   },
   stage1: {
-    progressLabel: "Stage 1 of 2 — intake",
+    progressLabel: "Stage 1 of 3 — intake",
     questions: {
       productDescription: {
         id: "productDescription",
@@ -50,7 +50,7 @@ export const readinessContent = {
     stop: "Thanks — not right now",
   },
   stage2: {
-    progressLabel: "Stage 2 of 2 — diagnostic prompt",
+    progressLabel: "Stage 2 of 3 — diagnostic prompt",
     title: "Your tailored diagnostic prompt",
     howToTitle: "How to run it",
     copy: "Copy prompt",
@@ -63,12 +63,45 @@ export const readinessContent = {
     emailError: "Could not send right now. Try again or copy the prompt instead.",
     cantRun: "Can't run this?",
     cantRunHref: "/readiness/fallback",
+    pasteResults: "I've run it — paste results",
     resumeHint: "Your progress is saved. Use the resume link in email or keep this tab.",
+  },
+  stage3: {
+    progressLabel: "Stage 3 of 3 — paste results",
+    title: "Paste your diagnostic report",
+    body: "Paste the full report from your AI tool. Chat wrapping and markdown code fences are fine — strip secrets first.",
+    textareaLabel: "Diagnostic report paste",
+    textareaPlaceholder:
+      "Paste the VYGO-READINESS-REPORT block here (markdown fences and line wrapping are OK)…",
+    submit: "Submit report",
+    submitting: "Checking…",
+    secretsMessage: "Remove secrets before submitting.",
+    back: "Back to prompt",
+    draftSaved: "Draft saved",
+  },
+  confirm: {
+    title: "Here's what we learned",
+    pendingTitle: "Here's what we learned so far",
+    pendingBody:
+      "We're still finishing the full parse. You can continue with what we have, or re-paste if something looks incomplete.",
+    stackLabel: "Stack",
+    sizeLabel: "Size",
+    findingsLabel: "Findings",
+    looksRight: "Looks right → continue",
+    somethingOff: "Something's off",
+    repaste: "Re-paste report",
+    editHint: "You can re-paste or tweak key fields below.",
   },
   fallback: {
     eyebrow: "Fallback questionnaire",
     title: "Can't run the diagnostic agent?",
-    body: "A structured questionnaire is coming soon. For now, email hello@vygo.ai with a short description of your product and stack, or return to the readiness check when you can run the prompt.",
+    body: "Answer these plain-language questions. We map them to the same readiness report as the automated path — with lower confidence and wider indicative ranges.",
+    submit: "Submit answers",
+    submitting: "Saving…",
+    successTitle: "Saved — manual path",
+    successBody:
+      "Your answers are stored on this session with source=manual and confidence=low. You can close this tab and resume later with your token.",
     back: "Back to readiness check",
+    continueToReadiness: "Return to readiness check",
   },
 } as const;

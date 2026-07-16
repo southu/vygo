@@ -53,6 +53,39 @@ export {
   type BuildDiagnosticPromptInput,
 } from "./prompt.js";
 
+export {
+  scanPasteForSecrets,
+  PASTE_SECRETS_BLOCK_MESSAGE,
+  type PasteSecretHit,
+  type PasteSecretScanResult,
+} from "./paste-secrets.js";
+
+export {
+  stripMarkdownFences,
+  unwrapChatLineWrapping,
+  ensureReportFooter,
+  normalizeReadinessPaste,
+  parseNormalizedReadinessPaste,
+  parseReadinessPastePartial,
+  buildConfirmationFindings,
+  describeStack,
+  describeSize,
+} from "./paste-normalize.js";
+
+export {
+  MANUAL_SOURCE,
+  MANUAL_CONFIDENCE_LABEL,
+  MANUAL_CONFIDENCE_VALUE,
+  MANUAL_QUESTIONNAIRE,
+  emptyManualAnswers,
+  isManualQuestionnaireComplete,
+  manualAnswersToReport,
+  buildManualSessionDraft,
+  type ManualQuestion,
+  type ManualQuestionType,
+  type ManualAnswers,
+} from "./manual-questionnaire.js";
+
 export const availabilityStatusSchema = z.enum(["open", "waitlist", "paused"]);
 
 export type AvailabilityStatus = z.infer<typeof availabilityStatusSchema>;

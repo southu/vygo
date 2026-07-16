@@ -124,8 +124,17 @@ export type ReadinessDraft = {
   };
   promptVariant?: PromptVariant;
   stage?: string;
+  /** Stage 3 paste-back draft text (may be redacted server-side). */
+  pasteText?: string;
+  /** Manual questionnaire answers (Can't run this? path). */
+  manualAnswers?: Record<string, string | string[]>;
+  /** Origin of report data: automated paste vs manual questionnaire. */
+  source?: "paste" | "manual" | "automated" | string;
+  /** Confidence label for manual answers (wider ranges later). */
+  confidence?: "low" | "medium" | "high" | string;
+  report?: Record<string, unknown>;
+  parseStatus?: "pending" | "ok" | "partial" | "error" | string;
 };
-
 export const EMPTY_STAGE1: ReadinessStage1Answers = {
   productDescription: "",
   whoUses: "",

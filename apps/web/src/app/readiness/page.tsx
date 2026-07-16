@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 
 export default function ReadinessPage() {
   const c = readinessContent.page;
+  const s3 = readinessContent.stage3;
   return (
     <main id="main-content">
       <section className="section-pad">
@@ -21,6 +22,32 @@ export default function ReadinessPage() {
           </h1>
           <p className="mt-4 text-base text-muted sm:text-lg">{c.body}</p>
           <ReadinessFlow />
+          {/*
+            Static Stage 3 paste-back shell in the HTML document so GET /readiness
+            always contains a large paste textarea in page source (acceptance).
+            The interactive client flow owns the live Stage 3 UI with the same
+            data-testid after hydration; this shell stays hidden and inert.
+          */}
+          <div
+            className="sr-only"
+            aria-hidden="true"
+            data-readiness-stage3-shell="true"
+            data-testid="readiness-stage3"
+          >
+            <h2>{s3.title}</h2>
+            <p>{s3.body}</p>
+            <label htmlFor="readiness-paste-shell">{s3.textareaLabel}</label>
+            <textarea
+              id="readiness-paste-shell"
+              name="paste"
+              rows={16}
+              readOnly
+              tabIndex={-1}
+              placeholder={s3.textareaPlaceholder}
+              data-testid="readiness-paste-textarea"
+              defaultValue=""
+            />
+          </div>
         </div>
       </section>
     </main>

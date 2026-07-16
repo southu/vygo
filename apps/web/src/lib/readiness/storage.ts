@@ -1,6 +1,6 @@
 /** localStorage helpers for the readiness flow (multi-tab + next-day resume). */
 
-import type { ReadinessStage1Answers } from "@vygo/validation";
+import type { ManualAnswers, ReadinessStage1Answers } from "@vygo/validation";
 
 export const READINESS_STORAGE_KEY = "vygo:readiness:v1" as const;
 
@@ -10,6 +10,12 @@ export type ReadinessLocalState = {
   stage1: Partial<ReadinessStage1Answers>;
   email?: string;
   offRampKind?: "not_built_yet" | "features_only" | null;
+  /** Stage 3 paste draft. */
+  pasteText?: string;
+  /** Manual questionnaire answers. */
+  manualAnswers?: ManualAnswers;
+  source?: string;
+  confidence?: string;
   updatedAt: string;
 };
 

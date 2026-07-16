@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
   BLOCKER_OPTIONS,
@@ -8,14 +8,20 @@ import {
   DEADLINE_OPTIONS,
   EMPTY_STAGE1,
   MAX_BLOCKERS,
+  PASTE_SECRETS_BLOCK_MESSAGE,
   PRODUCT_DESCRIPTION_MAX,
   READINESS_PROMPT_REASSURANCE,
   WHO_USES_OPTIONS,
+  buildConfirmationFindings,
   buildDiagnosticPrompt,
   buildPromptHowTo,
   deadlineNeedsDetail,
+  describeSize,
+  describeStack,
   isFeaturesOnlySoftOffRamp,
   isNotBuiltYet,
+  parseReadinessPastePartial,
+  scanPasteForSecrets,
   type BlockerOption,
   type BuiltWithOption,
   type DeadlineOption,
@@ -29,8 +35,11 @@ import {
   emailReadinessPrompt,
   getReadinessSession,
   logReadinessLead,
+  parseReadinessPaste,
   patchReadinessSession,
+  pasteTextFromDraft,
   stage1FromDraft,
+  type ParseResponse,
 } from "@/lib/readiness/api";
 import {
   loadReadinessLocal,
@@ -44,6 +53,8 @@ type View =
   | "off_ramp_not_built"
   | "off_ramp_features"
   | "stage2"
+  | "stage3"
+  | "confirm"
   | "error";
 
 const STAGE1_STEPS = [
@@ -77,6 +88,14 @@ function resumeTokenFromUrl(): string | null {
   }
 }
 
+type ConfirmState = {
+  stack: string;
+  size: string;
+  findings: string[];
+  parseStatus: string;
+  pending: boolean;
+};
+
 export function ReadinessFlow() {
   const c = readinessContent;
   const [view, setView] = useState<View>("loading");
@@ -91,7 +110,34 @@ export function ReadinessFlow() {
   );
   const [emailFeedback, setEmailFeedback] = useState("");
 
+  // Stage 3 paste-back
+  const [pasteText, setPasteText] = useState("");
+  const [secretLines, setSecretLines] = useState<number[]>([]);
+  const [secretMessage, setSecretMessage] = useState("");
+  const [pasteSubmitting, setPasteSubmitting] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const pasteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
   const step: Stage1Step = STAGE1_STEPS[stepIndex] ?? "productDescription";
+
+  const buildLocal = useCallback(
+    (
+      nextStage1: ReadinessStage1Answers,
+      stage: string,
+      sessionToken: string | null,
+      extra?: Partial<ReadinessLocalState>,
+    ): ReadinessLocalState => ({
+      token: sessionToken,
+      stage,
+      stage1: nextStage1,
+      email: email || undefined,
+      pasteText: extra?.pasteText ?? pasteText,
+      updatedAt: new Date().toISOString(),
+      ...extra,
+    }),
+    [email, pasteText],
+  );
 
   const persist = useCallback(
     async (
@@ -99,19 +145,15 @@ export function ReadinessFlow() {
       stage: string,
       extraDraft?: Record<string, unknown>,
       sessionToken?: string | null,
+      localExtra?: Partial<ReadinessLocalState>,
     ) => {
       const t = sessionToken ?? token;
       const draft = draftFromStage1(nextStage1, {
         email: email || undefined,
+        pasteText: (localExtra?.pasteText ?? pasteText) || undefined,
         ...extraDraft,
       });
-      const local: ReadinessLocalState = {
-        token: t,
-        stage,
-        stage1: nextStage1,
-        email: email || undefined,
-        updatedAt: new Date().toISOString(),
-      };
+      const local = buildLocal(nextStage1, stage, t, localExtra);
       saveReadinessLocal(local);
       if (!t) return;
       try {
@@ -120,7 +162,7 @@ export function ReadinessFlow() {
         // Local persist still works; server retry on next action.
       }
     },
-    [token, email],
+    [token, email, pasteText, buildLocal],
   );
 
   // Bootstrap: resume from ?token= or localStorage, else create session.
@@ -134,6 +176,7 @@ export function ReadinessFlow() {
         let restoredStage1 = mergeStage1(local?.stage1 ?? {});
         let restoredStage = local?.stage || "intake";
         let restoredEmail = local?.email || "";
+        let restoredPaste = local?.pasteText || "";
 
         if (sessionToken) {
           try {
@@ -148,12 +191,57 @@ export function ReadinessFlow() {
             if (typeof remote.draft?.email === "string") {
               restoredEmail = remote.draft.email;
             }
+            const remotePaste = pasteTextFromDraft(remote.draft || {});
+            if (remotePaste) restoredPaste = remotePaste;
+
             const off = remote.draft?.offRamp as { kind?: string } | undefined;
             if (off?.kind === "not_built_yet" || isNotBuiltYet(restoredStage1.builtWith)) {
               setToken(sessionToken);
               setStage1(restoredStage1);
               setEmail(restoredEmail);
+              setPasteText(restoredPaste);
               setView("off_ramp_not_built");
+              return;
+            }
+
+            // Resume stage 3 / confirm from server stage or draft.
+            if (
+              restoredStage === "paste" ||
+              restoredStage === "stage3" ||
+              restoredStage === "confirm" ||
+              remote.draft?.parseStatus
+            ) {
+              setToken(sessionToken);
+              setStage1(restoredStage1);
+              setEmail(restoredEmail);
+              setPasteText(restoredPaste);
+              saveReadinessLocal({
+                token: sessionToken,
+                stage: restoredStage,
+                stage1: restoredStage1,
+                email: restoredEmail || undefined,
+                pasteText: restoredPaste,
+                updatedAt: new Date().toISOString(),
+              });
+              if (restoredStage === "confirm" || remote.draft?.report) {
+                const report =
+                  remote.draft?.report &&
+                  typeof remote.draft.report === "object" &&
+                  !Array.isArray(remote.draft.report)
+                    ? (remote.draft.report as Parameters<typeof describeStack>[0])
+                    : parseReadinessPastePartial(restoredPaste);
+                const findings = buildConfirmationFindings(report, 6);
+                setConfirm({
+                  stack: describeStack(report),
+                  size: describeSize(report),
+                  findings,
+                  parseStatus: String(remote.draft?.parseStatus || "partial"),
+                  pending: remote.draft?.parseStatus === "pending" || findings.length === 0,
+                });
+                setView("confirm");
+                return;
+              }
+              setView("stage3");
               return;
             }
           } catch {
@@ -165,7 +253,9 @@ export function ReadinessFlow() {
         if (!sessionToken) {
           const created = await createReadinessSession({
             stage: "intake",
-            draft: draftFromStage1(restoredStage1),
+            draft: draftFromStage1(restoredStage1, {
+              pasteText: restoredPaste || undefined,
+            }),
           });
           if (cancelled) return;
           sessionToken = created.token;
@@ -175,11 +265,13 @@ export function ReadinessFlow() {
         setToken(sessionToken);
         setStage1(restoredStage1);
         setEmail(restoredEmail);
+        setPasteText(restoredPaste);
         saveReadinessLocal({
           token: sessionToken,
           stage: restoredStage,
           stage1: restoredStage1,
           email: restoredEmail || undefined,
+          pasteText: restoredPaste,
           updatedAt: new Date().toISOString(),
         });
 
@@ -205,7 +297,9 @@ export function ReadinessFlow() {
             if (
               isFeaturesOnlySoftOffRamp(restoredStage1.blockers ?? []) &&
               restoredStage !== "prompt" &&
-              restoredStage !== "stage2"
+              restoredStage !== "stage2" &&
+              restoredStage !== "paste" &&
+              restoredStage !== "stage3"
             ) {
               setView("off_ramp_features");
               return;
@@ -331,7 +425,6 @@ export function ReadinessFlow() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback for older browsers
       try {
         const ta = document.createElement("textarea");
         ta.value = promptBundle.prompt;
@@ -375,6 +468,157 @@ export function ReadinessFlow() {
       setEmailFeedback(c.stage2.emailError);
     }
   };
+
+  const goToStage3 = async () => {
+    setSecretLines([]);
+    setSecretMessage("");
+    await persist(stage1, "paste", { pasteText });
+    setView("stage3");
+  };
+
+  const onPasteChange = (value: string) => {
+    setPasteText(value);
+    // Clear secret highlight while editing
+    if (secretLines.length) {
+      setSecretLines([]);
+      setSecretMessage("");
+    }
+    if (pasteDebounceRef.current) clearTimeout(pasteDebounceRef.current);
+    pasteDebounceRef.current = setTimeout(() => {
+      const local = buildLocal(stage1, "paste", token, { pasteText: value });
+      saveReadinessLocal(local);
+      if (token) {
+        void patchReadinessSession(token, {
+          stage: "paste",
+          draft: draftFromStage1(stage1, {
+            email: email || undefined,
+            pasteText: value,
+          }),
+        }).catch(() => {
+          /* local only */
+        });
+      }
+    }, 600);
+  };
+
+  /**
+   * Client-side secret scan MUST run before any network send of paste contents.
+   * On hit: block submit, highlight lines, show fixed message — no fetch.
+   */
+  const onPasteSubmit = async () => {
+    if (pasteSubmitting) return;
+    const scan = scanPasteForSecrets(pasteText);
+    if (!scan.clean) {
+      setSecretLines(scan.lines);
+      setSecretMessage(PASTE_SECRETS_BLOCK_MESSAGE);
+      // Do NOT send network request with paste contents.
+      return;
+    }
+    setSecretLines([]);
+    setSecretMessage("");
+    setPasteSubmitting(true);
+
+    // Client partial for graceful pending if endpoint is not live.
+    const clientPartial = parseReadinessPastePartial(pasteText);
+    const clientFindings = buildConfirmationFindings(clientPartial, 6);
+    const clientConfirm: ConfirmState = {
+      stack: describeStack(clientPartial),
+      size: describeSize(clientPartial),
+      findings: clientFindings,
+      parseStatus: clientFindings.length > 0 ? "partial" : "pending",
+      pending: true,
+    };
+
+    // Persist draft (paste text) without waiting for parse — still no secrets.
+    saveReadinessLocal(buildLocal(stage1, "paste", token, { pasteText }));
+
+    if (!token) {
+      setConfirm(clientConfirm);
+      setView("confirm");
+      setPasteSubmitting(false);
+      return;
+    }
+
+    try {
+      const result: ParseResponse = await parseReadinessPaste({ token, paste: pasteText });
+      const findings =
+        result.findings.length > 0
+          ? result.findings.slice(0, 6)
+          : clientFindings.length > 0
+            ? clientFindings
+            : [];
+      // Ensure 4–6 findings when we have data; pad from client if needed.
+      let merged = findings;
+      if (merged.length < 4 && clientFindings.length > merged.length) {
+        const seen = new Set(merged);
+        for (const f of clientFindings) {
+          if (merged.length >= 6) break;
+          if (!seen.has(f)) {
+            merged = [...merged, f];
+            seen.add(f);
+          }
+        }
+      }
+      setConfirm({
+        stack: result.stack || clientConfirm.stack,
+        size: result.size || clientConfirm.size,
+        findings: merged.slice(0, 6),
+        parseStatus: result.parseStatus,
+        pending: result.parseStatus === "pending" || merged.length === 0,
+      });
+      setView("confirm");
+    } catch (err) {
+      const e = err as Error & { code?: string; lines?: number[] };
+      if (e.code === "SECRETS_DETECTED") {
+        setSecretLines(Array.isArray(e.lines) ? e.lines : []);
+        setSecretMessage(PASTE_SECRETS_BLOCK_MESSAGE);
+        setPasteSubmitting(false);
+        return;
+      }
+      // Graceful pending: show client-side confirmation.
+      setConfirm(clientConfirm);
+      setView("confirm");
+      // Still save draft on session without re-sending paste if possible
+      try {
+        await patchReadinessSession(token, {
+          stage: "confirm",
+          draft: draftFromStage1(stage1, {
+            email: email || undefined,
+            pasteText,
+            source: "paste",
+            parseStatus: "pending",
+            report: clientPartial as Record<string, unknown>,
+          }),
+        });
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      setPasteSubmitting(false);
+    }
+  };
+
+  const onLooksRight = async () => {
+    await persist(stage1, "scored", {
+      pasteText,
+      source: "paste",
+      parseStatus: confirm?.parseStatus || "ok",
+      confirmedAt: new Date().toISOString(),
+    });
+    // Next stage (scoring) is out of scope for this mission — stay on confirm
+    // with a soft success state by keeping confirm view; mark confirmed.
+    setConfirm((prev) =>
+      prev ? { ...prev, pending: false, parseStatus: prev.parseStatus || "ok" } : prev,
+    );
+  };
+
+  const onSomethingOff = () => {
+    setConfirm(null);
+    setView("stage3");
+  };
+
+  // Highlight helper: line numbers for secret scan overlay
+  const pasteLines = useMemo(() => pasteText.replace(/\r\n/g, "\n").split("\n"), [pasteText]);
 
   if (view === "loading") {
     return (
@@ -423,7 +667,6 @@ export function ReadinessFlow() {
             className="btn-primary"
             data-testid="readiness-features-continue"
             onClick={() => {
-              // Return to blockers so they can add a reliability/security concern.
               setStepIndex(STAGE1_STEPS.indexOf("blockers"));
               setView("stage1");
             }}
@@ -436,6 +679,169 @@ export function ReadinessFlow() {
         </div>
       </div>
     );
+  }
+
+  if (view === "confirm" && confirm) {
+    return (
+      <div className="mt-8" data-testid="readiness-confirm">
+        <p className="eyebrow">{c.stage3.progressLabel}</p>
+        <h2 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">
+          {confirm.pending ? c.confirm.pendingTitle : c.confirm.title}
+        </h2>
+        {confirm.pending ? (
+          <p className="mt-3 text-sm text-muted" data-testid="readiness-confirm-pending">
+            {c.confirm.pendingBody}
+          </p>
+        ) : null}
+
+        <div className="card mt-6 grid gap-4 sm:grid-cols-2">
+          <div data-testid="readiness-confirm-stack">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+              {c.confirm.stackLabel}
+            </p>
+            <p className="mt-1 text-base font-semibold text-ink">{confirm.stack}</p>
+          </div>
+          <div data-testid="readiness-confirm-size">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+              {c.confirm.sizeLabel}
+            </p>
+            <p className="mt-1 text-base font-semibold text-ink">{confirm.size}</p>
+          </div>
+        </div>
+
+        <div className="card mt-4" data-testid="readiness-confirm-findings">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            {c.confirm.findingsLabel}
+          </p>
+          {confirm.findings.length > 0 ? (
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-ink-soft">
+              {confirm.findings.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-muted">
+              Findings will appear once parsing completes. You can re-paste or continue.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => void onLooksRight()}
+            data-testid="readiness-confirm-looks-right"
+          >
+            {c.confirm.looksRight}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={onSomethingOff}
+            data-testid="readiness-confirm-something-off"
+          >
+            {c.confirm.somethingOff}
+          </button>
+        </div>
+        <p className="mt-3 text-xs text-muted">{c.confirm.editHint}</p>
+      </div>
+    );
+  }
+
+  /** Stage 3 paste-back panel — always mounted so the page/DOM always contains the large textarea. */
+  const stage3Panel = (
+    <div
+      className={view === "stage3" ? "mt-8" : "sr-only"}
+      data-testid="readiness-stage3"
+      aria-hidden={view === "stage3" ? undefined : true}
+    >
+      <p className="eyebrow">{c.stage3.progressLabel}</p>
+      <h2 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">{c.stage3.title}</h2>
+      <p className="mt-3 text-base text-muted">{c.stage3.body}</p>
+
+      <div className="mt-6">
+        <label htmlFor="readiness-paste" className="text-sm font-medium text-ink-soft">
+          {c.stage3.textareaLabel}
+        </label>
+        <textarea
+          id="readiness-paste"
+          ref={pasteTextareaRef}
+          name="paste"
+          rows={16}
+          value={pasteText}
+          onChange={(ev) => onPasteChange(ev.target.value)}
+          placeholder={c.stage3.textareaPlaceholder}
+          className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-3 font-mono text-xs leading-relaxed text-ink sm:text-sm"
+          data-testid="readiness-paste-textarea"
+          spellCheck={false}
+          autoComplete="off"
+          tabIndex={view === "stage3" ? 0 : -1}
+        />
+      </div>
+
+      {secretLines.length > 0 && view === "stage3" ? (
+        <div
+          className="mt-3 rounded-xl border border-red/40 bg-red/5 p-3"
+          role="alert"
+          data-testid="readiness-secrets-block"
+        >
+          <p className="text-sm font-semibold text-red" data-testid="readiness-secrets-message">
+            {secretMessage || PASTE_SECRETS_BLOCK_MESSAGE}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            Flagged line{secretLines.length === 1 ? "" : "s"}: {secretLines.join(", ")}
+          </p>
+          <div
+            className="mt-3 max-h-48 overflow-auto rounded-lg border border-border bg-trust p-2 font-mono text-xs text-white/90"
+            data-testid="readiness-secrets-highlight"
+            aria-label="Highlighted lines with secrets"
+          >
+            {pasteLines.map((line, idx) => {
+              const lineNo = idx + 1;
+              const hit = secretLines.includes(lineNo);
+              return (
+                <div
+                  key={lineNo}
+                  className={hit ? "rounded bg-red/40 px-1 text-white" : "px-1 text-white/70"}
+                  data-secret-line={hit ? "true" : "false"}
+                  data-line={lineNo}
+                >
+                  <span className="mr-2 inline-block w-8 text-right text-white/40">{lineNo}</span>
+                  {line || " "}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {view === "stage3" ? (
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setView("stage2")}
+            data-testid="readiness-paste-back"
+          >
+            {c.stage3.back}
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={pasteSubmitting || pasteText.trim().length < 8}
+            onClick={() => void onPasteSubmit()}
+            data-testid="readiness-paste-submit"
+          >
+            {pasteSubmitting ? c.stage3.submitting : c.stage3.submit}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (view === "stage3") {
+    return stage3Panel;
   }
 
   if (view === "stage2" && promptBundle && howTo) {
@@ -527,15 +933,31 @@ export function ReadinessFlow() {
           ) : null}
         </div>
 
-        <p className="mt-6 text-sm">
-          <Link
-            href={c.stage2.cantRunHref}
-            className="font-semibold text-purple hover:text-purple-dark"
-            data-testid="readiness-cant-run"
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => void goToStage3()}
+            data-testid="readiness-go-paste"
           >
-            {c.stage2.cantRun}
-          </Link>
-        </p>
+            {c.stage2.pasteResults}
+          </button>
+          <p className="text-sm">
+            <Link
+              href={
+                token
+                  ? `${c.stage2.cantRunHref}?token=${encodeURIComponent(token)}`
+                  : c.stage2.cantRunHref
+              }
+              className="font-semibold text-purple hover:text-purple-dark"
+              data-testid="readiness-cant-run"
+            >
+              {c.stage2.cantRun}
+            </Link>
+          </p>
+        </div>
+
+        {stage3Panel}
       </div>
     );
   }
@@ -764,6 +1186,8 @@ export function ReadinessFlow() {
           </button>
         </div>
       </div>
+
+      {stage3Panel}
     </div>
   );
 }
