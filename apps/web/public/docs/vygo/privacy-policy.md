@@ -17,6 +17,14 @@ When you visit the Site or apply to our waitlist, we collect:
 
 Please do not submit sensitive personal information through free-text fields.
 
+## Readiness Check Data Flow
+
+When you use the production readiness check on the Site, we collect answers you provide in the intake questionnaire, redacted paste text from diagnostic report paste-back, a parsed report derived from that paste (or from the manual fallback questionnaire), and contact information (name, email, and optional company) when you unlock scored results.
+
+Redaction of credential-shaped secrets happens before storage: high-confidence secret patterns are blocked in the browser when possible and replaced with [REDACTED] on the server before any paste is persisted. We do not intentionally store unredacted secrets from readiness pastes.
+
+We intend to retain raw redacted pastes for up to 90 days after collection, then delete or de-identify them. In v1 the automated purge job may be a documented stub; retention intent and the retention_expires_at field still apply, and we will enforce purge when the scheduled job is wired.
+
 ## Sources of Information
 
 We collect information directly from you, automatically from your browser or device when you use the Site, and from the service providers identified below when they operate the Site on our behalf. We may also receive a referring URL and campaign parameters from the page or link that directed you to us.
@@ -58,7 +66,7 @@ We may also disclose information when required by law; to protect rights, safety
 
 ## Retention
 
-We retain waitlist and inquiry information while evaluating your application and for up to 24 months after our last substantive interaction with you, unless a longer period is needed for an active business relationship, legal compliance, dispute resolution, or enforcement of agreements. We retain marketing-consent records until you withdraw consent and for a reasonable period afterward to honor and document your choice. Security and analytics records are retained only as long as reasonably necessary for security, troubleshooting, and aggregate analysis. We delete or de-identify information when the applicable retention period ends.
+We retain waitlist and inquiry information while evaluating your application and for up to 24 months after our last substantive interaction with you, unless a longer period is needed for an active business relationship, legal compliance, dispute resolution, or enforcement of agreements. We retain marketing-consent records until you withdraw consent and for a reasonable period afterward to honor and document your choice. Security and analytics records are retained only as long as reasonably necessary for security, troubleshooting, and aggregate analysis. For readiness raw redacted pastes, our retention intent is 90 days (see Readiness Check Data Flow). We delete or de-identify information when the applicable retention period ends.
 
 ## Security
 

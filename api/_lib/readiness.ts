@@ -79,6 +79,41 @@ function rowToPublic(row: {
   };
 }
 
+/**
+ * Edge-local draft redaction for paste fields (mirrors Railway/db path).
+ * High-confidence credential shapes only; never store unredacted pasteText.
+ */
+export function redactEdgeDraft(draft: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...draft };
+  for (const key of ["pasteText", "rawPasteRedacted"] as const) {
+    const value = out[key];
+    if (typeof value !== "string" || !value) continue;
+    let text = value;
+    text = text.replace(/\bsk[-_](?:live|test|proj|ant)?[-_]?[A-Za-z0-9]{16,}\b/g, "[REDACTED]");
+    text = text.replace(/\bAKIA[0-9A-Z]{16}\b/g, "[REDACTED]");
+    text = text.replace(
+      /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+      "[REDACTED]",
+    );
+    text = text.replace(
+      /\bpostgres(?:ql)?:\/\/[^/\s"'`]+:[^@\s"'`]+@[^\s"'`]*/gi,
+      "postgres://[REDACTED]",
+    );
+    text = text.replace(
+      /\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client_secret)\s*[:=]\s*['"]?[A-Za-z0-9_\-+/=]{16,}['"]?/gi,
+      (m) => {
+        const assign = m.match(
+          /^((?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token|client_secret)\s*[:=]\s*)/i,
+        );
+        return assign?.[1] ? `${assign[1]}[REDACTED]` : "[REDACTED]";
+      },
+    );
+    text = text.replace(/\bBearer\s+[A-Za-z0-9._\-+=/]+/gi, "Bearer [REDACTED]");
+    out[key] = text;
+  }
+  return out;
+}
+
 export async function createSessionRow(
   sql: Sql,
   input: { stage?: string; draft?: Record<string, unknown> },
@@ -89,7 +124,7 @@ export async function createSessionRow(
     typeof input.stage === "string" && input.stage.trim()
       ? input.stage.trim().slice(0, 64)
       : DEFAULT_STAGE;
-  const draft = input.draft && typeof input.draft === "object" ? input.draft : {};
+  const draft = input.draft && typeof input.draft === "object" ? redactEdgeDraft(input.draft) : {};
   const rows = await sql<
     {
       token: string;
@@ -141,7 +176,7 @@ export async function patchSessionRow(
   if (!existing) return null;
   const stage =
     input.stage !== undefined ? (input.stage.trim() || DEFAULT_STAGE).slice(0, 64) : existing.stage;
-  const draft = input.draft !== undefined ? input.draft : existing.draft;
+  const draft = input.draft !== undefined ? redactEdgeDraft(input.draft) : existing.draft;
   const rows = await sql<
     {
       token: string;

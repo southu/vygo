@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { readinessContent } from "@/content/readiness";
+import { trackAnalytics } from "@/lib/analytics";
 import { scoreReadiness, type ScoreResponse } from "@/lib/readiness/api";
 
 /** Cloudflare always-pass test sitekey when env unset (same as waitlist). */
@@ -153,6 +154,10 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
         turnstileToken,
         source,
       });
+      trackAnalytics("gate_completed", { ok: true });
+      if (result.bucket) {
+        trackAnalytics("bucket_assigned", { bucket: result.bucket });
+      }
       onScored(result);
     } catch (err) {
       const e = err as Error & { fields?: Record<string, string> };

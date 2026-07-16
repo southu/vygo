@@ -14,8 +14,7 @@ const commitSha =
  * Never embed TURNSTILE_SECRET_KEY (server-only).
  */
 const turnstileSiteKey =
-  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ||
-  "1x0000000000000000000000000000000AA";
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "1x0000000000000000000000000000000AA";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,

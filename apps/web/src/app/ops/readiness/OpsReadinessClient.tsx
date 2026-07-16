@@ -248,8 +248,7 @@ export function OpsReadinessClient() {
   const flags = detail?.brief?.discrepancyFlags ?? detail?.discrepancyFlags ?? [];
   const parsed =
     detail?.parsedReport ??
-    (detail?.brief?.body?.parsedTechReport &&
-    typeof detail.brief.body.parsedTechReport === "object"
+    (detail?.brief?.body?.parsedTechReport && typeof detail.brief.body.parsedTechReport === "object"
       ? (detail.brief.body.parsedTechReport as Record<string, unknown>)
       : null);
 
@@ -417,7 +416,10 @@ export function OpsReadinessClient() {
 
               <div>
                 <div className="text-xs font-semibold uppercase text-muted">Scores</div>
-                <div className="mt-2 rounded-xl border border-border bg-canvas p-3" data-field="scores">
+                <div
+                  className="mt-2 rounded-xl border border-border bg-canvas p-3"
+                  data-field="scores"
+                >
                   {dims ? (
                     <ul className="space-y-1">
                       {Object.entries(dims).map(([k, v]) => (
@@ -427,7 +429,8 @@ export function OpsReadinessClient() {
                       ))}
                       {"overall" in (scoreSummary || {}) ? (
                         <li>
-                          <strong>overall:</strong> {String((scoreSummary as Record<string, unknown>).overall)}
+                          <strong>overall:</strong>{" "}
+                          {String((scoreSummary as Record<string, unknown>).overall)}
                         </li>
                       ) : null}
                     </ul>
@@ -464,7 +467,9 @@ export function OpsReadinessClient() {
                   data-field="parsed-report"
                 >
                   {parsed ? (
-                    <pre className="whitespace-pre-wrap text-xs">{JSON.stringify(parsed, null, 2)}</pre>
+                    <pre className="whitespace-pre-wrap text-xs">
+                      {JSON.stringify(parsed, null, 2)}
+                    </pre>
                   ) : (
                     <span className="text-muted">No parsed report</span>
                   )}

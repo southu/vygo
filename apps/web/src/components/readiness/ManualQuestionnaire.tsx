@@ -25,6 +25,7 @@ import {
   saveReadinessLocal,
   type ReadinessLocalState,
 } from "@/lib/readiness/storage";
+import { trackAnalytics } from "@/lib/analytics";
 import { ScoreGateForm } from "@/components/readiness/ScoreGateForm";
 
 function resumeTokenFromUrl(): string | null {
@@ -106,6 +107,8 @@ export function ManualQuestionnaire() {
         setToken(sessionToken);
         setAnswers(restored);
         persistLocal(restored, sessionToken, "manual");
+        trackAnalytics("fallback_taken", { from: "manual_questionnaire" });
+        trackAnalytics("stage_started", { stage: "fallback" });
         setStatus("form");
       } catch (err) {
         if (cancelled) return;

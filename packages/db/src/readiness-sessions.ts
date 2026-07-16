@@ -6,6 +6,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { redactPasteSecrets } from "@vygo/validation";
 import type { Db } from "./client.js";
 import {
   OUTBOX_KINDS,
@@ -125,6 +126,22 @@ function normalizeDraft(value: Record<string, unknown> | undefined): Record<stri
   return value;
 }
 
+/**
+ * Redact credential-shaped paste fields before any draft is persisted.
+ * Defense in depth: client also blocks secrets before submit.
+ */
+export function redactSessionDraft(draft: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...draft };
+  for (const key of ["pasteText", "rawPasteRedacted"] as const) {
+    const value = out[key];
+    if (typeof value === "string" && value) {
+      const r = redactPasteSecrets(value);
+      out[key] = redactSensitivePaste(r.redacted);
+    }
+  }
+  return out;
+}
+
 /** Create a new session with a fresh resumable token. */
 export async function createReadinessSession(
   db: Db,
@@ -133,7 +150,7 @@ export async function createReadinessSession(
   const values: NewReadinessSession = {
     token: generateReadinessSessionToken(),
     stage: normalizeStage(input.stage),
-    draft: normalizeDraft(input.draft),
+    draft: redactSessionDraft(normalizeDraft(input.draft)),
   };
   const [inserted] = await db.insert(readinessSessions).values(values).returning();
   if (!inserted) {
@@ -174,7 +191,7 @@ export async function patchReadinessSessionByToken(
     updates.stage = normalizeStage(input.stage);
   }
   if (input.draft !== undefined) {
-    updates.draft = normalizeDraft(input.draft);
+    updates.draft = redactSessionDraft(normalizeDraft(input.draft));
   }
 
   const rows = await db
@@ -1033,7 +1050,9 @@ function overallFromScores(scores: Record<string, unknown> | null): number | nul
   return null;
 }
 
-function dimensionsFromScores(scores: Record<string, unknown> | null): Record<string, number> | null {
+function dimensionsFromScores(
+  scores: Record<string, unknown> | null,
+): Record<string, number> | null {
   if (!scores) return null;
   const dims = scores.dimensions;
   if (!dims || typeof dims !== "object" || Array.isArray(dims)) return null;
@@ -1149,7 +1168,7 @@ export async function getOpsReadinessSubmissionDetail(
     scores:
       row.scores && typeof row.scores === "object" && !Array.isArray(row.scores)
         ? (row.scores as Record<string, unknown>)
-        : brief?.scoreSummary ?? null,
+        : (brief?.scoreSummary ?? null),
     discrepancyFlags: Array.isArray(row.discrepancyFlags) ? row.discrepancyFlags : [],
     contact:
       row.contact && typeof row.contact === "object" && !Array.isArray(row.contact)

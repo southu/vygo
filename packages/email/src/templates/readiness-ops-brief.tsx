@@ -209,7 +209,7 @@ export function buildReadinessOpsBriefHtmlFallback(payload: ReadinessOpsBriefPay
     : [];
   const pointsHtml = talkingPoints
     .slice(0, 3)
-    .map((p, i) => `<li>${escapeHtml(p)}</li>`)
+    .map((p) => `<li>${escapeHtml(p)}</li>`)
     .join("");
   return `<!doctype html><html><body><h1>Readiness lead brief</h1><p><strong>${company}</strong> — ${bucket}</p><p>Product: ${escapeHtml(str(brief.productOneLiner))}</p><ol>${pointsHtml}</ol></body></html>`;
 }

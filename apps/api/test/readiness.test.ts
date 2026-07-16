@@ -276,7 +276,9 @@ describe("readiness routes without database", () => {
       snapshotId?: string;
     };
     assert.equal(body.error?.code, "VALIDATION_ERROR");
-    assert.ok(body.error?.fields?.name || body.error?.fields?.email || body.error?.fields?.privacyAccepted);
+    assert.ok(
+      body.error?.fields?.name || body.error?.fields?.email || body.error?.fields?.privacyAccepted,
+    );
     // No scored results when gate is incomplete.
     assert.equal(body.scores, undefined);
     assert.equal(body.dimensions, undefined);

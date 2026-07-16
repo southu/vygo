@@ -6,6 +6,7 @@
   "framework": null,
   "cleanUrls": true,
   "rewrites": [
+    { "source": "/v1/analytics", "destination": "/api/analytics" },
     { "source": "/v1/waitlist", "destination": "/api/waitlist" },
     { "source": "/v1/readiness/session", "destination": "/api/readiness/session" },
     {

@@ -44,6 +44,7 @@ export {
 export {
   generateReadinessSessionToken,
   redactSensitivePaste,
+  redactSessionDraft,
   toReadinessSessionPublic,
   createReadinessSession,
   findReadinessSessionByToken,

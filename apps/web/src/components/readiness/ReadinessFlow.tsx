@@ -47,7 +47,11 @@ import {
   saveReadinessLocal,
   type ReadinessLocalState,
 } from "@/lib/readiness/storage";
+import { readinessAnalyticsEventCatalog, trackAnalytics } from "@/lib/analytics";
 import { ScoreGateForm } from "@/components/readiness/ScoreGateForm";
+
+// Retain event-name literals in the client bundle for live JS checks.
+void readinessAnalyticsEventCatalog();
 
 type View =
   | "loading"
@@ -178,6 +182,7 @@ export function ReadinessFlow() {
         let restoredStage = local?.stage || "intake";
         let restoredEmail = local?.email || "";
         let restoredPaste = local?.pasteText || "";
+        const didResume = Boolean(fromUrl || local?.token);
 
         if (sessionToken) {
           try {
@@ -194,6 +199,9 @@ export function ReadinessFlow() {
             }
             const remotePaste = pasteTextFromDraft(remote.draft || {});
             if (remotePaste) restoredPaste = remotePaste;
+            if (didResume) {
+              trackAnalytics("session_resumed", { stage: restoredStage });
+            }
 
             const off = remote.draft?.offRamp as { kind?: string } | undefined;
             if (off?.kind === "not_built_yet" || isNotBuiltYet(restoredStage1.builtWith)) {
@@ -201,6 +209,7 @@ export function ReadinessFlow() {
               setStage1(restoredStage1);
               setEmail(restoredEmail);
               setPasteText(restoredPaste);
+              trackAnalytics("off_ramp_hit", { reason: "not_built_yet" });
               setView("off_ramp_not_built");
               return;
             }
@@ -319,13 +328,16 @@ export function ReadinessFlow() {
               restoredStage !== "paste" &&
               restoredStage !== "stage3"
             ) {
+              trackAnalytics("off_ramp_hit", { reason: "features_only" });
               setView("off_ramp_features");
               return;
             }
+            trackAnalytics("stage_started", { stage: "stage2" });
             setView("stage2");
             return;
           }
         }
+        trackAnalytics("stage_started", { stage: "stage1" });
         setView("stage1");
       } catch (err) {
         if (cancelled) return;
@@ -381,6 +393,7 @@ export function ReadinessFlow() {
       } catch {
         // still show off-ramp
       }
+      trackAnalytics("off_ramp_hit", { reason: "not_built_yet" });
       setView("off_ramp_not_built");
       return;
     }
@@ -417,6 +430,7 @@ export function ReadinessFlow() {
       } catch {
         // still show off-ramp
       }
+      trackAnalytics("off_ramp_hit", { reason: "features_only" });
       setView("off_ramp_features");
       return;
     }
@@ -428,7 +442,9 @@ export function ReadinessFlow() {
     }
 
     // Complete stage 1 → stage 2
+    trackAnalytics("stage_completed", { stage: "stage1" });
     await persist(stage1, "prompt");
+    trackAnalytics("stage_started", { stage: "stage2" });
     setView("stage2");
   };
 
@@ -441,6 +457,7 @@ export function ReadinessFlow() {
     try {
       await navigator.clipboard.writeText(promptBundle.prompt);
       setCopied(true);
+      trackAnalytics("prompt_copied", { variant: promptBundle.variant });
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
       try {
@@ -454,6 +471,7 @@ export function ReadinessFlow() {
         document.execCommand("copy");
         document.body.removeChild(ta);
         setCopied(true);
+        trackAnalytics("prompt_copied", { variant: promptBundle.variant });
         window.setTimeout(() => setCopied(false), 2500);
       } catch {
         setCopied(false);
@@ -480,6 +498,7 @@ export function ReadinessFlow() {
       });
       setEmailStatus("success");
       setEmailFeedback(c.stage2.emailSuccess);
+      trackAnalytics("prompt_emailed", { ok: true });
       await persist(stage1, "prompt", { email: trimmed });
     } catch {
       setEmailStatus("error");
@@ -490,7 +509,9 @@ export function ReadinessFlow() {
   const goToStage3 = async () => {
     setSecretLines([]);
     setSecretMessage("");
+    trackAnalytics("stage_completed", { stage: "stage2" });
     await persist(stage1, "paste", { pasteText });
+    trackAnalytics("stage_started", { stage: "stage3" });
     setView("stage3");
   };
 
@@ -525,11 +546,29 @@ export function ReadinessFlow() {
    */
   const onPasteSubmit = async () => {
     if (pasteSubmitting) return;
+    trackAnalytics("paste_attempted", { lengthBucket: pasteText.length > 2000 ? "long" : "short" });
     const scan = scanPasteForSecrets(pasteText);
     if (!scan.clean) {
       setSecretLines(scan.lines);
       setSecretMessage(PASTE_SECRETS_BLOCK_MESSAGE);
-      // Do NOT send network request with paste contents.
+      trackAnalytics("secret_scan_blocked", {
+        hitCount: scan.hits.length,
+        kind: scan.hits[0]?.kind ?? "unknown",
+      });
+      // Still persist redacted draft server-side (server re-redacts) so retrieval
+      // never returns the planted secret; client never sends unredacted via parse.
+      if (token) {
+        void patchReadinessSession(token, {
+          stage: "paste",
+          draft: draftFromStage1(stage1, {
+            email: email || undefined,
+            pasteText,
+          }),
+        }).catch(() => {
+          /* local only */
+        });
+      }
+      // Do NOT send parse request with paste contents.
       return;
     }
     setSecretLines([]);
@@ -577,6 +616,14 @@ export function ReadinessFlow() {
           }
         }
       }
+      if (result.parseStatus === "ok") {
+        trackAnalytics("parse_success", { parseStatus: result.parseStatus });
+      } else if (result.parseStatus === "partial" || result.parseStatus === "pending") {
+        trackAnalytics("parse_normalized", { parseStatus: result.parseStatus });
+      } else {
+        trackAnalytics("parse_failed", { parseStatus: result.parseStatus });
+      }
+      trackAnalytics("stage_completed", { stage: "stage3" });
       setConfirm({
         stack: result.stack || clientConfirm.stack,
         size: result.size || clientConfirm.size,
@@ -584,17 +631,21 @@ export function ReadinessFlow() {
         parseStatus: result.parseStatus,
         pending: result.parseStatus === "pending" || merged.length === 0,
       });
+      trackAnalytics("stage_started", { stage: "confirm" });
       setView("confirm");
     } catch (err) {
       const e = err as Error & { code?: string; lines?: number[] };
       if (e.code === "SECRETS_DETECTED") {
         setSecretLines(Array.isArray(e.lines) ? e.lines : []);
         setSecretMessage(PASTE_SECRETS_BLOCK_MESSAGE);
+        trackAnalytics("secret_scan_blocked", { hitCount: e.lines?.length ?? 0, source: "server" });
         setPasteSubmitting(false);
         return;
       }
+      trackAnalytics("parse_failed", { code: e.code || "network" });
       // Graceful pending: show client-side confirmation.
       setConfirm(clientConfirm);
+      trackAnalytics("stage_started", { stage: "confirm" });
       setView("confirm");
       // Still save draft on session without re-sending paste if possible
       try {
@@ -617,6 +668,7 @@ export function ReadinessFlow() {
   };
 
   const onLooksRight = async () => {
+    trackAnalytics("stage_completed", { stage: "confirm" });
     await persist(stage1, "confirm", {
       pasteText,
       source: "paste",
@@ -627,10 +679,16 @@ export function ReadinessFlow() {
       prev ? { ...prev, pending: false, parseStatus: prev.parseStatus || "ok" } : prev,
     );
     // Stage 5: gate scored results (name/email/consent + Turnstile) before scores.
+    trackAnalytics("stage_started", { stage: "gate" });
     setView("gate");
   };
 
   const onScored = (result: ScoreResponse) => {
+    trackAnalytics("gate_completed", { ok: true });
+    if (result.bucket) {
+      trackAnalytics("bucket_assigned", { bucket: result.bucket });
+    }
+    trackAnalytics("stage_completed", { stage: "gate" });
     const path =
       result.snapshotPath || `/readiness/snapshot?id=${encodeURIComponent(result.snapshotId)}`;
     if (typeof window !== "undefined") {
@@ -981,6 +1039,7 @@ export function ReadinessFlow() {
               }
               className="font-semibold text-purple hover:text-purple-dark"
               data-testid="readiness-cant-run"
+              onClick={() => trackAnalytics("fallback_taken", { from: "stage2" })}
             >
               {c.stage2.cantRun}
             </Link>

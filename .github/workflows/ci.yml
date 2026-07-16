@@ -46,6 +46,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Unit tests (validation + hardening instrumentation)
+        run: pnpm test:validation
+
       - name: Unit tests (email package)
         run: pnpm test:email
 

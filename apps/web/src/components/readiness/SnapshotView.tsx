@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { readinessContent } from "@/content/readiness";
+import { trackAnalytics } from "@/lib/analytics";
 import {
   emailReadinessSnapshot,
   getReadinessSnapshot,
@@ -95,6 +96,10 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
         const snap = await getReadinessSnapshot(snapshotId);
         if (!cancelled) {
           setData(snap);
+          if (snap.bucket) {
+            trackAnalytics("bucket_assigned", { bucket: snap.bucket, source: "snapshot" });
+          }
+          trackAnalytics("stage_started", { stage: "snapshot" });
           setLoading(false);
         }
       } catch (err) {
@@ -258,6 +263,12 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
           className="btn-primary inline-flex justify-center"
           data-testid="snapshot-primary-cta"
           data-offer={data.offerKey || (data.bucket === "Harden" ? "harden" : "audit")}
+          onClick={() =>
+            trackAnalytics("cta_clicked", {
+              offer: data.offerKey || (data.bucket === "Harden" ? "harden" : "audit"),
+              bucket: data.bucket || "unknown",
+            })
+          }
         >
           {ctaLabel}
         </Link>

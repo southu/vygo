@@ -1,7 +1,29 @@
 /**
- * Privacy-safe analytics for waitlist + availability UI.
- * Never attach name, email, phone, free-text, Turnstile tokens, or other form PII.
+ * Privacy-safe first-party analytics.
+ * Never attach name, email, phone, free-text, Turnstile tokens, paste contents,
+ * or other form PII. All sinks are same-origin / in-page only — no third parties.
  */
+
+/** Canonical readiness instrumentation events (must appear in served JS). */
+export const READINESS_ANALYTICS_EVENTS = [
+  "stage_started",
+  "stage_completed",
+  "prompt_copied",
+  "prompt_emailed",
+  "fallback_taken",
+  "paste_attempted",
+  "secret_scan_blocked",
+  "parse_success",
+  "parse_normalized",
+  "parse_failed",
+  "session_resumed",
+  "gate_completed",
+  "bucket_assigned",
+  "cta_clicked",
+  "off_ramp_hit",
+] as const;
+
+export type ReadinessAnalyticsEventName = (typeof READINESS_ANALYTICS_EVENTS)[number];
 
 export type AnalyticsEventName =
   | "waitlist_form_view"
@@ -12,7 +34,8 @@ export type AnalyticsEventName =
   | "waitlist_duplicate"
   | "waitlist_failure"
   | "availability_view"
-  | "availability_retry";
+  | "availability_retry"
+  | ReadinessAnalyticsEventName;
 
 export type AnalyticsPayload = {
   event: AnalyticsEventName;
@@ -29,7 +52,11 @@ declare global {
 }
 
 const PII_KEY_PATTERN =
-  /^(name|fullName|email|phone|telephone|message|description|token|turnstile|password|company|productUrl|role)$/i;
+  /^(name|fullName|email|phone|telephone|message|description|token|turnstile|password|company|productUrl|role|paste|pasteText|textarea|prompt|body|content|raw)$/i;
+
+/** Free-text / credential-shaped values must never leave the client via analytics. */
+const FORBIDDEN_VALUE_PATTERN =
+  /\b(AKIA[0-9A-Z]{16}|sk[-_](?:live|test)[_-]?[A-Za-z0-9]{8,}|postgres(?:ql)?:\/\/|-----BEGIN )/i;
 
 function sanitizeProps(
   props?: Record<string, string | number | boolean | null | undefined>,
@@ -39,10 +66,47 @@ function sanitizeProps(
   for (const [key, value] of Object.entries(props)) {
     if (PII_KEY_PATTERN.test(key)) continue;
     if (value === undefined) continue;
-    if (typeof value === "string" && value.includes("@")) continue;
+    if (typeof value === "string") {
+      if (value.includes("@")) continue;
+      if (value.length > 120) continue;
+      if (FORBIDDEN_VALUE_PATTERN.test(value)) continue;
+    }
     out[key] = value;
   }
   return out;
+}
+
+/** Same-origin path for first-party analytics beacons (never a third-party domain). */
+function analyticsBeaconUrl(): string {
+  if (typeof window === "undefined") return "/v1/analytics";
+  return `${window.location.origin}/v1/analytics`;
+}
+
+function emitBeacon(payload: AnalyticsPayload): void {
+  try {
+    const body = JSON.stringify({
+      event: payload.event,
+      props: payload.props ?? {},
+      ts: payload.ts,
+    });
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+      const blob = new Blob([body], { type: "application/json" });
+      navigator.sendBeacon(analyticsBeaconUrl(), blob);
+      return;
+    }
+    void fetch(analyticsBeaconUrl(), {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body,
+      credentials: "same-origin",
+      keepalive: true,
+      cache: "no-store",
+    }).catch(() => {
+      /* best-effort */
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 export function trackAnalytics(
@@ -76,4 +140,15 @@ export function trackAnalytics(
   } catch {
     // ignore
   }
+
+  // First-party same-origin beacon so live smoke can observe requests to www.vygo.ai.
+  emitBeacon(payload);
+}
+
+/**
+ * Keep readiness event name strings reachable from a single export so minifiers
+ * retain the literals in the client bundle (acceptance: served JS contains names).
+ */
+export function readinessAnalyticsEventCatalog(): readonly string[] {
+  return READINESS_ANALYTICS_EVENTS;
 }
