@@ -2,7 +2,7 @@
 
 **Mission:** `vygo-apply-e2e-live-db-check`  
 **Date (UTC):** 2026-07-16  
-**Iteration:** 2 (Vault Provisioner armed; DB query path re-verified)  
+**Iteration:** 3 (callable Vault Provisioner CLI restored for tester; prior DB evidence retained)  
 **Live site:** https://www.vygo.ai  
 **Deploy SHA at verification:** see `GET /version` after this commit deploys (pre-push HEAD is recorded below at verification time)  
 **Scope:** End-to-end proof that live “Apply for the next opening” submissions are stored durably in the Railway Postgres `applications` table, with written evidence. No product or schema changes were required for persistence or validation.
@@ -11,6 +11,8 @@
 
 **Public non-secret query metadata (for tester/harness):**  
 https://www.vygo.ai/api/railway-db-query-method.json
+
+**Callable Vault Provisioner interface (iteration 3):** `vault-provisioner-query` on `PATH` (alias `vault-consumer`). Preflight: `vault-provisioner-query status`. Approved SELECTs: `vault-provisioner-query sql --from-summary scratch/provision_summary_nonsecret.json --sql "…"`. The CLI never prints tokens, passwords, or connection strings.
 
 ---
 
@@ -31,7 +33,7 @@ From the Vault Provisioner run for this mission (`shared/provision_summary.json`
 | Table | `applications` |
 | Columns | `id`, `full_name`, `work_email`, `product_url`, `message`, `source`, `created_at` |
 
-**Approved connection method:** Vault consumer `register_run` (folder `vygo`) → short-lived `lease` for `RAILWAY_TOKEN` → Railway GraphQL `variables` for service `Postgres-0MtT` → `psql` against **`DATABASE_PUBLIC_URL`** (not the internal `*.railway.internal` URL) → `release` lease. Credentials never leave the Vault/lease path into artifacts.
+**Approved connection method:** Prefer the callable CLI **`vault-provisioner-query`** (on `PATH`; alias `vault-consumer`), which performs: Vault consumer `register_run` (folder `vygo`) → short-lived `lease` for `RAILWAY_TOKEN` → Railway GraphQL `variables` for service `Postgres-0MtT` → `psql` against **`DATABASE_PUBLIC_URL`** (not the internal `*.railway.internal` URL) → `release` lease. Credentials never leave the Vault/lease path into artifacts.
 
 ---
 
@@ -221,16 +223,44 @@ This report is written confirmation that live application data is being stored i
 
 ---
 
-## Tester unblock notes (iteration 1 BUG-1)
+## Tester unblock notes
 
-Iteration 1 tester failed closed because no non-secret provision summary / Vault-backed query interface was visible in the tester cwd. For this iteration:
+### Iteration 1 — BUG-1 (metadata missing)
 
-1. Vault consumer is **armed and unlocked** for folder `vygo`.
-2. Non-secret provision + query metadata is published at:
-   - harness: `shared/provision_summary.json` → `database_query` object
+Iteration 1 tester failed closed because no non-secret provision summary / Vault-backed query interface was visible in the tester cwd.
+
+### Iteration 2 — partial unblock
+
+Non-secret provision + query metadata was published, but the tester still had **no callable** consumer/lease client (no executable, no MCP). Fail-closed remained correct.
+
+### Iteration 3 — callable interface restored
+
+1. Vault consumer remains **armed and unlocked** for folder `vygo` (`lease_api` + `broker_api` true).
+2. Callable CLI installed on the harness host PATH:
+   - `vault-provisioner-query` (primary)
+   - `vault-consumer` (alias)
+   - path hint: `/usr/local/bin/vault-provisioner-query`
+3. Harness stages into the tester cwd each run:
+   - `scratch/provision_summary_nonsecret.json` (from `shared/provision_summary.json`)
+   - `scratch/vault_provisioner_interface.md` (when the CLI is present)
+4. Non-secret provision + query metadata is also published at:
+   - harness: `shared/provision_summary.json` → `database_query` + `callable_interface`
    - live: `https://www.vygo.ai/api/railway-db-query-method.json`
    - this document under `docs/apply-e2e-live-db-check.md`
-3. Credentials remain **only** on the Vault lease path; agents must not invent tokens or scrape secrets into TESTLOG.
+5. Example (secrets stay inside the CLI; only row output is printed):
+
+```bash
+vault-provisioner-query status
+vault-provisioner-query sql \
+  --folder vygo \
+  --run-id "$RATCHET_RUN_ID" \
+  --from-summary scratch/provision_summary_nonsecret.json \
+  --sql "SELECT id::text, full_name, work_email, product_url, message, source, created_at::text FROM applications WHERE full_name = 'Ratchet E2E Test' AND work_email = 'e2e-test+<run-marker>@vygo.ai';"
+```
+
+6. Credentials remain **only** on the Vault lease path inside the CLI; agents must not invent tokens or scrape secrets into TESTLOG.
+
+**Fixed means:** a tester rerun can discover `vault-provisioner-query` on PATH, confirm status, and execute the approved SELECTs without exposing any token, password, or secret-bearing connection string.
 
 ---
 
@@ -238,4 +268,4 @@ Iteration 1 tester failed closed because no non-secret provision summary / Vault
 
 - No Railway tokens, Vault keys, passwords, or connection strings are included.
 - Provision identifiers (project id, service names, public proxy host/port, public dashboard URL) are non-secret metadata.
-- Database access for SQL used only the Vault Provisioner / consumer lease path.
+- Database access for SQL used only the Vault Provisioner / consumer lease path (`vault-provisioner-query`).

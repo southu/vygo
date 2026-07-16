@@ -27,15 +27,29 @@
       "created_at"
     ]
   },
+  "callable_interface": {
+    "name": "vault-provisioner-query",
+    "on_path": true,
+    "executable": "vault-provisioner-query",
+    "alias": "vault-consumer",
+    "path_hint": "/usr/local/bin/vault-provisioner-query",
+    "commands": {
+      "status": "vault-provisioner-query status",
+      "whoami": "vault-provisioner-query whoami --folder vygo --run-id <run-id>",
+      "sql": "vault-provisioner-query sql --folder vygo --run-id <run-id> --from-summary scratch/provision_summary_nonsecret.json --sql \"<SELECT...>\""
+    },
+    "notes": "Harness stages scratch/provision_summary_nonsecret.json and scratch/vault_provisioner_interface.md for the tester. The CLI reads the Vault consumer key from the standard host path and never prints tokens, passwords, or connection strings."
+  },
   "connection_method": {
     "name": "vault-provisioner-lease-psql",
+    "preferred_entrypoint": "vault-provisioner-query sql --from-summary <nonsecret.json> --sql '...'",
     "steps": [
-      "Confirm Vault consumer is armed (GET /api/consumer/status via harness VAULT_URL).",
-      "register_run for folder=vygo and the mission run_id.",
-      "Issue a short-lived consumer lease for RAILWAY_TOKEN (provider=railway).",
-      "Use Railway GraphQL variables for project_id + environment_id + service_id Postgres-0MtT.",
-      "Connect with psql to DATABASE_PUBLIC_URL (not the .railway.internal DATABASE_URL).",
-      "Release the lease immediately after the SELECT.",
+      "Confirm callable interface: `which vault-provisioner-query` (or vault-consumer) and `vault-provisioner-query status` (armed + unlocked + lease_api).",
+      "register_run for folder=vygo and the mission run_id (performed by the CLI).",
+      "Issue a short-lived consumer lease for RAILWAY_TOKEN (provider=railway) via POST /api/consumer/lease (performed by the CLI).",
+      "Use Railway GraphQL variables for project_id + environment_id + service_id Postgres-0MtT (performed by the CLI).",
+      "Connect with psql to DATABASE_PUBLIC_URL (not the .railway.internal DATABASE_URL) (performed by the CLI).",
+      "Release the lease immediately after the SELECT (performed by the CLI).",
       "Never write tokens, passwords, or secret-bearing connection strings into TESTLOG.md, verdicts, or commits."
     ]
   },
@@ -46,8 +60,9 @@
   },
   "harness_locations": {
     "run_shared_provision_summary": "shared/provision_summary.json (non-secret; written by Vault Provisioner + builder enrichment)",
-    "run_shared_provision": "shared/provision.json (non-secret inventory)",
+    "tester_scratch_summary": "scratch/provision_summary_nonsecret.json (staged by harness each tester run)",
+    "tester_scratch_interface": "scratch/vault_provisioner_interface.md (staged by harness when CLI is installed)",
     "live_public_copy": "https://www.vygo.ai/api/railway-db-query-method.json"
   },
-  "secrets_policy": "This document contains no tokens, passwords, or connection strings. Credentials come exclusively through the Vault Provisioner consumer lease path."
+  "secrets_policy": "This document contains no tokens, passwords, or connection strings. Credentials come exclusively through the Vault Provisioner consumer lease path inside vault-provisioner-query."
 }
