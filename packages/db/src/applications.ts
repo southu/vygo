@@ -47,7 +47,8 @@ export async function insertApplication(
 ): Promise<ApplicationPublicRow> {
   const values: NewApplication = {
     fullName: input.fullName.trim(),
-    workEmail: input.workEmail.trim().toLowerCase(),
+    // Preserve submitted casing (do not force lowercase) so exact-email SELECTs match.
+    workEmail: input.workEmail.trim(),
     productUrl: nullIfEmpty(input.productUrl ?? null),
     message: nullIfEmpty(input.message ?? null),
     source: (input.source ?? "apply").trim() || "apply",

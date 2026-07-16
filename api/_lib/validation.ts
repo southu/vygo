@@ -245,12 +245,15 @@ export function parseWaitlist(body: Record<string, unknown>): ParseResult {
   if (typeof body.email !== "string") {
     fields["email"] = "Enter a valid work email.";
   } else {
-    const trimmed = body.email.trim().toLowerCase();
+    // Preserve submitted casing so durable applications rows match exact-email
+    // queries from operators/E2E (markers may include uppercase ISO "T", etc.).
+    const trimmed = body.email.trim();
+    const forValidation = trimmed.toLowerCase();
     if (
-      trimmed.length < 3 ||
-      trimmed.length > LIMITS.email ||
+      forValidation.length < 3 ||
+      forValidation.length > LIMITS.email ||
       hasControlChars(trimmed) ||
-      !isEmail(trimmed)
+      !isEmail(forValidation)
     ) {
       fields["email"] = "Enter a valid work email.";
     } else {

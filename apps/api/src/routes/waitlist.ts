@@ -402,10 +402,16 @@ export function registerWaitlistRoutes(app: FastifyInstance, deps: WaitlistRoute
       await ensureApplicationsTable(dbHandle);
       const existingApp = await findApplicationById(dbHandle.db, persistResult.entry.id);
       if (!existingApp) {
+        // Prefer the raw submitted email casing when present so applications
+        // rows match exact-email E2E/operator queries (Zod may lowercase).
+        const rawSubmittedEmail =
+          typeof body.email === "string" && body.email.trim()
+            ? body.email.trim()
+            : application.email;
         await insertApplication(dbHandle.db, {
           id: persistResult.entry.id,
           fullName: application.fullName,
-          workEmail: application.email,
+          workEmail: rawSubmittedEmail,
           productUrl: application.productUrl,
           message: application.message,
           source: "waitlist",

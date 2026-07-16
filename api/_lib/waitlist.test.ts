@@ -80,7 +80,7 @@ describe("edge waitlist — successful request", () => {
     assert.equal(serialized.includes("dummy.token"), false);
   });
 
-  it("normalizes email case/whitespace before persisting", async () => {
+  it("trims email whitespace and preserves submitted casing for durable storage", async () => {
     const store = new FakeStore();
     const captured: { value: WaitlistValue | null } = { value: null };
     const spy: WaitlistStore = {
@@ -92,7 +92,7 @@ describe("edge waitlist — successful request", () => {
     const res = await handleWaitlist(spy, validPayload({ email: "  Mixed.Case+x@Example.ORG " }));
     assert.equal(res.status, 200);
     assert.ok(captured.value);
-    assert.equal(captured.value.email, "mixed.case+x@example.org");
+    assert.equal(captured.value.email, "Mixed.Case+x@Example.ORG");
     assert.equal(captured.value.fullName, "Jordan Lee");
     assert.equal(captured.value.productUrl, "https://example.com/app");
   });

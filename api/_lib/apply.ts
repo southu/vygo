@@ -122,7 +122,8 @@ export function parseApplyBody(
     ok: true,
     value: {
       fullName,
-      workEmail: workEmail.toLowerCase(),
+      // Preserve submitted casing for durable storage / exact-email E2E queries.
+      workEmail,
       productUrl: productUrlRaw.trim() || null,
       message: messageRaw.trim() || null,
     },
