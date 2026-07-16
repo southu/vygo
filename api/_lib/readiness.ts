@@ -201,6 +201,37 @@ export function parseSessionBody(
   return { ok: true, stage, draft };
 }
 
+/**
+ * Best-effort client IP for upstream rate limiting. Prefer real edge headers;
+ * never invent addresses. Used only as an ephemeral hash input on Railway.
+ */
+export function resolveEdgeClientIp(
+  headers?: Record<string, string | string[] | undefined>,
+): string | null {
+  if (!headers) return null;
+  const pick = (name: string): string | null => {
+    const raw = headers[name];
+    if (typeof raw === "string" && raw.trim()) {
+      const first = raw.split(",")[0]?.trim();
+      return first || null;
+    }
+    if (Array.isArray(raw) && raw[0]) {
+      const first = String(raw[0]).split(",")[0]?.trim();
+      return first || null;
+    }
+    return null;
+  };
+  // Order: standard proxy chain, then platform-specific client IP headers.
+  return (
+    pick("x-forwarded-for") ||
+    pick("x-real-ip") ||
+    pick("x-vercel-forwarded-for") ||
+    pick("cf-connecting-ip") ||
+    pick("true-client-ip") ||
+    null
+  );
+}
+
 async function proxyJson(
   method: string,
   path: string,
@@ -216,16 +247,12 @@ async function proxyJson(
     if (body !== undefined) {
       headers["content-type"] = "application/json";
     }
-    // Forward client IP for upstream rate limiting when present.
-    const xff = inboundHeaders?.["x-forwarded-for"];
-    if (typeof xff === "string" && xff.trim()) {
-      headers["x-forwarded-for"] = xff.trim();
-    } else if (Array.isArray(xff) && xff[0]) {
-      headers["x-forwarded-for"] = String(xff[0]);
-    }
-    const xri = inboundHeaders?.["x-real-ip"];
-    if (typeof xri === "string" && xri.trim()) {
-      headers["x-real-ip"] = xri.trim();
+    // Forward client IP so Railway rate-limit buckets are per-client, not one
+    // shared Vercel egress / "unknown" key that multi-tenant traffic poisons.
+    const clientIp = resolveEdgeClientIp(inboundHeaders);
+    if (clientIp) {
+      headers["x-forwarded-for"] = clientIp;
+      headers["x-real-ip"] = clientIp;
     }
 
     const upstream = await fetch(`${origin}${path}`, {
@@ -245,7 +272,16 @@ async function proxyJson(
         },
       };
     }
-    return { status: upstream.status, body: payload };
+    const retryHeader = upstream.headers.get("retry-after");
+    const retryAfterSeconds =
+      retryHeader && /^\d+$/.test(retryHeader.trim())
+        ? Number(retryHeader.trim())
+        : undefined;
+    return {
+      status: upstream.status,
+      body: payload,
+      ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+    };
   } catch (error) {
     return {
       status: 503,

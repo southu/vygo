@@ -173,10 +173,11 @@ describe("readiness routes without database", () => {
     assert.equal(res.statusCode, 400);
   });
 
-  it("rate-limits rapid repeated requests with 429", async () => {
+  it("rate-limits rapid repeated create requests with 429", async () => {
     rateLimitStore.clear();
     let saw429 = false;
-    for (let i = 0; i < 30; i += 1) {
+    let successes = 0;
+    for (let i = 0; i < 35; i += 1) {
       const res = await ctx.app.inject({
         method: "POST",
         url: "/v1/readiness/session",
@@ -190,9 +191,45 @@ describe("readiness routes without database", () => {
         saw429 = true;
         const body = res.json() as { error?: { code?: string } };
         assert.equal(body.error?.code, "RATE_LIMITED");
+        // Create bucket should allow a normal multi-step flow (several creates headroom).
+        assert.ok(successes >= 5, `expected headroom before 429, got ${successes}`);
         break;
+      }
+      if (res.statusCode === 503 || res.statusCode === 201) {
+        successes += 1;
       }
     }
     assert.equal(saw429, true);
+  });
+
+  it("create rate limit is independent of token route traffic", async () => {
+    rateLimitStore.clear();
+    // Exhaust token-route budget with GETs.
+    for (let i = 0; i < 45; i += 1) {
+      await ctx.app.inject({
+        method: "GET",
+        url: "/v1/readiness/session/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        headers: { "x-forwarded-for": "203.0.113.77" },
+      });
+    }
+    const limitedToken = await ctx.app.inject({
+      method: "GET",
+      url: "/v1/readiness/session/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      headers: { "x-forwarded-for": "203.0.113.77" },
+    });
+    assert.equal(limitedToken.statusCode, 429);
+
+    // Create for the same IP must still be allowed (separate bucket).
+    const create = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/session",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "203.0.113.77",
+      },
+      payload: {},
+    });
+    assert.notEqual(create.statusCode, 429);
+    assert.ok(create.statusCode === 503 || create.statusCode === 201);
   });
 });

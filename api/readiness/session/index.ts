@@ -4,8 +4,11 @@
  *
  * Persistence: Railway Postgres readiness_sessions. Local DATABASE_URL when
  * configured; otherwise server-to-server proxy to the Railway Fastify API.
- * Rate limiting is enforced on the Railway API; edge also applies a coarse
- * in-process limit so abuse is rejected even before the proxy hop.
+ *
+ * Rate limiting: when proxying, Railway owns the counters (Redis) so we do NOT
+ * double-limit here — a poisoned in-process Map was permanently 429'ing create
+ * on shared warm isolates. Edge-only RL applies when this function writes DB
+ * itself (no upstream hop).
  */
 import postgres from "postgres";
 import type { Sql } from "postgres";
@@ -15,6 +18,7 @@ import {
   parseSessionBody,
   proxyCreateSession,
   resolveDatabaseUrl,
+  resolveEdgeClientIp,
   type ReadinessHandlerResult,
 } from "../../_lib/readiness.js";
 import {
@@ -30,13 +34,11 @@ let cachedSql: Sql | null = null;
 let cachedUrl: string | null = null;
 
 /**
- * Coarse in-process rate limit (per warm isolate).
- * Interactive session use needs headroom for create + several PATCH/GET cycles;
- * a 30+ burst still 429s. Short window so a prior tester run cannot block create
- * for an hour (old 20/3600s was too tight and stuck on shared warm isolates).
+ * Coarse in-process rate limit used ONLY for the local-DB path (per warm isolate).
+ * Headroom for a few creates; short window so a prior run cannot block for an hour.
  */
 const rlBuckets = new Map<string, { count: number; expiresAt: number }>();
-const RL_LIMIT = 25;
+const RL_LIMIT = 30;
 const RL_WINDOW_MS = 120 * 1000;
 
 function getSql(url: string): Sql {
@@ -53,13 +55,16 @@ function getSql(url: string): Sql {
 }
 
 function clientBucketKey(req: EdgeRequest): string {
-  const xff = req.headers["x-forwarded-for"];
-  const raw =
-    (typeof xff === "string" && xff.split(",")[0]?.trim()) ||
-    (typeof req.headers["x-real-ip"] === "string" && req.headers["x-real-ip"]) ||
-    "unknown";
+  const raw = resolveEdgeClientIp(req.headers) || "unknown";
   // Prefix isolates readiness create from other edge handlers sharing process state.
-  return `readiness:create:${createHash("sha256").update(String(raw)).digest("hex").slice(0, 32)}`;
+  // Include a coarse time shard for the "unknown" key so multi-tenant traffic on a
+  // single warm isolate cannot permanently exhaust one global bucket.
+  const ipPart = createHash("sha256").update(String(raw)).digest("hex").slice(0, 32);
+  if (raw === "unknown") {
+    const shard = Math.floor(Date.now() / RL_WINDOW_MS);
+    return `readiness:create:${ipPart}:t${shard}`;
+  }
+  return `readiness:create:${ipPart}`;
 }
 
 function checkEdgeRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterSeconds: number } {
@@ -68,6 +73,12 @@ function checkEdgeRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterSec
   const existing = rlBuckets.get(key);
   if (!existing || existing.expiresAt <= now) {
     rlBuckets.set(key, { count: 1, expiresAt: now + RL_WINDOW_MS });
+    // Opportunistic prune of expired entries to avoid unbounded Map growth.
+    if (rlBuckets.size > 500) {
+      for (const [k, v] of rlBuckets) {
+        if (v.expiresAt <= now) rlBuckets.delete(k);
+      }
+    }
     return { allowed: true, retryAfterSeconds: 0 };
   }
   existing.count += 1;
@@ -91,20 +102,6 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null): void {
 }
 
 async function handlePost(req: EdgeRequest): Promise<ReadinessHandlerResult> {
-  const rl = checkEdgeRateLimit(req);
-  if (!rl.allowed) {
-    return {
-      status: 429,
-      body: {
-        error: {
-          code: "RATE_LIMITED",
-          message: "Too many attempts. Please try again later.",
-        },
-      },
-      retryAfterSeconds: rl.retryAfterSeconds,
-    };
-  }
-
   const contentType = contentTypeBase(req.headers);
   if (contentType && contentType !== "application/json") {
     return {
@@ -133,6 +130,9 @@ async function handlePost(req: EdgeRequest): Promise<ReadinessHandlerResult> {
 
   const url = resolveDatabaseUrl();
   if (!url) {
+    // Proxy path: Railway Fastify enforces rate limits. Do not double-limit
+    // here — the prior in-process Map was shared across multi-tenant traffic
+    // and permanently blocked POST create while token routes still worked.
     return proxyCreateSession(
       {
         stage: parsed.stage,
@@ -141,6 +141,21 @@ async function handlePost(req: EdgeRequest): Promise<ReadinessHandlerResult> {
       process.env,
       req.headers,
     );
+  }
+
+  // Local DB path: no Railway hop, so apply coarse edge RL.
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) {
+    return {
+      status: 429,
+      body: {
+        error: {
+          code: "RATE_LIMITED",
+          message: "Too many attempts. Please try again later.",
+        },
+      },
+      retryAfterSeconds: rl.retryAfterSeconds,
+    };
   }
 
   try {

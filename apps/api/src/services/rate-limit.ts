@@ -172,8 +172,27 @@ export class RedisRateLimitStore implements RateLimitStore {
     const replies = await this.send(["INCR", key]);
     const raw = replies[0] ?? ":0";
     const count = Number(raw.startsWith(":") ? raw.slice(1) : raw);
+    // Always ensure a TTL. EXPIRE on first hit is the happy path; if a legacy
+    // key has no TTL (or EXPIRE previously failed), repair it so counters cannot
+    // stick forever and permanently 429 legitimate clients.
     if (count === 1) {
       await this.send(["EXPIRE", key, String(windowSeconds)]);
+    } else {
+      try {
+        const ttlReplies = await this.send(["TTL", key]);
+        const ttlRaw = ttlReplies[0] ?? ":-2";
+        const ttl = Number(ttlRaw.startsWith(":") ? ttlRaw.slice(1) : ttlRaw);
+        // -1 = no expiry, -2 = missing (race). Both need a finite window.
+        if (!Number.isFinite(ttl) || ttl < 0) {
+          await this.send(["EXPIRE", key, String(windowSeconds)]);
+        }
+      } catch {
+        try {
+          await this.send(["EXPIRE", key, String(windowSeconds)]);
+        } catch {
+          // best-effort; next request will retry repair
+        }
+      }
     }
     return count;
   }

@@ -29,18 +29,23 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
 
 /**
  * Readiness session endpoints are interactive (create + several PATCH/GET
- * cycles). Use a dedicated bucket and a short window so:
- * - normal multi-step flows have headroom
- * - a 30+ burst still hits 429
- * - waitlist/apply IP exhaustion cannot block session create for an hour
+ * cycles). Use dedicated buckets and a short window so:
+ * - normal multi-step flows have headroom (create + several PATCH/GET)
+ * - a 30+ burst on token routes still hits 429
+ * - GET/PATCH bursts cannot starve create (separate keys)
+ * - waitlist/apply IP exhaustion cannot block session create
+ * - v2 key prefix abandons any pre-TTL-repair poisoned Redis counters
  * Do not share `rl:ip:` with waitlist (RATE_LIMIT_IP_*).
  */
-const READINESS_RL_LIMIT = 25;
+const READINESS_CREATE_RL_LIMIT = 20;
+const READINESS_TOKEN_RL_LIMIT = 40;
 const READINESS_RL_WINDOW_SECONDS = 120;
 
+type ReadinessRlKind = "create" | "token";
+
 /** PII-safe key for readiness-only IP dimension (separate from waitlist). */
-function readinessIpRateLimitKey(ipHash: string): string {
-  return `rl:readiness:ip:${ipHash}`;
+function readinessIpRateLimitKey(kind: ReadinessRlKind, ipHash: string): string {
+  return `rl:readiness:v2:${kind}:ip:${ipHash}`;
 }
 
 export type ReadinessRouteDeps = {
@@ -174,22 +179,25 @@ function parseSessionBody(
 
 /**
  * Rate-limit readiness endpoints by client IP (readiness-only bucket).
- * Uses salted IP hash when configured; otherwise a non-stored HMAC bucket so
- * limits still apply without logging or persisting raw IPs.
+ * Create and token routes use separate keys so resume/save traffic cannot
+ * permanently starve session creation. Uses salted IP hash when configured;
+ * otherwise a non-stored HMAC bucket so limits still apply without logging
+ * or persisting raw IPs.
  */
 async function enforceReadinessRateLimit(
   request: FastifyRequest,
   reply: FastifyReply,
   deps: ReadinessRouteDeps,
+  kind: ReadinessRlKind,
 ): Promise<boolean> {
   const rawIp = resolveClientIp(request);
   const ipHashResult = hashIpAddress(rawIp, deps.env);
-  const limit = READINESS_RL_LIMIT;
+  const limit = kind === "create" ? READINESS_CREATE_RL_LIMIT : READINESS_TOKEN_RL_LIMIT;
   const windowSeconds = READINESS_RL_WINDOW_SECONDS;
 
   let bucketKey: string;
   if (ipHashResult) {
-    bucketKey = readinessIpRateLimitKey(ipHashResult.hash);
+    bucketKey = readinessIpRateLimitKey(kind, ipHashResult.hash);
   } else {
     // Fall back: bucket by HMAC of IP with a fixed pepper (key only — not stored as PII).
     const { createHmac } = await import("node:crypto");
@@ -197,13 +205,13 @@ async function enforceReadinessRateLimit(
       .update(rawIp)
       .digest("hex")
       .slice(0, 32);
-    bucketKey = readinessIpRateLimitKey(`rlfb:${digest}`);
+    bucketKey = readinessIpRateLimitKey(kind, `rlfb:${digest}`);
   }
 
   const result = await checkRateLimit(deps.rateLimitStore, bucketKey, limit, windowSeconds);
 
   if (!result.allowed) {
-    request.log.info({ event: "readiness_rate_limited" }, "rate limited");
+    request.log.info({ event: "readiness_rate_limited", kind }, "rate limited");
     await reply
       .status(429)
       .header("Retry-After", String(result.retryAfterSeconds || windowSeconds))
@@ -215,7 +223,7 @@ async function enforceReadinessRateLimit(
 
 export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRouteDeps): void {
   app.post("/v1/readiness/session", async (request, reply) => {
-    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+    if (!(await enforceReadinessRateLimit(request, reply, deps, "create"))) return;
 
     // Content-Type optional when body empty; when present must be JSON.
     const ct = request.headers["content-type"];
@@ -254,7 +262,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
   });
 
   app.get("/v1/readiness/session/:token", async (request, reply) => {
-    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+    if (!(await enforceReadinessRateLimit(request, reply, deps, "token"))) return;
 
     const token = parseTokenParam(request.params);
     if (!token) {
@@ -285,7 +293,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
   });
 
   app.patch("/v1/readiness/session/:token", async (request, reply) => {
-    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+    if (!(await enforceReadinessRateLimit(request, reply, deps, "token"))) return;
 
     const token = parseTokenParam(request.params);
     if (!token) {

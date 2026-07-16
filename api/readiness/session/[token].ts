@@ -1,6 +1,9 @@
 /**
  * GET/PATCH /api/readiness/session/:token — resume or update draft/stage.
  * Rewritten from /v1/readiness/session/:token via vercel.json.
+ *
+ * Rate limiting: when proxying, Railway owns the counters. Edge RL only applies
+ * on the local-DB path so we do not double-limit and poison multi-tenant Maps.
  */
 import postgres from "postgres";
 import type { Sql } from "postgres";
@@ -13,6 +16,7 @@ import {
   proxyGetSession,
   proxyPatchSession,
   resolveDatabaseUrl,
+  resolveEdgeClientIp,
   type ReadinessHandlerResult,
 } from "../../_lib/readiness.js";
 import {
@@ -28,12 +32,11 @@ let cachedSql: Sql | null = null;
 let cachedUrl: string | null = null;
 
 /**
- * Coarse in-process rate limit (per warm isolate).
- * Align with create endpoint: headroom for multi-step resume/save, 429 on 30+
- * burst, short window so prior runs cannot block for an hour.
+ * Coarse in-process rate limit for the local-DB path only.
+ * Headroom for multi-step resume/save; 30+ burst still 429s.
  */
 const rlBuckets = new Map<string, { count: number; expiresAt: number }>();
-const RL_LIMIT = 25;
+const RL_LIMIT = 40;
 const RL_WINDOW_MS = 120 * 1000;
 
 function getSql(url: string): Sql {
@@ -50,13 +53,13 @@ function getSql(url: string): Sql {
 }
 
 function clientBucketKey(req: EdgeRequest): string {
-  const xff = req.headers["x-forwarded-for"];
-  const raw =
-    (typeof xff === "string" && xff.split(",")[0]?.trim()) ||
-    (typeof req.headers["x-real-ip"] === "string" && req.headers["x-real-ip"]) ||
-    "unknown";
-  // Prefix isolates readiness token routes from other edge handlers.
-  return `readiness:token:${createHash("sha256").update(String(raw)).digest("hex").slice(0, 32)}`;
+  const raw = resolveEdgeClientIp(req.headers) || "unknown";
+  const ipPart = createHash("sha256").update(String(raw)).digest("hex").slice(0, 32);
+  if (raw === "unknown") {
+    const shard = Math.floor(Date.now() / RL_WINDOW_MS);
+    return `readiness:token:${ipPart}:t${shard}`;
+  }
+  return `readiness:token:${ipPart}`;
 }
 
 function checkEdgeRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterSeconds: number } {
@@ -65,6 +68,11 @@ function checkEdgeRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterSec
   const existing = rlBuckets.get(key);
   if (!existing || existing.expiresAt <= now) {
     rlBuckets.set(key, { count: 1, expiresAt: now + RL_WINDOW_MS });
+    if (rlBuckets.size > 500) {
+      for (const [k, v] of rlBuckets) {
+        if (v.expiresAt <= now) rlBuckets.delete(k);
+      }
+    }
     return { allowed: true, retryAfterSeconds: 0 };
   }
   existing.count += 1;
@@ -96,7 +104,9 @@ function tokenFromReq(req: EdgeRequest): string {
   return "";
 }
 
-async function handleGet(req: EdgeRequest, token: string): Promise<ReadinessHandlerResult> {
+async function maybeEdgeRateLimit(req: EdgeRequest): Promise<ReadinessHandlerResult | null> {
+  // Only when this function talks to Postgres directly (no Railway hop).
+  if (!resolveDatabaseUrl()) return null;
   const rl = checkEdgeRateLimit(req);
   if (!rl.allowed) {
     return {
@@ -107,6 +117,13 @@ async function handleGet(req: EdgeRequest, token: string): Promise<ReadinessHand
       retryAfterSeconds: rl.retryAfterSeconds,
     };
   }
+  return null;
+}
+
+async function handleGet(req: EdgeRequest, token: string): Promise<ReadinessHandlerResult> {
+  const limited = await maybeEdgeRateLimit(req);
+  if (limited) return limited;
+
   if (!isValidReadinessToken(token)) {
     return {
       status: 400,
@@ -143,16 +160,9 @@ async function handleGet(req: EdgeRequest, token: string): Promise<ReadinessHand
 }
 
 async function handlePatch(req: EdgeRequest, token: string): Promise<ReadinessHandlerResult> {
-  const rl = checkEdgeRateLimit(req);
-  if (!rl.allowed) {
-    return {
-      status: 429,
-      body: {
-        error: { code: "RATE_LIMITED", message: "Too many attempts. Please try again later." },
-      },
-      retryAfterSeconds: rl.retryAfterSeconds,
-    };
-  }
+  const limited = await maybeEdgeRateLimit(req);
+  if (limited) return limited;
+
   if (!isValidReadinessToken(token)) {
     return {
       status: 400,
