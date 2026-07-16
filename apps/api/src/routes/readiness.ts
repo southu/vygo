@@ -20,14 +20,28 @@ import { safeError } from "../errors.js";
 import { resolveClientIp } from "../services/client-ip.js";
 import { hashIpAddress } from "../services/ip-hash.js";
 import {
-  checkIpRateLimitWithRotation,
   checkRateLimit,
-  ipRateLimitKey,
   type RateLimitStore,
 } from "../services/rate-limit.js";
 
 /** Resumable tokens are base64url of 24 bytes (32 chars) or legacy UUID. */
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+
+/**
+ * Readiness session endpoints are interactive (create + several PATCH/GET
+ * cycles). Use a dedicated bucket and a short window so:
+ * - normal multi-step flows have headroom
+ * - a 30+ burst still hits 429
+ * - waitlist/apply IP exhaustion cannot block session create for an hour
+ * Do not share `rl:ip:` with waitlist (RATE_LIMIT_IP_*).
+ */
+const READINESS_RL_LIMIT = 25;
+const READINESS_RL_WINDOW_SECONDS = 120;
+
+/** PII-safe key for readiness-only IP dimension (separate from waitlist). */
+function readinessIpRateLimitKey(ipHash: string): string {
+  return `rl:readiness:ip:${ipHash}`;
+}
 
 export type ReadinessRouteDeps = {
   env: ApiEnv;
@@ -159,7 +173,7 @@ function parseSessionBody(
 }
 
 /**
- * Rate-limit readiness endpoints by client IP.
+ * Rate-limit readiness endpoints by client IP (readiness-only bucket).
  * Uses salted IP hash when configured; otherwise a non-stored HMAC bucket so
  * limits still apply without logging or persisting raw IPs.
  */
@@ -170,18 +184,12 @@ async function enforceReadinessRateLimit(
 ): Promise<boolean> {
   const rawIp = resolveClientIp(request);
   const ipHashResult = hashIpAddress(rawIp, deps.env);
-  const limit = deps.env.RATE_LIMIT_IP_MAX;
-  const windowSeconds = deps.env.RATE_LIMIT_IP_WINDOW_SECONDS;
+  const limit = READINESS_RL_LIMIT;
+  const windowSeconds = READINESS_RL_WINDOW_SECONDS;
 
-  let result;
+  let bucketKey: string;
   if (ipHashResult) {
-    result = await checkIpRateLimitWithRotation(
-      deps.rateLimitStore,
-      ipHashResult.hash,
-      ipHashResult.rotationHashes,
-      limit,
-      windowSeconds,
-    );
+    bucketKey = readinessIpRateLimitKey(ipHashResult.hash);
   } else {
     // Fall back: bucket by HMAC of IP with a fixed pepper (key only — not stored as PII).
     const { createHmac } = await import("node:crypto");
@@ -189,13 +197,10 @@ async function enforceReadinessRateLimit(
       .update(rawIp)
       .digest("hex")
       .slice(0, 32);
-    result = await checkRateLimit(
-      deps.rateLimitStore,
-      ipRateLimitKey(`rlfb:${digest}`),
-      limit,
-      windowSeconds,
-    );
+    bucketKey = readinessIpRateLimitKey(`rlfb:${digest}`);
   }
+
+  const result = await checkRateLimit(deps.rateLimitStore, bucketKey, limit, windowSeconds);
 
   if (!result.allowed) {
     request.log.info({ event: "readiness_rate_limited" }, "rate limited");

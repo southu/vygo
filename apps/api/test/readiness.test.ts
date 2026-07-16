@@ -121,7 +121,8 @@ describe("readiness routes without database", () => {
         NODE_ENV: "test",
         LOG_LEVEL: "silent",
         CORS_ORIGINS: "https://www.vygo.ai",
-        RATE_LIMIT_IP_MAX: "5",
+        // Waitlist IP limits must not gate readiness; readiness uses its own bucket.
+        RATE_LIMIT_IP_MAX: "100",
         RATE_LIMIT_IP_WINDOW_SECONDS: "3600",
         IP_HASH_SALT: "test-salt-for-readiness",
       }),

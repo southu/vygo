@@ -29,10 +29,15 @@ import {
 let cachedSql: Sql | null = null;
 let cachedUrl: string | null = null;
 
-/** Coarse in-process rate limit (per warm isolate). */
+/**
+ * Coarse in-process rate limit (per warm isolate).
+ * Interactive session use needs headroom for create + several PATCH/GET cycles;
+ * a 30+ burst still 429s. Short window so a prior tester run cannot block create
+ * for an hour (old 20/3600s was too tight and stuck on shared warm isolates).
+ */
 const rlBuckets = new Map<string, { count: number; expiresAt: number }>();
-const RL_LIMIT = 20;
-const RL_WINDOW_MS = 60 * 60 * 1000;
+const RL_LIMIT = 25;
+const RL_WINDOW_MS = 120 * 1000;
 
 function getSql(url: string): Sql {
   if (!cachedSql || cachedUrl !== url) {
@@ -53,7 +58,8 @@ function clientBucketKey(req: EdgeRequest): string {
     (typeof xff === "string" && xff.split(",")[0]?.trim()) ||
     (typeof req.headers["x-real-ip"] === "string" && req.headers["x-real-ip"]) ||
     "unknown";
-  return createHash("sha256").update(String(raw)).digest("hex").slice(0, 32);
+  // Prefix isolates readiness create from other edge handlers sharing process state.
+  return `readiness:create:${createHash("sha256").update(String(raw)).digest("hex").slice(0, 32)}`;
 }
 
 function checkEdgeRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterSeconds: number } {
@@ -95,6 +101,7 @@ async function handlePost(req: EdgeRequest): Promise<ReadinessHandlerResult> {
           message: "Too many attempts. Please try again later.",
         },
       },
+      retryAfterSeconds: rl.retryAfterSeconds,
     };
   }
 
@@ -191,7 +198,11 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   try {
     const result = await handlePost(req);
     if (result.status === 429) {
-      res.setHeader("Retry-After", "3600");
+      const retryAfter =
+        typeof result.retryAfterSeconds === "number" && result.retryAfterSeconds > 0
+          ? result.retryAfterSeconds
+          : Math.ceil(RL_WINDOW_MS / 1000);
+      res.setHeader("Retry-After", String(retryAfter));
     }
     if (result.logError) {
       const message =

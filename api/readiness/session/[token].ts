@@ -27,9 +27,14 @@ import {
 let cachedSql: Sql | null = null;
 let cachedUrl: string | null = null;
 
+/**
+ * Coarse in-process rate limit (per warm isolate).
+ * Align with create endpoint: headroom for multi-step resume/save, 429 on 30+
+ * burst, short window so prior runs cannot block for an hour.
+ */
 const rlBuckets = new Map<string, { count: number; expiresAt: number }>();
-const RL_LIMIT = 20;
-const RL_WINDOW_MS = 60 * 60 * 1000;
+const RL_LIMIT = 25;
+const RL_WINDOW_MS = 120 * 1000;
 
 function getSql(url: string): Sql {
   if (!cachedSql || cachedUrl !== url) {
@@ -50,19 +55,26 @@ function clientBucketKey(req: EdgeRequest): string {
     (typeof xff === "string" && xff.split(",")[0]?.trim()) ||
     (typeof req.headers["x-real-ip"] === "string" && req.headers["x-real-ip"]) ||
     "unknown";
-  return createHash("sha256").update(String(raw)).digest("hex").slice(0, 32);
+  // Prefix isolates readiness token routes from other edge handlers.
+  return `readiness:token:${createHash("sha256").update(String(raw)).digest("hex").slice(0, 32)}`;
 }
 
-function checkEdgeRateLimit(req: EdgeRequest): boolean {
+function checkEdgeRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterSeconds: number } {
   const key = clientBucketKey(req);
   const now = Date.now();
   const existing = rlBuckets.get(key);
   if (!existing || existing.expiresAt <= now) {
     rlBuckets.set(key, { count: 1, expiresAt: now + RL_WINDOW_MS });
-    return true;
+    return { allowed: true, retryAfterSeconds: 0 };
   }
   existing.count += 1;
-  return existing.count <= RL_LIMIT;
+  if (existing.count > RL_LIMIT) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((existing.expiresAt - now) / 1000)),
+    };
+  }
+  return { allowed: true, retryAfterSeconds: 0 };
 }
 
 function applyBaseHeaders(res: EdgeResponse, origin: string | null): void {
@@ -85,12 +97,14 @@ function tokenFromReq(req: EdgeRequest): string {
 }
 
 async function handleGet(req: EdgeRequest, token: string): Promise<ReadinessHandlerResult> {
-  if (!checkEdgeRateLimit(req)) {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) {
     return {
       status: 429,
       body: {
         error: { code: "RATE_LIMITED", message: "Too many attempts. Please try again later." },
       },
+      retryAfterSeconds: rl.retryAfterSeconds,
     };
   }
   if (!isValidReadinessToken(token)) {
@@ -129,12 +143,14 @@ async function handleGet(req: EdgeRequest, token: string): Promise<ReadinessHand
 }
 
 async function handlePatch(req: EdgeRequest, token: string): Promise<ReadinessHandlerResult> {
-  if (!checkEdgeRateLimit(req)) {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) {
     return {
       status: 429,
       body: {
         error: { code: "RATE_LIMITED", message: "Too many attempts. Please try again later." },
       },
+      retryAfterSeconds: rl.retryAfterSeconds,
     };
   }
   if (!isValidReadinessToken(token)) {
@@ -257,7 +273,11 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     }
 
     if (result.status === 429) {
-      res.setHeader("Retry-After", "3600");
+      const retryAfter =
+        typeof result.retryAfterSeconds === "number" && result.retryAfterSeconds > 0
+          ? result.retryAfterSeconds
+          : Math.ceil(RL_WINDOW_MS / 1000);
+      res.setHeader("Retry-After", String(retryAfter));
     }
     if (result.logError) {
       const message =

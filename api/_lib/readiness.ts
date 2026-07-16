@@ -19,6 +19,8 @@ export type ReadinessHandlerResult = {
   status: number;
   body: Record<string, unknown>;
   logError?: unknown;
+  /** Seconds for Retry-After when status is 429. */
+  retryAfterSeconds?: number;
 };
 
 const DEFAULT_STAGE = "intake";
