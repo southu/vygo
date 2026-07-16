@@ -3,6 +3,8 @@ import type { Db } from "./client.js";
 import { applications, type Application, type NewApplication } from "./schema.js";
 
 export type ApplicationInsertInput = {
+  /** Optional fixed primary key (e.g. dual-write using waitlist entry id). */
+  id?: string;
   fullName: string;
   workEmail: string;
   productUrl?: string | null;
@@ -50,6 +52,9 @@ export async function insertApplication(
     message: nullIfEmpty(input.message ?? null),
     source: (input.source ?? "apply").trim() || "apply",
   };
+  if (input.id) {
+    values.id = input.id;
+  }
 
   const [inserted] = await db.insert(applications).values(values).returning();
   if (!inserted) {

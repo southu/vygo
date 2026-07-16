@@ -1,14 +1,16 @@
 /**
  * POST /api/waitlist — public waitlist intake served on the marketing edge
  * (www.vygo.ai). The site's `vercel.json` rewrites the documented
- * `POST /v1/waitlist` path to this function, so the marketing form persists
- * directly to Postgres from the static deployment.
+ * `POST /v1/waitlist` path to this function.
+ *
+ * Persistence: a committed row in Railway Postgres `applications` is required
+ * before any accepted:true response. When this edge has a local DATABASE_URL it
+ * writes directly; otherwise it proxies server-to-server to the Railway API
+ * apply route (same production Postgres). Never acknowledges from memory alone.
  *
  * Responsibilities: method/CORS/content-type gating, JSON parsing, then the
- * shared handler (validation + idempotent upsert + sanitized errors). No
+ * shared handler (validation + durable upsert + sanitized errors). No
  * credentials, connection strings, SQL, or stack traces ever reach a response.
- *
- * Production migration command (documented): `DATABASE_URL=… pnpm db:migrate`.
  */
 import postgres from "postgres";
 import type { Sql } from "postgres";
@@ -22,8 +24,8 @@ import {
   type EdgeResponse,
 } from "./_lib/http.js";
 import {
-  createMemoryStore,
   createPgStore,
+  createUpstreamApplyStore,
   resolveDatabaseUrl,
   type WaitlistStore,
 } from "./_lib/store.js";
@@ -33,12 +35,9 @@ let cachedUrl: string | null = null;
 let warnedNoDatabase = false;
 
 /**
- * Resolve the persistence layer for this invocation. Durable Postgres is used
- * whenever a connection string is configured (one small pool is reused across
- * warm invocations). When no database is configured we fall back to a
- * process-local store rather than hard-failing valid submissions with a 503, so
- * the marketing form still acknowledges the applicant with safe duplicate
- * handling. See `createMemoryStore`.
+ * Resolve durable persistence for this invocation. Local Postgres when
+ * DATABASE_URL is set; otherwise Railway API proxy that commits `applications`.
+ * Never uses the in-memory test store in production.
  */
 function getStore(): WaitlistStore {
   const url = resolveDatabaseUrl();
@@ -48,11 +47,12 @@ function getStore(): WaitlistStore {
       console.warn(
         JSON.stringify({
           event: "waitlist_edge_no_database",
-          message: "DATABASE_URL not configured; using non-durable in-memory intake store",
+          message:
+            "DATABASE_URL not configured; proxying waitlist intake to Railway apply for durable applications rows",
         }),
       );
     }
-    return createMemoryStore();
+    return createUpstreamApplyStore();
   }
   if (!cachedSql || cachedUrl !== url) {
     cachedSql = postgres(url, {

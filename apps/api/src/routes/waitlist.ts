@@ -1,9 +1,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { isTestSurfaceEnabled, parseCorsOrigins, type ApiEnv } from "@vygo/config";
 import {
+  findApplicationById,
   findIdempotency,
   findWaitlistById,
   hashWaitlistRequest,
+  insertApplication,
   listOutboxForEntry,
   persistWaitlistIntake,
   saveIdempotency,
@@ -29,6 +31,7 @@ import {
 } from "../services/rate-limit.js";
 import { computeLeadScore } from "../services/scoring.js";
 import type { TurnstileVerifier } from "../services/turnstile.js";
+import { ensureApplicationsTable } from "./apply.js";
 
 /** Map internal outbox status → mission-safe job state (no secrets / no bodies). */
 function mapOutboxJobState(
@@ -386,6 +389,32 @@ export function registerWaitlistRoutes(app: FastifyInstance, deps: WaitlistRoute
       request.log.error(
         { event: "waitlist_persist_failed", fault: msg.startsWith("FAULT_") },
         "persist failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+
+    // Dual-write the mandated production `applications` row (same id as the
+    // waitlist entry) before acknowledging success. Fail closed if this commit
+    // does not land — clients must not see accepted:true without durable storage.
+    try {
+      await ensureApplicationsTable(dbHandle);
+      const existingApp = await findApplicationById(dbHandle.db, persistResult.entry.id);
+      if (!existingApp) {
+        await insertApplication(dbHandle.db, {
+          id: persistResult.entry.id,
+          fullName: application.fullName,
+          workEmail: application.email,
+          productUrl: application.productUrl,
+          message: application.message,
+          source: "waitlist",
+        });
+      }
+    } catch (error) {
+      request.log.error(
+        { event: "waitlist_applications_dual_write_failed" },
+        error instanceof Error ? error.message : "applications dual-write failed",
       );
       return reply
         .status(500)
