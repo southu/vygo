@@ -23,10 +23,13 @@ import {
   proxyFollowups,
   proxyFollowupsAnswer,
   proxyGetSession,
+  proxyGetSnapshot,
   proxyGetSubmission,
   proxyLogLead,
   proxyParsePaste,
   proxyPatchSession,
+  proxyScore,
+  proxySnapshotEmail,
   resolveDatabaseUrl,
   resolveEdgeClientIp,
   type ReadinessHandlerResult,
@@ -47,6 +50,7 @@ import {
 } from "../_lib/http.js";
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_OPS = new Set([
   "lead",
   "email-prompt",
@@ -54,6 +58,9 @@ const ALLOWED_OPS = new Set([
   "followups",
   "followups-answer",
   "submission",
+  "score",
+  "snapshot",
+  "snapshot-email",
 ]);
 
 /** Shared readiness edge rate-limit budget (aligns with Railway ~20/60s). */
@@ -990,6 +997,99 @@ async function handleSubmissionGet(req: EdgeRequest): Promise<ReadinessHandlerRe
 }
 
 // ---------------------------------------------------------------------------
+// score / snapshot (Stage 5) — proxy to Railway (source of truth)
+// ---------------------------------------------------------------------------
+
+function queryParam(req: EdgeRequest, name: string): string {
+  try {
+    const url = String((req as EdgeRequest & { url?: string }).url || "");
+    if (url.includes("?")) {
+      const v = new URL(url, "https://www.vygo.ai").searchParams.get(name);
+      if (v) return v.trim();
+    }
+  } catch {
+    /* ignore */
+  }
+  const qObj = (req as EdgeRequest & { query?: Record<string, string | string[]> }).query;
+  const raw = qObj?.[name];
+  if (Array.isArray(raw)) return typeof raw[0] === "string" ? raw[0].trim() : "";
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+async function handleScore(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const contentType = contentTypeBase(req.headers);
+  if (contentType && contentType !== "application/json") {
+    return {
+      status: 415,
+      body: {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "Content-Type must be application/json.",
+        },
+      },
+    };
+  }
+  const parsedBody = readJsonBody(req);
+  if (!parsedBody.ok) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+    };
+  }
+  return proxyScore(parsedBody.value ?? {}, process.env, req.headers);
+}
+
+async function handleSnapshotGet(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const id = queryParam(req, "id");
+  if (!id || !UUID_RE.test(id)) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Invalid snapshot id." } },
+    };
+  }
+  return proxyGetSnapshot(id, process.env, req.headers);
+}
+
+async function handleSnapshotEmail(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const id = queryParam(req, "id");
+  if (!id || !UUID_RE.test(id)) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Invalid snapshot id." } },
+    };
+  }
+  const contentType = contentTypeBase(req.headers);
+  if (contentType && contentType !== "application/json") {
+    return {
+      status: 415,
+      body: {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "Content-Type must be application/json.",
+        },
+      },
+    };
+  }
+  const parsedBody = readJsonBody(req);
+  if (!parsedBody.ok) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+    };
+  }
+  return proxySnapshotEmail(id, parsedBody.value ?? {}, process.env, req.headers);
+}
+
+// ---------------------------------------------------------------------------
 // HTTP entry
 // ---------------------------------------------------------------------------
 
@@ -1025,8 +1125,9 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     return;
   }
 
-  // submission is GET; all other ops are POST
-  if (op === "submission") {
+  // submission + snapshot are GET; score / snapshot-email / others are POST
+  const getOps = new Set(["submission", "snapshot"]);
+  if (getOps.has(op)) {
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET, OPTIONS");
       res
@@ -1052,6 +1153,12 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleFollowups(req);
     } else if (op === "followups-answer") {
       result = await handleFollowupsAnswer(req);
+    } else if (op === "score") {
+      result = await handleScore(req);
+    } else if (op === "snapshot") {
+      result = await handleSnapshotGet(req);
+    } else if (op === "snapshot-email") {
+      result = await handleSnapshotEmail(req);
     } else {
       result = await handleSubmissionGet(req);
     }

@@ -5,12 +5,17 @@
  * a documented stub until a scheduled job is wired.
  */
 import { randomBytes } from "node:crypto";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
-import { OUTBOX_KINDS, readinessPromptIdempotencyKey } from "./outbox.js";
+import {
+  OUTBOX_KINDS,
+  readinessPromptIdempotencyKey,
+  readinessSnapshotIdempotencyKey,
+} from "./outbox.js";
 import {
   emailOutbox,
   readinessQuestionBank,
+  readinessScoringConfig,
   readinessSessions,
   readinessSubmissions,
   type NewReadinessSession,
@@ -381,10 +386,19 @@ export type ReadinessSubmissionPublic = {
   sessionToken: string | null;
   parsedReport: Record<string, unknown> | null;
   rawPasteRedacted: string | null;
+  scores: Record<string, unknown> | null;
   discrepancyFlags: unknown[];
   bucket: string | null;
   contact: Record<string, unknown> | null;
   createdAt: string;
+};
+
+export type ReadinessScoringConfigRowPublic = {
+  configKey: string;
+  version: number;
+  rules: Record<string, unknown>;
+  weights: Record<string, unknown>;
+  active: boolean;
 };
 
 export async function findLatestSubmissionBySessionToken(
@@ -428,6 +442,10 @@ export async function findLatestSubmissionBySessionToken(
           : typeof draft.pasteText === "string"
             ? draft.pasteText
             : null,
+      scores:
+        draft.scores && typeof draft.scores === "object" && !Array.isArray(draft.scores)
+          ? (draft.scores as Record<string, unknown>)
+          : null,
       discrepancyFlags: Array.isArray(draft.discrepancyFlags) ? draft.discrepancyFlags : [],
       bucket: typeof draft.bucket === "string" ? draft.bucket : null,
       contact:
@@ -446,6 +464,10 @@ export async function findLatestSubmissionBySessionToken(
         ? (row.parsedReport as Record<string, unknown>)
         : null,
     rawPasteRedacted: row.rawPasteRedacted,
+    scores:
+      row.scores && typeof row.scores === "object" && !Array.isArray(row.scores)
+        ? (row.scores as Record<string, unknown>)
+        : null,
     discrepancyFlags: Array.isArray(row.discrepancyFlags) ? row.discrepancyFlags : [],
     bucket: row.bucket,
     contact:
@@ -454,6 +476,296 @@ export async function findLatestSubmissionBySessionToken(
         : null,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/** Load a submission by public snapshot id (UUID). */
+export async function findReadinessSubmissionById(
+  db: Db,
+  id: string,
+): Promise<ReadinessSubmissionPublic | null> {
+  const trimmed = id.trim();
+  if (!trimmed || trimmed.startsWith("draft:")) return null;
+
+  const rows = await db
+    .select()
+    .from(readinessSubmissions)
+    .where(eq(readinessSubmissions.id, trimmed))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+
+  let sessionToken: string | null = null;
+  if (row.sessionId) {
+    const sessions = await db
+      .select()
+      .from(readinessSessions)
+      .where(eq(readinessSessions.id, row.sessionId))
+      .limit(1);
+    sessionToken = sessions[0]?.token ?? null;
+  }
+
+  return {
+    id: row.id,
+    sessionToken,
+    parsedReport:
+      row.parsedReport && typeof row.parsedReport === "object"
+        ? (row.parsedReport as Record<string, unknown>)
+        : null,
+    rawPasteRedacted: row.rawPasteRedacted,
+    scores:
+      row.scores && typeof row.scores === "object" && !Array.isArray(row.scores)
+        ? (row.scores as Record<string, unknown>)
+        : null,
+    discrepancyFlags: Array.isArray(row.discrepancyFlags) ? row.discrepancyFlags : [],
+    bucket: row.bucket,
+    contact:
+      row.contact && typeof row.contact === "object" && !Array.isArray(row.contact)
+        ? (row.contact as Record<string, unknown>)
+        : null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/** Active scoring config (highest version wins). */
+export async function getActiveReadinessScoringConfig(
+  db: Db,
+  configKey = "default",
+): Promise<ReadinessScoringConfigRowPublic | null> {
+  const rows = await db
+    .select()
+    .from(readinessScoringConfig)
+    .where(
+      and(eq(readinessScoringConfig.configKey, configKey), eq(readinessScoringConfig.active, true)),
+    )
+    .orderBy(desc(readinessScoringConfig.version))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    configKey: row.configKey,
+    version: row.version,
+    rules:
+      row.rules && typeof row.rules === "object" && !Array.isArray(row.rules)
+        ? (row.rules as Record<string, unknown>)
+        : {},
+    weights:
+      row.weights && typeof row.weights === "object" && !Array.isArray(row.weights)
+        ? (row.weights as Record<string, unknown>)
+        : {},
+    active: row.active,
+  };
+}
+
+/** Idempotent seed of scoring config v2 from provided rules/weights JSON. */
+export async function seedReadinessScoringConfig(
+  db: Db,
+  input: {
+    configKey?: string;
+    version?: number;
+    rules: Record<string, unknown>;
+    weights: Record<string, unknown>;
+  },
+): Promise<void> {
+  const configKey = input.configKey ?? "default";
+  const version = input.version ?? 2;
+  const existing = await db
+    .select({ id: readinessScoringConfig.id })
+    .from(readinessScoringConfig)
+    .where(
+      and(
+        eq(readinessScoringConfig.configKey, configKey),
+        eq(readinessScoringConfig.version, version),
+      ),
+    )
+    .limit(1);
+  if (existing[0]) {
+    await db
+      .update(readinessScoringConfig)
+      .set({
+        rules: input.rules,
+        weights: input.weights,
+        active: true,
+      })
+      .where(eq(readinessScoringConfig.id, existing[0].id));
+    return;
+  }
+  await db.insert(readinessScoringConfig).values({
+    configKey,
+    version,
+    rules: input.rules,
+    weights: input.weights,
+    active: true,
+  });
+}
+
+export type PersistReadinessScoreInput = {
+  token: string;
+  scores: Record<string, unknown>;
+  bucket: string;
+  contact: Record<string, unknown>;
+  /** Already-redacted report / paste fields. */
+  parsedReport?: Record<string, unknown> | null;
+  rawPasteRedacted?: string | null;
+  discrepancyFlags?: unknown[];
+};
+
+/**
+ * Persist score + bucket + contact on the latest submission (or insert one).
+ * Mirrors scores into session draft for resume. Returns the submission id.
+ */
+export async function persistReadinessScore(
+  db: Db,
+  input: PersistReadinessScoreInput,
+): Promise<ReadinessSubmissionPublic> {
+  const trimmed = input.token.trim();
+  const sessions = await db
+    .select()
+    .from(readinessSessions)
+    .where(eq(readinessSessions.token, trimmed))
+    .limit(1);
+  const session = sessions[0];
+  if (!session) {
+    throw new Error("readiness session not found");
+  }
+
+  const draft =
+    session.draft && typeof session.draft === "object" && !Array.isArray(session.draft)
+      ? { ...(session.draft as Record<string, unknown>) }
+      : {};
+  draft.scores = input.scores;
+  draft.bucket = input.bucket;
+  draft.contact = input.contact;
+  draft.scoredAt = new Date().toISOString();
+  if (input.parsedReport) draft.report = input.parsedReport;
+  if (input.rawPasteRedacted) {
+    draft.rawPasteRedacted = input.rawPasteRedacted;
+    draft.pasteText = input.rawPasteRedacted;
+  }
+
+  await db
+    .update(readinessSessions)
+    .set({ draft, stage: "scored", updatedAt: new Date() })
+    .where(eq(readinessSessions.token, trimmed));
+
+  const existing = await findLatestSubmissionBySessionToken(db, trimmed);
+  if (existing && !String(existing.id).startsWith("draft:")) {
+    await db
+      .update(readinessSubmissions)
+      .set({
+        scores: input.scores,
+        bucket: input.bucket,
+        contact: input.contact,
+        parsedReport: input.parsedReport ?? existing.parsedReport,
+        rawPasteRedacted: input.rawPasteRedacted ?? existing.rawPasteRedacted,
+        discrepancyFlags: input.discrepancyFlags ?? existing.discrepancyFlags,
+      })
+      .where(eq(readinessSubmissions.id, existing.id));
+    const updated = await findReadinessSubmissionById(db, existing.id);
+    if (updated) {
+      draft.submissionId = updated.id;
+      await db
+        .update(readinessSessions)
+        .set({ draft, updatedAt: new Date() })
+        .where(eq(readinessSessions.token, trimmed));
+      return updated;
+    }
+  }
+
+  const inserted = await insertReadinessSubmission(db, {
+    sessionId: session.id,
+    parsedReport:
+      input.parsedReport ??
+      (draft.report && typeof draft.report === "object"
+        ? (draft.report as Record<string, unknown>)
+        : null),
+    rawPasteRedacted:
+      input.rawPasteRedacted ??
+      (typeof draft.rawPasteRedacted === "string"
+        ? draft.rawPasteRedacted
+        : typeof draft.pasteText === "string"
+          ? draft.pasteText
+          : null),
+    scores: input.scores,
+    bucket: input.bucket,
+    discrepancyFlags: input.discrepancyFlags ?? [],
+    contact: input.contact,
+  });
+
+  draft.submissionId = inserted.id;
+  await db
+    .update(readinessSessions)
+    .set({ draft, updatedAt: new Date() })
+    .where(eq(readinessSessions.token, trimmed));
+
+  return {
+    id: inserted.id,
+    sessionToken: session.token,
+    parsedReport:
+      inserted.parsedReport && typeof inserted.parsedReport === "object"
+        ? (inserted.parsedReport as Record<string, unknown>)
+        : null,
+    rawPasteRedacted: inserted.rawPasteRedacted,
+    scores:
+      inserted.scores && typeof inserted.scores === "object"
+        ? (inserted.scores as Record<string, unknown>)
+        : null,
+    discrepancyFlags: Array.isArray(inserted.discrepancyFlags) ? inserted.discrepancyFlags : [],
+    bucket: inserted.bucket,
+    contact:
+      inserted.contact && typeof inserted.contact === "object"
+        ? (inserted.contact as Record<string, unknown>)
+        : null,
+    createdAt: inserted.createdAt.toISOString(),
+  };
+}
+
+export type EnqueueReadinessSnapshotEmailInput = {
+  snapshotId: string;
+  email: string;
+  snapshotUrl: string;
+  /** Pre-rendered HTML/text optional; worker may rebuild from payload. */
+  subject?: string;
+  html?: string;
+  text?: string;
+  bucket?: string | null;
+  name?: string | null;
+};
+
+/** Queue a readiness snapshot email (accept even if delivery is deferred). */
+export async function enqueueReadinessSnapshotEmail(
+  db: Db,
+  input: EnqueueReadinessSnapshotEmailInput,
+): Promise<{ queued: true; idempotencyKey: string }> {
+  const email = input.email.trim().toLowerCase();
+  const snapshotId = input.snapshotId.trim();
+  const idempotencyKey = readinessSnapshotIdempotencyKey(snapshotId, email);
+  const now = new Date();
+
+  await db
+    .insert(emailOutbox)
+    .values({
+      waitlistEntryId: null,
+      kind: OUTBOX_KINDS.readinessSnapshot,
+      recipient: email,
+      payload: {
+        kind: OUTBOX_KINDS.readinessSnapshot,
+        email,
+        snapshotId,
+        snapshotUrl: input.snapshotUrl.slice(0, 500),
+        subject: input.subject ?? "Your vygo readiness snapshot",
+        html: input.html ?? null,
+        text: input.text ?? null,
+        bucket: input.bucket ?? null,
+        name: input.name ?? null,
+      },
+      idempotencyKey,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing();
+
+  return { queued: true, idempotencyKey };
 }
 
 /**

@@ -225,3 +225,224 @@ export function manualAnswersFromDraft(draft: Record<string, unknown>): ManualAn
   }
   return null;
 }
+
+export type ScoreResponse = {
+  snapshotId: string;
+  id?: string;
+  scores: Record<string, number>;
+  dimensions?: Record<string, number>;
+  ranges?: Record<string, { low: number; high: number; mid: number }> | null;
+  displayMode?: "point" | "range";
+  overall?: number;
+  bucket: string;
+  reasoning: string;
+  caveat?: string | null;
+  findings: string[];
+  recommendedEngagement?: string;
+  offerKey?: string;
+  ctaLabel?: string;
+  pricing?: Record<string, string>;
+  source?: string;
+  snapshotPath?: string;
+};
+
+export type SnapshotResponse = {
+  id: string;
+  snapshotId?: string;
+  scores: Record<string, number> | null;
+  dimensions?: Record<string, number> | null;
+  ranges?: Record<string, { low: number; high: number; mid: number }> | null;
+  displayMode?: "point" | "range";
+  overall?: number | null;
+  bucket: string | null;
+  reasoning: string | null;
+  caveat?: string | null;
+  findings: string[];
+  recommendedEngagement?: string | null;
+  offerKey?: string;
+  ctaLabel?: string;
+  pricing?: {
+    harden?: string;
+    launch?: string;
+    scale?: string;
+    enterprise?: string;
+    auditNote?: string;
+  } | null;
+  source?: string | null;
+  contact?: {
+    name?: string | null;
+    email?: string | null;
+    company?: string | null;
+  } | null;
+  reportSummary?: Record<string, unknown> | null;
+  createdAt?: string;
+};
+
+/** Gate + score. Requires name, email, privacy consent, and Turnstile token. */
+export async function scoreReadiness(input: {
+  token: string;
+  name: string;
+  email: string;
+  company?: string;
+  privacyAccepted: boolean;
+  turnstileToken: string;
+  source?: string;
+}): Promise<ScoreResponse> {
+  const res = await fetch(apiUrl("/v1/readiness/score"), {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({
+      token: input.token,
+      name: input.name,
+      email: input.email,
+      company: input.company || undefined,
+      privacyAccepted: input.privacyAccepted,
+      privacyConsent: input.privacyAccepted,
+      turnstileToken: input.turnstileToken,
+      source: input.source,
+    }),
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  const body = await parseJson(res);
+  if (!res.ok) {
+    const fields = (body.error as { fields?: Record<string, string> } | undefined)?.fields;
+    const msg =
+      (body.error as { message?: string } | undefined)?.message ||
+      "Could not compute readiness scores.";
+    const err = new Error(msg) as Error & {
+      status?: number;
+      code?: string;
+      fields?: Record<string, string>;
+    };
+    err.status = res.status;
+    err.code = (body.error as { code?: string } | undefined)?.code;
+    err.fields = fields;
+    throw err;
+  }
+  const snapshotId =
+    typeof body.snapshotId === "string"
+      ? body.snapshotId
+      : typeof body.id === "string"
+        ? body.id
+        : "";
+  if (!snapshotId) {
+    throw new Error("Score response missing snapshot id.");
+  }
+  return {
+    snapshotId,
+    id: snapshotId,
+    scores:
+      body.scores && typeof body.scores === "object" && !Array.isArray(body.scores)
+        ? (body.scores as Record<string, number>)
+        : body.dimensions && typeof body.dimensions === "object"
+          ? (body.dimensions as Record<string, number>)
+          : {},
+    dimensions:
+      body.dimensions && typeof body.dimensions === "object"
+        ? (body.dimensions as Record<string, number>)
+        : undefined,
+    ranges:
+      body.ranges && typeof body.ranges === "object"
+        ? (body.ranges as ScoreResponse["ranges"])
+        : null,
+    displayMode: body.displayMode === "range" ? "range" : "point",
+    overall: typeof body.overall === "number" ? body.overall : undefined,
+    bucket: typeof body.bucket === "string" ? body.bucket : "Launch",
+    reasoning: typeof body.reasoning === "string" ? body.reasoning : "",
+    caveat: typeof body.caveat === "string" ? body.caveat : null,
+    findings: Array.isArray(body.findings)
+      ? (body.findings as unknown[]).filter((f): f is string => typeof f === "string")
+      : [],
+    recommendedEngagement:
+      typeof body.recommendedEngagement === "string" ? body.recommendedEngagement : undefined,
+    offerKey: typeof body.offerKey === "string" ? body.offerKey : undefined,
+    ctaLabel: typeof body.ctaLabel === "string" ? body.ctaLabel : undefined,
+    pricing:
+      body.pricing && typeof body.pricing === "object"
+        ? (body.pricing as Record<string, string>)
+        : undefined,
+    source: typeof body.source === "string" ? body.source : undefined,
+    snapshotPath:
+      typeof body.snapshotPath === "string"
+        ? body.snapshotPath
+        : `/readiness/snapshot?id=${encodeURIComponent(snapshotId)}`,
+  };
+}
+
+export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse> {
+  const res = await fetch(apiUrl(`/v1/readiness/snapshot/${encodeURIComponent(id)}`), {
+    method: "GET",
+    headers: { accept: "application/json" },
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  const body = await parseJson(res);
+  if (!res.ok) {
+    const msg = (body.error as { message?: string } | undefined)?.message || "Snapshot not found.";
+    throw new Error(msg);
+  }
+  const scores =
+    body.dimensions && typeof body.dimensions === "object"
+      ? (body.dimensions as Record<string, number>)
+      : body.scores && typeof body.scores === "object" && !Array.isArray(body.scores)
+        ? (body.scores as Record<string, number>)
+        : null;
+  return {
+    id: typeof body.id === "string" ? body.id : id,
+    snapshotId: typeof body.snapshotId === "string" ? body.snapshotId : id,
+    scores,
+    dimensions: scores,
+    ranges:
+      body.ranges && typeof body.ranges === "object"
+        ? (body.ranges as SnapshotResponse["ranges"])
+        : null,
+    displayMode: body.displayMode === "range" ? "range" : "point",
+    overall: typeof body.overall === "number" ? body.overall : null,
+    bucket: typeof body.bucket === "string" ? body.bucket : null,
+    reasoning: typeof body.reasoning === "string" ? body.reasoning : null,
+    caveat: typeof body.caveat === "string" ? body.caveat : null,
+    findings: Array.isArray(body.findings)
+      ? (body.findings as unknown[]).filter((f): f is string => typeof f === "string")
+      : [],
+    recommendedEngagement:
+      typeof body.recommendedEngagement === "string" ? body.recommendedEngagement : null,
+    offerKey: typeof body.offerKey === "string" ? body.offerKey : "audit",
+    ctaLabel:
+      typeof body.ctaLabel === "string" ? body.ctaLabel : "Apply for the next audit opening",
+    pricing:
+      body.pricing && typeof body.pricing === "object"
+        ? (body.pricing as SnapshotResponse["pricing"])
+        : null,
+    source: typeof body.source === "string" ? body.source : null,
+    contact:
+      body.contact && typeof body.contact === "object"
+        ? (body.contact as SnapshotResponse["contact"])
+        : null,
+    reportSummary:
+      body.reportSummary && typeof body.reportSummary === "object"
+        ? (body.reportSummary as Record<string, unknown>)
+        : null,
+    createdAt: typeof body.createdAt === "string" ? body.createdAt : undefined,
+  };
+}
+
+export async function emailReadinessSnapshot(input: {
+  id: string;
+  email?: string;
+}): Promise<{ ok: true; status: number }> {
+  const res = await fetch(apiUrl(`/v1/readiness/snapshot/${encodeURIComponent(input.id)}/email`), {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(input.email ? { email: input.email } : {}),
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await parseJson(res);
+    const msg =
+      (body.error as { message?: string } | undefined)?.message || "Could not email snapshot.";
+    throw new Error(msg);
+  }
+  return { ok: true, status: res.status };
+}

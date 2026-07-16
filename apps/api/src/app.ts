@@ -316,6 +316,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
     env,
     getDb,
     rateLimitStore,
+    turnstile,
   });
 
   registerResendWebhookRoutes(app, {

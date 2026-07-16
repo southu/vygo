@@ -112,6 +112,45 @@ async function renderForJob(
     return { subject, html, text };
   }
 
+  if (kind === OUTBOX_KINDS.readinessSnapshot || kind === "readiness_snapshot") {
+    const snapshotUrl = String(payload.snapshotUrl ?? "https://www.vygo.ai/readiness");
+    const bucket = String(payload.bucket ?? "");
+    const subject =
+      typeof payload.subject === "string" && payload.subject.trim()
+        ? String(payload.subject)
+        : "Your vygo readiness snapshot";
+    if (typeof payload.html === "string" && payload.html.trim()) {
+      const text =
+        typeof payload.text === "string" && payload.text.trim()
+          ? String(payload.text)
+          : `Your vygo readiness snapshot: ${snapshotUrl}`;
+      return { subject, html: String(payload.html), text };
+    }
+    const escapedUrl = snapshotUrl
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+    const escapedBucket = bucket.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    const text = [
+      "Your vygo readiness snapshot is ready.",
+      bucket ? `Bucket: ${bucket}` : "",
+      `Open: ${snapshotUrl}`,
+      "",
+      "Sent because you requested a copy on vygo.ai.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const html = [
+      "<p>Your <strong>vygo</strong> readiness snapshot is ready.</p>",
+      bucket ? `<p><strong>Bucket:</strong> ${escapedBucket}</p>` : "",
+      `<p><a href="${escapedUrl}">Open your snapshot</a></p>`,
+      '<p style="color:#64748b;font-size:12px;">Sent because you requested a copy on vygo.ai.</p>',
+    ]
+      .filter(Boolean)
+      .join("");
+    return { subject, html, text };
+  }
+
   // Unknown kind: still produce a minimal transactional shell so the job can complete or fail cleanly.
   const subject = `Vygo notification (${kind})`;
   const text = "Transactional notification.";

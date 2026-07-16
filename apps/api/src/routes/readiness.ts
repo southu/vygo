@@ -10,6 +10,9 @@
  * POST   /v1/readiness/followups        — Stage 4 dynamic questions (from bank)
  * POST   /v1/readiness/followups/answer — submit follow-up answers (+ discrepancy)
  * GET    /v1/readiness/submission       — token-scoped read-back of stored submission
+ * POST   /v1/readiness/score            — email gate + score + persist snapshot
+ * GET    /v1/readiness/snapshot/:id     — public snapshot read-back
+ * POST   /v1/readiness/snapshot/:id/email — enqueue snapshot email copy
  *
  * All Postgres writes go through these server endpoints. Rate-limited by IP.
  * Never returns connection strings, DATABASE_URL, stack traces, or secrets.
@@ -21,29 +24,43 @@ import {
   patchReadinessSessionByToken,
   logReadinessLead,
   enqueueReadinessPromptEmail,
+  enqueueReadinessSnapshotEmail,
   redactSensitivePaste,
   insertReadinessSubmission,
   listReadinessQuestionBank,
   findLatestSubmissionBySessionToken,
+  findReadinessSubmissionById,
+  getActiveReadinessScoringConfig,
+  seedReadinessScoringConfig,
+  persistReadinessScore,
   appendSubmissionDiscrepancyFlags,
   seedReadinessFollowupQuestions,
   type DatabaseHandle,
 } from "@vygo/db";
 import {
+  computeReadinessScore,
+  containsRemediationDetail,
+  defaultScoringRulesJson,
+  defaultScoringWeightsJson,
   detectFollowupDiscrepancies,
   FOLLOWUP_QUESTION_SEED,
   followupSeedMetadata,
+  manualAnswersToReport,
   redactPasteSecrets,
   runDeterministicParse,
+  scoringConfigFromDbRow,
   selectFollowupQuestions,
   tryLlmNormalizeReport,
   type ReadinessReportV1Partial,
+  type ReadinessScorePayload,
+  type ReadinessStage1Answers,
 } from "@vygo/validation";
 import type { ApiEnv } from "@vygo/config";
 import { safeError } from "../errors.js";
 import { resolveClientIp } from "../services/client-ip.js";
 import { hashIpAddress } from "../services/ip-hash.js";
 import { checkRateLimit, type RateLimitStore } from "../services/rate-limit.js";
+import type { TurnstileVerifier } from "../services/turnstile.js";
 
 /** Resumable tokens are base64url of 24 bytes (32 chars) or legacy UUID. */
 const TOKEN_RE = /^[A-Za-z0-9_-]{16,128}$/;
@@ -73,7 +90,111 @@ export type ReadinessRouteDeps = {
   env: ApiEnv;
   getDb: () => DatabaseHandle | null;
   rateLimitStore: RateLimitStore;
+  turnstile: TurnstileVerifier;
 };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Tighter budget for score POSTs so rapid abuse hits 429 quickly. */
+const SCORE_RL_LIMIT = 12;
+const SCORE_RL_WINDOW_SECONDS = 60;
+
+function readinessScoreIpRateLimitKey(ipHash: string): string {
+  return `rl:readiness:score:v1:ip:${ipHash}`;
+}
+
+function isEmailLike(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function redactReportDeep(report: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(report)) {
+    if (typeof v === "string") {
+      const r = redactPasteSecrets(v);
+      out[k] = redactSensitivePaste(r.redacted);
+    } else if (Array.isArray(v)) {
+      out[k] = v.map((item) =>
+        typeof item === "string" ? redactSensitivePaste(redactPasteSecrets(item).redacted) : item,
+      );
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+function publicSnapshotBody(submission: {
+  id: string;
+  scores: Record<string, unknown> | null;
+  bucket: string | null;
+  contact: Record<string, unknown> | null;
+  parsedReport: Record<string, unknown> | null;
+  createdAt: string;
+}): Record<string, unknown> {
+  const scores = (submission.scores ?? {}) as Partial<ReadinessScorePayload> &
+    Record<string, unknown>;
+  const findings = Array.isArray(scores.findings)
+    ? (scores.findings as unknown[])
+        .filter((f): f is string => typeof f === "string")
+        .map((f) => f.slice(0, 280))
+        .filter((f) => !containsRemediationDetail(f))
+        .slice(0, 3)
+    : [];
+
+  // Never return raw paste; only a redacted report summary for reasoning context.
+  const report = submission.parsedReport ? redactReportDeep(submission.parsedReport) : null;
+
+  return {
+    id: submission.id,
+    snapshotId: submission.id,
+    scores: scores.dimensions ?? scores.scores ?? null,
+    dimensions: scores.dimensions ?? null,
+    ranges: scores.ranges ?? null,
+    displayMode: scores.displayMode ?? "point",
+    overall: scores.overall ?? null,
+    bucket: submission.bucket ?? scores.bucket ?? null,
+    reasoning: typeof scores.reasoning === "string" ? scores.reasoning : null,
+    caveat: typeof scores.caveat === "string" ? scores.caveat : null,
+    findings,
+    recommendedEngagement:
+      typeof scores.recommendedEngagement === "string" ? scores.recommendedEngagement : null,
+    offerKey: typeof scores.offerKey === "string" ? scores.offerKey : "audit",
+    ctaLabel:
+      typeof scores.ctaLabel === "string" ? scores.ctaLabel : "Apply for the next audit opening",
+    pricing: scores.pricing ?? null,
+    source: scores.source ?? null,
+    contact: submission.contact
+      ? {
+          name:
+            typeof submission.contact.name === "string"
+              ? submission.contact.name
+              : typeof submission.contact.fullName === "string"
+                ? submission.contact.fullName
+                : null,
+          email: typeof submission.contact.email === "string" ? submission.contact.email : null,
+          company:
+            typeof submission.contact.company === "string"
+              ? submission.contact.company
+              : typeof submission.contact.companyName === "string"
+                ? submission.contact.companyName
+                : null,
+        }
+      : null,
+    // Intentionally omit how-to-fix / remediation keys.
+    reportSummary: report
+      ? {
+          summary: report.summary ?? null,
+          tenancy: report.tenancy ?? null,
+          auth: report.auth ?? null,
+          tests: report.tests ?? null,
+          deploys: report.deploys ?? null,
+          pii_categories: report.pii_categories ?? null,
+        }
+      : null,
+    createdAt: submission.createdAt,
+  };
+}
 
 /** Ensure readiness tables exist (bootstrap when formal migrate has not run yet). */
 export async function ensureReadinessTables(dbHandle: DatabaseHandle): Promise<void> {
@@ -150,6 +271,60 @@ export async function ensureReadinessTables(dbHandle: DatabaseHandle): Promise<v
   } catch {
     // seed races are non-fatal
   }
+
+  // Seed Stage 5 scoring config v2 (dimension weights as data).
+  try {
+    await seedReadinessScoringConfig(dbHandle.db, {
+      configKey: "default",
+      version: 2,
+      rules: defaultScoringRulesJson(),
+      weights: defaultScoringWeightsJson(),
+    });
+  } catch {
+    // seed races are non-fatal
+  }
+}
+
+async function enforceScoreRateLimit(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: ReadinessRouteDeps,
+): Promise<boolean> {
+  const rawIp = resolveClientIp(request);
+  const ipHashResult = hashIpAddress(rawIp, deps.env);
+  let bucketKey: string;
+  if (ipHashResult) {
+    bucketKey = readinessScoreIpRateLimitKey(ipHashResult.hash);
+  } else {
+    const { createHmac } = await import("node:crypto");
+    const digest = createHmac("sha256", "vygo-readiness-score-rl")
+      .update(rawIp)
+      .digest("hex")
+      .slice(0, 32);
+    bucketKey = readinessScoreIpRateLimitKey(`rlfb:${digest}`);
+  }
+  const result = await checkRateLimit(
+    deps.rateLimitStore,
+    bucketKey,
+    SCORE_RL_LIMIT,
+    SCORE_RL_WINDOW_SECONDS,
+  );
+  if (!result.allowed) {
+    const retryAfter = Math.max(
+      1,
+      Math.min(result.retryAfterSeconds || SCORE_RL_WINDOW_SECONDS, SCORE_RL_WINDOW_SECONDS),
+    );
+    request.log.info(
+      { event: "readiness_score_rate_limited", retryAfterSeconds: retryAfter },
+      "rate limited",
+    );
+    await reply
+      .status(429)
+      .header("Retry-After", String(retryAfter))
+      .send(safeError("RATE_LIMITED", "Too many attempts. Please try again later."));
+    return false;
+  }
+  return true;
 }
 
 function isJsonContentType(header: string | string[] | undefined): boolean {
@@ -878,6 +1053,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         token: submission.sessionToken,
         parsedReport: submission.parsedReport,
         rawPasteRedacted: safePaste,
+        scores: submission.scores,
         discrepancyFlags: submission.discrepancyFlags,
         bucket: submission.bucket,
         contact: submission.contact,
@@ -887,6 +1063,388 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       request.log.error(
         { event: "readiness_submission_read_failed" },
         error instanceof Error ? error.message : "submission read failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  /**
+   * Stage 5: email gate + score. Requires name, email, privacy consent.
+   * Reuses Turnstile (no new CAPTCHA). Persists scores, bucket, reasoning.
+   * Redacts secret-shaped free text before storage.
+   */
+  app.post("/v1/readiness/score", async (request, reply) => {
+    if (!(await enforceScoreRateLimit(request, reply, deps))) return;
+    // Also count against shared readiness budget.
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    if (!isJsonContentType(request.headers["content-type"])) {
+      return reply
+        .status(415)
+        .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const token = typeof body.token === "string" ? body.token.trim().slice(0, 128) : "";
+    const name =
+      typeof body.name === "string"
+        ? body.name.trim().slice(0, 120)
+        : typeof body.fullName === "string"
+          ? body.fullName.trim().slice(0, 120)
+          : "";
+    const email =
+      typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 254) : "";
+    const company =
+      typeof body.company === "string"
+        ? body.company.trim().slice(0, 160)
+        : typeof body.companyName === "string"
+          ? body.companyName.trim().slice(0, 160)
+          : "";
+    const privacyAccepted =
+      body.privacyAccepted === true || body.privacyConsent === true || body.consent === true;
+    const turnstileToken =
+      typeof body.turnstileToken === "string" ? body.turnstileToken : undefined;
+
+    if (!token || !TOKEN_RE.test(token)) {
+      return reply
+        .status(400)
+        .send(safeError("VALIDATION_ERROR", "A valid session token is required."));
+    }
+
+    const fieldErrors: Record<string, string> = {};
+    if (!name || name.length < 1) fieldErrors.name = "Name is required.";
+    if (!email || !isEmailLike(email)) fieldErrors.email = "A valid email is required.";
+    if (!privacyAccepted) fieldErrors.privacyAccepted = "Privacy consent is required.";
+
+    if (Object.keys(fieldErrors).length > 0) {
+      return reply.status(400).send({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Name, email, and privacy consent are required before scored results.",
+          fields: fieldErrors,
+        },
+      });
+    }
+
+    const rawIp = resolveClientIp(request);
+    const turnstileResult = await deps.turnstile.verify(turnstileToken, rawIp);
+    if (!turnstileResult.success) {
+      request.log.info(
+        { event: "readiness_score_turnstile_failed", reason: turnstileResult.reason },
+        "turnstile failed",
+      );
+      return reply
+        .status(400)
+        .send(safeError("TURNSTILE_FAILED", "Verification failed. Please try again."));
+    }
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+      const session = await findReadinessSessionByToken(dbHandle.db, token);
+      if (!session) {
+        return reply.status(404).send(safeError("NOT_FOUND", "Session not found."));
+      }
+
+      const draft = session.draft;
+      const sourceRaw =
+        typeof draft.source === "string"
+          ? draft.source
+          : typeof body.source === "string"
+            ? body.source
+            : "paste";
+      const source = sourceRaw === "manual" ? "manual" : "paste";
+
+      let report: Record<string, unknown> = {};
+      if (draft.report && typeof draft.report === "object" && !Array.isArray(draft.report)) {
+        report = { ...(draft.report as Record<string, unknown>) };
+      } else if (
+        draft.manualAnswers &&
+        typeof draft.manualAnswers === "object" &&
+        !Array.isArray(draft.manualAnswers)
+      ) {
+        report = manualAnswersToReport(draft.manualAnswers as never) as Record<string, unknown>;
+      } else if (body.report && typeof body.report === "object" && !Array.isArray(body.report)) {
+        report = { ...(body.report as Record<string, unknown>) };
+      }
+
+      // Deep-redact free-text report fields before scoring/storage.
+      report = redactReportDeep(report);
+
+      let pasteRedacted: string | null =
+        typeof draft.rawPasteRedacted === "string"
+          ? draft.rawPasteRedacted
+          : typeof draft.pasteText === "string"
+            ? draft.pasteText
+            : null;
+      if (pasteRedacted) {
+        pasteRedacted = redactSensitivePaste(redactPasteSecrets(pasteRedacted).redacted);
+      }
+      if (typeof body.paste === "string" && body.paste.trim()) {
+        pasteRedacted = redactSensitivePaste(redactPasteSecrets(body.paste).redacted).slice(
+          0,
+          50_000,
+        );
+      }
+
+      const stage1 =
+        draft.stage1 && typeof draft.stage1 === "object" && !Array.isArray(draft.stage1)
+          ? (draft.stage1 as Partial<ReadinessStage1Answers>)
+          : null;
+      const followups =
+        draft.followupAnswers &&
+        typeof draft.followupAnswers === "object" &&
+        !Array.isArray(draft.followupAnswers)
+          ? (draft.followupAnswers as Record<string, unknown>)
+          : null;
+
+      let configRow = null;
+      try {
+        configRow = await getActiveReadinessScoringConfig(dbHandle.db, "default");
+      } catch {
+        configRow = null;
+      }
+      const scoringConfig = scoringConfigFromDbRow(configRow);
+
+      const payload = computeReadinessScore({
+        report,
+        source,
+        stage1,
+        followups,
+        config: scoringConfig,
+      });
+
+      // Persist full score payload (includes reasoning) on submission row.
+      const scoresJson: Record<string, unknown> = {
+        ...payload,
+        dimensions: payload.dimensions,
+        reasoning: payload.reasoning,
+        findings: payload.findings,
+        bucket: payload.bucket,
+      };
+
+      const contact: Record<string, unknown> = {
+        source: "readiness_score_gate",
+        name,
+        fullName: name,
+        email,
+        privacyAccepted: true,
+        gatedAt: new Date().toISOString(),
+      };
+      if (company) {
+        contact.company = company;
+        contact.companyName = company;
+      }
+
+      const saved = await persistReadinessScore(dbHandle.db, {
+        token,
+        scores: scoresJson,
+        bucket: payload.bucket,
+        contact,
+        parsedReport: report,
+        rawPasteRedacted: pasteRedacted,
+      });
+
+      request.log.info(
+        {
+          event: "readiness_scored",
+          bucket: payload.bucket,
+          source,
+          snapshotId: saved.id,
+        },
+        "readiness scored",
+      );
+
+      return reply.status(200).send({
+        snapshotId: saved.id,
+        id: saved.id,
+        scores: payload.dimensions,
+        dimensions: payload.dimensions,
+        ranges: payload.ranges ?? null,
+        displayMode: payload.displayMode,
+        overall: payload.overall,
+        bucket: payload.bucket,
+        reasoning: payload.reasoning,
+        caveat: payload.caveat ?? null,
+        findings: payload.findings,
+        recommendedEngagement: payload.recommendedEngagement,
+        offerKey: payload.offerKey,
+        ctaLabel: payload.ctaLabel,
+        pricing: payload.pricing,
+        source: payload.source,
+        snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(saved.id)}`,
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_score_failed" },
+        error instanceof Error ? error.message : "score failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  /** Public snapshot read-back by id — score, bucket, reasoning only (no secrets). */
+  app.get("/v1/readiness/snapshot/:id", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    const params = request.params as { id?: string };
+    const id = typeof params.id === "string" ? params.id.trim() : "";
+    if (!id || !UUID_RE.test(id)) {
+      return reply.status(400).send(safeError("BAD_REQUEST", "Invalid snapshot id."));
+    }
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+      const submission = await findReadinessSubmissionById(dbHandle.db, id);
+      if (!submission || !submission.scores) {
+        return reply.status(404).send(safeError("NOT_FOUND", "Snapshot not found."));
+      }
+
+      // Defense in depth: re-redact any paste that might be joined elsewhere.
+      if (submission.rawPasteRedacted) {
+        const recheck = redactPasteSecrets(submission.rawPasteRedacted);
+        if (recheck.didRedact && recheck.redacted !== submission.rawPasteRedacted) {
+          // Do not repair silently into response; never return the unredacted form.
+        }
+      }
+
+      const body = publicSnapshotBody(submission);
+      // Absolute guarantee: no planted secret shape leaves the API.
+      const serialized = JSON.stringify(body);
+      const scrubbed = redactPasteSecrets(serialized);
+      if (scrubbed.didRedact) {
+        try {
+          return reply.status(200).send(JSON.parse(scrubbed.redacted));
+        } catch {
+          return reply.status(200).send(body);
+        }
+      }
+      return reply.status(200).send(body);
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_snapshot_read_failed" },
+        error instanceof Error ? error.message : "snapshot read failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  /** Secondary action: email a copy of the snapshot (accept/enqueue). */
+  app.post("/v1/readiness/snapshot/:id/email", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    const params = request.params as { id?: string };
+    const id = typeof params.id === "string" ? params.id.trim() : "";
+    if (!id || !UUID_RE.test(id)) {
+      return reply.status(400).send(safeError("BAD_REQUEST", "Invalid snapshot id."));
+    }
+
+    if (!isJsonContentType(request.headers["content-type"])) {
+      return reply
+        .status(415)
+        .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const emailRaw =
+      typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 254) : "";
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+      const submission = await findReadinessSubmissionById(dbHandle.db, id);
+      if (!submission || !submission.scores) {
+        return reply.status(404).send(safeError("NOT_FOUND", "Snapshot not found."));
+      }
+
+      const contactEmail =
+        submission.contact && typeof submission.contact.email === "string"
+          ? submission.contact.email
+          : "";
+      const email = emailRaw || contactEmail;
+      if (!email || !isEmailLike(email)) {
+        return reply.status(400).send(safeError("VALIDATION_ERROR", "A valid email is required."));
+      }
+
+      const origin =
+        (deps.env as { PUBLIC_WEB_ORIGIN?: string }).PUBLIC_WEB_ORIGIN?.trim() ||
+        "https://www.vygo.ai";
+      const snapshotUrl = `${origin.replace(/\/$/, "")}/readiness/snapshot?id=${encodeURIComponent(id)}`;
+
+      const scores = (submission.scores ?? {}) as Record<string, unknown>;
+      const bucket = submission.bucket || (typeof scores.bucket === "string" ? scores.bucket : "");
+      const name =
+        submission.contact && typeof submission.contact.name === "string"
+          ? submission.contact.name
+          : null;
+
+      const text = [
+        `Your vygo readiness snapshot`,
+        "",
+        `Bucket: ${bucket || "—"}`,
+        `View online: ${snapshotUrl}`,
+        "",
+        typeof scores.reasoning === "string" ? scores.reasoning : "",
+        "",
+        "This email was sent because you requested a copy on vygo.ai.",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const html = `<p>Your vygo readiness snapshot is ready.</p><p><strong>Bucket:</strong> ${String(
+        bucket || "—",
+      )
+        .replace(/&/g, "&amp;")
+        .replace(
+          /</g,
+          "&lt;",
+        )}</p><p><a href="${snapshotUrl}">Open your snapshot</a></p><p>This email was sent because you requested a copy on vygo.ai.</p>`;
+
+      const result = await enqueueReadinessSnapshotEmail(dbHandle.db, {
+        snapshotId: id,
+        email,
+        snapshotUrl,
+        subject: "Your vygo readiness snapshot",
+        html,
+        text,
+        bucket: bucket || null,
+        name,
+      });
+
+      request.log.info(
+        { event: "readiness_snapshot_email_queued", snapshotId: id },
+        "snapshot email queued",
+      );
+
+      return reply.status(202).send({
+        accepted: true,
+        queued: true,
+        snapshotId: id,
+        idempotencyKey: result.idempotencyKey,
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_snapshot_email_failed" },
+        error instanceof Error ? error.message : "snapshot email failed",
       );
       return reply
         .status(500)

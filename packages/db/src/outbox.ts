@@ -9,6 +9,8 @@ export const OUTBOX_KINDS = {
   waitlistConfirmation: "waitlist_confirmation",
   /** Readiness Check: email diagnostic prompt + resume link. */
   readinessPrompt: "readiness_prompt",
+  /** Readiness Check: email a scored snapshot copy (HTML). */
+  readinessSnapshot: "readiness_snapshot",
 } as const;
 
 /** Stable non-secret idempotency key for readiness prompt emails. */
@@ -18,6 +20,14 @@ export function readinessPromptIdempotencyKey(sessionToken: string, email: strin
   // Include a coarse time bucket (hour) so re-sends after an hour are allowed.
   const hour = Math.floor(Date.now() / (60 * 60 * 1000));
   return `readiness-prompt:${t}:${e}:h${hour}`;
+}
+
+/** Stable non-secret idempotency key for readiness snapshot emails. */
+export function readinessSnapshotIdempotencyKey(snapshotId: string, email: string): string {
+  const e = email.trim().toLowerCase().slice(0, 120);
+  const id = snapshotId.trim().slice(0, 80);
+  const hour = Math.floor(Date.now() / (60 * 60 * 1000));
+  return `readiness-snapshot:${id}:${e}:h${hour}`;
 }
 
 export type OutboxKind = (typeof OUTBOX_KINDS)[keyof typeof OUTBOX_KINDS];

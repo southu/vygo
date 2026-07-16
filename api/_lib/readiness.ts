@@ -385,6 +385,43 @@ export async function proxyGetSubmission(
   );
 }
 
+export async function proxyScore(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/score", body ?? {}, env, inboundHeaders);
+}
+
+export async function proxyGetSnapshot(
+  id: string,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson(
+    "GET",
+    `/v1/readiness/snapshot/${encodeURIComponent(id)}`,
+    undefined,
+    env,
+    inboundHeaders,
+  );
+}
+
+export async function proxySnapshotEmail(
+  id: string,
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson(
+    "POST",
+    `/v1/readiness/snapshot/${encodeURIComponent(id)}/email`,
+    body ?? {},
+    env,
+    inboundHeaders,
+  );
+}
+
 /** Lightweight lead log when edge has direct DB (no secrets in body). */
 export async function logLeadRow(
   sql: Sql,

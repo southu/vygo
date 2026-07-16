@@ -131,6 +131,39 @@ export {
   type ManualAnswers,
 } from "./manual-questionnaire.js";
 
+export {
+  READINESS_DIMENSIONS,
+  DEFAULT_SCORING_CONFIG,
+  computeReadinessScore,
+  scoreAllDimensions,
+  scoreFieldValue,
+  scoreDimension,
+  overallFromDimensions,
+  rangesFromDimensions,
+  deriveBucketSignals,
+  assignEngagementBucket,
+  buildTopFindings,
+  buildEngagementReasoning,
+  engagementMeta,
+  scoringConfigFromDbRow,
+  normalizeScoringConfig,
+  defaultScoringRulesJson,
+  defaultScoringWeightsJson,
+  containsRemediationDetail,
+  type ReadinessDimension,
+  type DimensionScores,
+  type DimensionRanges,
+  type EngagementBucket,
+  type ScoringSource,
+  type ReadinessScorePayload,
+  type ReadinessScoringConfig,
+  type FieldScoreRule,
+  type DimensionConfig,
+  type BucketSignals,
+  type BucketResult,
+  type ComputeScoreInput,
+} from "./readiness-scoring.js";
+
 export const availabilityStatusSchema = z.enum(["open", "waitlist", "paused"]);
 
 export type AvailabilityStatus = z.infer<typeof availabilityStatusSchema>;

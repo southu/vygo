@@ -138,12 +138,20 @@ const FIELD_LABELS: Record<string, string> = {
   turnstileToken: "Verification challenge",
 };
 
+type WaitlistPrefill = {
+  fullName?: string;
+  email?: string;
+  companyName?: string;
+};
+
 type WaitlistFormProps = {
   mode?: "page" | "modal";
   open?: boolean;
   onDismiss?: () => void;
   /** Preselected inquiry offer (e.g. free vygo Harden assessment). */
   offer?: InquiryOfferKey | null;
+  /** Prefill from readiness snapshot apply CTA. */
+  prefill?: WaitlistPrefill | null;
 };
 
 export function WaitlistForm({
@@ -151,6 +159,7 @@ export function WaitlistForm({
   open = true,
   onDismiss,
   offer = null,
+  prefill = null,
 }: WaitlistFormProps) {
   const { form, success } = waitlistContent;
   const { uiState, copy: availabilityCopy } = useAvailability();
@@ -162,7 +171,13 @@ export function WaitlistForm({
   const isHardenAssessment = offer === "harden";
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [values, setValues] = useState<FormState>(() => createInitialFormState(offer));
+  const [values, setValues] = useState<FormState>(() => {
+    const base = createInitialFormState(offer);
+    if (prefill?.fullName) base.fullName = prefill.fullName;
+    if (prefill?.email) base.email = prefill.email;
+    if (prefill?.companyName) base.companyName = prefill.companyName;
+    return base;
+  });
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "error" | "success" | "duplicate">(
     "idle",
@@ -198,7 +213,11 @@ export function WaitlistForm({
     formStartedAtRef.current = Date.now();
     attributionRef.current = captureAttribution();
     setStep(1);
-    setValues(createInitialFormState(offer));
+    const next = createInitialFormState(offer);
+    if (prefill?.fullName) next.fullName = prefill.fullName;
+    if (prefill?.email) next.email = prefill.email;
+    if (prefill?.companyName) next.companyName = prefill.companyName;
+    setValues(next);
     setErrors({});
     setShowErrorSummary(false);
     setStatus("idle");
@@ -209,7 +228,7 @@ export function WaitlistForm({
       headingRef.current?.focus();
     }, 0);
     return () => window.clearTimeout(t);
-  }, [open, mode, offer]);
+  }, [open, mode, offer, prefill?.fullName, prefill?.email, prefill?.companyName]);
 
   useEffect(() => {
     trackAnalytics("waitlist_step_change", { step, mode });

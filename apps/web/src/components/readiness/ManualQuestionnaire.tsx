@@ -18,12 +18,14 @@ import {
   manualAnswersFromDraft,
   patchReadinessSession,
   stage1FromDraft,
+  type ScoreResponse,
 } from "@/lib/readiness/api";
 import {
   loadReadinessLocal,
   saveReadinessLocal,
   type ReadinessLocalState,
 } from "@/lib/readiness/storage";
+import { ScoreGateForm } from "@/components/readiness/ScoreGateForm";
 
 function resumeTokenFromUrl(): string | null {
   if (typeof window === "undefined") return null;
@@ -42,9 +44,9 @@ export function ManualQuestionnaire() {
   const [answers, setAnswers] = useState<ManualAnswers>(() => emptyManualAnswers());
   const [stage1, setStage1] = useState<Record<string, unknown>>({});
   const stage1Ref = useRef<Record<string, unknown>>({});
-  const [status, setStatus] = useState<"loading" | "form" | "submitting" | "done" | "error">(
-    "loading",
-  );
+  const [status, setStatus] = useState<
+    "loading" | "form" | "submitting" | "gate" | "done" | "error"
+  >("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [savedMeta, setSavedMeta] = useState<{ source: string; confidence: string } | null>(null);
 
@@ -150,7 +152,7 @@ export function ManualQuestionnaire() {
     try {
       const draft = buildManualSessionDraft(answers, { stage1 });
       // Ensure source/confidence are top-level on the session draft for API verification.
-      const sessionDraft = {
+      const sessionDraft: Record<string, unknown> = {
         ...draft,
         source: MANUAL_SOURCE,
         confidence: MANUAL_CONFIDENCE_LABEL,
@@ -166,10 +168,19 @@ export function ManualQuestionnaire() {
           ? updated.draft.confidence
           : MANUAL_CONFIDENCE_LABEL;
       setSavedMeta({ source: src, confidence: conf });
-      setStatus("done");
+      // Stage 5: gate before scored results (manual → ranges on snapshot).
+      setStatus("gate");
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Could not save answers.");
       setStatus("form");
+    }
+  };
+
+  const onScored = (result: ScoreResponse) => {
+    const path =
+      result.snapshotPath || `/readiness/snapshot?id=${encodeURIComponent(result.snapshotId)}`;
+    if (typeof window !== "undefined") {
+      window.location.assign(path);
     }
   };
 
@@ -189,6 +200,17 @@ export function ManualQuestionnaire() {
         <button type="button" className="btn-primary mt-4" onClick={() => window.location.reload()}>
           Retry
         </button>
+      </div>
+    );
+  }
+
+  if (status === "gate" && token) {
+    return (
+      <div data-testid="manual-questionnaire-gate">
+        <p className="sr-only" data-testid="manual-source">
+          {savedMeta?.source ?? MANUAL_SOURCE}
+        </p>
+        <ScoreGateForm token={token} source={MANUAL_SOURCE} onScored={onScored} />
       </div>
     );
   }

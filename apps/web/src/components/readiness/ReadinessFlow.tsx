@@ -40,12 +40,14 @@ import {
   pasteTextFromDraft,
   stage1FromDraft,
   type ParseResponse,
+  type ScoreResponse,
 } from "@/lib/readiness/api";
 import {
   loadReadinessLocal,
   saveReadinessLocal,
   type ReadinessLocalState,
 } from "@/lib/readiness/storage";
+import { ScoreGateForm } from "@/components/readiness/ScoreGateForm";
 
 type View =
   | "loading"
@@ -55,6 +57,7 @@ type View =
   | "stage2"
   | "stage3"
   | "confirm"
+  | "gate"
   | "error";
 
 const STAGE1_STEPS = [
@@ -202,11 +205,24 @@ export function ReadinessFlow() {
               return;
             }
 
-            // Resume stage 3 / confirm from server stage or draft.
+            // Already scored — open shareable snapshot when we have an id.
+            if (
+              restoredStage === "scored" &&
+              typeof remote.draft?.submissionId === "string" &&
+              remote.draft.submissionId
+            ) {
+              window.location.assign(
+                `/readiness/snapshot?id=${encodeURIComponent(String(remote.draft.submissionId))}`,
+              );
+              return;
+            }
+
+            // Resume stage 3 / confirm / gate from server stage or draft.
             if (
               restoredStage === "paste" ||
               restoredStage === "stage3" ||
               restoredStage === "confirm" ||
+              restoredStage === "gate" ||
               remote.draft?.parseStatus
             ) {
               setToken(sessionToken);
@@ -221,6 +237,10 @@ export function ReadinessFlow() {
                 pasteText: restoredPaste,
                 updatedAt: new Date().toISOString(),
               });
+              if (restoredStage === "gate") {
+                setView("gate");
+                return;
+              }
               if (restoredStage === "confirm" || remote.draft?.report) {
                 const report =
                   remote.draft?.report &&
@@ -597,17 +617,25 @@ export function ReadinessFlow() {
   };
 
   const onLooksRight = async () => {
-    await persist(stage1, "scored", {
+    await persist(stage1, "confirm", {
       pasteText,
       source: "paste",
       parseStatus: confirm?.parseStatus || "ok",
       confirmedAt: new Date().toISOString(),
     });
-    // Next stage (scoring) is out of scope for this mission — stay on confirm
-    // with a soft success state by keeping confirm view; mark confirmed.
     setConfirm((prev) =>
       prev ? { ...prev, pending: false, parseStatus: prev.parseStatus || "ok" } : prev,
     );
+    // Stage 5: gate scored results (name/email/consent + Turnstile) before scores.
+    setView("gate");
+  };
+
+  const onScored = (result: ScoreResponse) => {
+    const path =
+      result.snapshotPath || `/readiness/snapshot?id=${encodeURIComponent(result.snapshotId)}`;
+    if (typeof window !== "undefined") {
+      window.location.assign(path);
+    }
   };
 
   const onSomethingOff = () => {
@@ -672,6 +700,12 @@ export function ReadinessFlow() {
           </Link>
         </div>
       </div>
+    );
+  }
+
+  if (view === "gate") {
+    return (
+      <ScoreGateForm token={token || ""} initialEmail={email} source="paste" onScored={onScored} />
     );
   }
 
