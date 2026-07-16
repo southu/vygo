@@ -32,8 +32,8 @@
       "destination": "/api/readiness/snapshot?id=:id"
     },
     { "source": "/v1/public/availability", "destination": "/api/availability" },
-    { "source": "/v1/ops/readiness/export", "destination": "/api/ops/readiness/export" },
-    { "source": "/v1/ops/readiness/:id", "destination": "/api/ops/readiness/:id" },
+    { "source": "/v1/ops/readiness/export", "destination": "/api/ops/readiness?export=1" },
+    { "source": "/v1/ops/readiness/:id", "destination": "/api/ops/readiness?id=:id" },
     { "source": "/v1/ops/readiness", "destination": "/api/ops/readiness" },
     { "source": "/health", "destination": "/api/health" },
     { "source": "/readyz", "destination": "/api/readyz" },
