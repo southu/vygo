@@ -44,12 +44,44 @@ export type EngagementBucket = "Not a fit" | "Enterprise" | "Scale" | "Launch" |
 
 export type ScoringSource = "paste" | "manual" | "unknown";
 
+/** Status band for a single sub-metric check. */
+export type SubMetricStatus = "strong" | "adequate" | "at_risk" | "unknown";
+
+/** One scored check (sub-metric) inside a dimension, e.g. Security → auth. */
+export type SubMetricScore = {
+  /** Report field key the check evaluates, e.g. "auth". */
+  key: string;
+  /** Human-readable label, e.g. "Authentication". */
+  label: string;
+  /** 0–100 check score (same math that feeds the dimension aggregate). */
+  score: number;
+  /** Contribution weight within the dimension. */
+  weight: number;
+  /** Whether the underlying report field was answered (vs unknown/blank). */
+  answered: boolean;
+  status: SubMetricStatus;
+};
+
+/** Nested per-dimension breakdown: aggregate score + its sub-metric checks. */
+export type DimensionDetail = {
+  label: ReadinessDimension;
+  /** Aggregate 0–100 dimension score (weighted mean of checks). */
+  score: number;
+  /** Dimension-level weight used in the overall blend. */
+  weight: number;
+  checks: SubMetricScore[];
+};
+
+export type DimensionDetails = Record<ReadinessDimension, DimensionDetail>;
+
 /** Public snapshot scores payload persisted on readiness_submissions.scores. */
 export type ReadinessScorePayload = {
   version: number;
   source: ScoringSource;
   displayMode: "point" | "range";
   dimensions: DimensionScores;
+  /** Detailed nested sub-metrics (checks) for every dimension. */
+  dimensionDetails: DimensionDetails;
   ranges?: DimensionRanges;
   overall: number;
   bucket: EngagementBucket;
@@ -379,22 +411,109 @@ export function scoreFieldValue(
   return clampScore(score);
 }
 
+/** Human-readable labels for sub-metric check keys (report fields). */
+export const READINESS_CHECK_LABELS: Record<string, string> = {
+  auth: "Authentication",
+  authorization: "Authorization & access control",
+  row_level_security: "Row-level security / tenant isolation",
+  secrets_pattern: "Secrets management",
+  api_surface: "API surface hardening",
+  tests: "Tests & deploy gates",
+  error_handling: "Error handling",
+  background_jobs: "Background jobs & queues",
+  fragility_flags: "Fragility & single points of failure",
+  logging: "Logging & observability",
+  deploys: "Deploy pipeline",
+  environments: "Environments",
+  structure: "Codebase structure",
+  languages: "Language stack",
+  size: "Codebase size",
+  frontend: "Frontend stack",
+  backend: "Backend stack",
+  pii_categories: "PII & data sensitivity",
+  tenancy: "Tenancy model",
+};
+
+function checkLabel(field: string): string {
+  return READINESS_CHECK_LABELS[field] ?? field.replace(/_/g, " ");
+}
+
+function subMetricStatus(score: number, answered: boolean): SubMetricStatus {
+  if (!answered) return "unknown";
+  if (score >= 70) return "strong";
+  if (score >= 55) return "adequate";
+  return "at_risk";
+}
+
+/**
+ * Score one dimension into its nested sub-metric checks plus the weighted
+ * aggregate. The aggregate math is identical to the historical scoreDimension
+ * so dimension scores, overall, and buckets are unchanged.
+ */
+export function scoreDimensionDetail(
+  report: ReadinessReportV1Partial | Record<string, unknown>,
+  dim: DimensionConfig,
+  unknownPercentile: number,
+): DimensionDetail {
+  const checks: SubMetricScore[] = [];
+  let weighted = 0;
+  let totalW = 0;
+  for (const rule of dim.fields) {
+    const raw = (report as Record<string, unknown>)[rule.field];
+    const answered = !isUnknownField(raw);
+    const s = scoreFieldValue(raw, rule, unknownPercentile);
+    const w = typeof rule.weight === "number" && rule.weight > 0 ? rule.weight : 1;
+    checks.push({
+      key: rule.field,
+      label: checkLabel(rule.field),
+      score: s,
+      weight: w,
+      answered,
+      status: subMetricStatus(s, answered),
+    });
+    weighted += s * w;
+    totalW += w;
+  }
+  const score = totalW <= 0 ? clampScore(unknownPercentile * 100) : clampScore(weighted / totalW);
+  const dimWeight = typeof dim.weight === "number" && dim.weight > 0 ? dim.weight : 1;
+  return { label: dim.label, score, weight: dimWeight, checks };
+}
+
 export function scoreDimension(
   report: ReadinessReportV1Partial | Record<string, unknown>,
   dim: DimensionConfig,
   unknownPercentile: number,
 ): number {
-  let weighted = 0;
-  let totalW = 0;
-  for (const rule of dim.fields) {
-    const raw = (report as Record<string, unknown>)[rule.field];
-    const s = scoreFieldValue(raw, rule, unknownPercentile);
-    const w = typeof rule.weight === "number" && rule.weight > 0 ? rule.weight : 1;
-    weighted += s * w;
-    totalW += w;
+  return scoreDimensionDetail(report, dim, unknownPercentile).score;
+}
+
+/**
+ * Nested breakdown for all five dimensions. Dimensions missing from a partial
+ * config fall back to the default seed config so every dimension always ships
+ * its sub-metric checks.
+ */
+export function scoreAllDimensionDetails(
+  report: ReadinessReportV1Partial | Record<string, unknown>,
+  config: ReadinessScoringConfig = DEFAULT_SCORING_CONFIG,
+): DimensionDetails {
+  const out = {} as DimensionDetails;
+  for (const dim of config.dimensions) {
+    out[dim.label] = scoreDimensionDetail(report, dim, config.unknownPercentile);
   }
-  if (totalW <= 0) return clampScore(unknownPercentile * 100);
-  return clampScore(weighted / totalW);
+  for (const label of READINESS_DIMENSIONS) {
+    if (!out[label]) {
+      const fallback = DEFAULT_SCORING_CONFIG.dimensions.find((d) => d.label === label);
+      out[label] = fallback
+        ? scoreDimensionDetail(report, fallback, config.unknownPercentile)
+        : {
+            label,
+            score: clampScore(config.unknownPercentile * 100),
+            weight: 1,
+            checks: [],
+          };
+    }
+  }
+  return out;
 }
 
 export function scoreAllDimensions(
@@ -849,6 +968,7 @@ export function computeReadinessScore(input: ComputeScoreInput): ReadinessScoreP
         ? "manual"
         : "paste";
 
+  const dimensionDetails = scoreAllDimensionDetails(report, config);
   const dimensions = scoreAllDimensions(report, config);
   const overall = overallFromDimensions(dimensions, config);
   const signals = deriveBucketSignals(report, dimensions, input.stage1, input.followups);
@@ -868,6 +988,7 @@ export function computeReadinessScore(input: ComputeScoreInput): ReadinessScoreP
     source,
     displayMode,
     dimensions,
+    dimensionDetails,
     ranges,
     overall,
     bucket: bucketResult.bucket,

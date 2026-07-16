@@ -2,8 +2,8 @@
   "ready": false,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "948018cac255735a7b3d4fb687bb6e3cd9ee6ca5",
-  "generatedAt": "2026-07-16T19:03:21.716Z",
+  "gitSha": "d24cb0ab02b7ec9d4c9fb341e13f71ccd8d9eed1",
+  "generatedAt": "2026-07-16T23:01:08.903Z",
   "railwayFoundation": {
     "statusUrl": "/api/railway-foundation",
     "project": "vygo",
@@ -16,6 +16,431 @@
       "forHumanAttachOn": "vygo"
     },
     "docs": "docs/railway-backend-readiness.md"
+  },
+  "analysis": {
+    "scoringModel": {
+      "configKey": "default",
+      "version": 2,
+      "engine": "packages/validation/src/readiness-scoring.ts",
+      "dimensions": [
+        {
+          "label": "Security",
+          "weight": 1.2,
+          "checks": [
+            {
+              "key": "auth",
+              "label": "Authentication",
+              "weight": 1.5
+            },
+            {
+              "key": "authorization",
+              "label": "Authorization & access control",
+              "weight": 1.5
+            },
+            {
+              "key": "row_level_security",
+              "label": "Row-level security / tenant isolation",
+              "weight": 1.2
+            },
+            {
+              "key": "secrets_pattern",
+              "label": "Secrets management",
+              "weight": 1.3
+            },
+            {
+              "key": "api_surface",
+              "label": "API surface hardening",
+              "weight": 0.8
+            }
+          ]
+        },
+        {
+          "label": "Reliability",
+          "weight": 1.1,
+          "checks": [
+            {
+              "key": "tests",
+              "label": "Tests & deploy gates",
+              "weight": 1.5
+            },
+            {
+              "key": "error_handling",
+              "label": "Error handling",
+              "weight": 1
+            },
+            {
+              "key": "background_jobs",
+              "label": "Background jobs & queues",
+              "weight": 0.8
+            },
+            {
+              "key": "fragility_flags",
+              "label": "Fragility & single points of failure",
+              "weight": 1.2
+            },
+            {
+              "key": "logging",
+              "label": "Logging & observability",
+              "weight": 0.7
+            }
+          ]
+        },
+        {
+          "label": "Operability",
+          "weight": 1,
+          "checks": [
+            {
+              "key": "deploys",
+              "label": "Deploy pipeline",
+              "weight": 1.4
+            },
+            {
+              "key": "environments",
+              "label": "Environments",
+              "weight": 1
+            },
+            {
+              "key": "logging",
+              "label": "Logging & observability",
+              "weight": 0.9
+            },
+            {
+              "key": "error_handling",
+              "label": "Error handling",
+              "weight": 0.7
+            },
+            {
+              "key": "background_jobs",
+              "label": "Background jobs & queues",
+              "weight": 0.6
+            }
+          ]
+        },
+        {
+          "label": "Maintainability",
+          "weight": 0.9,
+          "checks": [
+            {
+              "key": "structure",
+              "label": "Codebase structure",
+              "weight": 1.2
+            },
+            {
+              "key": "languages",
+              "label": "Language stack",
+              "weight": 0.7
+            },
+            {
+              "key": "size",
+              "label": "Codebase size",
+              "weight": 0.6
+            },
+            {
+              "key": "tests",
+              "label": "Tests & deploy gates",
+              "weight": 1.1
+            },
+            {
+              "key": "frontend",
+              "label": "Frontend stack",
+              "weight": 0.5
+            },
+            {
+              "key": "backend",
+              "label": "Backend stack",
+              "weight": 0.5
+            }
+          ]
+        },
+        {
+          "label": "Compliance posture",
+          "weight": 1.15,
+          "checks": [
+            {
+              "key": "pii_categories",
+              "label": "PII & data sensitivity",
+              "weight": 1.4
+            },
+            {
+              "key": "tenancy",
+              "label": "Tenancy model",
+              "weight": 1.1
+            },
+            {
+              "key": "auth",
+              "label": "Authentication",
+              "weight": 1
+            },
+            {
+              "key": "authorization",
+              "label": "Authorization & access control",
+              "weight": 0.9
+            },
+            {
+              "key": "secrets_pattern",
+              "label": "Secrets management",
+              "weight": 0.8
+            }
+          ]
+        }
+      ]
+    },
+    "selfAssessment": {
+      "source": "repo-self-report",
+      "overall": 71,
+      "dimensions": {
+        "Security": 74,
+        "Reliability": 78,
+        "Operability": 77,
+        "Maintainability": 74,
+        "Compliance posture": 55
+      },
+      "dimensionDetails": {
+        "Security": {
+          "label": "Security",
+          "score": 74,
+          "weight": 1.2,
+          "checks": [
+            {
+              "key": "auth",
+              "label": "Authentication",
+              "score": 70,
+              "weight": 1.5,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "authorization",
+              "label": "Authorization & access control",
+              "score": 78,
+              "weight": 1.5,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "row_level_security",
+              "label": "Row-level security / tenant isolation",
+              "score": 55,
+              "weight": 1.2,
+              "answered": true,
+              "status": "adequate"
+            },
+            {
+              "key": "secrets_pattern",
+              "label": "Secrets management",
+              "score": 78,
+              "weight": 1.3,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "api_surface",
+              "label": "API surface hardening",
+              "score": 94,
+              "weight": 0.8,
+              "answered": true,
+              "status": "strong"
+            }
+          ]
+        },
+        "Reliability": {
+          "label": "Reliability",
+          "score": 78,
+          "weight": 1.1,
+          "checks": [
+            {
+              "key": "tests",
+              "label": "Tests & deploy gates",
+              "score": 94,
+              "weight": 1.5,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "error_handling",
+              "label": "Error handling",
+              "score": 86,
+              "weight": 1,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "background_jobs",
+              "label": "Background jobs & queues",
+              "score": 94,
+              "weight": 0.8,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "fragility_flags",
+              "label": "Fragility & single points of failure",
+              "score": 38,
+              "weight": 1.2,
+              "answered": true,
+              "status": "at_risk"
+            },
+            {
+              "key": "logging",
+              "label": "Logging & observability",
+              "score": 86,
+              "weight": 0.7,
+              "answered": true,
+              "status": "strong"
+            }
+          ]
+        },
+        "Operability": {
+          "label": "Operability",
+          "score": 77,
+          "weight": 1,
+          "checks": [
+            {
+              "key": "deploys",
+              "label": "Deploy pipeline",
+              "score": 94,
+              "weight": 1.4,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "environments",
+              "label": "Environments",
+              "score": 86,
+              "weight": 1,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "logging",
+              "label": "Logging & observability",
+              "score": 70,
+              "weight": 0.9,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "error_handling",
+              "label": "Error handling",
+              "score": 55,
+              "weight": 0.7,
+              "answered": true,
+              "status": "adequate"
+            },
+            {
+              "key": "background_jobs",
+              "label": "Background jobs & queues",
+              "score": 55,
+              "weight": 0.6,
+              "answered": true,
+              "status": "adequate"
+            }
+          ]
+        },
+        "Maintainability": {
+          "label": "Maintainability",
+          "score": 74,
+          "weight": 0.9,
+          "checks": [
+            {
+              "key": "structure",
+              "label": "Codebase structure",
+              "score": 86,
+              "weight": 1.2,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "languages",
+              "label": "Language stack",
+              "score": 70,
+              "weight": 0.7,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "size",
+              "label": "Codebase size",
+              "score": 70,
+              "weight": 0.6,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "tests",
+              "label": "Tests & deploy gates",
+              "score": 70,
+              "weight": 1.1,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "frontend",
+              "label": "Frontend stack",
+              "score": 70,
+              "weight": 0.5,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "backend",
+              "label": "Backend stack",
+              "score": 70,
+              "weight": 0.5,
+              "answered": true,
+              "status": "strong"
+            }
+          ]
+        },
+        "Compliance posture": {
+          "label": "Compliance posture",
+          "score": 55,
+          "weight": 1.15,
+          "checks": [
+            {
+              "key": "pii_categories",
+              "label": "PII & data sensitivity",
+              "score": 44,
+              "weight": 1.4,
+              "answered": true,
+              "status": "at_risk"
+            },
+            {
+              "key": "tenancy",
+              "label": "Tenancy model",
+              "score": 70,
+              "weight": 1.1,
+              "answered": true,
+              "status": "strong"
+            },
+            {
+              "key": "auth",
+              "label": "Authentication",
+              "score": 55,
+              "weight": 1,
+              "answered": true,
+              "status": "adequate"
+            },
+            {
+              "key": "authorization",
+              "label": "Authorization & access control",
+              "score": 55,
+              "weight": 0.9,
+              "answered": true,
+              "status": "adequate"
+            },
+            {
+              "key": "secrets_pattern",
+              "label": "Secrets management",
+              "score": 55,
+              "weight": 0.8,
+              "answered": true,
+              "status": "adequate"
+            }
+          ]
+        }
+      }
+    }
   },
   "frontend": {
     "platform": "vercel",

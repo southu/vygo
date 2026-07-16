@@ -2,10 +2,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_SCORING_CONFIG,
+  READINESS_DIMENSIONS,
   assignEngagementBucket,
   computeReadinessScore,
   containsRemediationDetail,
   deriveBucketSignals,
+  scoreAllDimensionDetails,
   scoreAllDimensions,
   scoreFieldValue,
 } from "./readiness-scoring.js";
@@ -219,6 +221,46 @@ describe("readiness scoring", () => {
     assert.equal(payload.bucket, "Harden");
     assert.equal(payload.ctaLabel, "Start free Harden assessment");
     assert.equal(payload.offerKey, "harden");
+  });
+
+  it("returns detailed nested sub-metrics (checks) for all five dimensions", () => {
+    const payload = computeReadinessScore({ report: HARDEN_REPORT, source: "paste" });
+    assert.ok(payload.dimensionDetails, "payload must include dimensionDetails");
+    for (const label of READINESS_DIMENSIONS) {
+      const detail = payload.dimensionDetails[label];
+      assert.ok(detail, `dimensionDetails must include ${label}`);
+      assert.equal(detail.label, label);
+      assert.ok(detail.checks.length >= 2, `${label} must break down into multiple checks`);
+      assert.equal(
+        detail.score,
+        payload.dimensions[label],
+        `${label} aggregate must match the dimension score`,
+      );
+      for (const check of detail.checks) {
+        assert.ok(check.key.length > 0, "check key present");
+        assert.ok(check.label.length > 0, "check label present");
+        assert.ok(check.score >= 0 && check.score <= 100, "check score in 0–100");
+        assert.ok(check.weight > 0, "check weight positive");
+        assert.ok(
+          ["strong", "adequate", "at_risk", "unknown"].includes(check.status),
+          "check status is a known band",
+        );
+      }
+    }
+    const securityKeys = payload.dimensionDetails.Security.checks.map((c) => c.key);
+    assert.ok(securityKeys.includes("auth"), "Security breaks down into auth");
+    assert.ok(securityKeys.includes("secrets_pattern"), "Security breaks down into secrets");
+  });
+
+  it("marks unanswered sub-metrics unknown and scores them as risk", () => {
+    const details = scoreAllDimensionDetails(UNKNOWN_REPORT, DEFAULT_SCORING_CONFIG);
+    for (const label of READINESS_DIMENSIONS) {
+      for (const check of details[label].checks) {
+        assert.equal(check.answered, false, `${label}/${check.key} should be unanswered`);
+        assert.equal(check.status, "unknown");
+        assert.equal(check.score, 25, "unknown checks score at the risk percentile");
+      }
+    }
   });
 
   it("non-Harden CTA is apply for audit opening", () => {

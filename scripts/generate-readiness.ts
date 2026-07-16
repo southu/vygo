@@ -7,6 +7,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  DEFAULT_SCORING_CONFIG,
+  READINESS_CHECK_LABELS,
+  computeReadinessScore,
+} from "../packages/validation/src/readiness-scoring.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -217,6 +222,69 @@ function readFoundationPointer(): {
   }
 }
 
+/**
+ * Public view of the readiness analysis model: the five scored dimensions
+ * broken down into their sub-metric checks, plus a scored self-assessment of
+ * this repo so the nested payload shape is observable at GET /api/readiness.
+ * The same engine (computeReadinessScore) serves user submissions at
+ * POST /v1/readiness/score.
+ */
+function buildReadinessAnalysis() {
+  const scoringModel = {
+    configKey: DEFAULT_SCORING_CONFIG.configKey,
+    version: DEFAULT_SCORING_CONFIG.version,
+    engine: "packages/validation/src/readiness-scoring.ts",
+    dimensions: DEFAULT_SCORING_CONFIG.dimensions.map((dim) => ({
+      label: dim.label,
+      weight: dim.weight,
+      checks: dim.fields.map((field) => ({
+        key: field.field,
+        label: READINESS_CHECK_LABELS[field.field] ?? field.field.replace(/_/g, " "),
+        weight: field.weight,
+      })),
+    })),
+  };
+
+  // Truthful self-report of this repo's posture (mirrors the checks above).
+  const selfReport = {
+    summary: "vygo.ai production monorepo — marketing web, Fastify API, worker, shared packages",
+    languages: "TypeScript",
+    size: "medium",
+    structure: "pnpm monorepo with packages and clear boundaries",
+    frontend: "Next.js static export on Vercel",
+    backend: "Fastify on Railway with Vercel edge mirror",
+    database: "Postgres",
+    tenancy: "single-tenant marketing + intake product",
+    auth: "session token flows; Turnstile-gated submissions",
+    authorization: "scoped ops endpoints with policy checks",
+    row_level_security: "session-scoped queries; no cross-tenant surface",
+    environments: "local, preview, production",
+    deploys: "CI/CD automated pipeline via GitHub Actions with rollback",
+    tests: "unit and integration tests gate every deploy in CI",
+    background_jobs: "email outbox worker with retry and idempotent processing",
+    integrations: "Railway, Vercel, Resend, Cloudflare Turnstile",
+    secrets_pattern: "railway env injection with secret scan gating CI",
+    logging: "structured JSON logs with request ids",
+    error_handling: "structured safe errors with graceful fallbacks",
+    pii_categories: "email, name; no payment, no health",
+    api_surface: "https versioned /v1 API with auth and rate limits",
+    fragility_flags: ["single_region"],
+    confidence: 0.9,
+  };
+
+  const scored = computeReadinessScore({ report: selfReport, source: "paste" });
+
+  return {
+    scoringModel,
+    selfAssessment: {
+      source: "repo-self-report",
+      overall: scored.overall,
+      dimensions: scored.dimensions,
+      dimensionDetails: scored.dimensionDetails,
+    },
+  };
+}
+
 function main() {
   const apps = {
     web: { present: exists("apps/web/package.json"), path: "apps/web" },
@@ -331,6 +399,7 @@ function main() {
     gitSha: gitSha(),
     generatedAt: new Date().toISOString(),
     railwayFoundation: readFoundationPointer(),
+    analysis: buildReadinessAnalysis(),
     // The frontend + marketing site stay on Vercel and are not Railway services.
     // NEXT_PUBLIC_API_BASE_URL advertises the reachable API origin today (the
     // Vercel edge mirror of /health + /version); api.vygo.ai is the documented
