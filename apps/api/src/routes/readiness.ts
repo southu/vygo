@@ -11,6 +11,7 @@
  * POST   /v1/readiness/followups/answer — submit follow-up answers (+ discrepancy)
  * GET    /v1/readiness/submission       — token-scoped read-back of stored submission
  * POST   /v1/readiness/score            — email gate + score + persist snapshot
+ * POST   /v1/readiness/score-preview    — dry-run score (no Turnstile, no lead, no PII)
  * GET    /v1/readiness/snapshot/:id     — public snapshot read-back
  * POST   /v1/readiness/snapshot/:id/email — enqueue snapshot email copy
  *
@@ -109,8 +110,185 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const SCORE_RL_LIMIT = 12;
 const SCORE_RL_WINDOW_SECONDS = 60;
 
+/** Dry-run preview is cheaper (no DB/email) but still rate-limited against abuse. */
+const SCORE_PREVIEW_RL_LIMIT = 30;
+const SCORE_PREVIEW_RL_WINDOW_SECONDS = 60;
+
 function readinessScoreIpRateLimitKey(ipHash: string): string {
   return `rl:readiness:score:v1:ip:${ipHash}`;
+}
+
+function readinessScorePreviewIpRateLimitKey(ipHash: string): string {
+  return `rl:readiness:score-preview:v1:ip:${ipHash}`;
+}
+
+/** Built-in profiles for automated dry-run checks (materially different answers). */
+const SCORE_PREVIEW_PROFILE_WEAK: Record<string, unknown> = {
+  summary: "risky prototype with shared passwords and no tests",
+  languages: "unknown mixed undocumented",
+  size: "huge unknown",
+  structure: "spaghetti god module",
+  frontend: "unknown",
+  backend: "unknown",
+  database: "sqlite file on laptop",
+  tenancy: "shared without isolation",
+  auth: "none — shared password only",
+  authorization: "all admin",
+  row_level_security: "none",
+  environments: "prod only",
+  deploys: "manual ssh",
+  tests: "none",
+  background_jobs: "fire and forget",
+  integrations: "unknown",
+  secrets_pattern: "hardcoded in git",
+  logging: "console only",
+  error_handling: "unhandled stack traces",
+  pii_categories: "payment cards and health records",
+  api_surface: "public unauthenticated open",
+  fragility_flags: ["single region", "no backup", "manual migrate"],
+  confidence: 0.35,
+};
+
+const SCORE_PREVIEW_PROFILE_STRONG: Record<string, unknown> = {
+  summary: "Internal ops tool for inventory approvals with solid production hygiene",
+  languages: "TypeScript",
+  size: "small",
+  structure: "modular monorepo packages",
+  frontend: "Next.js",
+  backend: "Fastify",
+  database: "Postgres",
+  tenancy: "single-tenant internal",
+  auth: "session cookies + magic link",
+  authorization: "RBAC roles owner admin member",
+  row_level_security: "enforced via app middleware",
+  environments: "local staging production",
+  deploys: "GitHub Actions CI/CD automated pipeline with rollback",
+  tests: "unit integration e2e gate on every deploy via CI",
+  background_jobs: "email outbox worker with retry",
+  integrations: "Slack",
+  secrets_pattern: "Railway env + Vault references",
+  logging: "structured JSON logs request ids",
+  error_handling: "safe public errors with graceful retry",
+  pii_categories: "email, name; no payment card or health records in prod",
+  api_surface: "HTTPS /v1 versioned API with auth",
+  fragility_flags: ["single_region"],
+  confidence: 0.85,
+};
+
+const SCORE_PREVIEW_PROFILES: Record<string, Record<string, unknown>> = {
+  weak: SCORE_PREVIEW_PROFILE_WEAK,
+  strong: SCORE_PREVIEW_PROFILE_STRONG,
+  low: SCORE_PREVIEW_PROFILE_WEAK,
+  high: SCORE_PREVIEW_PROFILE_STRONG,
+};
+
+function stripPreviewContactKeys(report: Record<string, unknown>): Record<string, unknown> {
+  const blocked = new Set([
+    "email",
+    "name",
+    "fullName",
+    "full_name",
+    "phone",
+    "company",
+    "companyName",
+    "turnstileToken",
+    "turnstile_token",
+    "password",
+    "token",
+  ]);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(report)) {
+    if (blocked.has(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+function resolveScorePreviewReport(body: Record<string, unknown>): {
+  report: Record<string, unknown>;
+  source: "paste" | "manual";
+  profile: string | null;
+} | null {
+  const profileRaw = typeof body.profile === "string" ? body.profile.trim().toLowerCase() : "";
+  if (profileRaw && SCORE_PREVIEW_PROFILES[profileRaw]) {
+    const canonical =
+      profileRaw === "low" ? "weak" : profileRaw === "high" ? "strong" : profileRaw;
+    return {
+      report: { ...SCORE_PREVIEW_PROFILES[profileRaw] },
+      source: "paste",
+      profile: canonical,
+    };
+  }
+
+  if (body.report && typeof body.report === "object" && !Array.isArray(body.report)) {
+    const report = body.report as Record<string, unknown>;
+    if (Object.keys(report).length > 0) {
+      return {
+        report: { ...report },
+        source: body.source === "manual" ? "manual" : "paste",
+        profile: null,
+      };
+    }
+  }
+
+  if (body.answers && typeof body.answers === "object" && !Array.isArray(body.answers)) {
+    const answers = body.answers as Record<string, unknown>;
+    if (Object.keys(answers).length > 0) {
+      return {
+        report: { ...answers },
+        source: body.source === "manual" ? "manual" : "paste",
+        profile: null,
+      };
+    }
+  }
+
+  if (
+    body.manualAnswers &&
+    typeof body.manualAnswers === "object" &&
+    !Array.isArray(body.manualAnswers)
+  ) {
+    const mapped = manualAnswersToReport(body.manualAnswers as never);
+    return {
+      report: { ...mapped },
+      source: "manual",
+      profile: null,
+    };
+  }
+
+  return null;
+}
+
+function publicScorePreviewBody(
+  payload: ReadinessScorePayload,
+  meta: { profile: string | null },
+): Record<string, unknown> {
+  return {
+    preview: true,
+    dryRun: true,
+    persisted: false,
+    leadCreated: false,
+    turnstileRequired: false,
+    profile: meta.profile,
+    source: payload.source,
+    displayMode: payload.displayMode,
+    overall: payload.overall,
+    bucket: payload.bucket,
+    scores: payload.dimensions,
+    dimensions: payload.dimensions,
+    dimensionDetails: payload.dimensionDetails,
+    dimensionResults: payload.dimensionResults,
+    results: payload.dimensionResults,
+    ranges: payload.ranges ?? null,
+    reasoning: payload.reasoning,
+    caveat: payload.caveat ?? null,
+    findings: payload.findings,
+    recommendedEngagement: payload.recommendedEngagement,
+    offerKey: payload.offerKey,
+    ctaLabel: payload.ctaLabel,
+    pricing: payload.pricing,
+    configKey: payload.configKey,
+    configVersion: payload.configVersion,
+  };
 }
 
 function isEmailLike(value: string): boolean {
@@ -503,6 +681,49 @@ async function finalizeSubmissionSideEffects(
   }
 
   return { briefId, snapshotQueued, opsBriefQueued };
+}
+
+async function enforceScorePreviewRateLimit(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: ReadinessRouteDeps,
+): Promise<boolean> {
+  const rawIp = resolveClientIp(request);
+  const ipHashResult = hashIpAddress(rawIp, deps.env);
+  let bucketKey: string;
+  if (ipHashResult) {
+    bucketKey = readinessScorePreviewIpRateLimitKey(ipHashResult.hash);
+  } else {
+    const { createHmac } = await import("node:crypto");
+    const digest = createHmac("sha256", "vygo-readiness-score-preview-rl")
+      .update(rawIp)
+      .digest("hex")
+      .slice(0, 32);
+    bucketKey = readinessScorePreviewIpRateLimitKey(`rlfb:${digest}`);
+  }
+  const result = await checkRateLimit(
+    deps.rateLimitStore,
+    bucketKey,
+    SCORE_PREVIEW_RL_LIMIT,
+    SCORE_PREVIEW_RL_WINDOW_SECONDS,
+  );
+  if (!result.allowed) {
+    const retryAfter = Math.max(
+      1,
+      Math.min(
+        result.retryAfterSeconds || SCORE_PREVIEW_RL_WINDOW_SECONDS,
+        SCORE_PREVIEW_RL_WINDOW_SECONDS,
+      ),
+    );
+    request.log.info(
+      { event: "readiness_score_preview_rate_limited", retryAfterSeconds: retryAfter },
+      "rate limited",
+    );
+    reply.header("Retry-After", String(retryAfter));
+    reply.status(429).send(safeError("RATE_LIMITED", "Too many attempts. Please try again later."));
+    return false;
+  }
+  return true;
 }
 
 async function enforceScoreRateLimit(
@@ -1383,6 +1604,99 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       return reply
         .status(500)
         .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  /**
+   * Dry-run scoring for automated verification and later UI layers.
+   * Accepts assessment answers (or a built-in weak/strong profile) and returns
+   * the same mission-shaped dimensionResults payload as a real score — without
+   * Turnstile, lead capture, email, or persistence.
+   */
+  app.post("/v1/readiness/score-preview", async (request, reply) => {
+    if (!(await enforceScorePreviewRateLimit(request, reply, deps))) return;
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    if (!isJsonContentType(request.headers["content-type"])) {
+      return reply
+        .status(415)
+        .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const resolved = resolveScorePreviewReport(body);
+    if (!resolved) {
+      return reply.status(400).send(
+        safeError(
+          "VALIDATION_ERROR",
+          'Provide assessment answers as `report` or `answers`, or a built-in `profile` of "weak" or "strong".',
+        ),
+      );
+    }
+
+    const report = stripPreviewContactKeys(resolved.report);
+    if (Object.keys(report).length === 0) {
+      return reply
+        .status(400)
+        .send(safeError("VALIDATION_ERROR", "Assessment answers must include at least one scored field."));
+    }
+
+    try {
+      // Prefer active DB config when available; fall back to DEFAULT (pure compute).
+      let scoringConfig = null as ReturnType<typeof scoringConfigFromDbRow> | null;
+      const dbHandle = deps.getDb();
+      if (dbHandle) {
+        try {
+          await ensureReadinessTables(dbHandle);
+          const configRow = await getActiveReadinessScoringConfig(dbHandle.db, "default");
+          scoringConfig = scoringConfigFromDbRow(configRow);
+        } catch {
+          scoringConfig = null;
+        }
+      }
+
+      const stage1 =
+        body.stage1 && typeof body.stage1 === "object" && !Array.isArray(body.stage1)
+          ? (body.stage1 as Partial<ReadinessStage1Answers>)
+          : null;
+      const followups =
+        body.followups && typeof body.followups === "object" && !Array.isArray(body.followups)
+          ? (body.followups as Record<string, unknown>)
+          : null;
+
+      const payload = computeReadinessScore({
+        report,
+        source: resolved.source,
+        stage1,
+        followups,
+        config: scoringConfig,
+      });
+
+      request.log.info(
+        {
+          event: "readiness_score_preview",
+          profile: resolved.profile,
+          source: resolved.source,
+          overall: payload.overall,
+          bucket: payload.bucket,
+        },
+        "readiness score preview",
+      );
+
+      return reply.status(200).send(publicScorePreviewBody(payload, { profile: resolved.profile }));
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_score_preview_failed" },
+        error instanceof Error ? error.message : "score preview failed",
+      );
+      return reply
+        .status(500)
+        .send(
+          safeError(
+            "SCORING_UNAVAILABLE",
+            "Scoring engine failed closed. Please try again later.",
+          ),
+        );
     }
   });
 

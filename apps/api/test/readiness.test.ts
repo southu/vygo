@@ -285,6 +285,124 @@ describe("readiness routes without database", () => {
     assert.equal(body.snapshotId, undefined);
   });
 
+  it("POST /v1/readiness/score-preview scores two answer sets without Turnstile or DB", async () => {
+    rateLimitStore.clear();
+
+    const missing = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/score-preview",
+      headers: { "content-type": "application/json" },
+      payload: {},
+    });
+    assert.equal(missing.statusCode, 400);
+    assert.equal((missing.json() as { error?: { code?: string } }).error?.code, "VALIDATION_ERROR");
+
+    const weakRes = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/score-preview",
+      headers: { "content-type": "application/json" },
+      payload: { profile: "weak" },
+    });
+    assert.equal(weakRes.statusCode, 200);
+    const weak = weakRes.json() as {
+      preview?: boolean;
+      dryRun?: boolean;
+      persisted?: boolean;
+      leadCreated?: boolean;
+      turnstileRequired?: boolean;
+      overall?: number;
+      dimensionResults?: Array<{
+        dimension: string;
+        score: number;
+        sub_metrics: Array<{
+          name: string;
+          score: number;
+          weight: number;
+          evidence: { question_id: string; answer_value: unknown; reason: string };
+        }>;
+      }>;
+    };
+    assert.equal(weak.preview, true);
+    assert.equal(weak.dryRun, true);
+    assert.equal(weak.persisted, false);
+    assert.equal(weak.leadCreated, false);
+    assert.equal(weak.turnstileRequired, false);
+    assert.ok(Array.isArray(weak.dimensionResults));
+    assert.equal(weak.dimensionResults!.length, 5);
+
+    const strongRes = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/score-preview",
+      headers: { "content-type": "application/json" },
+      payload: { profile: "strong" },
+    });
+    assert.equal(strongRes.statusCode, 200);
+    const strong = strongRes.json() as {
+      overall?: number;
+      dimensionResults?: Array<{
+        dimension: string;
+        score: number;
+        sub_metrics: Array<{
+          name: string;
+          score: number;
+          weight: number;
+          evidence: { question_id: string; answer_value: unknown; reason: string };
+        }>;
+      }>;
+    };
+
+    // (a) dimension scores differ across answer sets
+    let anyDimDiffers = false;
+    for (let i = 0; i < weak.dimensionResults!.length; i += 1) {
+      if (weak.dimensionResults![i]!.score !== strong.dimensionResults![i]!.score) {
+        anyDimDiffers = true;
+      }
+    }
+    assert.ok(anyDimDiffers, "weak vs strong profiles must produce different dimension scores");
+
+    // (b) within each payload not all dimensions share the same score
+    const weakScores = weak.dimensionResults!.map((d) => d.score);
+    const strongScores = strong.dimensionResults!.map((d) => d.score);
+    assert.ok(new Set(weakScores).size > 1);
+    assert.ok(new Set(strongScores).size > 1);
+
+    // (c) not pinned at 25 for both
+    assert.ok(!(weakScores.every((s) => s === 25) && strongScores.every((s) => s === 25)));
+
+    // (d)(e) sub_metrics + evidence shape
+    for (const dim of weak.dimensionResults!) {
+      assert.ok(dim.sub_metrics.length >= 4 && dim.sub_metrics.length <= 6);
+      for (const sm of dim.sub_metrics) {
+        assert.ok(sm.name.length > 0);
+        assert.equal(typeof sm.score, "number");
+        assert.equal(typeof sm.weight, "number");
+        assert.ok(sm.evidence.question_id.length > 0);
+        assert.ok(sm.evidence.answer_value != null && sm.evidence.answer_value !== "");
+        assert.ok(sm.evidence.reason.length > 10);
+        assert.notEqual(sm.evidence.reason, "N/A");
+      }
+    }
+
+    // Custom answers path (not just named profiles)
+    const custom = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/score-preview",
+      headers: { "content-type": "application/json" },
+      payload: {
+        answers: {
+          auth: "none — shared password only",
+          tests: "none",
+          secrets_pattern: "hardcoded in git",
+          deploys: "manual ssh",
+        },
+      },
+    });
+    assert.equal(custom.statusCode, 200);
+    const customBody = custom.json() as { dimensionResults?: unknown[]; overall?: number };
+    assert.ok(Array.isArray(customBody.dimensionResults));
+    assert.equal(typeof customBody.overall, "number");
+  });
+
   it("GET /v1/readiness/snapshot/:id is registered and validates id shape", async () => {
     rateLimitStore.clear();
     const res = await ctx.app.inject({

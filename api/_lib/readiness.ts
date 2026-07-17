@@ -445,6 +445,14 @@ export async function proxyScore(
   return proxyJson("POST", "/v1/readiness/score", body ?? {}, env, inboundHeaders);
 }
 
+export async function proxyScorePreview(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/score-preview", body ?? {}, env, inboundHeaders);
+}
+
 export async function proxyGetSnapshot(
   id: string,
   env: NodeJS.ProcessEnv = process.env,

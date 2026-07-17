@@ -2,8 +2,8 @@
   "ready": false,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "5d43c4273b27131d5535d22e67aad96bb922d311",
-  "generatedAt": "2026-07-17T03:42:33.708Z",
+  "gitSha": "b1b06aaaa3a5c94b4e415521df84be74e7b40e0d",
+  "generatedAt": "2026-07-17T04:02:06.227Z",
   "railwayFoundation": {
     "statusUrl": "/api/railway-foundation",
     "project": "vygo",
@@ -1164,6 +1164,680 @@
           ]
         }
       ]
+    },
+    "sampleAssessments": {
+      "scorePreviewPath": "/v1/readiness/score-preview",
+      "scorePreviewAlias": "/api/readiness/score-preview",
+      "weak": {
+        "profile": "weak",
+        "label": "Materially weak answers",
+        "answers": {
+          "summary": "risky prototype with shared passwords and no tests",
+          "languages": "unknown mixed undocumented",
+          "size": "huge unknown",
+          "structure": "spaghetti god module",
+          "frontend": "unknown",
+          "backend": "unknown",
+          "database": "sqlite file on laptop",
+          "tenancy": "shared without isolation",
+          "auth": "none — shared password only",
+          "authorization": "all admin",
+          "row_level_security": "none",
+          "environments": "prod only",
+          "deploys": "manual ssh",
+          "tests": "none",
+          "background_jobs": "fire and forget",
+          "integrations": "unknown",
+          "secrets_pattern": "hardcoded in git",
+          "logging": "console only",
+          "error_handling": "unhandled stack traces",
+          "pii_categories": "payment cards and health records",
+          "api_surface": "public unauthenticated open",
+          "fragility_flags": [
+            "single region",
+            "no backup",
+            "manual migrate"
+          ],
+          "confidence": 0.35
+        },
+        "overall": 33,
+        "dimensions": {
+          "Security": 33,
+          "Reliability": 32,
+          "Operability": 43,
+          "Maintainability": 31,
+          "Compliance posture": 29
+        },
+        "dimensionResults": [
+          {
+            "dimension": "Security",
+            "score": 33,
+            "sub_metrics": [
+              {
+                "name": "Authentication",
+                "score": 28,
+                "weight": 1.5,
+                "evidence": {
+                  "question_id": "auth",
+                  "answer_value": "none — shared password only",
+                  "reason": "You reported authentication as \"none — shared password only\", which includes risk signals (none, shared password)."
+                }
+              },
+              {
+                "name": "Authorization & access control",
+                "score": 38,
+                "weight": 1.5,
+                "evidence": {
+                  "question_id": "authorization",
+                  "answer_value": "all admin",
+                  "reason": "You reported authorization & access control as \"all admin\", which includes risk signals (all admin)."
+                }
+              },
+              {
+                "name": "Row-level security / tenant isolation",
+                "score": 38,
+                "weight": 1.2,
+                "evidence": {
+                  "question_id": "row_level_security",
+                  "answer_value": "none",
+                  "reason": "You reported row-level security / tenant isolation as \"none\", which includes risk signals (none)."
+                }
+              },
+              {
+                "name": "Secrets management",
+                "score": 28,
+                "weight": 1.3,
+                "evidence": {
+                  "question_id": "secrets_pattern",
+                  "answer_value": "hardcoded in git",
+                  "reason": "You reported secrets management as \"hardcoded in git\", which includes risk signals (git, hardcoded)."
+                }
+              },
+              {
+                "name": "API surface hardening",
+                "score": 32,
+                "weight": 0.8,
+                "evidence": {
+                  "question_id": "api_surface",
+                  "answer_value": "public unauthenticated open",
+                  "reason": "You reported api surface hardening as \"public unauthenticated open\", which includes risk signals (public unauthenticated, open)."
+                }
+              }
+            ]
+          },
+          {
+            "dimension": "Reliability",
+            "score": 32,
+            "sub_metrics": [
+              {
+                "name": "Tests & deploy gates",
+                "score": 38,
+                "weight": 1.5,
+                "evidence": {
+                  "question_id": "tests",
+                  "answer_value": "none",
+                  "reason": "You reported tests & deploy gates as \"none\", which includes risk signals (none)."
+                }
+              },
+              {
+                "name": "Error handling",
+                "score": 38,
+                "weight": 1,
+                "evidence": {
+                  "question_id": "error_handling",
+                  "answer_value": "unhandled stack traces",
+                  "reason": "You reported error handling as \"unhandled stack traces\", which includes risk signals (unhandled)."
+                }
+              },
+              {
+                "name": "Background jobs & queues",
+                "score": 38,
+                "weight": 0.8,
+                "evidence": {
+                  "question_id": "background_jobs",
+                  "answer_value": "fire and forget",
+                  "reason": "You reported background jobs & queues as \"fire and forget\", which includes risk signals (fire and forget)."
+                }
+              },
+              {
+                "name": "Fragility & single points of failure",
+                "score": 10,
+                "weight": 1.2,
+                "evidence": {
+                  "question_id": "fragility_flags",
+                  "answer_value": [
+                    "single region",
+                    "no backup",
+                    "manual migrate"
+                  ],
+                  "reason": "You reported fragility & single points of failure as \"single region, no backup, manual migrate\", which includes risk signals (single, manual)."
+                }
+              },
+              {
+                "name": "Logging & observability",
+                "score": 38,
+                "weight": 0.7,
+                "evidence": {
+                  "question_id": "logging",
+                  "answer_value": "console only",
+                  "reason": "You reported logging & observability as \"console only\", which includes risk signals (console only)."
+                }
+              }
+            ]
+          },
+          {
+            "dimension": "Operability",
+            "score": 43,
+            "sub_metrics": [
+              {
+                "name": "Deploy pipeline",
+                "score": 28,
+                "weight": 1.4,
+                "evidence": {
+                  "question_id": "deploys",
+                  "answer_value": "manual ssh",
+                  "reason": "You reported deploy pipeline as \"manual ssh\", which includes risk signals (manual, ssh)."
+                }
+              },
+              {
+                "name": "Environments",
+                "score": 38,
+                "weight": 1,
+                "evidence": {
+                  "question_id": "environments",
+                  "answer_value": "prod only",
+                  "reason": "You reported environments as \"prod only\", which includes risk signals (prod only)."
+                }
+              },
+              {
+                "name": "Logging & observability",
+                "score": 55,
+                "weight": 0.9,
+                "evidence": {
+                  "question_id": "logging",
+                  "answer_value": "console only",
+                  "reason": "You reported logging & observability as \"console only\", which is adequate but not strongly evidenced."
+                }
+              },
+              {
+                "name": "Error handling",
+                "score": 55,
+                "weight": 0.7,
+                "evidence": {
+                  "question_id": "error_handling",
+                  "answer_value": "unhandled stack traces",
+                  "reason": "You reported error handling as \"unhandled stack traces\", which is adequate but not strongly evidenced."
+                }
+              },
+              {
+                "name": "Background jobs & queues",
+                "score": 55,
+                "weight": 0.6,
+                "evidence": {
+                  "question_id": "background_jobs",
+                  "answer_value": "fire and forget",
+                  "reason": "You reported background jobs & queues as \"fire and forget\", which is adequate but not strongly evidenced."
+                }
+              }
+            ]
+          },
+          {
+            "dimension": "Maintainability",
+            "score": 31,
+            "sub_metrics": [
+              {
+                "name": "Codebase structure",
+                "score": 28,
+                "weight": 1.2,
+                "evidence": {
+                  "question_id": "structure",
+                  "answer_value": "spaghetti god module",
+                  "reason": "You reported codebase structure as \"spaghetti god module\", which includes risk signals (spaghetti, god module)."
+                }
+              },
+              {
+                "name": "Language stack",
+                "score": 28,
+                "weight": 0.7,
+                "evidence": {
+                  "question_id": "languages",
+                  "answer_value": "unknown mixed undocumented",
+                  "reason": "You reported language stack as \"unknown mixed undocumented\", which includes risk signals (unknown, mixed undocumented)."
+                }
+              },
+              {
+                "name": "Codebase size",
+                "score": 38,
+                "weight": 0.6,
+                "evidence": {
+                  "question_id": "size",
+                  "answer_value": "huge unknown",
+                  "reason": "You reported codebase size as \"huge unknown\", which includes risk signals (huge unknown)."
+                }
+              },
+              {
+                "name": "Tests & deploy gates",
+                "score": 38,
+                "weight": 1.1,
+                "evidence": {
+                  "question_id": "tests",
+                  "answer_value": "none",
+                  "reason": "You reported tests & deploy gates as \"none\", which includes risk signals (none)."
+                }
+              },
+              {
+                "name": "Frontend stack",
+                "score": 25,
+                "weight": 0.5,
+                "evidence": {
+                  "question_id": "frontend",
+                  "answer_value": "unknown",
+                  "reason": "You did not answer the frontend stack question, so this check scores at the risk percentile."
+                }
+              },
+              {
+                "name": "Backend stack",
+                "score": 25,
+                "weight": 0.5,
+                "evidence": {
+                  "question_id": "backend",
+                  "answer_value": "unknown",
+                  "reason": "You did not answer the backend stack question, so this check scores at the risk percentile."
+                }
+              }
+            ]
+          },
+          {
+            "dimension": "Compliance posture",
+            "score": 29,
+            "sub_metrics": [
+              {
+                "name": "PII & data sensitivity",
+                "score": 18,
+                "weight": 1.4,
+                "evidence": {
+                  "question_id": "pii_categories",
+                  "answer_value": "payment cards and health records",
+                  "reason": "You reported pii & data sensitivity as \"payment cards and health records\", which includes risk signals (payment, card)."
+                }
+              },
+              {
+                "name": "Tenancy model",
+                "score": 38,
+                "weight": 1.1,
+                "evidence": {
+                  "question_id": "tenancy",
+                  "answer_value": "shared without isolation",
+                  "reason": "You reported tenancy model as \"shared without isolation\", which includes risk signals (shared without isolation)."
+                }
+              },
+              {
+                "name": "Authentication",
+                "score": 28,
+                "weight": 1,
+                "evidence": {
+                  "question_id": "auth",
+                  "answer_value": "none — shared password only",
+                  "reason": "You reported authentication as \"none — shared password only\", which includes risk signals (shared password, none)."
+                }
+              },
+              {
+                "name": "Authorization & access control",
+                "score": 38,
+                "weight": 0.9,
+                "evidence": {
+                  "question_id": "authorization",
+                  "answer_value": "all admin",
+                  "reason": "You reported authorization & access control as \"all admin\", which includes risk signals (all admin)."
+                }
+              },
+              {
+                "name": "Secrets management",
+                "score": 28,
+                "weight": 0.8,
+                "evidence": {
+                  "question_id": "secrets_pattern",
+                  "answer_value": "hardcoded in git",
+                  "reason": "You reported secrets management as \"hardcoded in git\", which includes risk signals (git, hardcoded)."
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "strong": {
+        "profile": "strong",
+        "label": "Materially strong answers",
+        "answers": {
+          "summary": "Internal ops tool for inventory approvals with solid production hygiene",
+          "languages": "TypeScript",
+          "size": "small",
+          "structure": "modular monorepo packages",
+          "frontend": "Next.js",
+          "backend": "Fastify",
+          "database": "Postgres",
+          "tenancy": "single-tenant internal",
+          "auth": "session cookies + magic link",
+          "authorization": "RBAC roles owner admin member",
+          "row_level_security": "enforced via app middleware",
+          "environments": "local staging production",
+          "deploys": "GitHub Actions CI/CD automated pipeline with rollback",
+          "tests": "unit integration e2e gate on every deploy via CI",
+          "background_jobs": "email outbox worker with retry",
+          "integrations": "Slack",
+          "secrets_pattern": "Railway env + Vault references",
+          "logging": "structured JSON logs request ids",
+          "error_handling": "safe public errors with graceful retry",
+          "pii_categories": "email, name; no payment card or health records in prod",
+          "api_surface": "HTTPS /v1 versioned API with auth",
+          "fragility_flags": [
+            "single_region"
+          ],
+          "confidence": 0.85
+        },
+        "overall": 72,
+        "dimensions": {
+          "Security": 77,
+          "Reliability": 77,
+          "Operability": 77,
+          "Maintainability": 74,
+          "Compliance posture": 55
+        },
+        "dimensionResults": [
+          {
+            "dimension": "Security",
+            "score": 77,
+            "sub_metrics": [
+              {
+                "name": "Authentication",
+                "score": 78,
+                "weight": 1.5,
+                "evidence": {
+                  "question_id": "auth",
+                  "answer_value": "session cookies + magic link",
+                  "reason": "You reported authentication as \"session cookies + magic link\", including positive signals (session, magic link)."
+                }
+              },
+              {
+                "name": "Authorization & access control",
+                "score": 78,
+                "weight": 1.5,
+                "evidence": {
+                  "question_id": "authorization",
+                  "answer_value": "RBAC roles owner admin member",
+                  "reason": "You reported authorization & access control as \"RBAC roles owner admin member\", including positive signals (rbac, roles)."
+                }
+              },
+              {
+                "name": "Row-level security / tenant isolation",
+                "score": 70,
+                "weight": 1.2,
+                "evidence": {
+                  "question_id": "row_level_security",
+                  "answer_value": "enforced via app middleware",
+                  "reason": "You reported row-level security / tenant isolation as \"enforced via app middleware\", including positive signals (enforced)."
+                }
+              },
+              {
+                "name": "Secrets management",
+                "score": 78,
+                "weight": 1.3,
+                "evidence": {
+                  "question_id": "secrets_pattern",
+                  "answer_value": "Railway env + Vault references",
+                  "reason": "You reported secrets management as \"Railway env + Vault references\", including positive signals (vault, railway env)."
+                }
+              },
+              {
+                "name": "API surface hardening",
+                "score": 86,
+                "weight": 0.8,
+                "evidence": {
+                  "question_id": "api_surface",
+                  "answer_value": "HTTPS /v1 versioned API with auth",
+                  "reason": "You reported api surface hardening as \"HTTPS /v1 versioned API with auth\", including positive signals (https, auth)."
+                }
+              }
+            ]
+          },
+          {
+            "dimension": "Reliability",
+            "score": 77,
+            "sub_metrics": [
+              {
+                "name": "Tests & deploy gates",
+                "score": 94,
+                "weight": 1.5,
+                "evidence": {
+                  "question_id": "tests",
+                  "answer_value": "unit integration e2e gate on every deploy via CI",
+                  "reason": "You reported tests & deploy gates as \"unit integration e2e gate on every deploy via CI\", including positive signals (unit, integration)."
+                }
+              },
+              {
+                "name": "Error handling",
+                "score": 86,
+                "weight": 1,
+                "evidence": {
+                  "question_id": "error_handling",
+                  "answer_value": "safe public errors with graceful retry",
+                  "reason": "You reported error handling as \"safe public errors with graceful retry\", including positive signals (safe, retry)."
+                }
+              },
+              {
+                "name": "Background jobs & queues",
+                "score": 86,
+                "weight": 0.8,
+                "evidence": {
+                  "question_id": "background_jobs",
+                  "answer_value": "email outbox worker with retry",
+                  "reason": "You reported background jobs & queues as \"email outbox worker with retry\", including positive signals (worker, outbox)."
+                }
+              },
+              {
+                "name": "Fragility & single points of failure",
+                "score": 38,
+                "weight": 1.2,
+                "evidence": {
+                  "question_id": "fragility_flags",
+                  "answer_value": [
+                    "single_region"
+                  ],
+                  "reason": "You reported fragility & single points of failure as \"single_region\", which includes risk signals (single)."
+                }
+              },
+              {
+                "name": "Logging & observability",
+                "score": 86,
+                "weight": 0.7,
+                "evidence": {
+                  "question_id": "logging",
+                  "answer_value": "structured JSON logs request ids",
+                  "reason": "You reported logging & observability as \"structured JSON logs request ids\", including positive signals (structured, request id)."
+                }
+              }
+            ]
+          },
+          {
+            "dimension": "Operability",
+            "score": 77,
+            "sub_metrics": [
+              {
+                "name": "Deploy pipeline",
+                "score": 94,
+                "weight": 1.4,
+                "evidence": {
+                  "question_id": "deploys",
+                  "answer_value": "GitHub Actions CI/CD automated pipeline with rollback",
+                  "reason": "You reported deploy pipeline as \"GitHub Actions CI/CD automated pipeline with rollback\", including positive signals (ci/cd, github actions)."
+                }
+              },
+              {
+                "name": "Environments",
+                "score": 86,
+                "weight": 1,
+                "evidence": {
+                  "question_id": "environments",
+                  "answer_value": "local staging production",
+                  "reason": "You reported environments as \"local staging production\", including positive signals (staging, production)."
+                }
+              },
+              {
+                "name": "Logging & observability",
+                "score": 70,
+                "weight": 0.9,
+                "evidence": {
+                  "question_id": "logging",
+                  "answer_value": "structured JSON logs request ids",
+                  "reason": "You reported logging & observability as \"structured JSON logs request ids\", including positive signals (structured)."
+                }
+              },
+              {
+                "name": "Error handling",
+                "score": 55,
+                "weight": 0.7,
+                "evidence": {
+                  "question_id": "error_handling",
+                  "answer_value": "safe public errors with graceful retry",
+                  "reason": "You reported error handling as \"safe public errors with graceful retry\", which is adequate but not strongly evidenced."
+                }
+              },
+              {
+                "name": "Background jobs & queues",
+                "score": 55,
+                "weight": 0.6,
+                "evidence": {
+                  "question_id": "background_jobs",
+                  "answer_value": "email outbox worker with retry",
+                  "reason": "You reported background jobs & queues as \"email outbox worker with retry\", which is adequate but not strongly evidenced."
+                }
+              }
+            ]
+          },
+          {
+            "dimension": "Maintainability",
+            "score": 74,
+            "sub_metrics": [
+              {
+                "name": "Codebase structure",
+                "score": 86,
+                "weight": 1.2,
+                "evidence": {
+                  "question_id": "structure",
+                  "answer_value": "modular monorepo packages",
+                  "reason": "You reported codebase structure as \"modular monorepo packages\", including positive signals (monorepo, packages)."
+                }
+              },
+              {
+                "name": "Language stack",
+                "score": 70,
+                "weight": 0.7,
+                "evidence": {
+                  "question_id": "languages",
+                  "answer_value": "TypeScript",
+                  "reason": "You reported language stack as \"TypeScript\", including positive signals (typescript)."
+                }
+              },
+              {
+                "name": "Codebase size",
+                "score": 70,
+                "weight": 0.6,
+                "evidence": {
+                  "question_id": "size",
+                  "answer_value": "small",
+                  "reason": "You reported codebase size as \"small\", including positive signals (small)."
+                }
+              },
+              {
+                "name": "Tests & deploy gates",
+                "score": 70,
+                "weight": 1.1,
+                "evidence": {
+                  "question_id": "tests",
+                  "answer_value": "unit integration e2e gate on every deploy via CI",
+                  "reason": "You reported tests & deploy gates as \"unit integration e2e gate on every deploy via CI\", including positive signals (unit)."
+                }
+              },
+              {
+                "name": "Frontend stack",
+                "score": 70,
+                "weight": 0.5,
+                "evidence": {
+                  "question_id": "frontend",
+                  "answer_value": "Next.js",
+                  "reason": "You reported frontend stack as \"Next.js\", including positive signals (next)."
+                }
+              },
+              {
+                "name": "Backend stack",
+                "score": 70,
+                "weight": 0.5,
+                "evidence": {
+                  "question_id": "backend",
+                  "answer_value": "Fastify",
+                  "reason": "You reported backend stack as \"Fastify\", including positive signals (fastify)."
+                }
+              }
+            ]
+          },
+          {
+            "dimension": "Compliance posture",
+            "score": 55,
+            "sub_metrics": [
+              {
+                "name": "PII & data sensitivity",
+                "score": 26,
+                "weight": 1.4,
+                "evidence": {
+                  "question_id": "pii_categories",
+                  "answer_value": "email, name; no payment card or health records in prod",
+                  "reason": "You reported pii & data sensitivity as \"email, name; no payment card or health records in prod\", which includes risk signals (payment, card)."
+                }
+              },
+              {
+                "name": "Tenancy model",
+                "score": 70,
+                "weight": 1.1,
+                "evidence": {
+                  "question_id": "tenancy",
+                  "answer_value": "single-tenant internal",
+                  "reason": "You reported tenancy model as \"single-tenant internal\", including positive signals (single-tenant)."
+                }
+              },
+              {
+                "name": "Authentication",
+                "score": 55,
+                "weight": 1,
+                "evidence": {
+                  "question_id": "auth",
+                  "answer_value": "session cookies + magic link",
+                  "reason": "You reported authentication as \"session cookies + magic link\", which is adequate but not strongly evidenced."
+                }
+              },
+              {
+                "name": "Authorization & access control",
+                "score": 70,
+                "weight": 0.9,
+                "evidence": {
+                  "question_id": "authorization",
+                  "answer_value": "RBAC roles owner admin member",
+                  "reason": "You reported authorization & access control as \"RBAC roles owner admin member\", including positive signals (rbac)."
+                }
+              },
+              {
+                "name": "Secrets management",
+                "score": 70,
+                "weight": 0.8,
+                "evidence": {
+                  "question_id": "secrets_pattern",
+                  "answer_value": "Railway env + Vault references",
+                  "reason": "You reported secrets management as \"Railway env + Vault references\", including positive signals (vault)."
+                }
+              }
+            ]
+          }
+        ]
+      }
     }
   },
   "frontend": {

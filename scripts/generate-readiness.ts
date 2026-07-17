@@ -13,6 +13,60 @@ import {
   computeReadinessScore,
 } from "../packages/validation/src/readiness-scoring.js";
 
+/** Built-in weak answers for dual-profile sampleAssessments on GET /api/readiness. */
+const SAMPLE_WEAK_REPORT = {
+  summary: "risky prototype with shared passwords and no tests",
+  languages: "unknown mixed undocumented",
+  size: "huge unknown",
+  structure: "spaghetti god module",
+  frontend: "unknown",
+  backend: "unknown",
+  database: "sqlite file on laptop",
+  tenancy: "shared without isolation",
+  auth: "none — shared password only",
+  authorization: "all admin",
+  row_level_security: "none",
+  environments: "prod only",
+  deploys: "manual ssh",
+  tests: "none",
+  background_jobs: "fire and forget",
+  integrations: "unknown",
+  secrets_pattern: "hardcoded in git",
+  logging: "console only",
+  error_handling: "unhandled stack traces",
+  pii_categories: "payment cards and health records",
+  api_surface: "public unauthenticated open",
+  fragility_flags: ["single region", "no backup", "manual migrate"],
+  confidence: 0.35,
+} as const;
+
+/** Built-in strong answers (materially different from weak). */
+const SAMPLE_STRONG_REPORT = {
+  summary: "Internal ops tool for inventory approvals with solid production hygiene",
+  languages: "TypeScript",
+  size: "small",
+  structure: "modular monorepo packages",
+  frontend: "Next.js",
+  backend: "Fastify",
+  database: "Postgres",
+  tenancy: "single-tenant internal",
+  auth: "session cookies + magic link",
+  authorization: "RBAC roles owner admin member",
+  row_level_security: "enforced via app middleware",
+  environments: "local staging production",
+  deploys: "GitHub Actions CI/CD automated pipeline with rollback",
+  tests: "unit integration e2e gate on every deploy via CI",
+  background_jobs: "email outbox worker with retry",
+  integrations: "Slack",
+  secrets_pattern: "Railway env + Vault references",
+  logging: "structured JSON logs request ids",
+  error_handling: "safe public errors with graceful retry",
+  pii_categories: "email, name; no payment card or health records in prod",
+  api_surface: "HTTPS /v1 versioned API with auth",
+  fragility_flags: ["single_region"],
+  confidence: 0.85,
+} as const;
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
@@ -226,8 +280,11 @@ function readFoundationPointer(): {
  * Public view of the readiness analysis model: the five scored dimensions
  * broken down into their sub-metric checks, plus a scored self-assessment of
  * this repo so the nested payload shape is observable at GET /api/readiness.
- * The same engine (computeReadinessScore) serves user submissions at
- * POST /v1/readiness/score.
+ * Also embeds two clearly-distinct built-in answer profiles so automated
+ * callers can compare answer-driven scores without Turnstile. Live dry-runs
+ * of arbitrary answers use POST /v1/readiness/score-preview (and
+ * POST /api/readiness/score-preview). Real lead capture remains on
+ * POST /v1/readiness/score (Turnstile-gated).
  */
 function buildReadinessAnalysis() {
   const scoringModel = {
@@ -273,6 +330,8 @@ function buildReadinessAnalysis() {
   };
 
   const scored = computeReadinessScore({ report: selfReport, source: "paste" });
+  const weak = computeReadinessScore({ report: SAMPLE_WEAK_REPORT, source: "paste" });
+  const strong = computeReadinessScore({ report: SAMPLE_STRONG_REPORT, source: "paste" });
 
   return {
     scoringModel,
@@ -283,6 +342,31 @@ function buildReadinessAnalysis() {
       dimensionDetails: scored.dimensionDetails,
       /** Mission-shaped array: [{ dimension, score, sub_metrics: [{ name, score, weight, evidence }] }] */
       dimensionResults: scored.dimensionResults,
+    },
+    /**
+     * Two clearly-distinct built-in answer profiles scored by the same engine.
+     * Lets automated callers on the deployed site observe answer-driven spread
+     * without Turnstile. Prefer POST /v1/readiness/score-preview for arbitrary answers.
+     */
+    sampleAssessments: {
+      scorePreviewPath: "/v1/readiness/score-preview",
+      scorePreviewAlias: "/api/readiness/score-preview",
+      weak: {
+        profile: "weak",
+        label: "Materially weak answers",
+        answers: SAMPLE_WEAK_REPORT,
+        overall: weak.overall,
+        dimensions: weak.dimensions,
+        dimensionResults: weak.dimensionResults,
+      },
+      strong: {
+        profile: "strong",
+        label: "Materially strong answers",
+        answers: SAMPLE_STRONG_REPORT,
+        overall: strong.overall,
+        dimensions: strong.dimensions,
+        dimensionResults: strong.dimensionResults,
+      },
     },
   };
 }
