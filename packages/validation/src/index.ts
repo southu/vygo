@@ -187,6 +187,16 @@ export {
   type ComputeScoreInput,
 } from "./readiness-scoring.js";
 
+export {
+  buildEvidenceInsights,
+  extractNamedTools,
+  extractIntegrationCount,
+  extractTeamSignals,
+  rawAnswerText,
+  type EvidenceInsight,
+  type InsightType,
+} from "./evidence-insights.js";
+
 export const availabilityStatusSchema = z.enum(["open", "waitlist", "paused"]);
 
 export type AvailabilityStatus = z.infer<typeof availabilityStatusSchema>;

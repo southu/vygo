@@ -21,6 +21,10 @@
 
 import type { ReadinessReportV1Partial } from "./report-schema.js";
 import type { ReadinessStage1Answers } from "./readiness-intake.js";
+import {
+  buildEvidenceInsights,
+  type EvidenceInsight,
+} from "./evidence-insights.js";
 
 /** Canonical dimension labels (API + UI). */
 export const READINESS_DIMENSIONS = [
@@ -127,6 +131,12 @@ export type ReadinessScorePayload = {
    * [{ dimension, score, sub_metrics: [{ name, score, weight, evidence }] }]
    */
   dimensionResults: DimensionScoreResult[];
+  /**
+   * Ranked evidence insights extracted from the prospect's own answers
+   * (tools, counts, security practices, team signals). Additive; does not
+   * alter dimension scores or existing findings shape.
+   */
+  insights: EvidenceInsight[];
   ranges?: DimensionRanges;
   overall: number;
   bucket: EngagementBucket;
@@ -1151,6 +1161,7 @@ export function computeReadinessScore(input: ComputeScoreInput): ReadinessScoreP
   const dimensionDetails = scoreAllDimensionDetails(report, config);
   const dimensions = scoreAllDimensions(report, config);
   const dimensionResults = toDimensionResults(dimensionDetails);
+  const insights = buildEvidenceInsights(report, dimensionDetails);
   const overall = overallFromDimensions(dimensions, config);
   const signals = deriveBucketSignals(report, dimensions, input.stage1, input.followups);
   const bucketResult = assignEngagementBucket(signals);
@@ -1171,6 +1182,7 @@ export function computeReadinessScore(input: ComputeScoreInput): ReadinessScoreP
     dimensions,
     dimensionDetails,
     dimensionResults,
+    insights,
     ranges,
     overall,
     bucket: bucketResult.bucket,

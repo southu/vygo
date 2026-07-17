@@ -200,6 +200,8 @@ function publicPreviewBody(
     dimensionResults,
     /** Alias so callers may treat the body as results-first. */
     results: dimensionResults,
+    /** Ranked evidence insights grounded in submitted answers. */
+    insights: Array.isArray(payload.insights) ? payload.insights : [],
     ranges: payload.ranges ?? null,
     reasoning: payload.reasoning,
     caveat: payload.caveat ?? null,

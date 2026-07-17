@@ -87,6 +87,37 @@ describe("runScorePreview", () => {
     assert.equal(typeof result.body.overall, "number");
   });
 
+  it("returns ranked insights grounded in submitted tools and gaps", () => {
+    const result = runScorePreview({
+      answers: {
+        summary: "Agent ops with Zapier, Make, LangChain",
+        size: "Medium (small team of 8)",
+        integrations: "Zapier, Make, LangChain — 12 integrations",
+        secrets_pattern: "no centralized credential management — keys in env files",
+        auth: "session cookies + MFA",
+        tests: "unit integration e2e",
+        deploys: "GitHub Actions CI/CD",
+        structure: "modular monorepo packages",
+      },
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    const insights = result.body.insights as Array<Record<string, unknown>>;
+    assert.ok(Array.isArray(insights));
+    assert.ok(insights.length >= 6);
+    for (const insight of insights) {
+      assert.deepEqual(
+        Object.keys(insight).sort(),
+        ["detail", "dimension", "headline", "source_answer", "type"].sort(),
+      );
+      assert.ok(["strength", "risk", "opportunity"].includes(String(insight.type)));
+    }
+    assert.ok(insights.some((i) => i.type === "risk"));
+    assert.ok(insights.some((i) => i.type === "strength"));
+    const blob = JSON.stringify(insights);
+    assert.ok(blob.includes("Zapier") || blob.includes("Make") || blob.includes("LangChain"));
+  });
+
   it("scoreBuiltInProfiles returns both weak and strong payloads", () => {
     const both = scoreBuiltInProfiles();
     assert.equal(both.weak.profile, "weak");

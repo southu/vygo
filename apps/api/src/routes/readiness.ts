@@ -278,6 +278,8 @@ function publicScorePreviewBody(
     dimensionDetails: payload.dimensionDetails,
     dimensionResults: payload.dimensionResults,
     results: payload.dimensionResults,
+    /** Ranked evidence insights (tools, counts, practices) grounded in answers. */
+    insights: Array.isArray(payload.insights) ? payload.insights : [],
     ranges: payload.ranges ?? null,
     reasoning: payload.reasoning,
     caveat: payload.caveat ?? null,
@@ -343,6 +345,8 @@ function publicSnapshotBody(submission: {
     }
   }
 
+  const insights = Array.isArray(scores.insights) ? scores.insights : [];
+
   return {
     id: submission.id,
     snapshotId: submission.id,
@@ -350,6 +354,7 @@ function publicSnapshotBody(submission: {
     dimensions: scores.dimensions ?? null,
     dimensionDetails: scores.dimensionDetails ?? null,
     dimensionResults,
+    insights,
     ranges: scores.ranges ?? null,
     displayMode: scores.displayMode ?? "point",
     overall: scores.overall ?? null,
@@ -1928,6 +1933,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         dimensions: payload.dimensions,
         dimensionDetails: payload.dimensionDetails,
         dimensionResults: payload.dimensionResults,
+        insights: payload.insights,
         ranges: payload.ranges ?? null,
         displayMode: payload.displayMode,
         overall: payload.overall,
