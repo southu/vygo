@@ -130,6 +130,90 @@
   }
 }
 
+/* ── Readiness chart staging animations ─────────────────────────────────── */
+
+@keyframes readiness-gauge-draw {
+  from {
+    stroke-dashoffset: var(--gauge-total, 251.3);
+  }
+  to {
+    stroke-dashoffset: var(--gauge-offset, 125);
+  }
+}
+
+@keyframes readiness-gauge-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes readiness-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes readiness-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.readiness-gauge-arc {
+  animation: readiness-gauge-draw 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.readiness-gauge-value {
+  animation: readiness-gauge-fade-up 0.7s ease-out 0.25s both;
+}
+
+.readiness-bar-fill {
+  transform-origin: left center;
+  animation: readiness-bar-grow 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.readiness-charts-enter {
+  animation: readiness-card-enter 0.55s ease-out both;
+}
+
+.readiness-charts-enter-delay {
+  animation-delay: 0.12s;
+}
+
+.readiness-charts-enter-delay-2 {
+  animation-delay: 0.22s;
+}
+
+/* Score-band utility hooks (machine-readable via class + data-band) */
+.score-band-critical {
+  --score-band-color: var(--color-red);
+}
+.score-band-warning {
+  --score-band-color: var(--color-amber);
+}
+.score-band-good {
+  --score-band-color: var(--color-green);
+}
+
+/* Staging charts: prevent horizontal overflow at mobile widths */
+.readiness-charts-stage {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 /* Reduced motion: disable / materially shorten animations and transitions */
 @media (prefers-reduced-motion: reduce) {
   html {
