@@ -17,11 +17,14 @@
 import postgres from "postgres";
 import type { Sql } from "postgres";
 import {
+  GUIDE_UPDATES_SOURCE,
   guideUpdatesSuccessBody,
+  handleApplyIntake,
   insertApplicationRow,
   parseApplyBody,
   proxyApplyPost,
   resolveDatabaseUrl,
+  scrubGuideUpdatesResponse,
   type ApplyHandlerResult,
 } from "../_lib/apply.js";
 import {
@@ -59,6 +62,24 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null): void {
   }
 }
 
+/**
+ * Finalize a guide_updates response: success template on 2xx, scrubbed body otherwise.
+ * Never echoes the submitted email.
+ */
+function finalizeGuideUpdates(
+  result: ApplyHandlerResult,
+  email: string,
+): ApplyHandlerResult {
+  if (result.status >= 200 && result.status < 300) {
+    return { status: 200, body: guideUpdatesSuccessBody(), logError: result.logError };
+  }
+  return {
+    status: result.status,
+    body: scrubGuideUpdatesResponse(result.body, email),
+    logError: result.logError,
+  };
+}
+
 async function handlePost(req: EdgeRequest): Promise<ApplyHandlerResult> {
   try {
     const contentType = contentTypeBase(req.headers);
@@ -82,55 +103,50 @@ async function handlePost(req: EdgeRequest): Promise<ApplyHandlerResult> {
       };
     }
 
-    const parsed = parseApplyBody(parsedBody.value);
-    if (!parsed.ok) {
-      return { status: parsed.status, body: parsed.body };
+    // Validation before any insert/proxy. Invalid guide_updates never reach persist.
+    // handleApplyIntake re-validates; this precheck also enables the no-DB proxy path
+    // to skip the network when the body is already invalid.
+    const precheck = parseApplyBody(parsedBody.value);
+    if (!precheck.ok) {
+      return { status: precheck.status, body: precheck.body };
     }
 
     const url = resolveDatabaseUrl();
     if (!url) {
-      // Forward source so upstream Railway sets applications.source explicitly
-      // (guide_updates must never fall through to the 'apply' default).
+      // Proxy to Railway with explicit source (guide_updates never uses 'apply' default).
       const upstream = await proxyApplyPost({
-        source: parsed.value.source,
-        full_name: parsed.value.fullName,
-        work_email: parsed.value.workEmail,
-        product_url: parsed.value.productUrl,
-        message: parsed.value.message,
+        source: precheck.value.source ?? GUIDE_UPDATES_SOURCE,
+        full_name: precheck.value.fullName,
+        work_email: precheck.value.workEmail,
+        product_url: precheck.value.productUrl,
+        message: precheck.value.message,
       });
-      // Defense in depth: never echo email/PII for guide_updates even if upstream
-      // returned a full applications row (success only after upstream 2xx commit).
-      if (
-        parsed.value.isGuideUpdates &&
-        upstream.status >= 200 &&
-        upstream.status < 300
-      ) {
-        return { status: 200, body: guideUpdatesSuccessBody(), logError: upstream.logError };
+      if (precheck.value.isGuideUpdates) {
+        // Soft-succeed unique/duplicate wording from upstream for insert-again policy.
+        if (
+          upstream.status >= 400 &&
+          /unique|duplicate/i.test(JSON.stringify(upstream.body))
+        ) {
+          return { status: 200, body: guideUpdatesSuccessBody(), logError: upstream.logError };
+        }
+        return finalizeGuideUpdates(upstream, precheck.value.workEmail);
       }
       return upstream;
     }
 
-    try {
-      const sql = getSql(url);
-      // source is taken from parsed.value (guide_updates set explicitly above).
-      const row = await insertApplicationRow(sql, parsed.value, parsed.value.source);
-      if (parsed.value.isGuideUpdates) {
-        // Success only after commit; never echo email / PII for guide opt-ins.
-        return { status: 200, body: guideUpdatesSuccessBody() };
-      }
-      return { status: 201, body: row };
-    } catch (error) {
-      return {
-        status: 500,
-        body: {
-          error: {
-            code: "INTERNAL_ERROR",
-            message: "An unexpected error occurred. Please try again later.",
-          },
-        },
-        logError: error,
-      };
+    const sql = getSql(url);
+    // handleApplyIntake: validate → insert (source from value); unique soft-success
+    // for guide_updates; PII-free success body.
+    const result = await handleApplyIntake(parsedBody.value, {
+      async insert(value) {
+        return insertApplicationRow(sql, value, value.source);
+      },
+    });
+
+    if (precheck.value.isGuideUpdates) {
+      return finalizeGuideUpdates(result, precheck.value.workEmail);
     }
+    return result;
   } catch (error) {
     // Body-access / parse failures from the platform must be client errors (4xx),
     // not opaque 500s — malformed JSON is never an insert success path.

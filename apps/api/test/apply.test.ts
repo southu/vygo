@@ -161,6 +161,28 @@ describe("apply routes without database", () => {
     const raw = res.body;
     assert.equal(/traceback/i.test(raw), false);
     assert.equal(/postgres/i.test(raw), false);
+    assert.equal(raw.includes("not-an-email"), false);
+    const body = res.json() as { id?: string; error?: { code?: string } };
+    assert.equal(body.id, undefined);
+    assert.equal(body.error?.code, "VALIDATION_ERROR");
+  });
+
+  it("POST /api/apply guide_updates returns 4xx for empty email without row id", async () => {
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/api/apply",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://www.vygo.ai",
+      },
+      payload: {
+        source: "guide_updates",
+        email: "",
+      },
+    });
+    assert.equal(res.statusCode, 400);
+    const body = res.json() as { id?: string };
+    assert.equal(body.id, undefined);
   });
 
   it("POST /api/apply guide_updates returns 4xx for empty body object", async () => {
@@ -175,6 +197,39 @@ describe("apply routes without database", () => {
     });
     assert.ok(res.statusCode >= 400 && res.statusCode < 500);
     assert.ok(res.statusCode < 500);
+  });
+
+  it("POST /api/apply guide_updates with valid email returns 503 without DB (validation passed, no secrets)", async () => {
+    const email = "ratchet-qa+guide-nodb@example.com";
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/api/apply",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://www.vygo.ai",
+      },
+      payload: {
+        source: "guide_updates",
+        email,
+      },
+    });
+    // No database in this suite — must not 500 with stack, must not echo email.
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.includes(email), false);
+    assert.equal(/traceback|postgres:\/\//i.test(res.body), false);
+  });
+
+  it("non-POST methods on /api/apply are rejected (no stack)", async () => {
+    for (const method of ["GET", "PUT", "DELETE", "PATCH"] as const) {
+      const res = await ctx.app.inject({
+        method,
+        url: "/api/apply",
+        headers: { origin: "https://www.vygo.ai" },
+      });
+      // Fastify returns 404 for unregistered methods on this path, or 405 if set.
+      assert.ok(res.statusCode >= 400 && res.statusCode < 500, method);
+      assert.equal(/traceback/i.test(res.body), false);
+    }
   });
 
   it("GET /api/apply/:id returns 400 for non-uuid", async () => {

@@ -56,6 +56,115 @@ export type ApplyHandlerResult = {
   logError?: unknown;
 };
 
+/**
+ * Persistence port for POST /api/apply (including source=guide_updates).
+ * Validation in handleApplyIntake always runs before insert is called.
+ */
+export type ApplyPersist = {
+  insert(value: ApplyParsed): Promise<ApplyPublicRow>;
+};
+
+/** True when an error looks like a unique-constraint / duplicate-key failure. */
+export function isUniqueConstraintError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  // Postgres 23505, common driver wording, and generic unique/duplicate phrases.
+  return /23505|unique(?:\s+constraint)?|duplicate key|already exists/i.test(msg);
+}
+
+/**
+ * Scrub accidental PII echo from a response body for guide_updates responses.
+ * Never used to build success bodies (those are fixed templates); defense in depth.
+ */
+export function scrubGuideUpdatesResponse(
+  body: Record<string, unknown>,
+  submittedEmail?: string,
+): Record<string, unknown> {
+  const serialized = JSON.stringify(body);
+  let next = serialized;
+  if (submittedEmail && submittedEmail.trim()) {
+    const email = submittedEmail.trim();
+    // Case-insensitive removal of the submitted address if it leaked into the payload.
+    next = next.replace(new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "[redacted]");
+  }
+  // Drop common secret/stack markers if an upstream ever misbehaves.
+  next = next
+    .replace(/postgres(?:ql)?:\/\/[^\s"']+/gi, "[redacted]")
+    .replace(/Traceback[\s\S]{0,500}/gi, "[redacted]")
+    .replace(/psycopg[^\s"']*/gi, "[redacted]");
+  try {
+    return JSON.parse(next) as Record<string, unknown>;
+  } catch {
+    return {
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An unexpected error occurred. Please try again later.",
+      },
+    };
+  }
+}
+
+/**
+ * Validate then optionally insert for POST /api/apply.
+ *
+ * Route: POST /api/apply — guide_updates uses the same path with
+ * `{ "source": "guide_updates", "email": "..." }`.
+ *
+ * Contract:
+ * - Invalid/missing/garbage emails return 4xx and NEVER call persist.insert.
+ * - guide_updates always inserts with source='guide_updates' (via value.source).
+ * - Duplicate policy: insert-again; unique-constraint errors soft-succeed for guide_updates.
+ * - Success/error bodies for guide_updates never echo email or secrets.
+ */
+export async function handleApplyIntake(
+  body: unknown,
+  persist: ApplyPersist | null,
+): Promise<ApplyHandlerResult> {
+  // Validation gate — must complete before any persistence attempt.
+  const parsed = parseApplyBody(body);
+  if (!parsed.ok) {
+    // Error bodies from parseApplyBody never include the submitted email.
+    return { status: parsed.status, body: parsed.body };
+  }
+
+  if (!persist) {
+    return {
+      status: 503,
+      body: {
+        error: {
+          code: "UNAVAILABLE",
+          message: "Service temporarily unavailable. Please try again later.",
+        },
+      },
+    };
+  }
+
+  try {
+    // source is on parsed.value (guide_updates set explicitly in parseApplyBody).
+    const row = await persist.insert(parsed.value);
+    if (parsed.value.isGuideUpdates) {
+      // Success only after commit; PII-free template (no email echo).
+      return { status: 200, body: guideUpdatesSuccessBody() };
+    }
+    return { status: 201, body: row as unknown as Record<string, unknown> };
+  } catch (error) {
+    // Documented insert-again policy: if a UNIQUE constraint is present or added
+    // later, guide_updates still looks like success from the client's perspective.
+    if (parsed.value.isGuideUpdates && isUniqueConstraintError(error)) {
+      return { status: 200, body: guideUpdatesSuccessBody() };
+    }
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred. Please try again later.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
 /** Plausible work email: non-empty local, @, domain with a dot. */
 export function isPlausibleWorkEmail(value: string): boolean {
   const email = value.trim();

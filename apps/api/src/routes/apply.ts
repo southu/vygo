@@ -234,6 +234,7 @@ export function registerApplyRoutes(app: FastifyInstance, deps: ApplyRouteDeps):
     try {
       await ensureApplicationsTable(dbHandle);
       // source is set explicitly from parsed value (guide_updates never uses 'apply' default).
+      // Validation already ran above — invalid emails never reach this insert.
       const row = await insertApplication(dbHandle.db, {
         fullName: parsed.value.fullName,
         workEmail: parsed.value.workEmail,
@@ -247,6 +248,14 @@ export function registerApplyRoutes(app: FastifyInstance, deps: ApplyRouteDeps):
       }
       return reply.status(201).send(row);
     } catch (error) {
+      // Insert-again policy: unique/duplicate failures still look like success for guide_updates.
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (
+        parsed.value.isGuideUpdates &&
+        /23505|unique(?:\s+constraint)?|duplicate key|already exists/i.test(errMsg)
+      ) {
+        return reply.status(200).send(guideUpdatesSuccessBody());
+      }
       request.log.error(
         { event: "apply_insert_failed" },
         error instanceof Error ? error.message : "apply insert failed",
