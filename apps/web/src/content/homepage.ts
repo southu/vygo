@@ -114,6 +114,12 @@ export const homepage = {
       },
     ],
   },
+  guideOffer: {
+    eyebrow: "FREE GUIDE",
+    heading: "Get the Ratchet system guide.",
+    body: "A free, downloadable guide to the build-and-verify loop we use for AI-built software — overview, architecture, and a rebuild checklist. Optional updates signup never blocks reading or download.",
+    cta: { label: "Get the guide", href: "/guide" },
+  },
   methodPreview: {
     heading: "A fixed methodology, not open-ended consulting.",
     steps: [

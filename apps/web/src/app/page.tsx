@@ -101,6 +101,22 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Free guide — public /guide landing with download + optional notify */}
+      <section className="section-pad border-t border-border bg-surface" data-section="guide-offer">
+        <div className="container-page max-w-3xl">
+          <SectionHeading
+            eyebrow={homepage.guideOffer.eyebrow}
+            title={homepage.guideOffer.heading}
+            intro={homepage.guideOffer.body}
+          />
+          <div className="mt-8">
+            <CtaLink href={homepage.guideOffer.cta.href} variant="secondary">
+              {homepage.guideOffer.cta.label}
+            </CtaLink>
+          </div>
+        </div>
+      </section>
+
       {/* Method preview */}
       <section className="section-pad">
         <div className="container-page">

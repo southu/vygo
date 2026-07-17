@@ -38,7 +38,17 @@ export default function InsightsIndexPage() {
                 Draft field notes are being prepared. Public article links and Insights navigation
                 stay hidden until reviewed content is ready.
               </p>
-              <div className="mt-6">
+              <p className="mt-3 text-sm text-muted">
+                Meanwhile, the free{" "}
+                <a href="/guide" className="font-medium text-purple hover:underline">
+                  Ratchet system guide
+                </a>{" "}
+                is available to read and download.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <CtaLink href="/guide" variant="secondary">
+                  Get the guide
+                </CtaLink>
                 <CtaLink href={ctaHrefs.waitlist}>{ctas.applyNextOpening}</CtaLink>
               </div>
             </div>
