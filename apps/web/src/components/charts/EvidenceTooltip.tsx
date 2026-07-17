@@ -138,6 +138,8 @@ export function InteractiveChartSegment({
 }: InteractiveChartSegmentProps) {
   const tipId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
+  /** Touch path: focus opens the tip, then a synthetic click would toggle it closed. */
+  const ignoreNextClickRef = useRef(false);
   const [open, setOpen] = useState(false);
   const hasEvidence = hasChartEvidence(evidence);
   /** Fine-pointer + hover: open on hover; coarse/touch: toggle on tap. */
@@ -226,19 +228,30 @@ export function InteractiveChartSegment({
         onMouseLeave={() => {
           if (fineHover) close();
         }}
-        onFocus={openTip}
+        onFocus={() => {
+          openTip();
+          // On touch/coarse devices, focus is followed by a click that would
+          // toggle the tip closed — swallow that one click.
+          if (!fineHover) ignoreNextClickRef.current = true;
+        }}
         onBlur={(e) => {
           // Keep open when focus moves into the tooltip (rare); otherwise close.
           const next = e.relatedTarget as Node | null;
           if (next && rootRef.current?.contains(next)) return;
+          ignoreNextClickRef.current = false;
           close();
         }}
         onClick={(e) => {
           e.stopPropagation();
-          // Desktop hover already shows the card; only toggle for touch / coarse pointers.
-          // Always ensure open on click so emulated mobile clicks still work when
-          // the browser reports fine pointer (common in headless automation).
+          // Desktop hover already shows the card; click keeps it open.
           if (fineHover) {
+            openTip();
+            return;
+          }
+          // Touch: first click after focus is a no-op (tip already open).
+          // Second tap (already focused) toggles closed; tap elsewhere dismisses.
+          if (ignoreNextClickRef.current) {
+            ignoreNextClickRef.current = false;
             openTip();
             return;
           }
