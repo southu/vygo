@@ -6,10 +6,16 @@ import { ctas } from "@/content/ctas";
 import { LogoText } from "./LogoText";
 import { ApplyCta } from "./ApplyCta";
 import { FooterEmail } from "./FooterEmail";
+import { EmailText } from "./EmailText";
 
 export function SiteFooter() {
   const nav = getFooterNav();
   const showInsights = hasPublishedInsights();
+  // The disclaimer names the contact address; it is swapped for EmailText so
+  // no literal address reaches the served HTML (Cloudflare rewrites even
+  // plain-text emails into /cdn-cgi/l/email-protection anchors that 404).
+  const disclaimer = brand.footerDisclaimer;
+  const emailIndex = disclaimer.indexOf(brand.email);
 
   return (
     <footer className="border-t border-border bg-surface">
@@ -21,7 +27,17 @@ export function SiteFooter() {
           <p className="mt-4">
             <FooterEmail className="text-sm font-semibold text-purple hover:text-purple-dark" />
           </p>
-          <p className="mt-4 max-w-md text-xs text-muted">{brand.footerDisclaimer}</p>
+          <p className="mt-4 max-w-md text-xs text-muted">
+            {emailIndex === -1 ? (
+              disclaimer
+            ) : (
+              <>
+                {disclaimer.slice(0, emailIndex)}
+                <EmailText />
+                {disclaimer.slice(emailIndex + brand.email.length)}
+              </>
+            )}
+          </p>
         </div>
 
         <div>
