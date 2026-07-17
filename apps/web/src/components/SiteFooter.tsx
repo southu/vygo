@@ -5,6 +5,7 @@ import { hasPublishedInsights } from "@/content/insights";
 import { ctas } from "@/content/ctas";
 import { LogoText } from "./LogoText";
 import { ApplyCta } from "./ApplyCta";
+import { FooterEmail } from "./FooterEmail";
 
 export function SiteFooter() {
   const nav = getFooterNav();
@@ -18,12 +19,7 @@ export function SiteFooter() {
           <p className="mt-4 max-w-sm text-sm text-muted">{brand.tagline}</p>
           <p className="mt-3 text-sm text-ink-soft">{brand.promise}</p>
           <p className="mt-4">
-            <a
-              href={`mailto:${brand.email}`}
-              className="text-sm font-semibold text-purple hover:text-purple-dark"
-            >
-              {brand.email}
-            </a>
+            <FooterEmail className="text-sm font-semibold text-purple hover:text-purple-dark" />
           </p>
           <p className="mt-4 max-w-md text-xs text-muted">{brand.footerDisclaimer}</p>
         </div>
