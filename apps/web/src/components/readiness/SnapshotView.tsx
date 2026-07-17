@@ -195,11 +195,14 @@ function dimSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-/** Build insight cards from API insights, with evidence fallbacks when needed. */
+/**
+ * Build insight cards from API insights only.
+ * Sparse degrade: when structured insights are empty, render fewer/zero callouts —
+ * never synthesize a padded grid of template "leaves room to harden" cards.
+ * Never render empty-quote callouts.
+ */
 function resolveInsightCards(data: SnapshotResponse): SnapshotInsight[] {
-  // Require a non-empty source quote so we never render empty-quote callouts or
-  // fabricate insights from blank / whitespace-only answers (sparse degrade).
-  const fromApi = (data.insights ?? [])
+  return (data.insights ?? [])
     .filter(
       (i) =>
         Boolean(i.headline?.trim()) &&
@@ -212,44 +215,8 @@ function resolveInsightCards(data: SnapshotResponse): SnapshotInsight[] {
       detail: quoteText(i.detail, 480),
       source_answer: quoteText(i.source_answer, 180),
     }))
-    .filter((i) => i.source_answer.length > 0);
-  if (fromApi.length > 0) return fromApi.slice(0, 9);
-
-  const fallbacks: SnapshotInsight[] = [];
-  const details = data.dimensionDetails ?? {};
-  for (const dim of DIMENSIONS) {
-    const checks = details[dim]?.checks ?? [];
-    for (const check of checks) {
-      if (fallbacks.length >= 6) break;
-      const answer = quoteText(check.evidence?.answer_value, 120);
-      if (!answer) continue;
-      // Skip unknown / unanswered checks — sparse input must not pad with filler.
-      if (check.status === "unknown" || check.answered === false) continue;
-      const type: SnapshotInsightType =
-        check.status === "strong" ? "strength" : check.status === "at_risk" ? "risk" : "opportunity";
-      const scoreLabel =
-        typeof check.score === "number" && Number.isFinite(check.score)
-          ? `${Math.round(clampScore(check.score))}/100`
-          : null;
-      const detail =
-        quoteText(check.evidence?.reason, 240) ||
-        (scoreLabel ? `${check.label} scored ${scoreLabel}.` : "");
-      if (!detail) continue;
-      fallbacks.push({
-        type,
-        headline:
-          check.status === "strong"
-            ? `Your ${check.label} check is a relative strength`
-            : check.status === "at_risk"
-              ? `Your ${check.label} answer flags production risk`
-              : `Your ${check.label} answer leaves room to harden`,
-        detail,
-        source_answer: answer,
-        dimension: dim,
-      });
-    }
-  }
-  return fallbacks;
+    .filter((i) => i.source_answer.length > 0)
+    .slice(0, 9);
 }
 
 function InsightCard({ insight }: { insight: SnapshotInsight }) {
@@ -570,6 +537,8 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
   );
 
   if (loading) {
+    // Mirror the hydrated report structure (hero / radar / insights / 5 dimensions)
+    // with fixed min-heights so chart hydration does not jump body layout.
     return (
       <div
         className="readiness-report mt-6 space-y-12 sm:mt-8 sm:space-y-14"
@@ -581,24 +550,64 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
           data-testid="snapshot-loading-hero"
         >
           <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-12">
-            <div className="mx-auto w-full max-w-sm shrink-0 lg:mx-0">
+            <div
+              className="mx-auto w-full max-w-sm shrink-0 lg:mx-0"
+              style={{ minHeight: 300 }}
+              data-testid="snapshot-loading-gauge-slot"
+            >
               <ChartSkeleton kind="gauge" label="Loading readiness gauge" />
             </div>
             <div className="min-w-0 flex-1 space-y-4">
               <div className="h-3 w-28 animate-pulse rounded bg-canvas" />
               <div className="h-8 w-3/4 max-w-md animate-pulse rounded bg-canvas" />
               <div className="h-16 w-full max-w-prose animate-pulse rounded bg-canvas" />
+              <div className="h-4 w-40 animate-pulse rounded bg-canvas" />
             </div>
           </div>
         </section>
-        <section data-testid="snapshot-loading-radar">
-          <div className="mb-4 h-6 w-48 animate-pulse rounded bg-canvas" />
-          <div className="mx-auto w-full max-w-xl rounded-3xl border border-border bg-surface p-4 shadow-card sm:p-6">
+        <section data-testid="snapshot-loading-radar" className="space-y-4">
+          <div className="max-w-prose space-y-2">
+            <div className="h-3 w-24 animate-pulse rounded bg-canvas" />
+            <div className="h-7 w-48 animate-pulse rounded bg-canvas" />
+            <div className="h-4 w-full max-w-md animate-pulse rounded bg-canvas" />
+          </div>
+          <div
+            className="mx-auto w-full max-w-xl rounded-3xl border border-border bg-surface p-4 shadow-card sm:p-6"
+            style={{ minHeight: 400 }}
+          >
             <ChartSkeleton kind="radar" label="Loading readiness radar" />
           </div>
         </section>
-        <section data-testid="snapshot-loading-bars">
-          <ChartSkeleton kind="bars" label="Loading sub-metric bars" />
+        <section data-testid="snapshot-loading-insights" className="space-y-5">
+          <div className="max-w-prose space-y-2">
+            <div className="h-3 w-28 animate-pulse rounded bg-canvas" />
+            <div className="h-7 w-64 animate-pulse rounded bg-canvas" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-36 animate-pulse rounded-2xl border border-border bg-canvas"
+                aria-hidden
+              />
+            ))}
+          </div>
+        </section>
+        <section data-testid="snapshot-loading-bars" className="space-y-2">
+          <div className="max-w-prose space-y-2 pb-2">
+            <div className="h-3 w-20 animate-pulse rounded bg-canvas" />
+            <div className="h-7 w-72 animate-pulse rounded bg-canvas" />
+          </div>
+          <div className="space-y-8">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <ChartSkeleton
+                key={i}
+                kind="dimension"
+                label={`Loading dimension ${i + 1}`}
+                className="border-t border-border pt-6"
+              />
+            ))}
+          </div>
         </section>
         <p className="text-sm text-muted">{c.loading}</p>
       </div>
@@ -691,7 +700,7 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
           <div
             className="mx-auto w-full max-w-sm shrink-0 lg:mx-0"
             data-testid="snapshot-hero-gauge"
-            style={{ minHeight: 220 }}
+            style={{ minHeight: 300 }}
           >
             {overallScore !== null ? (
               <ReadinessGauge
@@ -703,7 +712,7 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
               />
             ) : (
               <div
-                className="flex h-[220px] items-center justify-center rounded-2xl border border-border bg-canvas text-sm text-muted"
+                className="flex h-[300px] items-center justify-center rounded-2xl border border-border bg-canvas text-sm text-muted"
                 data-testid="snapshot-score-unavailable"
               >
                 Score unavailable
@@ -767,7 +776,7 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
           className="mx-auto w-full max-w-xl rounded-3xl border border-border bg-surface p-4 shadow-card sm:p-6"
           data-testid="snapshot-chart-radar"
           data-chart="radar"
-          style={{ minHeight: 320 }}
+          style={{ minHeight: 400 }}
         >
           {radarDimensions.length > 0 ? (
             <ReadinessRadarChart dimensions={radarDimensions} />

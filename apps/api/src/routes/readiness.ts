@@ -52,6 +52,7 @@ import {
   detectFollowupDiscrepancies,
   FOLLOWUP_QUESTION_SEED,
   followupSeedMetadata,
+  hasScorableReportAnswers,
   manualAnswersToReport,
   redactPasteSecrets,
   runDeterministicParse,
@@ -2141,15 +2142,45 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       // Deep-redact free-text report fields before scoring/storage.
       report = redactReportDeep(report);
 
-      // Malformed / empty answer payload: fail closed with an honest error (no silent score).
-      const reportKeys = Object.keys(report).filter((k) => {
-        const v = report[k];
-        if (v == null) return false;
-        if (typeof v === "string") return v.trim().length > 0;
-        if (Array.isArray(v)) return v.length > 0;
-        return true;
-      });
-      if (reportKeys.length === 0) {
+      let pasteRedacted: string | null =
+        typeof draft.rawPasteRedacted === "string"
+          ? draft.rawPasteRedacted
+          : typeof draft.pasteText === "string"
+            ? draft.pasteText
+            : null;
+      if (pasteRedacted) {
+        pasteRedacted = redactSensitivePaste(redactPasteSecrets(pasteRedacted).redacted);
+      }
+      if (typeof body.paste === "string" && body.paste.trim()) {
+        pasteRedacted = redactSensitivePaste(redactPasteSecrets(body.paste).redacted).slice(
+          0,
+          50_000,
+        );
+      }
+
+      const stage1 =
+        draft.stage1 && typeof draft.stage1 === "object" && !Array.isArray(draft.stage1)
+          ? (draft.stage1 as Partial<ReadinessStage1Answers>)
+          : null;
+      const followups =
+        draft.followupAnswers &&
+        typeof draft.followupAnswers === "object" &&
+        !Array.isArray(draft.followupAnswers)
+          ? (draft.followupAnswers as Record<string, unknown>)
+          : null;
+
+      let configRow = null;
+      try {
+        configRow = await getActiveReadinessScoringConfig(dbHandle.db, "default");
+      } catch {
+        configRow = null;
+      }
+      const scoringConfig = scoringConfigFromDbRow(configRow);
+
+      // Empty OR junk/unrecognized answer payload: fail closed (no silent all-25 baseline).
+      // Only recognized scoring/report fields count — arbitrary keys like {totally:'wrong'}
+      // must not produce a normal scorecard.
+      if (!hasScorableReportAnswers(report, scoringConfig)) {
         const contactFail: Record<string, unknown> = {
           source: e2eBypass ? "readiness_score_gate_e2e" : "readiness_score_gate",
           name,
@@ -2198,41 +2229,6 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
             "Assessment answers were missing or malformed; no readiness score was computed.",
         });
       }
-
-      let pasteRedacted: string | null =
-        typeof draft.rawPasteRedacted === "string"
-          ? draft.rawPasteRedacted
-          : typeof draft.pasteText === "string"
-            ? draft.pasteText
-            : null;
-      if (pasteRedacted) {
-        pasteRedacted = redactSensitivePaste(redactPasteSecrets(pasteRedacted).redacted);
-      }
-      if (typeof body.paste === "string" && body.paste.trim()) {
-        pasteRedacted = redactSensitivePaste(redactPasteSecrets(body.paste).redacted).slice(
-          0,
-          50_000,
-        );
-      }
-
-      const stage1 =
-        draft.stage1 && typeof draft.stage1 === "object" && !Array.isArray(draft.stage1)
-          ? (draft.stage1 as Partial<ReadinessStage1Answers>)
-          : null;
-      const followups =
-        draft.followupAnswers &&
-        typeof draft.followupAnswers === "object" &&
-        !Array.isArray(draft.followupAnswers)
-          ? (draft.followupAnswers as Record<string, unknown>)
-          : null;
-
-      let configRow = null;
-      try {
-        configRow = await getActiveReadinessScoringConfig(dbHandle.db, "default");
-      } catch {
-        configRow = null;
-      }
-      const scoringConfig = scoringConfigFromDbRow(configRow);
 
       let payload: ReadinessScorePayload;
       try {
@@ -2531,6 +2527,57 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           !Array.isArray(draft.followupAnswers)
             ? (draft.followupAnswers as Record<string, unknown>)
             : null;
+
+        // Fail closed on junk/empty — same policy as /v1/readiness/score.
+        if (!hasScorableReportAnswers(report, scoringConfig ?? undefined)) {
+          const contactFail: Record<string, unknown> = {
+            source: "readiness_score_e2e",
+            name,
+            fullName: name,
+            email,
+            privacyAccepted: true,
+            e2e: true,
+            gatedAt: new Date().toISOString(),
+          };
+          const failScores: Record<string, unknown> = {
+            scoringFailed: true,
+            errorCode: "SCORING_FAILED",
+            errorMessage:
+              "Assessment answers were missing or malformed; no readiness score was computed.",
+          };
+          const savedFail = await persistReadinessScore(dbHandle.db, {
+            token,
+            scores: failScores,
+            bucket: "Launch",
+            contact: contactFail,
+            parsedReport: report,
+            rawPasteRedacted: null,
+            discrepancyFlags: Array.isArray(draft.discrepancyFlags) ? draft.discrepancyFlags : [],
+          });
+          request.log.info(
+            { event: "readiness_score_e2e_failed_validation", snapshotId: savedFail.id },
+            "readiness e2e scoring failed: empty/malformed answers",
+          );
+          return reply.status(200).send({
+            ...publicSnapshotBody({
+              id: savedFail.id,
+              scores: failScores,
+              bucket: null,
+              contact: contactFail,
+              parsedReport: report,
+              createdAt: savedFail.createdAt,
+            }),
+            snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(savedFail.id)}`,
+            scoringFailed: true,
+            errorCode: "SCORING_FAILED",
+            errorMessage:
+              "Assessment answers were missing or malformed; no readiness score was computed.",
+            e2e: true,
+            turnstileRequired: false,
+            persisted: true,
+            email: { snapshotQueued: false, opsBriefQueued: false },
+          });
+        }
 
         const payload = computeReadinessScore({
           report,

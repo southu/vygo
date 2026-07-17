@@ -7,6 +7,7 @@ import {
   computeReadinessScore,
   containsRemediationDetail,
   deriveBucketSignals,
+  hasScorableReportAnswers,
   scoreAllDimensionDetails,
   scoreAllDimensions,
   scoreFieldValue,
@@ -452,5 +453,34 @@ describe("readiness scoring", () => {
       payload.reasoning,
       /The submission does not yet describe a working product surface we can score confidently\./,
     );
+  });
+});
+
+describe("hasScorableReportAnswers", () => {
+  it("returns false for empty, junk-only, and all-unknown payloads", () => {
+    assert.equal(hasScorableReportAnswers({}), false);
+    assert.equal(hasScorableReportAnswers(null), false);
+    assert.equal(
+      hasScorableReportAnswers({ totally: "wrong", confidence: "NaN" }),
+      false,
+      "unrecognized keys must not count as scorable answers",
+    );
+    assert.equal(
+      hasScorableReportAnswers({ confidence: "NaN", not: "valid" }),
+      false,
+    );
+    assert.equal(
+      hasScorableReportAnswers({ auth: "unknown", tests: "Not sure" }),
+      false,
+      "placeholder-only answers must not count as scorable",
+    );
+    assert.equal(hasScorableReportAnswers(UNKNOWN_REPORT), false);
+  });
+
+  it("returns true for real report field answers (including sparse)", () => {
+    assert.equal(hasScorableReportAnswers({ auth: "oauth" }), true);
+    assert.equal(hasScorableReportAnswers({ tests: "none" }), true);
+    assert.equal(hasScorableReportAnswers({ summary: "x" }), true);
+    assert.equal(hasScorableReportAnswers(HARDEN_REPORT), true);
   });
 });

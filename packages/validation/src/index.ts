@@ -161,6 +161,7 @@ export {
   buildTopFindings,
   buildEngagementReasoning,
   engagementMeta,
+  hasScorableReportAnswers,
   scoringConfigFromDbRow,
   normalizeScoringConfig,
   defaultScoringRulesJson,

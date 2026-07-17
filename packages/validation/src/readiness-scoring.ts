@@ -1235,6 +1235,48 @@ export type ComputeScoreInput = {
 };
 
 /**
+ * True when the report contains at least one recognized scoring/report field
+ * with a real (non-empty, non-unknown-placeholder) answer. Junk / unrecognized
+ * payloads (e.g. `{totally:'wrong', confidence:'NaN'}`) and all-unknown defaults
+ * from empty manual maps return false so callers fail closed instead of emitting
+ * the silent all-unknown baseline (~25).
+ *
+ * Sparse but real answers ("x", "none", short free-text) still count as scorable.
+ */
+export function hasScorableReportAnswers(
+  report: ReadinessReportV1Partial | Record<string, unknown> | null | undefined,
+  config: ReadinessScoringConfig = DEFAULT_SCORING_CONFIG,
+): boolean {
+  const rec = (report ?? {}) as Record<string, unknown>;
+  const fields = new Set<string>();
+  for (const dim of config.dimensions) {
+    for (const rule of dim.fields) {
+      if (rule.field) fields.add(rule.field);
+    }
+  }
+  // Also accept canonical report fields that feed findings/insights even when
+  // not every config revision lists them as weighted checks (e.g. summary).
+  for (const f of [
+    "summary",
+    "integrations",
+    "database",
+    "frontend",
+    "backend",
+    "tenancy",
+    "pii_categories",
+  ] as const) {
+    fields.add(f);
+  }
+
+  for (const field of fields) {
+    const v = rec[field];
+    // Require a concrete answer — unknown/blank placeholders alone are not scorable.
+    if (!isUnknownField(v)) return true;
+  }
+  return false;
+}
+
+/**
  * Full score + bucket + reasoning computation.
  * Config must supply dimension weights; falls back to DEFAULT_SCORING_CONFIG.
  */
