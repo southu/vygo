@@ -5,10 +5,19 @@
  * DATABASE_URL it writes directly; otherwise it proxies server-to-server to the
  * Railway API (which always has the project Postgres). Clients never talk to the
  * database — only this endpoint.
+ *
+ * Also accepts guide-update email signups on the same path (no heavier anti-bot
+ * gate than standard apply — Turnstile is not required on this intake today).
+ * Request shape (documented near parseApplyBody in ../_lib/apply.ts):
+ *   { "source": "guide_updates", "email": "user@example.com" }
+ * Duplicate policy: repeat guide_updates emails insert a NEW row and return
+ * friendly success (never "already signed up"). source is set to 'guide_updates'
+ * explicitly on insert — never the applications column default of 'apply'.
  */
 import postgres from "postgres";
 import type { Sql } from "postgres";
 import {
+  guideUpdatesSuccessBody,
   insertApplicationRow,
   parseApplyBody,
   proxyApplyPost,
@@ -80,17 +89,35 @@ async function handlePost(req: EdgeRequest): Promise<ApplyHandlerResult> {
 
     const url = resolveDatabaseUrl();
     if (!url) {
-      return proxyApplyPost({
+      // Forward source so upstream Railway sets applications.source explicitly
+      // (guide_updates must never fall through to the 'apply' default).
+      const upstream = await proxyApplyPost({
+        source: parsed.value.source,
         full_name: parsed.value.fullName,
         work_email: parsed.value.workEmail,
         product_url: parsed.value.productUrl,
         message: parsed.value.message,
       });
+      // Defense in depth: never echo email/PII for guide_updates even if upstream
+      // returned a full applications row (success only after upstream 2xx commit).
+      if (
+        parsed.value.isGuideUpdates &&
+        upstream.status >= 200 &&
+        upstream.status < 300
+      ) {
+        return { status: 200, body: guideUpdatesSuccessBody(), logError: upstream.logError };
+      }
+      return upstream;
     }
 
     try {
       const sql = getSql(url);
-      const row = await insertApplicationRow(sql, parsed.value);
+      // source is taken from parsed.value (guide_updates set explicitly above).
+      const row = await insertApplicationRow(sql, parsed.value, parsed.value.source);
+      if (parsed.value.isGuideUpdates) {
+        // Success only after commit; never echo email / PII for guide opt-ins.
+        return { status: 200, body: guideUpdatesSuccessBody() };
+      }
       return { status: 201, body: row };
     } catch (error) {
       return {

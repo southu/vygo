@@ -41,6 +41,31 @@ describe("apply validation", () => {
       assert.equal(result.status, 400);
     }
   });
+
+  it("accepts guide_updates with email and sets source explicitly", () => {
+    const result = parseApplyBody({
+      source: "guide_updates",
+      email: "  Guide.User@Example.COM ",
+    });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.value.isGuideUpdates, true);
+      assert.equal(result.value.source, "guide_updates");
+      assert.equal(result.value.workEmail, "guide.user@example.com");
+      assert.equal(result.value.fullName, "Guide updates");
+    }
+  });
+
+  it("rejects guide_updates with invalid email", () => {
+    const result = parseApplyBody({
+      source: "guide_updates",
+      email: "not-an-email",
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.status, 400);
+    }
+  });
 });
 
 describe("apply routes without database", () => {
@@ -117,6 +142,39 @@ describe("apply routes without database", () => {
     const body = res.json() as { id?: string; error?: { code?: string } };
     assert.equal(body.id, undefined);
     assert.equal(body.error?.code, "UNAVAILABLE");
+  });
+
+  it("POST /api/apply guide_updates returns 4xx for invalid email without secrets", async () => {
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/api/apply",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://www.vygo.ai",
+      },
+      payload: {
+        source: "guide_updates",
+        email: "not-an-email",
+      },
+    });
+    assert.equal(res.statusCode, 400);
+    const raw = res.body;
+    assert.equal(/traceback/i.test(raw), false);
+    assert.equal(/postgres/i.test(raw), false);
+  });
+
+  it("POST /api/apply guide_updates returns 4xx for empty body object", async () => {
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/api/apply",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://www.vygo.ai",
+      },
+      payload: {},
+    });
+    assert.ok(res.statusCode >= 400 && res.statusCode < 500);
+    assert.ok(res.statusCode < 500);
   });
 
   it("GET /api/apply/:id returns 400 for non-uuid", async () => {

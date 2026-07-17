@@ -78,6 +78,61 @@ describe("parseApplyBody", () => {
       assert.equal("id" in result.body, false);
     }
   });
+
+  it("accepts guide_updates with email only and normalizes address", () => {
+    const result = parseApplyBody({
+      source: "guide_updates",
+      email: "  Guide.User+Tag@Example.COM ",
+    });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.value.isGuideUpdates, true);
+      assert.equal(result.value.source, "guide_updates");
+      assert.equal(result.value.workEmail, "guide.user+tag@example.com");
+      assert.equal(result.value.fullName, "Guide updates");
+      assert.equal(result.value.message, "guide updates opt-in");
+    }
+  });
+
+  it("accepts guide_updates with work_email alias", () => {
+    const result = parseApplyBody({
+      source: "guide_updates",
+      work_email: "alias@example.com",
+    });
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.equal(result.value.workEmail, "alias@example.com");
+      assert.equal(result.value.source, "guide_updates");
+    }
+  });
+
+  it("rejects guide_updates with invalid email and no row id", () => {
+    const result = parseApplyBody({
+      source: "guide_updates",
+      email: "not-an-email",
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.status, 400);
+      assert.equal("id" in result.body, false);
+    }
+  });
+
+  it("rejects guide_updates with empty body fields (missing email)", () => {
+    const result = parseApplyBody({ source: "guide_updates" });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.status, 400);
+    }
+  });
+
+  it("rejects empty object as apply (not guide_updates) with 4xx", () => {
+    const result = parseApplyBody({});
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.status, 400);
+    }
+  });
 });
 
 describe("readJsonBody", () => {

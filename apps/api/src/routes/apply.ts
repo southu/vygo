@@ -5,12 +5,30 @@
  *
  * The applications table is ensured on first use so a deploy works even when
  * the formal Drizzle migration has not yet been applied via pnpm db:migrate.
+ *
+ * --- Guide-update email signups (same POST /api/apply intake) ---
+ * Request JSON shape (discriminator + email; name/message optional):
+ *   { "source": "guide_updates", "email": "user@example.com" }
+ * Also accepts "work_email" (or camelCase workEmail) as the email field.
+ * Optional: "full_name" / "fullName", "message".
+ *
+ * Duplicate policy: a repeat email for guide_updates inserts a NEW applications
+ * row (source explicitly 'guide_updates') and still returns a friendly success —
+ * never an "already signed up" error.
+ *
+ * Anti-bot: mirrors standard apply (no Turnstile on this route today).
+ * Success for guide_updates is returned only after the row commits and never
+ * echoes email or other PII.
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { findApplicationById, insertApplication, type DatabaseHandle } from "@vygo/db";
 import { safeError } from "../errors.js";
 
 const SOURCE = "apply";
+/** Explicit applications.source for guide-update opt-ins — never the 'apply' default. */
+const GUIDE_UPDATES_SOURCE = "guide_updates";
+const GUIDE_UPDATES_FULL_NAME = "Guide updates";
+const GUIDE_UPDATES_DEFAULT_MESSAGE = "guide updates opt-in";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type ApplyRouteDeps = {
@@ -36,7 +54,37 @@ export type ParsedApplyBody = {
   workEmail: string;
   productUrl: string | null;
   message: string | null;
+  /** Explicit insert source — guide_updates never falls through to 'apply'. */
+  source: string;
+  isGuideUpdates: boolean;
 };
+
+function isGuideUpdatesSource(record: Record<string, unknown>): boolean {
+  const raw = record.source;
+  return typeof raw === "string" && raw.trim().toLowerCase() === GUIDE_UPDATES_SOURCE;
+}
+
+function extractEmailRaw(record: Record<string, unknown>): string {
+  if (typeof record.work_email === "string") return record.work_email;
+  if (typeof record.workEmail === "string") return record.workEmail;
+  if (typeof record.email === "string") return record.email;
+  return "";
+}
+
+function extractFullNameRaw(record: Record<string, unknown>): string {
+  if (typeof record.full_name === "string") return record.full_name;
+  if (typeof record.fullName === "string") return record.fullName;
+  return "";
+}
+
+/** PII-free success body for guide_updates (no email, name, or secrets). */
+export function guideUpdatesSuccessBody(): Record<string, unknown> {
+  return {
+    ok: true,
+    accepted: true,
+    message: "You're signed up for guide updates.",
+  };
+}
 
 export function parseApplyBody(
   body: unknown,
@@ -52,20 +100,48 @@ export function parseApplyBody(
   }
   const record = body as Record<string, unknown>;
 
-  const fullNameRaw =
-    typeof record.full_name === "string"
-      ? record.full_name
-      : typeof record.fullName === "string"
-        ? record.fullName
-        : "";
-  const workEmailRaw =
-    typeof record.work_email === "string"
-      ? record.work_email
-      : typeof record.workEmail === "string"
-        ? record.workEmail
-        : typeof record.email === "string"
-          ? record.email
-          : "";
+  // --- guide_updates branch (same endpoint; lighter validation) ---
+  if (isGuideUpdatesSource(record)) {
+    const workEmailRaw = extractEmailRaw(record);
+    // Normalize: trim + lowercase for durable storage in work_email.
+    const workEmail = workEmailRaw.trim().toLowerCase();
+    if (!workEmail) {
+      return {
+        ok: false,
+        status: 400,
+        error: safeError("VALIDATION_ERROR", "email is required."),
+      };
+    }
+    if (!isPlausibleWorkEmail(workEmail)) {
+      return {
+        ok: false,
+        status: 400,
+        error: safeError(
+          "VALIDATION_ERROR",
+          "email must be a valid-looking address (include @ and a domain).",
+        ),
+      };
+    }
+
+    const fullNameRaw = extractFullNameRaw(record).trim();
+    const messageRaw = typeof record.message === "string" ? record.message.trim() : "";
+
+    return {
+      ok: true,
+      value: {
+        fullName: fullNameRaw || GUIDE_UPDATES_FULL_NAME,
+        workEmail,
+        productUrl: null,
+        message: messageRaw || GUIDE_UPDATES_DEFAULT_MESSAGE,
+        source: GUIDE_UPDATES_SOURCE,
+        isGuideUpdates: true,
+      },
+    };
+  }
+
+  // --- standard apply branch ---
+  const fullNameRaw = extractFullNameRaw(record);
+  const workEmailRaw = extractEmailRaw(record);
   const productUrlRaw =
     typeof record.product_url === "string"
       ? record.product_url
@@ -115,6 +191,8 @@ export function parseApplyBody(
       workEmail,
       productUrl: productUrlRaw.trim() || null,
       message: messageRaw.trim() || null,
+      source: SOURCE,
+      isGuideUpdates: false,
     },
   };
 }
@@ -155,13 +233,18 @@ export function registerApplyRoutes(app: FastifyInstance, deps: ApplyRouteDeps):
 
     try {
       await ensureApplicationsTable(dbHandle);
+      // source is set explicitly from parsed value (guide_updates never uses 'apply' default).
       const row = await insertApplication(dbHandle.db, {
         fullName: parsed.value.fullName,
         workEmail: parsed.value.workEmail,
         productUrl: parsed.value.productUrl,
         message: parsed.value.message,
-        source: SOURCE,
+        source: parsed.value.source,
       });
+      if (parsed.value.isGuideUpdates) {
+        // Success only after commit; never echo email / PII for guide opt-ins.
+        return reply.status(200).send(guideUpdatesSuccessBody());
+      }
       return reply.status(201).send(row);
     } catch (error) {
       request.log.error(

@@ -2,11 +2,28 @@
  * Shared apply-form validation + Postgres persistence for the marketing edge.
  * When no local DATABASE_URL is configured, the edge function proxies to the
  * Railway API (which has Postgres). Never returns connection strings or stacks.
+ *
+ * --- Guide-update email signups (same POST /api/apply intake) ---
+ * Request JSON shape (discriminator + email; name/message optional):
+ *   { "source": "guide_updates", "email": "user@example.com" }
+ * Also accepts "work_email" (or camelCase workEmail) as the email field.
+ * Optional: "full_name" / "fullName", "message".
+ *
+ * Duplicate policy: a repeat email for guide_updates inserts a NEW applications
+ * row (source explicitly 'guide_updates') and still returns a friendly success —
+ * never an "already signed up" error. No unique constraint is enforced here.
+ *
+ * Success for guide_updates is returned only after the applications row commits,
+ * and the response never echoes email or other PII (unlike apply read-back).
  */
 import type { Sql } from "postgres";
 import { resolveDatabaseUrl, resolveUpstreamApiOrigin } from "./store.js";
 
 export const APPLY_SOURCE = "apply";
+/** Explicit applications.source value for guide-update opt-ins — never rely on DB default. */
+export const GUIDE_UPDATES_SOURCE = "guide_updates";
+export const GUIDE_UPDATES_FULL_NAME = "Guide updates";
+export const GUIDE_UPDATES_DEFAULT_MESSAGE = "guide updates opt-in";
 
 export type ApplyPublicRow = {
   id: string;
@@ -23,6 +40,14 @@ export type ApplyParsed = {
   workEmail: string;
   productUrl: string | null;
   message: string | null;
+  /**
+   * Stored on applications.source when provided. For guide_updates this is always
+   * GUIDE_UPDATES_SOURCE (set explicitly at insert — never the 'apply' default).
+   * Optional for callers that pass source as insertApplicationRow's third arg
+   * (e.g. waitlist dual-write).
+   */
+  source?: string;
+  isGuideUpdates?: boolean;
 };
 
 export type ApplyHandlerResult = {
@@ -44,6 +69,36 @@ export function isPlausibleWorkEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function isGuideUpdatesSource(record: Record<string, unknown>): boolean {
+  const raw = record.source;
+  return typeof raw === "string" && raw.trim().toLowerCase() === GUIDE_UPDATES_SOURCE;
+}
+
+function extractEmailRaw(record: Record<string, unknown>): string {
+  if (typeof record.work_email === "string") return record.work_email;
+  if (typeof record.workEmail === "string") return record.workEmail;
+  if (typeof record.email === "string") return record.email;
+  return "";
+}
+
+function extractFullNameRaw(record: Record<string, unknown>): string {
+  if (typeof record.full_name === "string") return record.full_name;
+  if (typeof record.fullName === "string") return record.fullName;
+  return "";
+}
+
+/**
+ * PII-free success body for guide_updates. Never includes email, name, or secrets.
+ * Call only after the applications row has been committed.
+ */
+export function guideUpdatesSuccessBody(): Record<string, unknown> {
+  return {
+    ok: true,
+    accepted: true,
+    message: "You're signed up for guide updates.",
+  };
+}
+
 export function parseApplyBody(
   body: unknown,
 ): { ok: true; value: ApplyParsed } | { ok: false; status: number; body: Record<string, unknown> } {
@@ -56,20 +111,56 @@ export function parseApplyBody(
   }
   const record = body as Record<string, unknown>;
 
-  const fullNameRaw =
-    typeof record.full_name === "string"
-      ? record.full_name
-      : typeof record.fullName === "string"
-        ? record.fullName
-        : "";
-  const workEmailRaw =
-    typeof record.work_email === "string"
-      ? record.work_email
-      : typeof record.workEmail === "string"
-        ? record.workEmail
-        : typeof record.email === "string"
-          ? record.email
-          : "";
+  // --- guide_updates branch (same endpoint; lighter validation) ---
+  if (isGuideUpdatesSource(record)) {
+    const workEmailRaw = extractEmailRaw(record);
+    // Normalize: trim + lowercase for durable storage in work_email.
+    const workEmail = workEmailRaw.trim().toLowerCase();
+    if (!workEmail) {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "email is required.",
+          },
+        },
+      };
+    }
+    if (!isPlausibleWorkEmail(workEmail)) {
+      return {
+        ok: false,
+        status: 400,
+        body: {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "email must be a valid-looking address (include @ and a domain).",
+          },
+        },
+      };
+    }
+
+    const fullNameRaw = extractFullNameRaw(record).trim();
+    const messageRaw =
+      typeof record.message === "string" ? record.message.trim() : "";
+
+    return {
+      ok: true,
+      value: {
+        fullName: fullNameRaw || GUIDE_UPDATES_FULL_NAME,
+        workEmail,
+        productUrl: null,
+        message: messageRaw || GUIDE_UPDATES_DEFAULT_MESSAGE,
+        source: GUIDE_UPDATES_SOURCE,
+        isGuideUpdates: true,
+      },
+    };
+  }
+
+  // --- standard apply branch ---
+  const fullNameRaw = extractFullNameRaw(record);
+  const workEmailRaw = extractEmailRaw(record);
   const productUrlRaw =
     typeof record.product_url === "string"
       ? record.product_url
@@ -126,6 +217,8 @@ export function parseApplyBody(
       workEmail,
       productUrl: productUrlRaw.trim() || null,
       message: messageRaw.trim() || null,
+      source: APPLY_SOURCE,
+      isGuideUpdates: false,
     },
   };
 }
@@ -159,8 +252,17 @@ function toIso(value: Date | string): string {
 export async function insertApplicationRow(
   sql: Sql,
   value: ApplyParsed,
-  source: string = APPLY_SOURCE,
+  /**
+   * Override source (e.g. waitlist dual-write). When omitted, uses value.source
+   * so guide_updates never falls through to the 'apply' column default.
+   */
+  source?: string,
 ): Promise<ApplyPublicRow> {
+  // Prefer explicit override, then parsed value.source, then apply default.
+  const insertSource =
+    (source && source.trim()) ||
+    (value.source && value.source.trim()) ||
+    APPLY_SOURCE;
   await ensureApplicationsTable(sql);
   const rows = await sql<
     {
@@ -179,7 +281,7 @@ export async function insertApplicationRow(
       ${value.workEmail},
       ${value.productUrl},
       ${value.message},
-      ${source}
+      ${insertSource}
     )
     RETURNING id, full_name, work_email, product_url, message, source, created_at
   `;
