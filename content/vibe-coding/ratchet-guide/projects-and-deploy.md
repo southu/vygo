@@ -6,7 +6,7 @@
 
 ## Project shells
 
-Each product is a folder under `COMPOSER_PROJECTS_ROOT` (default `/srv/ratchet/projects/<slug>`) with a `project.json` (see [layout.md](./layout.md)).
+Each product is a folder under `COMPOSER_PROJECTS_ROOT` (default `RATCHET_ROOT/projects/<slug>`) with a `project.json` (see [layout.md](./layout.md)).
 
 Composer **Projects** UI creates/edits these shells and can clone repos onto the VPC.
 

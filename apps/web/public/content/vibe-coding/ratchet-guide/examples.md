@@ -2,6 +2,8 @@
 
 ← [Footguns](./footguns.md) · [Index](./README.md)
 
+Paths use the placeholder root `RATCHET_ROOT`.
+
 ---
 
 ## 1. Mock loop (zero API cost)
@@ -9,7 +11,7 @@
 Proves orchestration without Claude/Grok spend.
 
 ```bash
-cd /srv/ratchet/harness   # or your harness root
+cd RATCHET_ROOT/harness   # or your harness root
 bin/ratchet run missions/mock-loop.yaml --scenario fixtures/scenarios/happy.txt
 ```
 
@@ -83,7 +85,7 @@ adapters:
   "repo": {
     "url": "https://git.example.com/you/acme.git",
     "default_branch": "main",
-    "local_path": "/srv/ratchet/projects/acme"
+    "local_path": "RATCHET_ROOT/projects/acme"
   },
   "deploy": {
     "live_url": "https://www.acme.example",
@@ -116,64 +118,38 @@ The product details are incidental — the **system** is the loop + control plan
 
 ---
 
-## 6. systemd KillMode snippet
+## 6. Composer restart seatbelt (concept)
 
-```ini
-[Service]
-KillMode=process
-# Detached ratchet workers must survive Admin Apply / composer restarts.
-```
-
-Verify:
-
-```bash
-systemctl show ratchet-composer -p KillMode --value
-# process
-```
+Detached harness workers must survive Composer restarts (Admin Apply, model update). Configure your process manager so a Composer bounce does **not** reap the whole process tree.
 
 ---
 
-## 7. nginx open version paths (sketch)
+## 7. Product version path (edge sketch)
+
+Products should leave deploy-gate probes open without control-plane auth:
 
 ```nginx
 location = /version {
     auth_basic off;
-    proxy_pass http://127.0.0.1:8377;
+    # proxy or serve the product app
 }
 location = /version.txt {
     auth_basic off;
-    proxy_pass http://127.0.0.1:8377;
-}
-location = /health {
-    auth_basic off;
-    proxy_pass http://127.0.0.1:8377;
 }
 ```
 
-Adapt upstream per host (dash vs product site).
+Adapt to your edge and product host. The gate only needs a public SHA body at the configured `version_url`.
 
 ---
 
-## 8. Health one-liner pack
-
-```bash
-systemctl is-active ratchet-composer ratchet-lazy ratchet-vault ratchet-sentinel nginx
-curl -sS -w "\ncomposer %{http_code}\n" http://127.0.0.1:8377/health
-curl -sS -w "\nlazy %{http_code}\n" http://127.0.0.1:8378/health
-curl -sS -w "\nvault %{http_code}\n" http://127.0.0.1:8379/health
-curl -sS https://www.example.com/version; echo
-```
-
----
-
-## 9. What to open-source vs keep private
+## 8. What to open-source vs keep private
 
 | Share freely                              | Keep private                                |
 | ----------------------------------------- | ------------------------------------------- |
 | Harness, mission schema, mock adapters    | `secrets.env`, vault `data/`, consumer keys |
 | Composer UI patterns, queue builder tests | Basic-auth passwords, API tokens            |
-| This guide pack                           | Master passwords, Railway account tokens    |
-| Operator runbook _structure_              | Production-only hostnames if you care       |
+| This guide pack                           | Master passwords, cloud account tokens      |
+| Architecture diagrams                     | Install-specific hostnames if you care      |
 
 ---
 

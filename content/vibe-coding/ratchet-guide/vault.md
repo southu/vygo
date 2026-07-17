@@ -45,7 +45,7 @@ Local, master-password **credentials vault** for Ratchet/Composer — outside Bu
 
 ```bash
 # conceptual — never print key material
-/srv/ratchet/harness/bin/harness_smoke.sh acme
+RATCHET_ROOT/harness/bin/harness_smoke.sh acme
 ```
 
 Smoke-style exit codes (reference):
@@ -72,7 +72,7 @@ Smoke-style exit codes (reference):
 
 ```python
 from vault_client import VaultClient
-vc = VaultClient(key_path="/srv/ratchet/control/vault_consumer.key")
+vc = VaultClient(key_path="RATCHET_ROOT/control/vault_consumer.key")
 vc.register_run("my-run-id", "acme")
 print(vc.action("railway.whoami", folder="acme", run_id="my-run-id"))
 print(vc.action(

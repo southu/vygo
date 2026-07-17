@@ -40,23 +40,17 @@ More diagrams: [diagrams.md](./diagrams.md) · Printable: [one-pager-print](./on
 
 ## Component cheat sheet
 
-| Component            | Role                                                            | Default bind                   |
-| -------------------- | --------------------------------------------------------------- | ------------------------------ |
-| **Composer**         | Human UI: Build home, projects, queue, dashboard, admin, assist | `127.0.0.1:8377`               |
-| **Sentinel**         | Supervisor: arm/disarm, watch composer/queue health             | no public port                 |
-| **Lazy Mode**        | Independent overnight watchdog (observe / ops)                  | `127.0.0.1:8378`               |
-| **Medic**            | Recovery console for queues/ops (on Lazy host, `/medic`)        | same as Lazy                   |
-| **Vault**            | Master-password credentials; broker for Railway etc.            | `127.0.0.1:8379`               |
-| **Ratchet CLI**      | Orchestration loop (builder / deploy gate / tester)             | `/srv/ratchet/harness`         |
-| **Projects**         | One folder per product (`project.json` + optional clone)        | `/srv/ratchet/projects/<slug>` |
-| **Console**          | Browser ttyd → operator Grok TUI                                | loopback + nginx path          |
-| **Operator sidecar** | Long-lived Grok Build CLI babysitting the plant (poll cadence)  | laptop or `/console`           |
+| Component       | Role                                                            | Default bind (illustrative)        |
+| --------------- | --------------------------------------------------------------- | ---------------------------------- |
+| **Composer**    | Human UI: Build home, projects, queue, dashboard, admin, assist | `127.0.0.1:8377`                   |
+| **Sentinel**    | Supervisor: arm/disarm, watch composer/queue health             | no public port                     |
+| **Lazy Mode**   | Independent overnight watchdog (observe / ops)                  | `127.0.0.1:8378`                   |
+| **Medic**       | Recovery console for queues (on Lazy host, `/medic`)            | same as Lazy                       |
+| **Vault**       | Master-password credentials; broker for Railway etc.            | `127.0.0.1:8379`                   |
+| **Ratchet CLI** | Orchestration loop (builder / deploy gate / tester)             | `RATCHET_ROOT/harness`             |
+| **Projects**    | One folder per product (`project.json` + optional clone)        | `RATCHET_ROOT/projects/<slug>`     |
 
-All control-plane HTTP is **loopback only**. Public access is typically nginx TLS + basic auth (e.g. `dash.*`, `files.*`, `bot.*`).
-
-### Operator sidecar (quick)
-
-While the floor runs, operators often open a **Grok Build CLI** as a sidecar: poll about **every 2 minutes** until the plant is **clean**, then **every 10 minutes** until the campaign is **done** (snap back to 2 min if anything breaks). Details: [operations.md](./operations.md#operator-sidecar-grok-build-babysit).
+All control-plane HTTP is **loopback only** in the reference design. Public access is typically an edge proxy with TLS + basic auth (e.g. `dash.*`, `files.*`, `bot.*` placeholders).
 
 ---
 
@@ -75,9 +69,8 @@ While the floor runs, operators often open a **Grok Build CLI** as a sidecar: po
 
 - Not a general chat UI for product users
 - Not a CI replacement (though it pairs with host deploy pipelines)
-- Not “Medic implements features” — Medic recovers ops; builders implement product
+- Not “Medic implements features” — Medic recovers ops state; builders implement product
 - Not a place to put secrets in agent prompts or builder env
-- Not “sidecar writes product code” — sidecar babysits ops; builders implement product
 
 ---
 

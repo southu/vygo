@@ -33,7 +33,7 @@ flowchart TD
 
 ```mermaid
 flowchart TB
-  subgraph edge [Public edge nginx + basic auth]
+  subgraph edge [Public edge · TLS + basic auth]
     DASH[dash.*]
     FILES[files.*]
     BOT[bot.*]
@@ -43,7 +43,7 @@ flowchart TB
     C[Composer :8377]
     L[Lazy/Medic :8378]
     V[Vault :8379]
-    H[Ratchet harness<br/>/srv/ratchet/harness]
+    H[Ratchet harness]
   end
 
   subgraph outside [Outside]
@@ -69,7 +69,7 @@ flowchart TB
 ```mermaid
 flowchart LR
   subgraph privileged [Privileged]
-    OP[Operator browser]
+    OP[Human browser]
     CP[Loopback control plane]
     VC[Vault consumer key]
   end
@@ -118,7 +118,7 @@ stateDiagram-v2
 
 ---
 
-## 5. Who does what (ops vs product)
+## 5. Who does what (automation vs product)
 
 ```mermaid
 flowchart TB
@@ -128,34 +128,16 @@ flowchart TB
     TS[Tester]
   end
 
-  subgraph ops [Ops path — no product features]
+  subgraph watch [Night watch — no product features]
     SN[Sentinel]
     LZ[Lazy]
     MD[Medic]
-    HL[Heal timer]
-    SC[Sidecar · Grok Build CLI]
   end
 
   QB --> BL --> TS
   SN -.->|watch / quarantine| QB
   LZ -.->|restart / zombie| QB
   MD -.->|allowlisted recovery| QB
-  HL -.->|KillMode / version probe| SN
-  SC -.->|2 min clean · 10 min done| QB
-```
-
----
-
-## 5b. Operator sidecar cadence
-
-```mermaid
-stateDiagram-v2
-  [*] --> Stabilize: enqueue / wake sidecar
-  Stabilize --> Stabilize: poll ~2 min\nnot clean yet
-  Stabilize --> Cruise: plant clean
-  Cruise --> Cruise: poll ~10 min\ncampaign running
-  Cruise --> Stabilize: flap / hard-fail / outage
-  Cruise --> [*]: queue done · stop
 ```
 
 ---
@@ -187,7 +169,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-  A[A Host + CLIs] --> B[B Config + systemd]
+  A[A Host + CLIs] --> B[B Config + services]
   B --> C[C Vault]
   C --> D[D First product]
   D --> E[E Harden + docs]

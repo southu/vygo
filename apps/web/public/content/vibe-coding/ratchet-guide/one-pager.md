@@ -27,14 +27,14 @@ flowchart LR
 
 ## Stack (loopback)
 
-| Piece        | Port / place            | Job                      |
-| ------------ | ----------------------- | ------------------------ |
-| Composer     | `:8377`                 | UI, queue, admin         |
-| Lazy / Medic | `:8378`                 | Overnight ops / recovery |
-| Vault        | `:8379`                 | Secrets + cloud broker   |
-| Ratchet CLI  | `/srv/ratchet/harness`  | Loop orchestration       |
-| Projects     | `/srv/ratchet/projects` | `project.json` shells    |
-| Edge         | nginx TLS + basic auth  | Public face only         |
+| Piece        | Port / place              | Job                      |
+| ------------ | ------------------------- | ------------------------ |
+| Composer     | `:8377`                   | UI, queue, admin         |
+| Lazy / Medic | `:8378`                   | Overnight watch / recovery |
+| Vault        | `:8379`                   | Secrets + cloud broker   |
+| Ratchet CLI  | `RATCHET_ROOT/harness`    | Loop orchestration       |
+| Projects     | `RATCHET_ROOT/projects`   | `project.json` shells    |
+| Edge         | TLS + basic auth (optional) | Public face only       |
 
 ---
 
@@ -45,7 +45,7 @@ flowchart LR
 3. **Proof of work** — harness checks git; ignore agent claims
 4. **Streak** — usually 2 consecutive PASSes
 5. **No secrets in builder env** — Vault consumer only
-6. **`KillMode=process`** on Composer so restarts don’t kill builds
+6. **Composer restarts must not kill builders** — detached workers outlive Admin Apply
 7. **Team git author** — bot authors may be blocked by Vercel etc.
 8. **Multi-step goals** → about **4–8** queue items for real product work; bind cloud project UUIDs
 9. **Vault arm persists** across consumer restart (still unlock after full DEK loss / reboot)
@@ -67,13 +67,13 @@ flowchart LR
 
 ## Mental model
 
-**Composer** = factory office · **Ratchet** = factory floor · **Vault** = key cabinet · **Lazy/Medic/Sentinel** = night watch · **Sidecar** = Grok Build CLI (2 min until clean, 10 min until done) · **Product `/version`** = time clock.
+**Composer** = factory office · **Ratchet** = factory floor · **Vault** = key cabinet · **Lazy/Medic/Sentinel** = night watch · **Product `/version`** = time clock.
 
 ---
 
 ## Rebuild in one breath
 
-Host + Claude/Grok CLIs → trees `/srv/ratchet/control` `/srv/ratchet/harness` `/srv/ratchet/projects` → systemd (KillMode=process) → nginx → Vault arm → mock loop → product with `/version` → tiny real mission → harden (Sentinel, Lazy, docs).
+Host + Claude/Grok CLIs → trees `RATCHET_ROOT/{control,harness,projects}` → process manager (workers survive restarts) → edge → Vault arm → mock loop → product with `/version` → tiny real mission → harden (Sentinel, Lazy, docs).
 
 ---
 
@@ -87,4 +87,4 @@ Host + Claude/Grok CLIs → trees `/srv/ratchet/control` `/srv/ratchet/harness` 
 | Footguns      | [footguns.md](./footguns.md)     |
 | Guide history | [CHANGELOG.md](./CHANGELOG.md)   |
 
-_No secrets in this pack. Guide pack **v1.2** · ~2026 production reference layout._
+_No secrets in this pack. Guide pack **v1.2** · product-level architecture reference._

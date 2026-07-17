@@ -8,7 +8,7 @@
 
 ```mermaid
 flowchart TB
-  subgraph edge [Public edge · nginx + basic auth]
+  subgraph edge [Public edge · proxy + basic auth]
     DASH[dash.*]
     FILES[files.*]
     BOT[bot.*]
@@ -40,7 +40,7 @@ flowchart TB
 ASCII fallback:
 
 ```
-nginx (dash / files / bot)
+edge (dash / files / bot)
    → Composer :8377 · Lazy :8378 · Vault :8379
         → Ratchet harness → GitHub → Live (/version)
 ```
@@ -53,14 +53,14 @@ Gallery: [diagrams.md](./diagrams.md)
 
 | Zone                       | Who                     | Trust rules                                                          |
 | -------------------------- | ----------------------- | -------------------------------------------------------------------- |
-| **Browser (operator)**     | Human                   | Basic auth at edge; treat as privileged                              |
-| **Loopback control plane** | Composer / Lazy / Vault | Bind `127.0.0.1` only; nginx is the only public face                 |
+| **Browser (human)**        | Human                   | Basic auth at edge; treat as privileged                              |
+| **Loopback control plane** | Composer / Lazy / Vault | Bind `127.0.0.1` only; edge is the only public face                  |
 | **Builder workspace**      | Claude CLI              | Can edit product repo; **no** vault secrets in env                   |
 | **Tester workspace**       | Grok CLI                | Prefer read-only; only **live_url**, not local builder tree as truth |
 | **Vault consumer**         | Harness / provisioner   | Short-lived arm + key file; never log secret values                  |
 | **Product live**           | Public users            | Must expose `/version` without control-plane basic auth              |
 
-**Important nginx detail (Composer admin):** some write APIs treat “loopback peer” as trusted. If you put Composer behind nginx, **do not** forward `X-Forwarded-For` / `X-Real-IP` in a way that makes remote clients look non-local _if_ your code keys off peer address — or redesign auth properly. Production chose: authenticated remote users effectively on-host for Admin by not sending client IP headers to :8377.
+**Edge detail (Composer admin):** some write APIs treat “loopback peer” as trusted. If you put Composer behind a reverse proxy, **do not** forward `X-Forwarded-For` / `X-Real-IP` in a way that makes remote clients look local _if_ your code keys off peer address — or redesign auth properly.
 
 ---
 
@@ -93,7 +93,7 @@ flowchart LR
 
 ### 1. Intent capture
 
-1. Operator opens Build (`/`) or Composer (`/composer`).
+1. Human opens Build (`/`) or Composer (`/composer`).
 2. Types a goal (optional image attachments on Build).
 3. **Queue builder** turns prose into one or more queue items scoped to a **project folder** (`acme`, `composer`, …).
 
@@ -110,26 +110,23 @@ flowchart LR
 3. **Test** — agent exercises live site; writes `shared/verdict.json`.
 4. **PASS** → streak++; **FAIL** → streak=0, next build prompt = tester’s `builder_prompt`.
 
-### 4. Completion & ops
+### 4. Completion
 
 1. Exit code + `shared/report.md` + cost JSON.
 2. Queue item marked succeeded / failed / hard-fail.
-3. Sentinel / Lazy may requeue, quarantine, or wake operators — **without** implementing product features themselves.
-4. Optional **operator sidecar** (Grok Build CLI): poll **~2 min until clean**, then **~10 min until done** — ops heal only; see [operations.md](./operations.md#operator-sidecar-grok-build-babysit).
+3. Sentinel / Lazy may requeue, quarantine, or surface alerts — **without** implementing product features themselves.
 
 ---
 
-## Process model (production)
+## Process model (roles)
 
-| Process                      | Manager                       | Notes                                              |
-| ---------------------------- | ----------------------------- | -------------------------------------------------- |
-| `server.py` (Composer)       | `ratchet-composer.service`    | **`KillMode=process`** so workers survive restarts |
-| Detached `ratchet __worker`  | child of composer launch path | Must outlive Admin Apply / systemctl restart       |
-| `python3 -m sentinel`        | `ratchet-sentinel.service`    | Babysits; can be armed/disarmed                    |
-| `python3 -m lazy.web.server` | `ratchet-lazy.service`        | CORS to dash origin for header toggle              |
-| `python3 -m vault.server`    | `ratchet-vault.service`       | Encrypted data dir                                 |
-| `ttyd` → `grok`              | `ratchet-console.service`     | Operator console                                   |
-| Optional heal timer          | `ratchet-ops-heal.timer`      | Small blast radius checks every few minutes        |
+| Role                         | Typical entry                         | Notes                                              |
+| ---------------------------- | ------------------------------------- | -------------------------------------------------- |
+| Composer server              | `python3 server.py`                   | Restarts must leave detached workers alive         |
+| Detached `ratchet __worker`  | child of composer launch path         | Must outlive Admin Apply / control-plane restarts  |
+| Sentinel                     | `python3 -m sentinel`                 | Optional supervisor; can be armed/disarmed         |
+| Lazy / Medic                 | `python3 -m lazy.web.server`          | CORS to dash origin for header toggle              |
+| Vault                        | `python3 -m vault.server`             | Encrypted data dir                                 |
 
 ---
 
@@ -158,15 +155,16 @@ Mix roles while rolling out (e.g. real builder + mock tester).
 
 ## Where state lives
 
+Paths use the illustrative root `RATCHET_ROOT` — rename to match your install.
+
 | State                     | Location                                                              |
 | ------------------------- | --------------------------------------------------------------------- |
-| Queue items               | `/srv/ratchet/harness/composer-queue/<folder>-*.json`                 |
-| Run workspaces            | `/srv/ratchet/harness/runs/<name>-<ts>/`                              |
-| Mission templates / seeds | `/srv/ratchet/harness/missions/`                                      |
-| Project shells            | `/srv/ratchet/projects/<slug>/project.json`                           |
-| Sentinel state            | `/srv/ratchet/harness/composer-sentinel/`                             |
+| Queue items               | `RATCHET_ROOT/harness/composer-queue/<folder>-*.json`                 |
+| Run workspaces            | `RATCHET_ROOT/harness/runs/<name>-<ts>/`                              |
+| Mission templates / seeds | `RATCHET_ROOT/harness/missions/`                                      |
+| Project shells            | `RATCHET_ROOT/projects/<slug>/project.json`                           |
+| Sentinel state            | `RATCHET_ROOT/harness/composer-sentinel/`                             |
 | Vault ciphertext          | vault-mode `data/` (0700, gitignored)                                 |
-| Service env               | `/srv/ratchet/control/composer.env` + `secrets.env`                   |
-| Operator knowledge        | `/srv/ratchet/control/docs/operator/` (separate from this share pack) |
+| Service env               | `RATCHET_ROOT/control/composer.env` + `secrets.env`                   |
 
 Continue → [Principles](./principles.md)

@@ -2,42 +2,37 @@
 
 ← [Operations](./operations.md) · [Index](./README.md) · Next: [AI prompts](./ai-prompts.md)
 
-Use this as a phased plan for a human or coding agent. Check off in order; do not skip mock loop before real APIs.
+Use this as a phased plan for a human or coding agent. Check off in order; do not skip mock loop before real APIs. Paths use the placeholder root `RATCHET_ROOT`.
 
 ---
 
 ## Phase A — Host
 
-1. Linux server (Ubuntu LTS fine) with sudo/root
-2. Packages: `python3`, `git`, `nginx`, `python3-yaml` or `yq`, build tools as needed
-3. Install/auth **Claude** and **Grok** CLIs; confirm headless flags work under a systemd `PATH`
+1. Machine with a modern Linux or container host and package manager access
+2. Packages: `python3`, `git`, a reverse proxy of your choice, YAML tooling, build tools as needed
+3. Install/auth **Claude** and **Grok** CLIs; confirm headless flags work under your service `PATH`
 4. Create trees:
 
    ```bash
-   mkdir -p /srv/ratchet/control /srv/ratchet/harness /srv/ratchet/projects
+   mkdir -p RATCHET_ROOT/control RATCHET_ROOT/harness RATCHET_ROOT/projects
    ```
 
-5. Place sources: ratchet harness, composer-live, lazy-mode, vault-mode (clone or rsync)
+5. Place sources: ratchet harness, composer-live, lazy-mode, vault-mode (clone or copy)
 6. Optional: Node/pnpm if your first product needs them on the same box
 
 ---
 
-## Phase B — Configuration & units
+## Phase B — Configuration & services
 
 1. Write `composer.env` (see [layout.md](./layout.md))
 2. Write `secrets.env` mode `600` (tokens, `LAZY_CONTROL_TOKEN`)
 3. Configure **team git identity** (not a blocked bot name)
-4. Install systemd units; set Composer **`KillMode=process`**
-5. `systemctl enable --now` composer, lazy, vault, sentinel, console
-6. nginx TLS + basic auth; proxy three hosts to 8377–8379
-7. Open `/version` + `/health` without basic auth on dash if self-missions use public URL
+4. Install process-manager units/services; ensure Composer restarts do **not** kill detached builders
+5. Start composer, lazy, vault, sentinel
+6. Edge TLS + basic auth; proxy three hostnames to the loopback control-plane ports
+7. Open product `/version` (and optional `/health`) without control-plane basic auth
 
-Verify:
-
-```bash
-systemctl is-active ratchet-composer ratchet-lazy ratchet-vault
-curl -sS http://127.0.0.1:8377/health
-```
+Verify with your process manager’s status command and each service’s `/health` (or equivalent).
 
 ---
 
@@ -53,13 +48,13 @@ curl -sS http://127.0.0.1:8377/health
 
 ## Phase D — First product
 
-1. Create `/srv/ratchet/projects/<slug>/project.json` with repo + live_url + version_url
+1. Create `RATCHET_ROOT/projects/<slug>/project.json` with repo + live_url + version_url
 2. Implement product `/version` returning deploy SHA
 3. Bind cloud project UUID if using Railway
 4. **Mock loop** zero-cost:
 
    ```bash
-   cd /srv/ratchet/harness
+   cd RATCHET_ROOT/harness
    bin/ratchet run missions/mock-loop.yaml --scenario fixtures/scenarios/happy.txt
    ```
 
@@ -71,14 +66,12 @@ curl -sS http://127.0.0.1:8377/health
 
 ## Phase E — Hardening
 
-1. Arm Sentinel when you want babysitting
+1. Arm Sentinel when you want automated queue supervision
 2. Configure Lazy bedtime + Medic playbooks
-3. Optional ops-heal timer ([operations.md](./operations.md))
-4. Practice **operator sidecar**: Grok Build CLI, ~2 min until clean / ~10 min until done ([operations.md](./operations.md#operator-sidecar-grok-build-babysit), [ai-prompts.md § G](./ai-prompts.md#g-operator-sidecar-babysit))
-5. Write **your** `docs/operator/` pack (INDEX, reboot, footguns, changelog)
-6. Install this guide under `docs/ratchet-guide/` for friends/AIs
-7. Backup strategy for vault ciphertext + secrets.env (encrypted off-box)
-8. Document who is allowed to unlock vault and arm consumers
+3. Keep private ops notes separate from this share pack
+4. Install this guide under your docs tree for friends/AIs
+5. Backup strategy for vault ciphertext + secrets.env (encrypted off-box)
+6. Document who is allowed to unlock vault and arm consumers
 
 ---
 
@@ -91,7 +84,7 @@ You are done with MVP when:
 - [ ] Deploy gate sees `/version` move
 - [ ] Real tester returns structured PASS/FAIL
 - [ ] Composer enqueue → queue → run works from the browser
-- [ ] Composer restart does **not** kill an in-flight worker (`KillMode=process`)
+- [ ] Composer restart does **not** kill an in-flight worker
 - [ ] Vault lock doesn’t dump secrets into run logs
 
 ---
@@ -107,7 +100,7 @@ You are done with MVP when:
 7. Vault + consumer broker
 8. Lazy observe mode
 9. Sentinel
-10. Medic + heal timer
+10. Medic recovery surfaces
 
 Skip cloud provision until core loop is boringly reliable.
 

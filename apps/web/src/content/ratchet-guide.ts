@@ -60,7 +60,7 @@ export const guideDocs: [GuideDoc, ...GuideDoc[]] = [
     title: "Rebuild checklist",
     sourceFile: "rebuild.md",
     href: "/vibe-coding/ratchet-guide/rebuild",
-    blurb: "Greenfield rebuild checklist in phases A–E, from host setup to hardening",
+    blurb: "Greenfield rebuild checklist in phases A–E, from host setup through hardening",
   },
   {
     slug: "ai-prompts",
@@ -68,7 +68,7 @@ export const guideDocs: [GuideDoc, ...GuideDoc[]] = [
     sourceFile: "ai-prompts.md",
     href: "/vibe-coding/ratchet-guide/ai-prompts",
     blurb:
-      "Paste-ready prompts for rebuild, ops, heal, deploy-timeout, new product, and sidecar agents",
+      "Paste-ready prompts for rebuild, deploy-timeout debug, new product, and friend share",
   },
   {
     slug: "footguns",

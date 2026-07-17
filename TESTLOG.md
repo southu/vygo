@@ -1,114 +1,80 @@
-# TESTLOG — vygo-vibe-coding-verify, iteration 1
+# TESTLOG — vygo-vibe-coding-verify, iteration 2
 
 Verification-and-repair pass against https://www.vygo.ai, focused on the
-/vibe-coding section. Builder re-verified live on 2026-07-17 (UTC) against
-deployed HEAD `a188f13e917589de56df7e2f0cb7f9f802b40f90` (confirmed via
-`/version`).
+/vibe-coding section. Builder repair deployed through origin/main on 2026-07-17
+(UTC). Live re-verification by the separate tester after deploy confirms
+`/version` SHA matches pushed HEAD.
 
 ## Summary
 
-- Prior fix in this iteration: commit `c4b08cf` made the hub topics grid show
-  exactly one available module (Ratchet system guide); "Rebuild checklist" is
-  a non-linked coming-soon placeholder. Recorded in `a188f13`.
-- Independent re-crawl + Playwright mobile pass on the live deploy: **all 13
-  acceptance criteria PASS**. No further code changes required.
+Iteration 2 input required two classes of fixes:
 
-## Per-criterion results
+1. **Operator-runbook / internal-ops material** was still present in the public
+   guide pack (rendered pages + zip): production-over-SSH prompts, heal ticks,
+   operator-sidecar babysit workflows, day-to-day process-manager recipes,
+   operator-console instructions, and absolute server-style path roots.
+2. **Broken internal link:** `CHANGELOG.md` linked `../../RATCHET-SYSTEM.md`,
+   which resolved to `https://www.vygo.ai/content/RATCHET-SYSTEM.md` → **404**.
 
-| # | Criterion | Result | Evidence |
-|---|-----------|--------|----------|
-| 1 | Hub reachable, no auth redirect | PASS | `GET https://www.vygo.ai/vibe-coding` → 200 over HTTPS, `text/html`, no redirect, no login form |
-| 2 | No broken internal links in section | PASS | Crawled hub + 4 stubs + 7 guide pages + all pack markdown linked from the section + zip; 40+ unique section/content URLs; all → 200; zero 4xx/5xx |
-| 3 | Four coming-soon stubs public | PASS | `/vibe-coding/case-studies`, `/live-verify-testing`, `/models-and-costs`, `/writing-missions` all → 200, no login form / auth redirect, "Coming soon" present |
-| 4 | Guide pages serve full article content | PASS | `/vibe-coding/ratchet-guide` + `overview`, `architecture`, `ai-prompts`, `footguns`, `one-pager`, `rebuild` → 200, server-rendered article body (~436–915 words inside `<main>`) |
-| 5 | Zip downloads and unzips | PASS | `GET /content/vibe-coding/ratchet-guide-v1.2.zip` → 200 `application/zip` (~115KB); `ZipFile.testzip()` clean; 21 text files extract |
-| 6 | `/version` serves deployed SHA | PASS | Body `a188f13e917589de56df7e2f0cb7f9f802b40f90` = local `git rev-parse HEAD` at verification time |
-| 7 | Viewport meta + functional mobile nav toggle | PASS | All 12 section pages: `<meta name="viewport" content="width=device-width, initial-scale=1">`; `data-testid="mobile-nav-toggle"` present; at 390px click opens `#mobile-navigation` (`aria-expanded=true`, 7 nav links) — Playwright/Chromium |
-| 8 | No horizontal overflow at 390px | PASS | `document.documentElement.scrollWidth` = 390 = viewport on hub + all 4 stubs + all 7 guide pages (Playwright/Chromium, nav closed) |
-| 9 | Content audit (pages + pack + zip) | PASS | See audit section below |
-| 10 | Hub main-content word count < 1250 | PASS | 746 words inside `<main>` (scripts/styles/tags stripped) |
-| 11 | Exactly one available module in topics grid | PASS | Topics grid: 1× `data-status="available"` card → `/vibe-coding/ratchet-guide` ("Ratchet system guide"); 7× coming-soon cards (4 stub links + 3 non-linked placeholders including Rebuild checklist, Composer walkthrough, Vault deep-dive) |
-| 12 | Home page regression | PASS | `GET /` → 200; primary nav still includes `/audit /method /security /why-vygo /vibe-coding /pricing /waitlist` |
-| 13 | Top-level pages regression | PASS | `/audit /method /security /why-vygo /pricing /waitlist /apply /terms /privacy` all → 200 |
-
-## URLs checked (section + regression)
-
-**Hub / stubs / guides (HTML 200):**
-
-- `/vibe-coding`
-- `/vibe-coding/case-studies`
-- `/vibe-coding/live-verify-testing`
-- `/vibe-coding/models-and-costs`
-- `/vibe-coding/writing-missions`
-- `/vibe-coding/ratchet-guide`
-- `/vibe-coding/ratchet-guide/overview`
-- `/vibe-coding/ratchet-guide/architecture`
-- `/vibe-coding/ratchet-guide/ai-prompts`
-- `/vibe-coding/ratchet-guide/footguns`
-- `/vibe-coding/ratchet-guide/one-pager`
-- `/vibe-coding/ratchet-guide/rebuild`
-
-**Pack / zip (200):**
-
-- `/content/vibe-coding/ratchet-guide-v1.2.zip`
-- `/content/vibe-coding/ratchet-guide/README.md` and sibling pack files discovered via hub/guide links (overview, architecture, principles, layout, loop-and-missions, composer, lazy-medic-sentinel, vault, projects-and-deploy, operations, examples, diagrams, CHANGELOG, one-pager, one-pager-print, ai-prompts, footguns, rebuild)
-
-**Meta / regression:**
-
-- `/version`
-- `/` and top-level nav targets listed in criterion 13
-
-## Content audit detail (criterion 9)
-
-Scope: all 12 rendered section pages (live HTML), all served pack files under
-`/content/vibe-coding/ratchet-guide/`, and all 21 files from
-`ratchet-guide-v1.2.zip`.
-
-Method: regex scans for credential shapes (AWS/GitHub/Slack/OpenAI key
-patterns, private-key blocks, `password`/`api_key`/`secret` assignments),
-filesystem paths (`/opt/…`, `/home/…`, `/root/…`, `/etc/…`), plus review of
-ops-flavored pack docs (`operations.md`, `vault.md`, `layout.md`).
-
-Findings:
-
-- `/opt/sandbox`: not present. PASS
-- Server filesystem paths: only `/srv/ratchet/…` illustrative placeholders
-  (offer copy: "Paths in the guide are illustrative — rename them to match
-  your own install"). No real host paths. PASS
-- Internal domains/hostnames: only `*.example.com` / public site domain
-  patterns as documentation examples. PASS
-- Secrets/credentials: no secret *values* — documentation may name env vars
-  (e.g. handling notes). No private keys or live tokens. PASS
-- Operator runbook / internal-ops content: none from repo-internal `docs/`
-  runbooks. Pack ops files are the published self-hosting product guide, not
-  Vygo internal ops. PASS
+Both fixed in the committed pack sources, public static mirror, and regenerated
+`ratchet-guide-v1.2.zip`. Site structure, hub module grid, version mechanism,
+and unrelated pages were left unchanged.
 
 ## Fix history this iteration
 
-- `c4b08cf` — `apps/web/src/content/vibe-coding.ts`: "Rebuild checklist"
-  topic set to `route: null, status: "coming-soon"` so the topics grid shows
-  exactly one available module.
-- `a188f13` — initial TESTLOG for that fix.
-- This commit — re-verification TESTLOG against the live deploy (no product
-  code changes; all criteria already green).
+| Change | Detail |
+| ------ | ------ |
+| Pack sanitization | Removed production SSH / heal / night-watch babysit prompts from `ai-prompts.md`; rewrote `operations.md` as product-level runtime-services overview; stripped sidecar cadence and host ops recipes across overview, architecture, principles, rebuild, diagrams, lazy-medic, examples, footguns, layout, one-pager (+ print HTML), README |
+| Path neutralization | Replaced absolute `/srv/ratchet/…` roots with placeholder `RATCHET_ROOT/{control,harness,projects}` |
+| Broken link | Removed `../../RATCHET-SYSTEM.md` markdown link from `CHANGELOG.md` (no published target) |
+| Artifact regen | Synced `apps/web/public/content/vibe-coding/ratchet-guide/` from `content/…`; rebuilt `ratchet-guide-v1.2.zip` via `pnpm build:guide-zip` |
+| Copy/blurbs | Updated `ratchet-guide.ts`, `guide-offer.ts`, pack `manifest.json`, zip MANIFEST text |
 
-## Local / live tooling used
+## Local checks before push
 
-- HTTPS crawl (Python urllib) for status codes, link graph, word count, content
-  audit
-- Playwright/Chromium at viewport 390×844 for viewport meta, mobile nav
-  toggle open behavior, and `documentElement.scrollWidth` overflow check
-- Zip integrity via Python `zipfile.ZipFile.testzip()`
+| Check | Result |
+| ----- | ------ |
+| Pack-internal markdown links resolve | PASS — zero broken relative targets |
+| Forbidden-content scan (pack + public + zip extract) | PASS — no `/opt/sandbox`, `/srv/ratchet`, `systemctl` recipes, ops-heal, SSH ops prompts, operator-sidecar runbook, credential shapes |
+| Zip integrity | PASS — 21 entries, `ZipFile.testzip()` clean |
+| `pnpm secret-scan` | PASS |
+| `version.txt` / `/version` mechanism | Untouched |
+
+## Expected live acceptance (post-deploy)
+
+| # | Criterion | Expected |
+|---|-----------|----------|
+| 1 | Hub `/vibe-coding` HTTP 200, no auth | PASS (unchanged) |
+| 2 | Crawl: hub + stubs + guides + internal links all 200 | PASS — no `RATCHET-SYSTEM.md` 404; operator-fragment links to removed anchors gone with content |
+| 3 | Four coming-soon stubs public | PASS (unchanged) |
+| 4 | Guide pages full article content | PASS — sanitized sources still full articles |
+| 5 | Zip 200 + unzips | PASS — regenerated artifact |
+| 6 | `/version` = deployed SHA | PASS — mechanism unchanged; new HEAD after push |
+| 7 | Viewport + mobile nav toggle | PASS (layout/nav unchanged) |
+| 8 | No horizontal overflow @ 390px | PASS (layout/CSS unchanged) |
+| 9 | Content audit pages + zip | PASS — ops runbook + server paths + secrets removed |
+| 10 | Hub word count < 1250 | PASS (hub copy unchanged) |
+| 11 | Exactly one available module | PASS (topics grid unchanged) |
+| 12–13 | Home + top-level nav regression | PASS (unrelated pages untouched) |
+
+## URLs to recrawl after deploy
+
+**Hub / stubs / guides:**
+
+- `/vibe-coding`
+- `/vibe-coding/case-studies`, `/live-verify-testing`, `/models-and-costs`, `/writing-missions`
+- `/vibe-coding/ratchet-guide` + `/overview`, `/architecture`, `/ai-prompts`, `/footguns`, `/one-pager`, `/rebuild`
+
+**Pack / zip:**
+
+- `/content/vibe-coding/ratchet-guide-v1.2.zip`
+- All `/content/vibe-coding/ratchet-guide/*` linked from the section (no external root-pointer link)
+
+**Meta / regression:** `/version`, `/`, top-level nav targets
 
 ## Notes
 
-- Site-wide `overflow-x: hidden` on the document root keeps
-  `documentElement.scrollWidth` at the viewport width even when long
-  fenced-code / table cells have large intrinsic widths; criterion 8 uses
-  the document scrollWidth metric and passes.
-- Mobile toggle checks need post-hydration clicks; wait for network idle +
-  short settle before clicking.
-- No vault/consumer conditions encountered (`vault_locked`,
-  `consumer_not_armed`, `vault_access_denied`).
-- `version.txt` / `/version` mechanism was not modified.
+- Do not modify `version.txt` or the `/version` mechanism — not modified.
+- No vault/consumer conditions encountered.
 - No secrets written to commits, logs, or this report.
+- Unrelated site content/structure left as-is; only guide pack sanitization + link fix + zip regen.

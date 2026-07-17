@@ -12,7 +12,7 @@ Composer is the human-facing factory:
 - Draft / split missions
 - Manage projects and queues
 - Show run status
-- Host Admin settings and operator nav to Vault / Lazy / Console
+- Host Admin settings and nav to Vault / Lazy
 
 Implementation: Python `server.py` + static HTML/JS under `composer-live/`.
 
@@ -30,7 +30,7 @@ Default bind: `127.0.0.1:8377`.
 | `/queue`                    | Per-folder queue                                                |
 | `/dashboard`                | Runs overview                                                   |
 | `/sentinel`                 | Arm/disarm + status chips                                       |
-| `/admin`                    | Models, settings, console links                                 |
+| `/admin`                    | Models, settings                                                |
 | `/apply`                    | Optional public-ish application form (product-specific)         |
 | `/version` / `/version.txt` | Deployed control-plane SHA (for _self_ missions)                |
 | `/health`                   | Liveness                                                        |
@@ -41,9 +41,9 @@ Default bind: `127.0.0.1:8377`.
 ## Goal → queue → run
 
 1. **Build** (`home.html` / `home.js` + `queue_builder_mod.py`)
-   - Operator describes work; optional images
+   - Human describes work; optional images
    - Writer/planner produces a **multi-step draft** (target about **4–8** executable steps for real product goals)
-2. **Enqueue** into folder-scoped queue JSON under `/srv/ratchet/harness/composer-queue/`
+2. **Enqueue** into folder-scoped queue JSON under `RATCHET_ROOT/harness/composer-queue/`
 3. **Worker** materializes mission YAML and invokes `bin/ratchet`
 4. UI and Sentinel poll state; costs land in `shared/cost.json`
 
@@ -82,11 +82,11 @@ Claude on VPC often uses **CLI login** rather than a long-lived API key in `secr
 
 ## Unified header nav
 
-Every page should show the **same** primary links so operators never get lost:
+Every page should show the **same** primary links so humans never get lost:
 
 ```text
 Build · Projects · Composer · Queue · Dashboard · Sentinel · Admin
-Console · Vault · Lazy · Medic
+Vault · Lazy · Medic
 ```
 
 Implementation pattern:

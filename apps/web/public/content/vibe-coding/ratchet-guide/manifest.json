@@ -2,7 +2,7 @@
   "name": "ratchet-guide",
   "title": "Ratchet system guide",
   "version": "v1.2",
-  "description": "Shareable documentation pack for the Ratchet self-hosted AI build-and-verify control plane. Neutral illustrative /srv/ratchet paths only; no secrets, no real hostnames.",
+  "description": "Shareable documentation pack for the Ratchet self-hosted AI build-and-verify control plane. Neutral illustrative RATCHET_ROOT paths only; no secrets, no real hostnames, no host operations runbooks.",
   "basePath": "/content/vibe-coding/ratchet-guide/",
   "documents": [
     {
@@ -47,7 +47,7 @@
     },
     {
       "filename": "operations.md",
-      "title": "systemd units, nginx edge, health checks, heal timer, and the operator sidecar cadence"
+      "title": "Runtime services overview: roles, process-manager contract, and edge sketch"
     },
     {
       "filename": "rebuild.md",
@@ -55,7 +55,7 @@
     },
     {
       "filename": "ai-prompts.md",
-      "title": "Paste-ready prompts for rebuild, ops, heal, deploy-timeout, new product, and sidecar agents"
+      "title": "Paste-ready prompts for rebuild, deploy-timeout debug, new product, and friend share"
     },
     {
       "filename": "footguns.md",
@@ -63,7 +63,7 @@
     },
     {
       "filename": "examples.md",
-      "title": "Mock loop, full local loop, mission YAML and project.json examples, and ops snippets"
+      "title": "Mock loop, full local loop, mission YAML and project.json examples"
     },
     {
       "filename": "diagrams.md",

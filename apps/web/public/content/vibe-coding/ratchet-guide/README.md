@@ -7,14 +7,15 @@
 
 - Friends who want to understand or rebuild the system
 - Coding agents you point at this folder (“build me this”)
-- Operators coming back cold without chat history
+- Humans returning to the design without chat history
 
 **What is not here**
 
-- API keys, vault master passwords, nginx passwords, consumer keys
+- API keys, vault master passwords, edge passwords, consumer keys
 - Private host credentials
+- Day-to-day host operations runbooks (process-manager recipes, SSH production ops, heal timers)
 
-Reference layout in this pack uses neutral paths under `/srv/ratchet/{control,harness,projects}`. Rename freely when rebuilding — they are not your production host’s real paths.
+Reference layout in this pack uses the placeholder root **`RATCHET_ROOT/{control,harness,projects}`**. Rename freely when rebuilding — these are not a real host’s paths.
 
 ---
 
@@ -42,10 +43,10 @@ Reference layout in this pack uses neutral paths under `/srv/ratchet/{control,ha
 | 7   | [lazy-medic-sentinel.md](./lazy-medic-sentinel.md)                    | Overnight watchdogs and recovery                   |
 | 8   | [vault.md](./vault.md)                                                | Credentials, consumer broker, Railway actions      |
 | 9   | [projects-and-deploy.md](./projects-and-deploy.md)                    | Product shells, git identity, host deploys         |
-| 10  | [operations.md](./operations.md)                                      | systemd, nginx, heal timer, **operator sidecar**   |
+| 10  | [operations.md](./operations.md)                                      | Runtime services overview (roles, edge sketch)     |
 | 11  | [rebuild.md](./rebuild.md)                                            | Greenfield checklist (phases A–E)                  |
-| 12  | [ai-prompts.md](./ai-prompts.md)                                      | Coding / ops / **sidecar babysit** prompts         |
-| 13  | [footguns.md](./footguns.md)                                          | Production failure modes and fixes                 |
+| 12  | [ai-prompts.md](./ai-prompts.md)                                      | Coding / debug / new-product prompts               |
+| 13  | [footguns.md](./footguns.md)                                          | Failure modes and fix directions                   |
 | 14  | [examples.md](./examples.md)                                          | Mock loop, full loop, sample product campaign      |
 | —   | [diagrams.md](./diagrams.md)                                          | Mermaid gallery                                    |
 | —   | [one-pager-print](./one-pager-print) / [one-pager.md](./one-pager.md) | Printable sheet                                    |
@@ -55,7 +56,7 @@ Reference layout in this pack uses neutral paths under `/srv/ratchet/{control,ha
 
 ## One-sentence mental model
 
-**Composer** turns intent into queued missions. **Ratchet** is the factory floor (build → deploy gate → test → repeat). **Vault** holds keys the floor needs without giving them to the robots. **Lazy / Medic / Sentinel** keep the factory from catching fire overnight. The **operator sidecar** is a Grok Build CLI that polls **every ~2 min until clean**, then **~10 min until done**. Every product must tell the truth at **`/version`**.
+**Composer** turns intent into queued missions. **Ratchet** is the factory floor (build → deploy gate → test → repeat). **Vault** holds keys the floor needs without giving them to the robots. **Lazy / Medic / Sentinel** keep the factory from catching fire overnight. Every product must tell the truth at **`/version`**.
 
 ```mermaid
 flowchart LR
@@ -70,8 +71,6 @@ flowchart LR
 
 ---
 
-## Single-file snapshot
+## Pack scope
 
-A single-file root pointer (`RATCHET-SYSTEM.md`) exists outside this share pack and is intentionally not included.
-
-Prefer **this multi-file pack** for rebuilds and sharing.
+This multi-file pack is the portable public guide. Prefer it for rebuilds and sharing. It intentionally excludes private install notes and host-specific operations material.

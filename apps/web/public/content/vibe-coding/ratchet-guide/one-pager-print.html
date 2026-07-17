@@ -103,10 +103,10 @@
   <table>
     <tr><th>Piece</th><th>Port / place</th><th>Job</th></tr>
     <tr><td>Composer</td><td><code>:8377</code></td><td>UI, queue, admin</td></tr>
-    <tr><td>Lazy / Medic</td><td><code>:8378</code></td><td>Overnight ops / recovery</td></tr>
+    <tr><td>Lazy / Medic</td><td><code>:8378</code></td><td>Overnight watch / recovery</td></tr>
     <tr><td>Vault</td><td><code>:8379</code></td><td>Secrets + cloud broker</td></tr>
-    <tr><td>Ratchet CLI</td><td><code>/srv/ratchet/harness</code></td><td>Loop orchestration</td></tr>
-    <tr><td>Projects</td><td><code>/srv/ratchet/projects</code></td><td><code>project.json</code> shells</td></tr>
+    <tr><td>Ratchet CLI</td><td><code>RATCHET_ROOT/harness</code></td><td>Loop orchestration</td></tr>
+    <tr><td>Projects</td><td><code>RATCHET_ROOT/projects</code></td><td><code>project.json</code> shells</td></tr>
     <tr><td>Edge</td><td>nginx TLS + basic auth</td><td>Public face only</td></tr>
   </table>
 
@@ -118,7 +118,7 @@
       <li><strong>Proof of work</strong> — harness checks git; ignore agent claims</li>
       <li><strong>Streak</strong> — usually 2 consecutive PASSes</li>
       <li><strong>No secrets in builder env</strong> — Vault consumer only</li>
-      <li><strong><code>KillMode=process</code></strong> on Composer so restarts don’t kill builds</li>
+      <li><strong>Composer restarts must not kill builders</strong> — detached workers outlive Admin Apply</li>
       <li><strong>Team git author</strong> — bot authors may be blocked by Vercel etc.</li>
       <li><strong>Multi-step goals</strong> → about <strong>4–8</strong> queue items for real product work; bind cloud project UUIDs</li>
       <li><strong>Vault arm persists</strong> across consumer restart (still unlock after full DEK loss / reboot)</li>
@@ -137,10 +137,10 @@
   </div>
 
   <h2>Mental model</h2>
-  <p><strong>Composer</strong> = factory office · <strong>Ratchet</strong> = factory floor · <strong>Vault</strong> = key cabinet · <strong>Lazy/Medic/Sentinel</strong> = night watch · <strong>Sidecar</strong> = Grok Build CLI (2 min until clean, 10 min until done) · <strong>Product <code>/version</code></strong> = time clock.</p>
+  <p><strong>Composer</strong> = factory office · <strong>Ratchet</strong> = factory floor · <strong>Vault</strong> = key cabinet · <strong>Lazy/Medic/Sentinel</strong> = night watch · <strong>Product <code>/version</code></strong> = time clock.</p>
 
   <h2>Rebuild in one breath</h2>
-  <p>Host + Claude/Grok CLIs → trees <code>/srv/ratchet/control</code> <code>/srv/ratchet/harness</code> <code>/srv/ratchet/projects</code> → systemd (KillMode=process) → nginx → Vault arm → mock loop → product with <code>/version</code> → tiny real mission → harden (Sentinel, Lazy, docs).</p>
+  <p>Host + Claude/Grok CLIs → trees <code>RATCHET_ROOT/{control,harness,projects}</code> → process manager (workers survive restarts) → edge → Vault arm → mock loop → product with <code>/version</code> → tiny real mission → harden (Sentinel, Lazy, docs).</p>
 
   <h2>Share / go deeper</h2>
   <table>
@@ -152,7 +152,7 @@
     <tr><td>Guide history</td><td><a href="./CHANGELOG.md">CHANGELOG.md</a></td></tr>
   </table>
 
-  <footer>No secrets in this pack. Guide pack <strong>v1.2</strong> · ~2026 production reference layout · paths under <code>/srv/ratchet/</code> are illustrative.</footer>
+  <footer>No secrets in this pack. Guide pack <strong>v1.2</strong> · ~2026 production reference layout · paths use placeholder <code>RATCHET_ROOT/</code>.</footer>
 </main>
 </body>
 </html>

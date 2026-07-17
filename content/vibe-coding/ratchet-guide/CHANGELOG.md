@@ -8,6 +8,26 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ---
 
+## v1.2 / guide-2026-07-17e — public ops sanitization
+
+### Removed
+
+- Production SSH, heal-tick, and long-lived night-watch babysit prompts from [`ai-prompts.md`](./ai-prompts.md)
+- Day-to-day process-manager command recipes, heal-timer runbooks, SSH deploy snippets, and browser-console instructions from [`operations.md`](./operations.md)
+- Night-watch poll-cadence diagrams and mental-model links across overview, architecture, principles, rebuild, diagrams, lazy-medic, one-pager
+
+### Changed
+
+- Replaced absolute server-style path roots with placeholder **`RATCHET_ROOT/{control,harness,projects}`**
+- [`operations.md`](./operations.md) retitled to runtime-services overview (product-level architecture only)
+- Fixed broken pack-external root-pointer link (404 on the public site); historical root pointer is outside this pack and not published
+
+### Not published
+
+- Host-private ops runbooks remain out of this share pack
+
+---
+
 ## v1.2 / guide-2026-07-17d — one-pager clean-URL rename
 
 ### Changed
@@ -25,7 +45,7 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 ### Changed
 
 - Replaced third-party service domains in examples with unmistakable placeholders (`git.example.com`, `cloud.example.com`)
-- Removed host-specific scratch paths (null-device output sinks, relative rsync sources) from command examples — every remaining filesystem path is illustrative under `/srv/ratchet/`
+- Removed host-specific scratch paths (null-device output sinks, relative rsync sources) from command examples — every remaining filesystem path is an illustrative install root
 
 ---
 
@@ -33,7 +53,7 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ### Changed
 
-- Replaced production-style absolute path roots with neutral **`/srv/ratchet/{control,harness,projects}`** across the pack so the guide can be published without fingerprinting a real host layout
+- Replaced production-style absolute path roots with neutral **`RATCHET_ROOT/{control,harness,projects}`** placeholders across the pack so the guide can be published without fingerprinting a real host layout
 - Clarified that those paths are **illustrative** only
 
 ---
@@ -52,7 +72,7 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 - [`composer.md`](./composer.md) — queue builder rules, clear modes, models
 - [`vault.md`](./vault.md) — arm duration + persistence
-- [`operations.md`](./operations.md) — post-reboot unlock vs re-arm
+- [`operations.md`](./operations.md) — vault unlock vs re-arm notes
 - [`loop-and-missions.md`](./loop-and-missions.md) — multi-step campaign note
 - [`footguns.md`](./footguns.md) — new queue / vault / model rows
 - [`README.md`](./README.md), [`one-pager.md`](./one-pager.md) — pack version pointers
@@ -64,18 +84,15 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ---
 
-## guide-2026-07-15c — operator sidecar
+## guide-2026-07-15c — night-watch cadence (later removed from public pack)
 
 ### Added
 
-- Operator **sidecar** docs: Grok Build CLI babysit — **~2 min until clean**, then **~10 min until done**
-- [`ai-prompts.md`](./ai-prompts.md) section G (sidecar babysit prompt)
+- Documented long-lived night-watch poll cadence for install operators (later removed in guide-2026-07-17e as host-private ops material)
 
 ### Changed
 
-- [`operations.md`](./operations.md) — full sidecar section
-- [`lazy-medic-sentinel.md`](./lazy-medic-sentinel.md), [`overview.md`](./overview.md), [`principles.md`](./principles.md), [`architecture.md`](./architecture.md), [`diagrams.md`](./diagrams.md) — sidecar in ops model + cadence diagram
-- [`README.md`](./README.md), [`one-pager.md`](./one-pager.md), [`one-pager-print`](./one-pager-print) — mental model + links
+- Cross-links in overview / architecture / operations for the (now-removed) cadence notes
 
 ---
 
@@ -94,7 +111,7 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 - [`overview.md`](./overview.md) — Mermaid happy-path diagram
 - [`architecture.md`](./architecture.md) — Mermaid system map + data-flow diagram
 - [`loop-and-missions.md`](./loop-and-missions.md) — Mermaid iteration state diagram
-- Root [`RATCHET-SYSTEM.md`](../../RATCHET-SYSTEM.md) — points at one-pager + diagrams
+- Root pointer file (outside this pack; not published) — points at one-pager + diagrams
 
 ---
 
@@ -102,17 +119,17 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ### Added
 
-- Full pack split from single-file `RATCHET-SYSTEM.md`:
+- Full pack split from a single-file root pointer into:
   - overview, architecture, principles, layout
   - loop-and-missions, composer, lazy-medic-sentinel, vault
   - projects-and-deploy, operations, rebuild, ai-prompts
   - footguns, examples, README index
-- Expanded production lessons (KillMode, Railway dedupe, Vercel author, version auth, queue multi-step)
-- Paste-ready AI prompts (rebuild / ops / heal / deploy-timeout / new product)
+- Expanded failure-mode lessons (worker survival, Railway dedupe, Vercel author, version auth, queue multi-step)
+- Paste-ready AI prompts (rebuild / deploy-timeout / new product)
 
 ### Changed
 
-- Root `RATCHET-SYSTEM.md` became a short pointer to `docs/ratchet-guide/`
+- Root pointer outside this pack became a short pointer to `docs/ratchet-guide/`
 
 ---
 

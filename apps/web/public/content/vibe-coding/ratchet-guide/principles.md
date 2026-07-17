@@ -2,7 +2,7 @@
 
 ← [Architecture](./architecture.md) · [Index](./README.md) · Next: [Layout](./layout.md)
 
-These rules are load-bearing. Breaking them recreates the production failure modes in [footguns.md](./footguns.md).
+These rules are load-bearing. Breaking them recreates the failure modes in [footguns.md](./footguns.md).
 
 ---
 
@@ -12,7 +12,7 @@ The tester judges the **deployed** app at `live_url`, not the builder’s workin
 
 The deploy gate blocks testing until the world has caught up (by default: live `/version` equals the SHA the builder just pushed).
 
-**Implication:** every product needs a honest version endpoint. No endpoint → timeouts, not “AI is bad.”
+**Implication:** every product needs an honest version endpoint. No endpoint → timeouts, not “AI is bad.”
 
 ---
 
@@ -54,11 +54,11 @@ If a secret shows up in a run transcript, treat it as an incident.
 
 ## 5. Composer restarts must not kill builds
 
-systemd default `KillMode=control-group` kills every child when Composer restarts (Admin Apply, model update, unit bounce).
+A naive process-manager restart of Composer can kill every child when Admin Apply or model update bounces the service.
 
-**Required:** `KillMode=process` on `ratchet-composer.service`.
+**Required:** detached builder workers must **outlive** Composer restarts.
 
-**Ops rule:** still avoid restarting Composer during an active product build when you can; KillMode is seatbelt, not a license to thrash.
+**Practice:** still avoid restarting Composer during an active product build when you can; the seatbelt is not a license to thrash.
 
 ---
 
@@ -94,26 +94,20 @@ Turn provision **off** unless you intentionally need stack bootstrap.
 
 ---
 
-## 9. Small blast radius for ops automation
+## 9. Small blast radius for automation
 
-Heal timers and Medic:
+Lazy / Medic / Sentinel:
 
 - May unquarantine, close zombies, requeue aborted-with-policy
-- Must **not** `systemctl restart ratchet-composer` while a builder worker is active
+- Must **not** restart Composer while a builder worker is active
 - Must **not** implement product features (that’s the builder’s job)
 
 ---
 
 ## 10. Fresh sessions beat chat history
 
-Operator knowledge belongs in a **docs pack** on the machine (`docs/operator/` on production). Fresh Grok/Claude sessions should read that pack first — not depend on a laptop transcript.
+Durable knowledge belongs in a **docs pack** next to the install. Fresh Grok/Claude sessions should read that pack first — not depend on a laptop transcript.
 
-This share guide is the portable cousin of that pack.
-
----
-
-## 11. Sidecar babysits ops, not product
-
-A long-lived **Grok Build CLI** “sidecar” may poll the plant on a cadence (**~2 min until clean**, then **~10 min until done**). Same rules as heal automation: small blast radius, no Composer restart mid-build, no product feature work, no secrets in replies. Cadence and prompt: [operations.md](./operations.md#operator-sidecar-grok-build-babysit), [ai-prompts.md § G](./ai-prompts.md#g-operator-sidecar-babysit).
+This share guide is the portable cousin of private install notes.
 
 Continue → [Layout](./layout.md)
