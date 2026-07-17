@@ -133,7 +133,7 @@ function ScoreRing({ value, caption }: { value: number; caption: string }) {
   );
 }
 
-/** One nested sub-metric check row: label, status pill, and a status-colored meter. */
+/** One nested sub-metric check row: label, status pill, meter, and evidence reason. */
 function CheckRow({
   dimension,
   check,
@@ -144,6 +144,8 @@ function CheckRow({
   const status = check.answered ? check.status : "unknown";
   const meta = STATUS_META[status];
   const width = status === "unknown" ? 0 : clampPct(check.score);
+  const reason =
+    check.evidence && typeof check.evidence.reason === "string" ? check.evidence.reason : null;
   return (
     <li className="py-2.5" data-testid={`snapshot-check-${dimension}-${check.key}`}>
       <div className="flex items-center justify-between gap-3">
@@ -166,6 +168,14 @@ function CheckRow({
           aria-hidden
         />
       </div>
+      {reason ? (
+        <p
+          className="mt-1.5 text-xs leading-snug text-muted"
+          data-testid={`snapshot-check-reason-${dimension}-${check.key}`}
+        >
+          {reason}
+        </p>
+      ) : null}
     </li>
   );
 }

@@ -281,6 +281,8 @@ function buildReadinessAnalysis() {
       overall: scored.overall,
       dimensions: scored.dimensions,
       dimensionDetails: scored.dimensionDetails,
+      /** Mission-shaped array: [{ dimension, score, sub_metrics: [{ name, score, weight, evidence }] }] */
+      dimensionResults: scored.dimensionResults,
     },
   };
 }

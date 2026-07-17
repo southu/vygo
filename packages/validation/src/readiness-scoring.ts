@@ -47,12 +47,27 @@ export type ScoringSource = "paste" | "manual" | "unknown";
 /** Status band for a single sub-metric check. */
 export type SubMetricStatus = "strong" | "adequate" | "at_risk" | "unknown";
 
+/**
+ * Evidence record for a sub-metric: which question drove the score, the
+ * prospect's actual answer, and a one-line plain-English reason.
+ */
+export type SubMetricEvidence = {
+  /** Assessment / report field id that contributed (e.g. "auth", "tests"). */
+  question_id: string;
+  /** Prospect's actual answer value that produced the score. */
+  answer_value: unknown;
+  /** One-line plain-English reason referencing the substance of the answer. */
+  reason: string;
+};
+
 /** One scored check (sub-metric) inside a dimension, e.g. Security → auth. */
 export type SubMetricScore = {
   /** Report field key the check evaluates, e.g. "auth". */
   key: string;
   /** Human-readable label, e.g. "Authentication". */
   label: string;
+  /** Alias of label for mission-shaped consumers (`sub_metrics[].name`). */
+  name: string;
   /** 0–100 check score (same math that feeds the dimension aggregate). */
   score: number;
   /** Contribution weight within the dimension. */
@@ -60,6 +75,29 @@ export type SubMetricScore = {
   /** Whether the underlying report field was answered (vs unknown/blank). */
   answered: boolean;
   status: SubMetricStatus;
+  /** Fully populated evidence for this sub-score. */
+  evidence: SubMetricEvidence;
+};
+
+/**
+ * Mission-shaped sub-metric entry consumed by UI layers:
+ * { name, score, weight, evidence: { question_id, answer_value, reason } }
+ */
+export type SubMetricResult = {
+  name: string;
+  score: number;
+  weight: number;
+  evidence: SubMetricEvidence;
+};
+
+/**
+ * Mission-shaped dimension result:
+ * { dimension, score, sub_metrics: [...] }
+ */
+export type DimensionScoreResult = {
+  dimension: string;
+  score: number;
+  sub_metrics: SubMetricResult[];
 };
 
 /** Nested per-dimension breakdown: aggregate score + its sub-metric checks. */
@@ -70,6 +108,8 @@ export type DimensionDetail = {
   /** Dimension-level weight used in the overall blend. */
   weight: number;
   checks: SubMetricScore[];
+  /** Mission-shaped sub_metrics array (same checks, evidence-first shape). */
+  sub_metrics: SubMetricResult[];
 };
 
 export type DimensionDetails = Record<ReadinessDimension, DimensionDetail>;
@@ -82,6 +122,11 @@ export type ReadinessScorePayload = {
   dimensions: DimensionScores;
   /** Detailed nested sub-metrics (checks) for every dimension. */
   dimensionDetails: DimensionDetails;
+  /**
+   * Canonical array of dimension results for UI / tester consumers:
+   * [{ dimension, score, sub_metrics: [{ name, score, weight, evidence }] }]
+   */
+  dimensionResults: DimensionScoreResult[];
   ranges?: DimensionRanges;
   overall: number;
   bucket: EngagementBucket;
@@ -446,6 +491,130 @@ function subMetricStatus(score: number, answered: boolean): SubMetricStatus {
 }
 
 /**
+ * Present an answer value for evidence storage (preserve primitives/arrays).
+ * Always returns a present value so evidence.answer_value is never empty/null.
+ */
+function evidenceAnswerValue(value: unknown): unknown {
+  if (value == null) return "unanswered";
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : "unanswered";
+  }
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "unanswered";
+    return value.map((item) => (typeof item === "string" ? item.trim() : item));
+  }
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return String(value);
+  }
+}
+
+/** Short display snippet of an answer for reason strings (never empty when answered). */
+function answerSnippet(value: unknown, maxLen = 120): string {
+  if (value == null) return "unanswered";
+  if (typeof value === "string") {
+    const t = value.trim().replace(/\s+/g, " ");
+    if (!t) return "unanswered";
+    return t.length > maxLen ? `${t.slice(0, maxLen - 1)}…` : t;
+  }
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    const joined = value
+      .map((v) => (typeof v === "string" ? v.trim() : String(v)))
+      .filter(Boolean)
+      .join(", ");
+    if (!joined) return "unanswered";
+    return joined.length > maxLen ? `${joined.slice(0, maxLen - 1)}…` : joined;
+  }
+  try {
+    const s = JSON.stringify(value);
+    return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
+  } catch {
+    return "provided answer";
+  }
+}
+
+/**
+ * Build a one-line plain-English reason that references the substance of the
+ * prospect's answer (not empty, N/A, or identical boilerplate).
+ */
+export function buildSubMetricReason(
+  rule: FieldScoreRule,
+  value: unknown,
+  score: number,
+  answered: boolean,
+): string {
+  const label = checkLabel(rule.field);
+
+  if (!answered) {
+    return `You did not answer the ${label.toLowerCase()} question, so this check scores at the risk percentile.`;
+  }
+
+  const text = textOf(value);
+  const snippet = answerSnippet(value);
+  const goodHits = (rule.good ?? []).filter((g) => g && text.includes(g.toLowerCase()));
+  const badHits = (rule.bad ?? []).filter((b) => b && text.includes(b.toLowerCase()));
+
+  if (badHits.length > 0 && score < 55) {
+    return `You reported ${label.toLowerCase()} as "${snippet}", which includes risk signals (${badHits.slice(0, 2).join(", ")}).`;
+  }
+  if (goodHits.length > 0 && score >= 70) {
+    return `You reported ${label.toLowerCase()} as "${snippet}", including positive signals (${goodHits.slice(0, 2).join(", ")}).`;
+  }
+  if (goodHits.length > 0 && badHits.length > 0) {
+    return `You reported ${label.toLowerCase()} as "${snippet}", mixing positive (${goodHits[0]}) and risk (${badHits[0]}) signals.`;
+  }
+  if (goodHits.length > 0) {
+    return `You reported ${label.toLowerCase()} as "${snippet}" with partial positive signals (${goodHits.slice(0, 2).join(", ")}).`;
+  }
+  if (badHits.length > 0) {
+    return `You reported ${label.toLowerCase()} as "${snippet}", which raises concerns (${badHits.slice(0, 2).join(", ")}).`;
+  }
+  if (score >= 70) {
+    return `You reported ${label.toLowerCase()} as "${snippet}", which supports a solid posture for this check.`;
+  }
+  if (score >= 55) {
+    return `You reported ${label.toLowerCase()} as "${snippet}", which is adequate but not strongly evidenced.`;
+  }
+  return `You reported ${label.toLowerCase()} as "${snippet}", which scores below a production bar for this check.`;
+}
+
+function toSubMetricResult(check: SubMetricScore): SubMetricResult {
+  return {
+    name: check.name,
+    score: check.score,
+    weight: check.weight,
+    evidence: check.evidence,
+  };
+}
+
+/**
+ * Convert nested dimension details into the mission-shaped array:
+ * [{ dimension, score, sub_metrics: [...] }, ...]
+ */
+export function toDimensionResults(details: DimensionDetails): DimensionScoreResult[] {
+  return READINESS_DIMENSIONS.map((label) => {
+    const detail = details[label];
+    const checks = detail?.checks ?? [];
+    return {
+      dimension: label,
+      score: detail?.score ?? 0,
+      sub_metrics:
+        detail?.sub_metrics ??
+        checks.map((c) => ({
+          name: c.name ?? c.label,
+          score: c.score,
+          weight: c.weight,
+          evidence: c.evidence,
+        })),
+    };
+  });
+}
+
+/**
  * Score one dimension into its nested sub-metric checks plus the weighted
  * aggregate. The aggregate math is identical to the historical scoreDimension
  * so dimension scores, overall, and buckets are unchanged.
@@ -463,20 +632,30 @@ export function scoreDimensionDetail(
     const answered = !isUnknownField(raw);
     const s = scoreFieldValue(raw, rule, unknownPercentile);
     const w = typeof rule.weight === "number" && rule.weight > 0 ? rule.weight : 1;
+    const label = checkLabel(rule.field);
+    const answerValue = evidenceAnswerValue(raw);
+    const reason = buildSubMetricReason(rule, raw, s, answered);
     checks.push({
       key: rule.field,
-      label: checkLabel(rule.field),
+      label,
+      name: label,
       score: s,
       weight: w,
       answered,
       status: subMetricStatus(s, answered),
+      evidence: {
+        question_id: rule.field,
+        answer_value: answerValue,
+        reason,
+      },
     });
     weighted += s * w;
     totalW += w;
   }
   const score = totalW <= 0 ? clampScore(unknownPercentile * 100) : clampScore(weighted / totalW);
   const dimWeight = typeof dim.weight === "number" && dim.weight > 0 ? dim.weight : 1;
-  return { label: dim.label, score, weight: dimWeight, checks };
+  const sub_metrics = checks.map(toSubMetricResult);
+  return { label: dim.label, score, weight: dimWeight, checks, sub_metrics };
 }
 
 export function scoreDimension(
@@ -510,6 +689,7 @@ export function scoreAllDimensionDetails(
             score: clampScore(config.unknownPercentile * 100),
             weight: 1,
             checks: [],
+            sub_metrics: [],
           };
     }
   }
@@ -970,6 +1150,7 @@ export function computeReadinessScore(input: ComputeScoreInput): ReadinessScoreP
 
   const dimensionDetails = scoreAllDimensionDetails(report, config);
   const dimensions = scoreAllDimensions(report, config);
+  const dimensionResults = toDimensionResults(dimensionDetails);
   const overall = overallFromDimensions(dimensions, config);
   const signals = deriveBucketSignals(report, dimensions, input.stage1, input.followups);
   const bucketResult = assignEngagementBucket(signals);
@@ -989,6 +1170,7 @@ export function computeReadinessScore(input: ComputeScoreInput): ReadinessScoreP
     displayMode,
     dimensions,
     dimensionDetails,
+    dimensionResults,
     ranges,
     overall,
     bucket: bucketResult.bucket,

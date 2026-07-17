@@ -239,17 +239,116 @@ describe("readiness scoring", () => {
       for (const check of detail.checks) {
         assert.ok(check.key.length > 0, "check key present");
         assert.ok(check.label.length > 0, "check label present");
+        assert.equal(check.name, check.label, "name aliases label");
         assert.ok(check.score >= 0 && check.score <= 100, "check score in 0–100");
         assert.ok(check.weight > 0, "check weight positive");
         assert.ok(
           ["strong", "adequate", "at_risk", "unknown"].includes(check.status),
           "check status is a known band",
         );
+        assert.ok(check.evidence, "evidence present");
+        assert.equal(check.evidence.question_id, check.key);
+        assert.ok(
+          check.evidence.answer_value != null && String(check.evidence.answer_value).length > 0,
+          "answer_value present for answered field",
+        );
+        assert.ok(
+          typeof check.evidence.reason === "string" && check.evidence.reason.length > 10,
+          "reason is a non-empty plain-English string",
+        );
+        assert.notEqual(check.evidence.reason, "N/A");
       }
+      assert.ok(Array.isArray(detail.sub_metrics));
+      assert.equal(detail.sub_metrics.length, detail.checks.length);
     }
     const securityKeys = payload.dimensionDetails.Security.checks.map((c) => c.key);
     assert.ok(securityKeys.includes("auth"), "Security breaks down into auth");
     assert.ok(securityKeys.includes("secrets_pattern"), "Security breaks down into secrets");
+  });
+
+  it("returns mission-shaped dimensionResults with evidence on every sub-metric", () => {
+    const weak = computeReadinessScore({
+      report: {
+        ...UNKNOWN_REPORT,
+        auth: "none — shared password only",
+        authorization: "all admin",
+        row_level_security: "none",
+        secrets_pattern: "hardcoded in git",
+        api_surface: "public unauthenticated open",
+        tests: "none",
+        error_handling: "unhandled stack traces",
+        background_jobs: "fire and forget",
+        fragility_flags: ["single region", "no backup", "manual migrate"],
+        logging: "console only",
+        deploys: "manual ssh",
+        environments: "prod only",
+        structure: "spaghetti god module",
+        languages: "unknown mixed undocumented",
+        size: "huge unknown",
+        frontend: "unknown",
+        backend: "unknown",
+        pii_categories: "payment cards and health records",
+        tenancy: "shared without isolation",
+        summary: "risky prototype",
+        confidence: 0.4,
+      },
+      source: "paste",
+    });
+    const strong = computeReadinessScore({ report: HARDEN_REPORT, source: "paste" });
+
+    assert.ok(Array.isArray(weak.dimensionResults));
+    assert.equal(weak.dimensionResults.length, READINESS_DIMENSIONS.length);
+
+    for (const dim of weak.dimensionResults) {
+      assert.equal(typeof dim.dimension, "string");
+      assert.ok(dim.dimension.length > 0);
+      assert.equal(typeof dim.score, "number");
+      assert.ok(Array.isArray(dim.sub_metrics));
+      assert.ok(
+        dim.sub_metrics.length >= 4 && dim.sub_metrics.length <= 6,
+        `${dim.dimension} must have 4–6 sub_metrics, got ${dim.sub_metrics.length}`,
+      );
+      for (const sm of dim.sub_metrics) {
+        assert.ok(typeof sm.name === "string" && sm.name.length > 0);
+        assert.equal(typeof sm.score, "number");
+        assert.equal(typeof sm.weight, "number");
+        assert.ok(sm.evidence);
+        assert.ok(
+          typeof sm.evidence.question_id === "string" && sm.evidence.question_id.length > 0,
+        );
+        assert.ok(sm.evidence.answer_value != null && sm.evidence.answer_value !== "");
+        assert.ok(typeof sm.evidence.reason === "string" && sm.evidence.reason.length > 10);
+        assert.ok(/you (reported|did not answer)/i.test(sm.evidence.reason));
+        assert.notEqual(sm.evidence.reason, "N/A");
+      }
+    }
+
+    // Different answer sets → visibly different dimension scores.
+    let anyDimDiffers = false;
+    for (const label of READINESS_DIMENSIONS) {
+      if (weak.dimensions[label] !== strong.dimensions[label]) anyDimDiffers = true;
+    }
+    assert.ok(anyDimDiffers, "weak vs strong reports must produce different dimension scores");
+
+    // Within each payload, not all dimensions share the same score.
+    const weakScores = weak.dimensionResults.map((d) => d.score);
+    const strongScores = strong.dimensionResults.map((d) => d.score);
+    assert.ok(new Set(weakScores).size > 1, "weak payload dimensions must not all be equal");
+    assert.ok(new Set(strongScores).size > 1, "strong payload dimensions must not all be equal");
+
+    // Not pinned at the old flat default of 25 for both submissions.
+    const weakAll25 = weakScores.every((s) => s === 25);
+    const strongAll25 = strongScores.every((s) => s === 25);
+    assert.ok(
+      !(weakAll25 && strongAll25),
+      "scores must be computed from answers, not pinned at 25",
+    );
+
+    // Reason strings are not identical boilerplate across all sub-metrics.
+    const reasons = weak.dimensionResults.flatMap((d) =>
+      d.sub_metrics.map((s) => s.evidence.reason),
+    );
+    assert.ok(new Set(reasons).size > 3, "reason strings must vary with answers");
   });
 
   it("marks unanswered sub-metrics unknown and scores them as risk", () => {
@@ -259,6 +358,9 @@ describe("readiness scoring", () => {
         assert.equal(check.answered, false, `${label}/${check.key} should be unanswered`);
         assert.equal(check.status, "unknown");
         assert.equal(check.score, 25, "unknown checks score at the risk percentile");
+        assert.equal(check.evidence.question_id, check.key);
+        assert.ok(check.evidence.reason.length > 0);
+        assert.match(check.evidence.reason, /did not answer/i);
       }
     }
   });

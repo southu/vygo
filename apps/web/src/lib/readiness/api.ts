@@ -231,6 +231,9 @@ export type ScoreResponse = {
   id?: string;
   scores: Record<string, number>;
   dimensions?: Record<string, number>;
+  dimensionDetails?: Record<string, SnapshotDimensionDetail> | null;
+  /** Mission-shaped: [{ dimension, score, sub_metrics: [{ name, score, weight, evidence }] }] */
+  dimensionResults?: SnapshotDimensionResult[] | null;
   ranges?: Record<string, { low: number; high: number; mid: number }> | null;
   displayMode?: "point" | "range";
   overall?: number;
@@ -248,13 +251,21 @@ export type ScoreResponse = {
 
 export type SnapshotSubMetricStatus = "strong" | "adequate" | "at_risk" | "unknown";
 
+export type SnapshotSubMetricEvidence = {
+  question_id: string;
+  answer_value: unknown;
+  reason: string;
+};
+
 export type SnapshotSubMetric = {
   key: string;
   label: string;
+  name?: string;
   score: number;
   weight: number;
   answered: boolean;
   status: SnapshotSubMetricStatus;
+  evidence?: SnapshotSubMetricEvidence | null;
 };
 
 export type SnapshotDimensionDetail = {
@@ -262,6 +273,24 @@ export type SnapshotDimensionDetail = {
   score: number;
   weight: number;
   checks: SnapshotSubMetric[];
+  sub_metrics?: Array<{
+    name: string;
+    score: number;
+    weight: number;
+    evidence: SnapshotSubMetricEvidence;
+  }>;
+};
+
+/** Mission-shaped dimension result array entry. */
+export type SnapshotDimensionResult = {
+  dimension: string;
+  score: number;
+  sub_metrics: Array<{
+    name: string;
+    score: number;
+    weight: number;
+    evidence: SnapshotSubMetricEvidence;
+  }>;
 };
 
 export type SnapshotResponse = {
@@ -270,6 +299,7 @@ export type SnapshotResponse = {
   scores: Record<string, number> | null;
   dimensions?: Record<string, number> | null;
   dimensionDetails?: Record<string, SnapshotDimensionDetail> | null;
+  dimensionResults?: SnapshotDimensionResult[] | null;
   ranges?: Record<string, { low: number; high: number; mid: number }> | null;
   displayMode?: "point" | "range";
   overall?: number | null;
@@ -361,6 +391,8 @@ export async function scoreReadiness(input: {
       body.dimensions && typeof body.dimensions === "object"
         ? (body.dimensions as Record<string, number>)
         : undefined,
+    dimensionDetails: parseDimensionDetails(body.dimensionDetails),
+    dimensionResults: parseDimensionResults(body.dimensionResults),
     ranges:
       body.ranges && typeof body.ranges === "object"
         ? (body.ranges as ScoreResponse["ranges"])
@@ -396,6 +428,54 @@ const SUB_METRIC_STATUSES: ReadonlySet<string> = new Set([
   "unknown",
 ]);
 
+function parseEvidence(raw: unknown): SnapshotSubMetricEvidence | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const ev = raw as Record<string, unknown>;
+  const question_id = typeof ev.question_id === "string" ? ev.question_id.trim() : "";
+  const reason = typeof ev.reason === "string" ? ev.reason.trim() : "";
+  if (!question_id || !reason) return null;
+  return {
+    question_id,
+    answer_value: "answer_value" in ev ? ev.answer_value : null,
+    reason,
+  };
+}
+
+function parseDimensionResults(raw: unknown): SnapshotDimensionResult[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: SnapshotDimensionResult[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const dim = entry as Record<string, unknown>;
+    const dimension = typeof dim.dimension === "string" ? dim.dimension.trim() : "";
+    if (!dimension) continue;
+    const sub_metrics = Array.isArray(dim.sub_metrics)
+      ? (dim.sub_metrics as unknown[]).flatMap((sm) => {
+          if (!sm || typeof sm !== "object" || Array.isArray(sm)) return [];
+          const row = sm as Record<string, unknown>;
+          const name = typeof row.name === "string" ? row.name.trim() : "";
+          const evidence = parseEvidence(row.evidence);
+          if (!name || !evidence) return [];
+          return [
+            {
+              name,
+              score: typeof row.score === "number" && Number.isFinite(row.score) ? row.score : 0,
+              weight:
+                typeof row.weight === "number" && Number.isFinite(row.weight) ? row.weight : 1,
+              evidence,
+            },
+          ];
+        })
+      : [];
+    out.push({
+      dimension,
+      score: typeof dim.score === "number" && Number.isFinite(dim.score) ? dim.score : 0,
+      sub_metrics,
+    });
+  }
+  return out.length > 0 ? out : null;
+}
+
 function parseDimensionDetails(raw: unknown): Record<string, SnapshotDimensionDetail> | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const out: Record<string, SnapshotDimensionDetail> = {};
@@ -407,10 +487,12 @@ function parseDimensionDetails(raw: unknown): Record<string, SnapshotDimensionDe
           if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
           const check = entry as Record<string, unknown>;
           if (typeof check.key !== "string" || !check.key) return [];
+          const label = typeof check.label === "string" && check.label ? check.label : check.key;
           return [
             {
               key: check.key,
-              label: typeof check.label === "string" && check.label ? check.label : check.key,
+              label,
+              name: typeof check.name === "string" && check.name ? check.name : label,
               score:
                 typeof check.score === "number" && Number.isFinite(check.score) ? check.score : 0,
               weight:
@@ -422,16 +504,43 @@ function parseDimensionDetails(raw: unknown): Record<string, SnapshotDimensionDe
                 typeof check.status === "string" && SUB_METRIC_STATUSES.has(check.status)
                   ? (check.status as SnapshotSubMetricStatus)
                   : "unknown",
+              evidence: parseEvidence(check.evidence),
             },
           ];
         })
       : [];
+    const sub_metrics = Array.isArray(detail.sub_metrics)
+      ? (detail.sub_metrics as unknown[]).flatMap((sm) => {
+          if (!sm || typeof sm !== "object" || Array.isArray(sm)) return [];
+          const row = sm as Record<string, unknown>;
+          const name = typeof row.name === "string" ? row.name.trim() : "";
+          const evidence = parseEvidence(row.evidence);
+          if (!name || !evidence) return [];
+          return [
+            {
+              name,
+              score: typeof row.score === "number" && Number.isFinite(row.score) ? row.score : 0,
+              weight:
+                typeof row.weight === "number" && Number.isFinite(row.weight) ? row.weight : 1,
+              evidence,
+            },
+          ];
+        })
+      : checks
+          .filter((c) => c.evidence)
+          .map((c) => ({
+            name: c.name ?? c.label,
+            score: c.score,
+            weight: c.weight,
+            evidence: c.evidence as SnapshotSubMetricEvidence,
+          }));
     out[dim] = {
       label: typeof detail.label === "string" && detail.label ? detail.label : dim,
       score: typeof detail.score === "number" && Number.isFinite(detail.score) ? detail.score : 0,
       weight:
         typeof detail.weight === "number" && Number.isFinite(detail.weight) ? detail.weight : 1,
       checks,
+      sub_metrics,
     };
   }
   return Object.keys(out).length > 0 ? out : null;
@@ -461,6 +570,7 @@ export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse
     scores,
     dimensions: scores,
     dimensionDetails: parseDimensionDetails(body.dimensionDetails),
+    dimensionResults: parseDimensionResults(body.dimensionResults),
     ranges:
       body.ranges && typeof body.ranges === "object"
         ? (body.ranges as SnapshotResponse["ranges"])

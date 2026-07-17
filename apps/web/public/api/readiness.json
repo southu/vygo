@@ -2,8 +2,8 @@
   "ready": false,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "e2becbd9149cabf1ac64fabaf970cacf269ca85a",
-  "generatedAt": "2026-07-17T00:25:37.762Z",
+  "gitSha": "5d43c4273b27131d5535d22e67aad96bb922d311",
+  "generatedAt": "2026-07-17T03:42:33.708Z",
   "railwayFoundation": {
     "statusUrl": "/api/railway-foundation",
     "project": "vygo",
@@ -204,42 +204,124 @@
             {
               "key": "auth",
               "label": "Authentication",
+              "name": "Authentication",
               "score": 70,
               "weight": 1.5,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "auth",
+                "answer_value": "session token flows; Turnstile-gated submissions",
+                "reason": "You reported authentication as \"session token flows; Turnstile-gated submissions\", including positive signals (session)."
+              }
             },
             {
               "key": "authorization",
               "label": "Authorization & access control",
+              "name": "Authorization & access control",
               "score": 78,
               "weight": 1.5,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "authorization",
+                "answer_value": "scoped ops endpoints with policy checks",
+                "reason": "You reported authorization & access control as \"scoped ops endpoints with policy checks\", including positive signals (policy, scoped)."
+              }
             },
             {
               "key": "row_level_security",
               "label": "Row-level security / tenant isolation",
+              "name": "Row-level security / tenant isolation",
               "score": 55,
               "weight": 1.2,
               "answered": true,
-              "status": "adequate"
+              "status": "adequate",
+              "evidence": {
+                "question_id": "row_level_security",
+                "answer_value": "session-scoped queries; no cross-tenant surface",
+                "reason": "You reported row-level security / tenant isolation as \"session-scoped queries; no cross-tenant surface\", which is adequate but not strongly evidenced."
+              }
             },
             {
               "key": "secrets_pattern",
               "label": "Secrets management",
+              "name": "Secrets management",
               "score": 78,
               "weight": 1.3,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "secrets_pattern",
+                "answer_value": "railway env injection with secret scan gating CI",
+                "reason": "You reported secrets management as \"railway env injection with secret scan gating CI\", including positive signals (env injection, railway env)."
+              }
             },
             {
               "key": "api_surface",
               "label": "API surface hardening",
+              "name": "API surface hardening",
               "score": 94,
               "weight": 0.8,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "api_surface",
+                "answer_value": "https versioned /v1 API with auth and rate limits",
+                "reason": "You reported api surface hardening as \"https versioned /v1 API with auth and rate limits\", including positive signals (https, auth)."
+              }
+            }
+          ],
+          "sub_metrics": [
+            {
+              "name": "Authentication",
+              "score": 70,
+              "weight": 1.5,
+              "evidence": {
+                "question_id": "auth",
+                "answer_value": "session token flows; Turnstile-gated submissions",
+                "reason": "You reported authentication as \"session token flows; Turnstile-gated submissions\", including positive signals (session)."
+              }
+            },
+            {
+              "name": "Authorization & access control",
+              "score": 78,
+              "weight": 1.5,
+              "evidence": {
+                "question_id": "authorization",
+                "answer_value": "scoped ops endpoints with policy checks",
+                "reason": "You reported authorization & access control as \"scoped ops endpoints with policy checks\", including positive signals (policy, scoped)."
+              }
+            },
+            {
+              "name": "Row-level security / tenant isolation",
+              "score": 55,
+              "weight": 1.2,
+              "evidence": {
+                "question_id": "row_level_security",
+                "answer_value": "session-scoped queries; no cross-tenant surface",
+                "reason": "You reported row-level security / tenant isolation as \"session-scoped queries; no cross-tenant surface\", which is adequate but not strongly evidenced."
+              }
+            },
+            {
+              "name": "Secrets management",
+              "score": 78,
+              "weight": 1.3,
+              "evidence": {
+                "question_id": "secrets_pattern",
+                "answer_value": "railway env injection with secret scan gating CI",
+                "reason": "You reported secrets management as \"railway env injection with secret scan gating CI\", including positive signals (env injection, railway env)."
+              }
+            },
+            {
+              "name": "API surface hardening",
+              "score": 94,
+              "weight": 0.8,
+              "evidence": {
+                "question_id": "api_surface",
+                "answer_value": "https versioned /v1 API with auth and rate limits",
+                "reason": "You reported api surface hardening as \"https versioned /v1 API with auth and rate limits\", including positive signals (https, auth)."
+              }
             }
           ]
         },
@@ -251,42 +333,128 @@
             {
               "key": "tests",
               "label": "Tests & deploy gates",
+              "name": "Tests & deploy gates",
               "score": 94,
               "weight": 1.5,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "tests",
+                "answer_value": "unit and integration tests gate every deploy in CI",
+                "reason": "You reported tests & deploy gates as \"unit and integration tests gate every deploy in CI\", including positive signals (unit, integration)."
+              }
             },
             {
               "key": "error_handling",
               "label": "Error handling",
+              "name": "Error handling",
               "score": 86,
               "weight": 1,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "error_handling",
+                "answer_value": "structured safe errors with graceful fallbacks",
+                "reason": "You reported error handling as \"structured safe errors with graceful fallbacks\", including positive signals (safe, structured)."
+              }
             },
             {
               "key": "background_jobs",
               "label": "Background jobs & queues",
+              "name": "Background jobs & queues",
               "score": 94,
               "weight": 0.8,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "background_jobs",
+                "answer_value": "email outbox worker with retry and idempotent processing",
+                "reason": "You reported background jobs & queues as \"email outbox worker with retry and idempotent processing\", including positive signals (worker, outbox)."
+              }
             },
             {
               "key": "fragility_flags",
               "label": "Fragility & single points of failure",
+              "name": "Fragility & single points of failure",
               "score": 38,
               "weight": 1.2,
               "answered": true,
-              "status": "at_risk"
+              "status": "at_risk",
+              "evidence": {
+                "question_id": "fragility_flags",
+                "answer_value": [
+                  "single_region"
+                ],
+                "reason": "You reported fragility & single points of failure as \"single_region\", which includes risk signals (single)."
+              }
             },
             {
               "key": "logging",
               "label": "Logging & observability",
+              "name": "Logging & observability",
               "score": 86,
               "weight": 0.7,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "logging",
+                "answer_value": "structured JSON logs with request ids",
+                "reason": "You reported logging & observability as \"structured JSON logs with request ids\", including positive signals (structured, request id)."
+              }
+            }
+          ],
+          "sub_metrics": [
+            {
+              "name": "Tests & deploy gates",
+              "score": 94,
+              "weight": 1.5,
+              "evidence": {
+                "question_id": "tests",
+                "answer_value": "unit and integration tests gate every deploy in CI",
+                "reason": "You reported tests & deploy gates as \"unit and integration tests gate every deploy in CI\", including positive signals (unit, integration)."
+              }
+            },
+            {
+              "name": "Error handling",
+              "score": 86,
+              "weight": 1,
+              "evidence": {
+                "question_id": "error_handling",
+                "answer_value": "structured safe errors with graceful fallbacks",
+                "reason": "You reported error handling as \"structured safe errors with graceful fallbacks\", including positive signals (safe, structured)."
+              }
+            },
+            {
+              "name": "Background jobs & queues",
+              "score": 94,
+              "weight": 0.8,
+              "evidence": {
+                "question_id": "background_jobs",
+                "answer_value": "email outbox worker with retry and idempotent processing",
+                "reason": "You reported background jobs & queues as \"email outbox worker with retry and idempotent processing\", including positive signals (worker, outbox)."
+              }
+            },
+            {
+              "name": "Fragility & single points of failure",
+              "score": 38,
+              "weight": 1.2,
+              "evidence": {
+                "question_id": "fragility_flags",
+                "answer_value": [
+                  "single_region"
+                ],
+                "reason": "You reported fragility & single points of failure as \"single_region\", which includes risk signals (single)."
+              }
+            },
+            {
+              "name": "Logging & observability",
+              "score": 86,
+              "weight": 0.7,
+              "evidence": {
+                "question_id": "logging",
+                "answer_value": "structured JSON logs with request ids",
+                "reason": "You reported logging & observability as \"structured JSON logs with request ids\", including positive signals (structured, request id)."
+              }
             }
           ]
         },
@@ -298,42 +466,124 @@
             {
               "key": "deploys",
               "label": "Deploy pipeline",
+              "name": "Deploy pipeline",
               "score": 94,
               "weight": 1.4,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "deploys",
+                "answer_value": "CI/CD automated pipeline via GitHub Actions with rollback",
+                "reason": "You reported deploy pipeline as \"CI/CD automated pipeline via GitHub Actions with rollback\", including positive signals (ci/cd, github actions)."
+              }
             },
             {
               "key": "environments",
               "label": "Environments",
+              "name": "Environments",
               "score": 86,
               "weight": 1,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "environments",
+                "answer_value": "local, preview, production",
+                "reason": "You reported environments as \"local, preview, production\", including positive signals (production, preview)."
+              }
             },
             {
               "key": "logging",
               "label": "Logging & observability",
+              "name": "Logging & observability",
               "score": 70,
               "weight": 0.9,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "logging",
+                "answer_value": "structured JSON logs with request ids",
+                "reason": "You reported logging & observability as \"structured JSON logs with request ids\", including positive signals (structured)."
+              }
             },
             {
               "key": "error_handling",
               "label": "Error handling",
+              "name": "Error handling",
               "score": 55,
               "weight": 0.7,
               "answered": true,
-              "status": "adequate"
+              "status": "adequate",
+              "evidence": {
+                "question_id": "error_handling",
+                "answer_value": "structured safe errors with graceful fallbacks",
+                "reason": "You reported error handling as \"structured safe errors with graceful fallbacks\", which is adequate but not strongly evidenced."
+              }
             },
             {
               "key": "background_jobs",
               "label": "Background jobs & queues",
+              "name": "Background jobs & queues",
               "score": 55,
               "weight": 0.6,
               "answered": true,
-              "status": "adequate"
+              "status": "adequate",
+              "evidence": {
+                "question_id": "background_jobs",
+                "answer_value": "email outbox worker with retry and idempotent processing",
+                "reason": "You reported background jobs & queues as \"email outbox worker with retry and idempotent processing\", which is adequate but not strongly evidenced."
+              }
+            }
+          ],
+          "sub_metrics": [
+            {
+              "name": "Deploy pipeline",
+              "score": 94,
+              "weight": 1.4,
+              "evidence": {
+                "question_id": "deploys",
+                "answer_value": "CI/CD automated pipeline via GitHub Actions with rollback",
+                "reason": "You reported deploy pipeline as \"CI/CD automated pipeline via GitHub Actions with rollback\", including positive signals (ci/cd, github actions)."
+              }
+            },
+            {
+              "name": "Environments",
+              "score": 86,
+              "weight": 1,
+              "evidence": {
+                "question_id": "environments",
+                "answer_value": "local, preview, production",
+                "reason": "You reported environments as \"local, preview, production\", including positive signals (production, preview)."
+              }
+            },
+            {
+              "name": "Logging & observability",
+              "score": 70,
+              "weight": 0.9,
+              "evidence": {
+                "question_id": "logging",
+                "answer_value": "structured JSON logs with request ids",
+                "reason": "You reported logging & observability as \"structured JSON logs with request ids\", including positive signals (structured)."
+              }
+            },
+            {
+              "name": "Error handling",
+              "score": 55,
+              "weight": 0.7,
+              "evidence": {
+                "question_id": "error_handling",
+                "answer_value": "structured safe errors with graceful fallbacks",
+                "reason": "You reported error handling as \"structured safe errors with graceful fallbacks\", which is adequate but not strongly evidenced."
+              }
+            },
+            {
+              "name": "Background jobs & queues",
+              "score": 55,
+              "weight": 0.6,
+              "evidence": {
+                "question_id": "background_jobs",
+                "answer_value": "email outbox worker with retry and idempotent processing",
+                "reason": "You reported background jobs & queues as \"email outbox worker with retry and idempotent processing\", which is adequate but not strongly evidenced."
+              }
             }
           ]
         },
@@ -345,50 +595,148 @@
             {
               "key": "structure",
               "label": "Codebase structure",
+              "name": "Codebase structure",
               "score": 86,
               "weight": 1.2,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "structure",
+                "answer_value": "pnpm monorepo with packages and clear boundaries",
+                "reason": "You reported codebase structure as \"pnpm monorepo with packages and clear boundaries\", including positive signals (monorepo, packages)."
+              }
             },
             {
               "key": "languages",
               "label": "Language stack",
+              "name": "Language stack",
               "score": 70,
               "weight": 0.7,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "languages",
+                "answer_value": "TypeScript",
+                "reason": "You reported language stack as \"TypeScript\", including positive signals (typescript)."
+              }
             },
             {
               "key": "size",
               "label": "Codebase size",
+              "name": "Codebase size",
               "score": 70,
               "weight": 0.6,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "size",
+                "answer_value": "medium",
+                "reason": "You reported codebase size as \"medium\", including positive signals (medium)."
+              }
             },
             {
               "key": "tests",
               "label": "Tests & deploy gates",
+              "name": "Tests & deploy gates",
               "score": 70,
               "weight": 1.1,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "tests",
+                "answer_value": "unit and integration tests gate every deploy in CI",
+                "reason": "You reported tests & deploy gates as \"unit and integration tests gate every deploy in CI\", including positive signals (unit)."
+              }
             },
             {
               "key": "frontend",
               "label": "Frontend stack",
+              "name": "Frontend stack",
               "score": 70,
               "weight": 0.5,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "frontend",
+                "answer_value": "Next.js static export on Vercel",
+                "reason": "You reported frontend stack as \"Next.js static export on Vercel\", including positive signals (next)."
+              }
             },
             {
               "key": "backend",
               "label": "Backend stack",
+              "name": "Backend stack",
               "score": 70,
               "weight": 0.5,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "backend",
+                "answer_value": "Fastify on Railway with Vercel edge mirror",
+                "reason": "You reported backend stack as \"Fastify on Railway with Vercel edge mirror\", including positive signals (fastify)."
+              }
+            }
+          ],
+          "sub_metrics": [
+            {
+              "name": "Codebase structure",
+              "score": 86,
+              "weight": 1.2,
+              "evidence": {
+                "question_id": "structure",
+                "answer_value": "pnpm monorepo with packages and clear boundaries",
+                "reason": "You reported codebase structure as \"pnpm monorepo with packages and clear boundaries\", including positive signals (monorepo, packages)."
+              }
+            },
+            {
+              "name": "Language stack",
+              "score": 70,
+              "weight": 0.7,
+              "evidence": {
+                "question_id": "languages",
+                "answer_value": "TypeScript",
+                "reason": "You reported language stack as \"TypeScript\", including positive signals (typescript)."
+              }
+            },
+            {
+              "name": "Codebase size",
+              "score": 70,
+              "weight": 0.6,
+              "evidence": {
+                "question_id": "size",
+                "answer_value": "medium",
+                "reason": "You reported codebase size as \"medium\", including positive signals (medium)."
+              }
+            },
+            {
+              "name": "Tests & deploy gates",
+              "score": 70,
+              "weight": 1.1,
+              "evidence": {
+                "question_id": "tests",
+                "answer_value": "unit and integration tests gate every deploy in CI",
+                "reason": "You reported tests & deploy gates as \"unit and integration tests gate every deploy in CI\", including positive signals (unit)."
+              }
+            },
+            {
+              "name": "Frontend stack",
+              "score": 70,
+              "weight": 0.5,
+              "evidence": {
+                "question_id": "frontend",
+                "answer_value": "Next.js static export on Vercel",
+                "reason": "You reported frontend stack as \"Next.js static export on Vercel\", including positive signals (next)."
+              }
+            },
+            {
+              "name": "Backend stack",
+              "score": 70,
+              "weight": 0.5,
+              "evidence": {
+                "question_id": "backend",
+                "answer_value": "Fastify on Railway with Vercel edge mirror",
+                "reason": "You reported backend stack as \"Fastify on Railway with Vercel edge mirror\", including positive signals (fastify)."
+              }
             }
           ]
         },
@@ -400,46 +748,422 @@
             {
               "key": "pii_categories",
               "label": "PII & data sensitivity",
+              "name": "PII & data sensitivity",
               "score": 44,
               "weight": 1.4,
               "answered": true,
-              "status": "at_risk"
+              "status": "at_risk",
+              "evidence": {
+                "question_id": "pii_categories",
+                "answer_value": "email, name; no payment, no health",
+                "reason": "You reported pii & data sensitivity as \"email, name; no payment, no health\", which includes risk signals (payment, health)."
+              }
             },
             {
               "key": "tenancy",
               "label": "Tenancy model",
+              "name": "Tenancy model",
               "score": 70,
               "weight": 1.1,
               "answered": true,
-              "status": "strong"
+              "status": "strong",
+              "evidence": {
+                "question_id": "tenancy",
+                "answer_value": "single-tenant marketing + intake product",
+                "reason": "You reported tenancy model as \"single-tenant marketing + intake product\", including positive signals (single-tenant)."
+              }
             },
             {
               "key": "auth",
               "label": "Authentication",
+              "name": "Authentication",
               "score": 55,
               "weight": 1,
               "answered": true,
-              "status": "adequate"
+              "status": "adequate",
+              "evidence": {
+                "question_id": "auth",
+                "answer_value": "session token flows; Turnstile-gated submissions",
+                "reason": "You reported authentication as \"session token flows; Turnstile-gated submissions\", which is adequate but not strongly evidenced."
+              }
             },
             {
               "key": "authorization",
               "label": "Authorization & access control",
+              "name": "Authorization & access control",
               "score": 55,
               "weight": 0.9,
               "answered": true,
-              "status": "adequate"
+              "status": "adequate",
+              "evidence": {
+                "question_id": "authorization",
+                "answer_value": "scoped ops endpoints with policy checks",
+                "reason": "You reported authorization & access control as \"scoped ops endpoints with policy checks\", which is adequate but not strongly evidenced."
+              }
             },
             {
               "key": "secrets_pattern",
               "label": "Secrets management",
+              "name": "Secrets management",
               "score": 55,
               "weight": 0.8,
               "answered": true,
-              "status": "adequate"
+              "status": "adequate",
+              "evidence": {
+                "question_id": "secrets_pattern",
+                "answer_value": "railway env injection with secret scan gating CI",
+                "reason": "You reported secrets management as \"railway env injection with secret scan gating CI\", which is adequate but not strongly evidenced."
+              }
+            }
+          ],
+          "sub_metrics": [
+            {
+              "name": "PII & data sensitivity",
+              "score": 44,
+              "weight": 1.4,
+              "evidence": {
+                "question_id": "pii_categories",
+                "answer_value": "email, name; no payment, no health",
+                "reason": "You reported pii & data sensitivity as \"email, name; no payment, no health\", which includes risk signals (payment, health)."
+              }
+            },
+            {
+              "name": "Tenancy model",
+              "score": 70,
+              "weight": 1.1,
+              "evidence": {
+                "question_id": "tenancy",
+                "answer_value": "single-tenant marketing + intake product",
+                "reason": "You reported tenancy model as \"single-tenant marketing + intake product\", including positive signals (single-tenant)."
+              }
+            },
+            {
+              "name": "Authentication",
+              "score": 55,
+              "weight": 1,
+              "evidence": {
+                "question_id": "auth",
+                "answer_value": "session token flows; Turnstile-gated submissions",
+                "reason": "You reported authentication as \"session token flows; Turnstile-gated submissions\", which is adequate but not strongly evidenced."
+              }
+            },
+            {
+              "name": "Authorization & access control",
+              "score": 55,
+              "weight": 0.9,
+              "evidence": {
+                "question_id": "authorization",
+                "answer_value": "scoped ops endpoints with policy checks",
+                "reason": "You reported authorization & access control as \"scoped ops endpoints with policy checks\", which is adequate but not strongly evidenced."
+              }
+            },
+            {
+              "name": "Secrets management",
+              "score": 55,
+              "weight": 0.8,
+              "evidence": {
+                "question_id": "secrets_pattern",
+                "answer_value": "railway env injection with secret scan gating CI",
+                "reason": "You reported secrets management as \"railway env injection with secret scan gating CI\", which is adequate but not strongly evidenced."
+              }
             }
           ]
         }
-      }
+      },
+      "dimensionResults": [
+        {
+          "dimension": "Security",
+          "score": 74,
+          "sub_metrics": [
+            {
+              "name": "Authentication",
+              "score": 70,
+              "weight": 1.5,
+              "evidence": {
+                "question_id": "auth",
+                "answer_value": "session token flows; Turnstile-gated submissions",
+                "reason": "You reported authentication as \"session token flows; Turnstile-gated submissions\", including positive signals (session)."
+              }
+            },
+            {
+              "name": "Authorization & access control",
+              "score": 78,
+              "weight": 1.5,
+              "evidence": {
+                "question_id": "authorization",
+                "answer_value": "scoped ops endpoints with policy checks",
+                "reason": "You reported authorization & access control as \"scoped ops endpoints with policy checks\", including positive signals (policy, scoped)."
+              }
+            },
+            {
+              "name": "Row-level security / tenant isolation",
+              "score": 55,
+              "weight": 1.2,
+              "evidence": {
+                "question_id": "row_level_security",
+                "answer_value": "session-scoped queries; no cross-tenant surface",
+                "reason": "You reported row-level security / tenant isolation as \"session-scoped queries; no cross-tenant surface\", which is adequate but not strongly evidenced."
+              }
+            },
+            {
+              "name": "Secrets management",
+              "score": 78,
+              "weight": 1.3,
+              "evidence": {
+                "question_id": "secrets_pattern",
+                "answer_value": "railway env injection with secret scan gating CI",
+                "reason": "You reported secrets management as \"railway env injection with secret scan gating CI\", including positive signals (env injection, railway env)."
+              }
+            },
+            {
+              "name": "API surface hardening",
+              "score": 94,
+              "weight": 0.8,
+              "evidence": {
+                "question_id": "api_surface",
+                "answer_value": "https versioned /v1 API with auth and rate limits",
+                "reason": "You reported api surface hardening as \"https versioned /v1 API with auth and rate limits\", including positive signals (https, auth)."
+              }
+            }
+          ]
+        },
+        {
+          "dimension": "Reliability",
+          "score": 78,
+          "sub_metrics": [
+            {
+              "name": "Tests & deploy gates",
+              "score": 94,
+              "weight": 1.5,
+              "evidence": {
+                "question_id": "tests",
+                "answer_value": "unit and integration tests gate every deploy in CI",
+                "reason": "You reported tests & deploy gates as \"unit and integration tests gate every deploy in CI\", including positive signals (unit, integration)."
+              }
+            },
+            {
+              "name": "Error handling",
+              "score": 86,
+              "weight": 1,
+              "evidence": {
+                "question_id": "error_handling",
+                "answer_value": "structured safe errors with graceful fallbacks",
+                "reason": "You reported error handling as \"structured safe errors with graceful fallbacks\", including positive signals (safe, structured)."
+              }
+            },
+            {
+              "name": "Background jobs & queues",
+              "score": 94,
+              "weight": 0.8,
+              "evidence": {
+                "question_id": "background_jobs",
+                "answer_value": "email outbox worker with retry and idempotent processing",
+                "reason": "You reported background jobs & queues as \"email outbox worker with retry and idempotent processing\", including positive signals (worker, outbox)."
+              }
+            },
+            {
+              "name": "Fragility & single points of failure",
+              "score": 38,
+              "weight": 1.2,
+              "evidence": {
+                "question_id": "fragility_flags",
+                "answer_value": [
+                  "single_region"
+                ],
+                "reason": "You reported fragility & single points of failure as \"single_region\", which includes risk signals (single)."
+              }
+            },
+            {
+              "name": "Logging & observability",
+              "score": 86,
+              "weight": 0.7,
+              "evidence": {
+                "question_id": "logging",
+                "answer_value": "structured JSON logs with request ids",
+                "reason": "You reported logging & observability as \"structured JSON logs with request ids\", including positive signals (structured, request id)."
+              }
+            }
+          ]
+        },
+        {
+          "dimension": "Operability",
+          "score": 77,
+          "sub_metrics": [
+            {
+              "name": "Deploy pipeline",
+              "score": 94,
+              "weight": 1.4,
+              "evidence": {
+                "question_id": "deploys",
+                "answer_value": "CI/CD automated pipeline via GitHub Actions with rollback",
+                "reason": "You reported deploy pipeline as \"CI/CD automated pipeline via GitHub Actions with rollback\", including positive signals (ci/cd, github actions)."
+              }
+            },
+            {
+              "name": "Environments",
+              "score": 86,
+              "weight": 1,
+              "evidence": {
+                "question_id": "environments",
+                "answer_value": "local, preview, production",
+                "reason": "You reported environments as \"local, preview, production\", including positive signals (production, preview)."
+              }
+            },
+            {
+              "name": "Logging & observability",
+              "score": 70,
+              "weight": 0.9,
+              "evidence": {
+                "question_id": "logging",
+                "answer_value": "structured JSON logs with request ids",
+                "reason": "You reported logging & observability as \"structured JSON logs with request ids\", including positive signals (structured)."
+              }
+            },
+            {
+              "name": "Error handling",
+              "score": 55,
+              "weight": 0.7,
+              "evidence": {
+                "question_id": "error_handling",
+                "answer_value": "structured safe errors with graceful fallbacks",
+                "reason": "You reported error handling as \"structured safe errors with graceful fallbacks\", which is adequate but not strongly evidenced."
+              }
+            },
+            {
+              "name": "Background jobs & queues",
+              "score": 55,
+              "weight": 0.6,
+              "evidence": {
+                "question_id": "background_jobs",
+                "answer_value": "email outbox worker with retry and idempotent processing",
+                "reason": "You reported background jobs & queues as \"email outbox worker with retry and idempotent processing\", which is adequate but not strongly evidenced."
+              }
+            }
+          ]
+        },
+        {
+          "dimension": "Maintainability",
+          "score": 74,
+          "sub_metrics": [
+            {
+              "name": "Codebase structure",
+              "score": 86,
+              "weight": 1.2,
+              "evidence": {
+                "question_id": "structure",
+                "answer_value": "pnpm monorepo with packages and clear boundaries",
+                "reason": "You reported codebase structure as \"pnpm monorepo with packages and clear boundaries\", including positive signals (monorepo, packages)."
+              }
+            },
+            {
+              "name": "Language stack",
+              "score": 70,
+              "weight": 0.7,
+              "evidence": {
+                "question_id": "languages",
+                "answer_value": "TypeScript",
+                "reason": "You reported language stack as \"TypeScript\", including positive signals (typescript)."
+              }
+            },
+            {
+              "name": "Codebase size",
+              "score": 70,
+              "weight": 0.6,
+              "evidence": {
+                "question_id": "size",
+                "answer_value": "medium",
+                "reason": "You reported codebase size as \"medium\", including positive signals (medium)."
+              }
+            },
+            {
+              "name": "Tests & deploy gates",
+              "score": 70,
+              "weight": 1.1,
+              "evidence": {
+                "question_id": "tests",
+                "answer_value": "unit and integration tests gate every deploy in CI",
+                "reason": "You reported tests & deploy gates as \"unit and integration tests gate every deploy in CI\", including positive signals (unit)."
+              }
+            },
+            {
+              "name": "Frontend stack",
+              "score": 70,
+              "weight": 0.5,
+              "evidence": {
+                "question_id": "frontend",
+                "answer_value": "Next.js static export on Vercel",
+                "reason": "You reported frontend stack as \"Next.js static export on Vercel\", including positive signals (next)."
+              }
+            },
+            {
+              "name": "Backend stack",
+              "score": 70,
+              "weight": 0.5,
+              "evidence": {
+                "question_id": "backend",
+                "answer_value": "Fastify on Railway with Vercel edge mirror",
+                "reason": "You reported backend stack as \"Fastify on Railway with Vercel edge mirror\", including positive signals (fastify)."
+              }
+            }
+          ]
+        },
+        {
+          "dimension": "Compliance posture",
+          "score": 55,
+          "sub_metrics": [
+            {
+              "name": "PII & data sensitivity",
+              "score": 44,
+              "weight": 1.4,
+              "evidence": {
+                "question_id": "pii_categories",
+                "answer_value": "email, name; no payment, no health",
+                "reason": "You reported pii & data sensitivity as \"email, name; no payment, no health\", which includes risk signals (payment, health)."
+              }
+            },
+            {
+              "name": "Tenancy model",
+              "score": 70,
+              "weight": 1.1,
+              "evidence": {
+                "question_id": "tenancy",
+                "answer_value": "single-tenant marketing + intake product",
+                "reason": "You reported tenancy model as \"single-tenant marketing + intake product\", including positive signals (single-tenant)."
+              }
+            },
+            {
+              "name": "Authentication",
+              "score": 55,
+              "weight": 1,
+              "evidence": {
+                "question_id": "auth",
+                "answer_value": "session token flows; Turnstile-gated submissions",
+                "reason": "You reported authentication as \"session token flows; Turnstile-gated submissions\", which is adequate but not strongly evidenced."
+              }
+            },
+            {
+              "name": "Authorization & access control",
+              "score": 55,
+              "weight": 0.9,
+              "evidence": {
+                "question_id": "authorization",
+                "answer_value": "scoped ops endpoints with policy checks",
+                "reason": "You reported authorization & access control as \"scoped ops endpoints with policy checks\", which is adequate but not strongly evidenced."
+              }
+            },
+            {
+              "name": "Secrets management",
+              "score": 55,
+              "weight": 0.8,
+              "evidence": {
+                "question_id": "secrets_pattern",
+                "answer_value": "railway env injection with secret scan gating CI",
+                "reason": "You reported secrets management as \"railway env injection with secret scan gating CI\", which is adequate but not strongly evidenced."
+              }
+            }
+          ]
+        }
+      ]
     }
   },
   "frontend": {

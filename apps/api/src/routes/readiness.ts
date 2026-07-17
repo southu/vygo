@@ -55,6 +55,7 @@ import {
   runDeterministicParse,
   scoringConfigFromDbRow,
   selectFollowupQuestions,
+  toDimensionResults,
   toPublicLeadBrief,
   tryLlmNormalizeReport,
   tryLlmPolishBrief,
@@ -154,12 +155,23 @@ function publicSnapshotBody(submission: {
   // Never return raw paste; only a redacted report summary for reasoning context.
   const report = submission.parsedReport ? redactReportDeep(submission.parsedReport) : null;
 
+  // Prefer persisted dimensionResults; rebuild from dimensionDetails when older rows lack them.
+  let dimensionResults = Array.isArray(scores.dimensionResults) ? scores.dimensionResults : null;
+  if (!dimensionResults && scores.dimensionDetails && typeof scores.dimensionDetails === "object") {
+    try {
+      dimensionResults = toDimensionResults(scores.dimensionDetails as never);
+    } catch {
+      dimensionResults = null;
+    }
+  }
+
   return {
     id: submission.id,
     snapshotId: submission.id,
     scores: scores.dimensions ?? scores.scores ?? null,
     dimensions: scores.dimensions ?? null,
     dimensionDetails: scores.dimensionDetails ?? null,
+    dimensionResults,
     ranges: scores.ranges ?? null,
     displayMode: scores.displayMode ?? "point",
     overall: scores.overall ?? null,
@@ -1601,6 +1613,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         scores: payload.dimensions,
         dimensions: payload.dimensions,
         dimensionDetails: payload.dimensionDetails,
+        dimensionResults: payload.dimensionResults,
         ranges: payload.ranges ?? null,
         displayMode: payload.displayMode,
         overall: payload.overall,
