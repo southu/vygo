@@ -50,14 +50,13 @@ Typical keys (names only — values are site-specific):
 
 | Variable                                     | Purpose                                                  |
 | -------------------------------------------- | -------------------------------------------------------- |
-| `PUBLIC_BASE_URL`                            | Canonical Composer URL (e.g. `https://dash.example.com`) |
-| `LAZY_URL` / `LAZY_PUBLIC_URL`               | Lazy base for UI + CORS                                  |
+| `PUBLIC_BASE_URL`                            | Canonical Composer URL (site-specific)                   |
 | `COMPOSER_PROJECTS_ROOT`                     | `RATCHET_ROOT/projects`                                  |
 | `COMPOSER_RATCHET_DIR` / `RATCHET_RUNS_DIR`  | Under `RATCHET_ROOT/harness`                             |
 | `COMPOSER_APP_REPO`                          | Path used for assist self-facts                          |
 | `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL`       | Team identity for harness commits                        |
 | `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` | Match author                                             |
-| `VAULT_URL`                                  | e.g. `http://127.0.0.1:8379`                             |
+| `VAULT_URL`                                  | Base URL for the vault consumer (install-specific)       |
 | `VAULT_CONSUMER_KEY_PATH`                    | Path to consumer key file (0600)                         |
 
 ### `secrets.env` (secret)
@@ -65,7 +64,6 @@ Typical keys (names only — values are site-specific):
 | Kind        | Examples (names)                                        |
 | ----------- | ------------------------------------------------------- |
 | Model / CLI | provider API keys if not using CLI login                |
-| Lazy        | `LAZY_CONTROL_TOKEN`                                    |
 | Cloud       | optional cloud tokens (prefer Vault for product work)   |
 
 **Rules**
@@ -112,7 +110,7 @@ Typical keys (names only — values are site-specific):
 | `deploy.live_url`        | Tester + deploy gate base         |
 | `deploy.version_url`     | Must return deployed SHA          |
 | `deploy.cloud_project`   | **Bind UUID** to stop create-spam |
-| `defaults.lazy_babysit`  | Opt product into overnight watch  |
+| `defaults.lazy_babysit`  | Opt product into optional helpers |
 
 Field names may vary by install; the product idea is **one shell = one repo + one live truth**.
 

@@ -40,28 +40,24 @@ More diagrams: [diagrams.md](./diagrams.md) · Printable: [one-pager-print](./on
 
 ## Component cheat sheet
 
-| Component       | Role                                                            | Default bind (illustrative)        |
-| --------------- | --------------------------------------------------------------- | ---------------------------------- |
-| **Composer**    | Human UI: Build home, projects, queue, dashboard, admin, assist | `127.0.0.1:8377`                   |
-| **Sentinel**    | Supervisor: arm/disarm, watch composer/queue health             | no public port                     |
-| **Lazy Mode**   | Independent overnight watchdog (observe)                        | `127.0.0.1:8378`                   |
-| **Medic**       | Recovery console for queues (on Lazy host, `/medic`)            | same as Lazy                       |
-| **Vault**       | Master-password credentials; broker for cloud APIs              | `127.0.0.1:8379`                   |
-| **Ratchet CLI** | Orchestration loop (builder / deploy gate / tester)             | `RATCHET_ROOT/harness`             |
-| **Projects**    | One folder per product (`project.json` + optional clone)        | `RATCHET_ROOT/projects/<slug>`     |
-
-All control-plane HTTP is **loopback only** in the reference design. Public access is typically an edge proxy with TLS + basic auth (e.g. `dash.*`, `files.*`, `bot.*` placeholders).
+| Component | Role |
+| --------- | ---- |
+| **Composer** | Human UI: Build home, projects, queue, dashboard, assist |
+| **Ratchet CLI** | Orchestration loop (builder / deploy gate / tester) under `RATCHET_ROOT/harness` |
+| **Vault** | Encrypted credentials; consumer broker so harness actions never put tokens in builder env |
+| **Projects** | One folder per product (`project.json` + optional clone) under `RATCHET_ROOT/projects/<slug>` |
+| **Lazy / Medic / Sentinel** | Optional overnight helpers — observe and report only; never implement product features |
 
 ---
 
 ## What “done” means
 
-| Layer          | Done when                                                             |
-| -------------- | --------------------------------------------------------------------- |
-| Single mission | Streak of `PASS` verdicts ≥ `limits.consecutive_passes_required`      |
-| Deploy gate    | Live `version_endpoint` returns builder’s pushed SHA                  |
-| Builder step   | Git proof-of-work: real commits, ancestry ok, remote HEAD matches     |
-| Product queue  | Each step succeeded (or discarded intentionally); no stuck `running`  |
+| Layer | Done when |
+| ----- | --------- |
+| Single mission | Streak of `PASS` verdicts ≥ `limits.consecutive_passes_required` |
+| Deploy gate | Live `version_endpoint` returns builder’s pushed SHA |
+| Builder step | Git proof-of-work: real commits, ancestry ok, remote HEAD matches |
+| Product queue | Each step succeeded (or discarded intentionally) |
 
 ---
 
@@ -69,8 +65,9 @@ All control-plane HTTP is **loopback only** in the reference design. Public acce
 
 - Not a general chat UI for product users
 - Not a CI replacement (though it pairs with host deploy pipelines)
-- Not “Medic implements features” — Medic recovers queue state; builders implement product
+- Not “overnight helpers implement features” — builders implement product
 - Not a place to put secrets in agent prompts or builder env
+- Not a host operations runbook (see [operations.md](./operations.md) for pack scope)
 
 ---
 

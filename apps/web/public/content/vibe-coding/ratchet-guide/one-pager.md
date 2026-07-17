@@ -25,66 +25,64 @@ flowchart LR
 
 ---
 
-## Stack (loopback)
+## Stack (roles)
 
-| Piece        | Port / place              | Job                      |
-| ------------ | ------------------------- | ------------------------ |
-| Composer     | `:8377`                   | UI, queue, admin         |
-| Lazy / Medic | `:8378`                   | Overnight watch / recovery |
-| Vault        | `:8379`                   | Secrets + cloud broker   |
-| Ratchet CLI  | `RATCHET_ROOT/harness`    | Loop orchestration       |
-| Projects     | `RATCHET_ROOT/projects`   | `project.json` shells    |
-| Edge         | TLS + basic auth (optional) | Public face only       |
+| Piece | Place | Job |
+| ----- | ----- | --- |
+| Composer | control plane UI | Goals, queue, projects |
+| Ratchet CLI | `RATCHET_ROOT/harness` | Loop orchestration |
+| Vault | credentials boundary | Secrets + consumer broker |
+| Projects | `RATCHET_ROOT/projects` | `project.json` shells |
+| Overnight helpers | optional | Observe only; no product features |
 
 ---
 
 ## Non‑negotiables
 
 1. **Live is truth** — tester hits `live_url`, not local tree
-2. **`/version`** — product must return deployed git SHA (no basic auth on that path for the gate)
+2. **`/version`** — product must return deployed git SHA for the deploy gate
 3. **Proof of work** — harness checks git; ignore agent claims
 4. **Streak** — usually 2 consecutive PASSes
 5. **No secrets in builder env** — Vault consumer only
-6. **Composer restarts must not kill builders** — detached workers outlive Admin Apply
-7. **Team git author** — unknown bot authors may be blocked by hosts
-8. **Multi-step goals** → about **4–8** queue items for real product work; bind cloud project UUIDs
-9. **Credentials stay brokered** — builder and tester never hold cloud tokens
+6. **Team git author** — unknown bot authors may be blocked by hosts
+7. **Multi-step goals** → about **4–8** queue items for real product work; bind cloud project UUIDs
+8. **Credentials stay brokered** — builder and tester never hold cloud tokens
 
 ---
 
 ## Loop exits
 
-| Code | Meaning               |
-| ---- | --------------------- |
-| 0    | Success (streak)      |
-| 2    | Max iterations        |
-| 3    | Deploy timeout        |
-| 4    | Tester contract       |
-| 5    | Builder proof-of-work |
-| 6    | Budget                |
+| Code | Meaning |
+| ---- | ------- |
+| 0 | Success (streak) |
+| 2 | Max iterations |
+| 3 | Deploy timeout |
+| 4 | Tester contract |
+| 5 | Builder proof-of-work |
+| 6 | Budget |
 
 ---
 
 ## Mental model
 
-**Composer** = factory office · **Ratchet** = factory floor · **Vault** = key cabinet · **Lazy/Medic/Sentinel** = night watch · **Product `/version`** = time clock.
+**Composer** = factory office · **Ratchet** = factory floor · **Vault** = key cabinet · **Product `/version`** = time clock.
 
 ---
 
 ## Rebuild in one breath
 
-Host + model CLIs → trees `RATCHET_ROOT/{control,harness,projects}` → process model (workers survive restarts) → edge → vault consumer → mock loop → product with `/version` → tiny real mission → harden (Sentinel, Lazy, docs).
+Host + model CLIs → trees `RATCHET_ROOT/{control,harness,projects}` → vault consumer → mock loop → product with `/version` → tiny real mission → docs pack for friends/AIs.
 
 ---
 
 ## Share / go deeper
 
-| Need          | Open                             |
-| ------------- | -------------------------------- |
-| Full guide    | [README.md](./README.md)         |
-| All diagrams  | [diagrams.md](./diagrams.md)     |
+| Need | Open |
+| ---- | ---- |
+| Full guide | [README.md](./README.md) |
+| All diagrams | [diagrams.md](./diagrams.md) |
 | Agent prompts | [ai-prompts.md](./ai-prompts.md) |
-| Footguns      | [footguns.md](./footguns.md)     |
-| Guide history | [CHANGELOG.md](./CHANGELOG.md)   |
+| Footguns | [footguns.md](./footguns.md) |
+| Guide history | [CHANGELOG.md](./CHANGELOG.md) |
 
-_No secrets in this pack. Guide pack **v1.2** · product-level architecture reference._
+_No secrets in this pack. Guide pack **v1.2** · product design reference only._

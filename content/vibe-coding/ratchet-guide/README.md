@@ -13,7 +13,7 @@
 
 - API keys, vault master passwords, edge passwords, consumer keys
 - Private host credentials
-- Day-to-day host operations runbooks (process-manager recipes, SSH production ops, deploy/host diagnostics, queue recovery procedures, cloud provisioning runbooks)
+- Day-to-day host operations runbooks (process-manager recipes, SSH production ops, deploy/host diagnostics, production recovery playbooks, cloud provisioning steps)
 
 Reference layout in this pack uses the placeholder root **`RATCHET_ROOT/{control,harness,projects}`**. Rename freely when rebuilding — these are not a real host’s paths.
 
@@ -40,10 +40,10 @@ Reference layout in this pack uses the placeholder root **`RATCHET_ROOT/{control
 | 4   | [layout.md](./layout.md)                                              | Directory trees, env files, `project.json`         |
 | 5   | [loop-and-missions.md](./loop-and-missions.md)                        | Ratchet loop, mission YAML, exit codes, `/version` |
 | 6   | [composer.md](./composer.md)                                          | Build UI, queue, assist, admin, header nav         |
-| 7   | [lazy-medic-sentinel.md](./lazy-medic-sentinel.md)                    | Overnight watchdogs (product roles)                |
+| 7   | [lazy-medic-sentinel.md](./lazy-medic-sentinel.md)                    | Optional overnight helpers (observe only)          |
 | 8   | [vault.md](./vault.md)                                                | Credentials boundary and consumer broker shape     |
 | 9   | [projects-and-deploy.md](./projects-and-deploy.md)                    | Product shells and `/version` requirements         |
-| 10  | [operations.md](./operations.md)                                      | Runtime services overview (roles, edge sketch)     |
+| 10  | [operations.md](./operations.md)                                      | Pack scope: what is and is not included            |
 | 11  | [rebuild.md](./rebuild.md)                                            | Greenfield checklist (phases A–E)                  |
 | 12  | [ai-prompts.md](./ai-prompts.md)                                      | Coding / new-product / friend-share prompts        |
 | 13  | [footguns.md](./footguns.md)                                          | Design pitfalls and fix directions                 |
@@ -56,7 +56,7 @@ Reference layout in this pack uses the placeholder root **`RATCHET_ROOT/{control
 
 ## One-sentence mental model
 
-**Composer** turns intent into queued missions. **Ratchet** is the factory floor (build → deploy gate → test → repeat). **Vault** holds keys the floor needs without giving them to the robots. **Lazy / Medic / Sentinel** keep the factory from catching fire overnight. Every product must tell the truth at **`/version`**.
+**Composer** turns intent into queued missions. **Ratchet** is the factory floor (build → deploy gate → test → repeat). **Vault** holds keys the floor needs without giving them to the robots. Optional overnight helpers may observe stuck state — they never implement product features. Every product must tell the truth at **`/version`**.
 
 ```mermaid
 flowchart LR

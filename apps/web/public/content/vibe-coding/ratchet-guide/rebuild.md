@@ -19,20 +19,18 @@ This is a product rebuild outline — not a host operations runbook.
    mkdir -p RATCHET_ROOT/control RATCHET_ROOT/harness RATCHET_ROOT/projects
    ```
 
-5. Place sources: ratchet harness, composer-live, lazy-mode, vault-mode (clone or copy)
+5. Place sources: ratchet harness, composer-live, vault-mode (clone or copy)
 6. Optional: Node/pnpm if your first product needs them on the same box
 
 ---
 
-## Phase B — Configuration & services
+## Phase B — Configuration
 
 1. Write non-secret service config (see [layout.md](./layout.md))
 2. Keep secrets in a separate file mode `600` (never in this pack)
 3. Configure **team git identity** for harness commits (host platforms may block bot authors)
-4. Start composer, lazy, vault, sentinel under your process model
-5. Ensure Composer restarts do **not** kill detached builders (product contract)
-6. Optional edge TLS + auth for control-plane hostnames
-7. Open product `/version` (and optional `/health`) without control-plane basic auth
+4. Bring up Composer, harness, and Vault under your own install process
+5. Confirm product `/version` is reachable by the deploy gate
 
 ---
 
@@ -41,7 +39,7 @@ This is a product rebuild outline — not a host operations runbook.
 1. Stand up the vault (private master password — never in this pack)
 2. Store cloud credentials with access scoped to project folders
 3. Give the harness a consumer key path only (no tokens in builder env)
-4. Wire `VAULT_URL` + consumer key path into harness env only
+4. Wire vault URL + consumer key path into harness env only
 5. Confirm broker identity checks succeed **before** any optional infra step
 
 ---
@@ -66,12 +64,10 @@ This is a product rebuild outline — not a host operations runbook.
 
 ## Phase E — Hardening
 
-1. Arm Sentinel when you want automated queue supervision
-2. Configure Lazy / Medic for overnight observation (product features still go through builders)
-3. Keep private ops notes separate from this share pack
-4. Install this guide under your docs tree for friends/AIs
-5. Backup strategy for vault ciphertext + secret env (encrypted off-box; private)
-6. Document vault access policy privately (who may unlock / arm)
+1. Keep private install notes separate from this share pack
+2. Install this guide under your docs tree for friends/AIs
+3. Backup strategy for vault ciphertext + secret env (encrypted off-box; private)
+4. Document vault access policy privately (who may unlock / arm)
 
 ---
 
@@ -84,7 +80,6 @@ You are done with MVP when:
 - [ ] Deploy gate sees `/version` move
 - [ ] Real tester returns structured PASS/FAIL
 - [ ] Composer enqueue → queue → run works from the browser
-- [ ] Composer restart does **not** kill an in-flight worker
 - [ ] Vault lock doesn’t dump secrets into run logs
 
 ---
@@ -98,9 +93,7 @@ You are done with MVP when:
 5. Composer queue API + static Build UI
 6. project.json + Projects UI
 7. Vault + consumer broker
-8. Lazy observe mode
-9. Sentinel
-10. Medic recovery surfaces
+8. Optional overnight observe helpers (no product features)
 
 Skip optional cloud provision until core loop is boringly reliable.
 

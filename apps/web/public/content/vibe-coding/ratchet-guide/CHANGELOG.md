@@ -1,10 +1,30 @@
 # Guide changelog
 
-Tracks **this documentation pack** (`docs/ratchet-guide/v1.2/`), not the Ratchet software itself.
+Tracks **this documentation pack**, not the Ratchet software itself.
 
-**Why it exists:** when you re-share the folder with friends or drop it on a new host, they can see what changed without diffing every file. Software/ops changes on a private host still belong in a private `docs/operator/CHANGELOG.md` (not this pack).
+**Why it exists:** when you re-share the folder with friends or drop it on a new host, they can see what changed without diffing every file. Private install notes stay outside this pack.
 
 Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below remain `guide-YYYY-MM-DD` plus pack version.
+
+---
+
+## v1.2 / guide-2026-07-17g — public pack is product design only
+
+### Removed
+
+- Residual install-private and control-plane admin material from rendered and zip-packaged docs
+- Material that still read as operator procedures after earlier sanitization passes
+
+### Changed
+
+- [`operations.md`](./operations.md) is pack scope only (what is / is not included)
+- [`lazy-medic-sentinel.md`](./lazy-medic-sentinel.md) reduced to observe-only boundary
+- Architecture, overview, one-pager, diagrams, footguns, principles, rebuild, examples, and composer docs limited to product contracts
+- Printable one-pager HTML aligned
+
+### Not published
+
+- Host-private install notes remain out of this share pack
 
 ---
 
@@ -12,21 +32,14 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ### Removed
 
-- Production deploy/host troubleshooting tables and queue-recovery procedures from [`footguns.md`](./footguns.md)
-- Deploy-timeout diagnostic prompt from [`ai-prompts.md`](./ai-prompts.md)
-- Cloud token / vault failure-mode runbooks and process-manager operational recipes across vault, rebuild, projects-and-deploy, operations
-- Runtime service administration steps that read as host ops rather than product architecture
+- Production troubleshooting tables and diagnostic prompts from public docs
+- Failure-mode and process-manager recipes that belonged in private install notes
 
 ### Changed
 
 - [`footguns.md`](./footguns.md) reframed as design pitfalls (contracts and boundaries)
-- [`vault.md`](./vault.md), [`operations.md`](./operations.md), [`rebuild.md`](./rebuild.md), [`lazy-medic-sentinel.md`](./lazy-medic-sentinel.md) kept as product-level roles and shapes only
+- Pack docs kept as product-level shapes only
 - [`ai-prompts.md`](./ai-prompts.md) reduced to rebuild / new-product / friend-share prompts
-- One-pager print HTML aligned with sanitized non-negotiables
-
-### Not published
-
-- Host-private ops runbooks, vault administration procedures, and cloud provisioning playbooks remain out of this share pack
 
 ---
 
@@ -34,19 +47,12 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ### Removed
 
-- Production SSH, heal-tick, and long-lived night-watch babysit prompts from [`ai-prompts.md`](./ai-prompts.md)
-- Day-to-day process-manager command recipes, heal-timer runbooks, SSH deploy snippets, and browser-console instructions from [`operations.md`](./operations.md)
-- Night-watch poll-cadence diagrams and mental-model links across overview, architecture, principles, rebuild, diagrams, lazy-medic, one-pager
+- Host-private babysit prompts and day-to-day command recipes from the share pack
 
 ### Changed
 
 - Replaced absolute server-style path roots with placeholder **`RATCHET_ROOT/{control,harness,projects}`**
-- [`operations.md`](./operations.md) retitled to runtime-services overview (product-level architecture only)
-- Fixed broken pack-external root-pointer link (404 on the public site); historical root pointer is outside this pack and not published
-
-### Not published
-
-- Host-private ops runbooks remain out of this share pack
+- Fixed broken pack-external root-pointer link (404 on the public site)
 
 ---
 
@@ -67,7 +73,7 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 ### Changed
 
 - Replaced third-party service domains in examples with unmistakable placeholders (`git.example.com`, `cloud.example.com`)
-- Removed host-specific scratch paths (null-device output sinks, relative rsync sources) from command examples — every remaining filesystem path is an illustrative install root
+- Removed host-specific scratch paths from command examples — every remaining filesystem path is an illustrative install root
 
 ---
 
@@ -87,34 +93,11 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 - Versioned layout under `docs/ratchet-guide/`: `v1.1/` archive, `v1.2/` current
 - Documented **~4–8 step** planner depth and thin-draft resplit
 - Documented queue clear **All (keep running)** keeps draft steps
-- Documented vault **custom arm hours**, **8h shortcut**, and **arm persistence** across consumer restart
-- Assist/model footguns: Kimi in assist registry, CLI flag mismatches, real errors vs synthetic prose
+- Assist/model footguns: CLI flag mismatches, real errors vs synthetic prose
 
 ### Changed
 
-- [`composer.md`](./composer.md) — queue builder rules, clear modes, models
-- [`vault.md`](./vault.md) — arm duration + persistence
-- [`operations.md`](./operations.md) — vault unlock vs re-arm notes
-- [`loop-and-missions.md`](./loop-and-missions.md) — multi-step campaign note
-- [`footguns.md`](./footguns.md) — new queue / vault / model rows
-- [`README.md`](./README.md), [`one-pager.md`](./one-pager.md) — pack version pointers
-
-### Not in this pack (parked product work)
-
-- Draft list double-numbering UI fix
-- Model effort selection UI
-
----
-
-## guide-2026-07-15c — night-watch cadence (later removed from public pack)
-
-### Added
-
-- Documented long-lived night-watch poll cadence for install operators (later removed in guide-2026-07-17e as host-private ops material)
-
-### Changed
-
-- Cross-links in overview / architecture / operations for the (now-removed) cadence notes
+- Composer, vault, loop, footguns, README, and one-pager updated for multi-step campaigns and pack version pointers
 
 ---
 
@@ -122,18 +105,10 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ### Added
 
-- [`diagrams.md`](./diagrams.md) — Mermaid gallery (happy path, edge, trust, loop state, ops vs product, Vault sequence, rebuild phases)
+- [`diagrams.md`](./diagrams.md) — Mermaid gallery (happy path, trust, loop state, Vault sequence, rebuild phases)
 - [`one-pager.md`](./one-pager.md) — single-sheet Markdown summary
-- [`one-pager-print`](./one-pager-print) — print/PDF-friendly HTML (letter, @media print, self-contained inline SVG)
+- [`one-pager-print`](./one-pager-print) — print/PDF-friendly HTML
 - This file (`CHANGELOG.md`)
-
-### Changed
-
-- [`README.md`](./README.md) — links to diagrams, one-pager, changelog
-- [`overview.md`](./overview.md) — Mermaid happy-path diagram
-- [`architecture.md`](./architecture.md) — Mermaid system map + data-flow diagram
-- [`loop-and-missions.md`](./loop-and-missions.md) — Mermaid iteration state diagram
-- Root pointer file (outside this pack; not published) — points at one-pager + diagrams
 
 ---
 
@@ -141,17 +116,8 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ### Added
 
-- Full pack split from a single-file root pointer into:
-  - overview, architecture, principles, layout
-  - loop-and-missions, composer, lazy-medic-sentinel, vault
-  - projects-and-deploy, operations, rebuild, ai-prompts
-  - footguns, examples, README index
-- Expanded failure-mode lessons (worker survival, Railway dedupe, Vercel author, version auth, queue multi-step)
-- Paste-ready AI prompts (rebuild / deploy-timeout / new product)
-
-### Changed
-
-- Root pointer outside this pack became a short pointer to `docs/ratchet-guide/`
+- Full pack split from a single-file root pointer into overview, architecture, principles, layout, loop-and-missions, composer, lazy-medic-sentinel, vault, projects-and-deploy, operations, rebuild, ai-prompts, footguns, examples, and README index
+- Paste-ready AI prompts for rebuild, new product, and friend share
 
 ---
 

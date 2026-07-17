@@ -29,37 +29,25 @@ flowchart TD
 
 ---
 
-## 2. Control plane & edge
+## 2. Product path vs helpers
 
 ```mermaid
 flowchart TB
-  subgraph edge [Public edge · TLS + basic auth]
-    DASH[dash.*]
-    FILES[files.*]
-    BOT[bot.*]
+  subgraph product [Product path]
+    QB[Queue builder]
+    BL[Builder]
+    TS[Tester]
+    LIVE[Live app · /version]
   end
 
-  subgraph loopback [Loopback only]
-    C[Composer :8377]
-    L[Lazy/Medic :8378]
-    V[Vault :8379]
-    H[Ratchet harness]
+  subgraph helpers [Optional helpers]
+    V[Vault consumer]
+    NW[Overnight observe only]
   end
 
-  subgraph outside [Outside]
-    GH[GitHub product repo]
-    LIVE[Live app<br/>host of your choice]
-  end
-
-  DASH --> C
-  FILES --> L
-  BOT --> V
-  C -->|spawn workers| H
-  L -->|observe / salvage| C
-  V -->|consumer broker| H
-  H -->|push| GH
-  GH -->|host deploy| LIVE
-  H -->|poll GET /version| LIVE
+  QB --> BL --> TS --> LIVE
+  V -.->|broker actions · no tokens to builder| BL
+  NW -.->|report stuck state| QB
 ```
 
 ---
@@ -69,8 +57,7 @@ flowchart TB
 ```mermaid
 flowchart LR
   subgraph privileged [Privileged]
-    OP[Human browser]
-    CP[Loopback control plane]
+    OP[Human + Composer]
     VC[Vault consumer key]
   end
 
@@ -83,10 +70,9 @@ flowchart LR
     PL[Product live + /version]
   end
 
-  OP -->|basic auth| CP
-  CP --> BU
-  CP --> TE
-  VC -.->|broker actions only| CP
+  OP --> BU
+  OP --> TE
+  VC -.->|broker actions only| OP
   BU -->|push code| PL
   TE -->|HTTP checks only| PL
 ```
@@ -118,31 +104,7 @@ stateDiagram-v2
 
 ---
 
-## 5. Who does what (automation vs product)
-
-```mermaid
-flowchart TB
-  subgraph product [Product path]
-    QB[Queue builder]
-    BL[Builder]
-    TS[Tester]
-  end
-
-  subgraph watch [Night watch — no product features]
-    SN[Sentinel]
-    LZ[Lazy]
-    MD[Medic]
-  end
-
-  QB --> BL --> TS
-  SN -.->|watch / quarantine| QB
-  LZ -.->|observe / salvage| QB
-  MD -.->|allowlisted recovery| QB
-```
-
----
-
-## 6. Secrets path (Vault)
+## 5. Secrets path (Vault)
 
 ```mermaid
 sequenceDiagram
@@ -156,7 +118,7 @@ sequenceDiagram
   Hum->>V: store credentials + grant consumer access
   Hum->>H: consumer key path only
   H->>B: identity / resolve
-  B->>C: token never leaves Vault process
+  B->>C: token never leaves Vault
   C-->>B: ok / projects
   B-->>H: result without secrets
   Note over A: Builder env has NO cloud token
@@ -165,11 +127,11 @@ sequenceDiagram
 
 ---
 
-## 7. Rebuild phases
+## 6. Rebuild phases
 
 ```mermaid
 flowchart LR
-  A[A Foundations] --> B[B Config + services]
+  A[A Foundations] --> B[B Config]
   B --> C[C Credentials boundary]
   C --> D[D First product]
   D --> E[E Harden + docs]
@@ -181,9 +143,9 @@ flowchart LR
 
 ## Print / export tips
 
-| Goal               | Use                                                         |
-| ------------------ | ----------------------------------------------------------- |
-| Share on GitHub    | This file + others with Mermaid fences                      |
-| One sheet of paper | Open [`one-pager-print`](./one-pager-print) → Print         |
-| Terminal-only      | ASCII maps in architecture / overview                       |
-| Slide paste        | Copy a single Mermaid block into Notion / Obsidian / slides |
+| Goal | Use |
+| ---- | --- |
+| Share on GitHub | This file + others with Mermaid fences |
+| One sheet of paper | Open [`one-pager-print`](./one-pager-print) → Print |
+| Terminal-only | ASCII maps in architecture / overview |
+| Slide paste | Copy a single Mermaid block into Notion / Obsidian / slides |

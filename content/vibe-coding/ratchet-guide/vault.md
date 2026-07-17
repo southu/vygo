@@ -12,9 +12,6 @@ A local, master-password **credentials vault** for Ratchet/Composer — outside 
 - Human UI for managing access
 - **Consumer broker** so the harness can call cloud APIs without putting tokens in builder env
 
-**Bind (illustrative):** `127.0.0.1:8379`  
-**Public example hostname:** `https://bot.example.com/`
-
 **Lost master password ⇒ data unrecoverable.** Keep any recovery process offline and private — not in this pack.
 
 ---
@@ -23,7 +20,6 @@ A local, master-password **credentials vault** for Ratchet/Composer — outside 
 
 - Strong password-based key derivation + authenticated encryption (see a vault SPEC in your install)
 - Data directory under vault-mode `data/` (mode 0700, gitignored)
-- CSRF + host allowlist + step-up for sensitive human ops
 
 ---
 

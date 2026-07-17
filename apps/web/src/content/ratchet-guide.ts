@@ -46,7 +46,7 @@ export const guideDocs: [GuideDoc, ...GuideDoc[]] = [
     title: "Architecture",
     sourceFile: "architecture.md",
     href: "/vibe-coding/ratchet-guide/architecture",
-    blurb: "System map, trust boundaries, end-to-end data flow, and process model",
+    blurb: "System map, trust boundaries, and end-to-end data flow",
   },
   {
     slug: "one-pager",
@@ -75,6 +75,7 @@ export const guideDocs: [GuideDoc, ...GuideDoc[]] = [
     sourceFile: "footguns.md",
     href: "/vibe-coding/ratchet-guide/footguns",
     blurb: "Design pitfalls: contracts, boundaries, and fix directions",
+
   },
 ];
 

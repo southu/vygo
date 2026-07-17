@@ -12,29 +12,23 @@ Composer is the human-facing factory:
 - Draft / split missions
 - Manage projects and queues
 - Show run status
-- Host Admin settings and nav to Vault / Lazy
+- Host settings and links to Vault
 
 Implementation: Python `server.py` + static HTML/JS under `composer-live/`.
-
-Default bind: `127.0.0.1:8377`.
 
 ---
 
 ## Primary surfaces
 
-| Path                        | Purpose                                                         |
-| --------------------------- | --------------------------------------------------------------- |
-| `/`                         | **Build** home — natural language goal → multi-step queue draft |
-| `/composer`                 | Classic mission form + enqueue                                  |
-| `/projects`                 | Create / manage shells under `COMPOSER_PROJECTS_ROOT`           |
-| `/queue`                    | Per-folder queue                                                |
-| `/dashboard`                | Runs overview                                                   |
-| `/sentinel`                 | Arm/disarm + status chips                                       |
-| `/admin`                    | Models, settings                                                |
-| `/apply`                    | Optional public-ish application form (product-specific)         |
-| `/version` / `/version.txt` | Deployed control-plane SHA (for _self_ missions)                |
-| `/health`                   | Liveness                                                        |
-| `/api/*`                    | Queue, assist, runs, settings, sentinel, lazy ensure, …         |
+| Path | Purpose |
+| ---- | ------- |
+| `/` | **Build** home — natural language goal → multi-step queue draft |
+| `/composer` | Classic mission form + enqueue |
+| `/projects` | Create / manage shells under `COMPOSER_PROJECTS_ROOT` |
+| `/queue` | Per-folder queue |
+| `/dashboard` | Runs overview |
+| `/admin` | Models, settings |
+| `/api/*` | Queue, assist, runs, settings, … |
 
 ---
 
@@ -45,7 +39,7 @@ Default bind: `127.0.0.1:8377`.
    - Writer/planner produces a **multi-step draft** (target about **4–8** executable steps for real product goals)
 2. **Enqueue** into folder-scoped queue JSON under `RATCHET_ROOT/harness/composer-queue/`
 3. **Worker** materializes mission YAML and invokes `bin/ratchet`
-4. UI and Sentinel poll state; costs land in `shared/cost.json`
+4. UI polls state; costs land in `shared/cost.json`
 
 ### Queue builder rules
 
@@ -75,7 +69,6 @@ Other clear modes may wipe more aggressively — read the button label before co
 - Assist can route to registered model ids
 - CLI adapters must use flags the binary actually supports
 - Invalid or unknown model names should surface **real CLI errors**, not synthetic success prose
-- **Apply model updates** may write local `models.json` if bare origin repo missing
 
 Claude-style CLIs often use **CLI login** rather than a long-lived API key in secret env.
 
@@ -86,18 +79,14 @@ Claude-style CLIs often use **CLI login** rather than a long-lived API key in se
 Every page should show the **same** primary links so humans never get lost:
 
 ```text
-Build · Projects · Composer · Queue · Dashboard · Sentinel · Admin
-Vault · Lazy · Medic
+Build · Projects · Composer · Queue · Dashboard · Admin · Vault
 ```
 
 Implementation pattern:
 
 - HTML fallback `<nav class="site-nav">` on each page
-- Shared `site-nav.js` rewrites links for current host (dash vs files vs bot)
+- Shared `site-nav.js` rewrites links for current host
 - Collapse under hamburger below ~1100px so links never clip
-- Lazy header slot: toggle + chip only (no duplicate Medic/Lazy View links)
-
-Cross-host URLs are absolute when leaving the current origin.
 
 ---
 
@@ -113,22 +102,20 @@ Self-facts for “edit Composer itself” come from env (`PUBLIC_BASE_URL`, `COM
 
 Composer can be improved _by_ Ratchet:
 
-- Needs a **cloneable** git remote (`composer-origin.git` bare + live tree)
-- Live version endpoint must be reachable without basic auth
-- Prefer loopback for self-missions when possible
+- Needs a **cloneable** git remote for the control-plane tree
+- Live version endpoint must be reachable by the deploy gate
 
 ---
 
 ## Key source files (orientation)
 
-| File                                           | Role                                      |
-| ---------------------------------------------- | ----------------------------------------- |
-| `server.py`                                    | HTTP API + static serving                 |
-| `queue_builder_mod.py`                         | Goal → multi-step queue                   |
-| `projects_mod.py`                              | Project shells + git identity for commits |
-| `home.html` / `home.js`                        | Build UX                                  |
-| `models.json`                                  | Model registry                            |
-| `styles.css` / `site-nav.js` / `mobile-nav.js` | Shell UI                                  |
-| `lazy-client.js`                               | Header Lazy toggle                        |
+| File | Role |
+| ---- | ---- |
+| `server.py` | HTTP API + static serving |
+| `queue_builder_mod.py` | Goal → multi-step queue |
+| `projects_mod.py` | Project shells + git identity for commits |
+| `home.html` / `home.js` | Build UX |
+| `models.json` | Model registry |
+| `styles.css` / `site-nav.js` / `mobile-nav.js` | Shell UI |
 
 Continue → [Lazy / Medic / Sentinel](./lazy-medic-sentinel.md)

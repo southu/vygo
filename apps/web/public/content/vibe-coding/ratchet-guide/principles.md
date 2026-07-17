@@ -52,17 +52,7 @@ If a secret shows up in a run transcript, treat it as an incident.
 
 ---
 
-## 5. Composer restarts must not kill builds
-
-A naive restart of Composer can kill every child when Admin Apply or model update bounces the service.
-
-**Required:** detached builder workers must **outlive** Composer restarts.
-
-**Practice:** still avoid restarting Composer during an active product build when you can; the seatbelt is not a license to thrash.
-
----
-
-## 6. Git identity is part of deploy
+## 5. Git identity is part of deploy
 
 Host platforms may block commits from unknown bot authors.
 
@@ -72,7 +62,7 @@ Symptoms: push to GitHub succeeds; live `/version` never moves; deploy gate time
 
 ---
 
-## 7. One project folder = one queue
+## 6. One project folder = one queue
 
 Queue items are scoped by folder.
 
@@ -82,7 +72,7 @@ Queue items are scoped by folder.
 
 ---
 
-## 8. Optional infra ensure stays small
+## 7. Optional infra ensure stays small
 
 Infrastructure ensure (create/bind cloud projects) is powerful and dangerous:
 
@@ -94,17 +84,16 @@ Turn provision **off** unless you intentionally need stack bootstrap.
 
 ---
 
-## 9. Small blast radius for automation
+## 8. Small blast radius for automation
 
-Lazy / Medic / Sentinel:
+Optional overnight helpers (Lazy / Medic / Sentinel):
 
-- May surface stuck runs and apply allowlisted queue recoveries
-- Must **not** restart Composer while a builder worker is active
+- May surface stuck runs for a human
 - Must **not** implement product features (that’s the builder’s job)
 
 ---
 
-## 10. Fresh sessions beat chat history
+## 9. Fresh sessions beat chat history
 
 Durable knowledge belongs in a **docs pack** next to the install. Fresh coding sessions should read that pack first — not depend on a laptop transcript.
 

@@ -19,19 +19,18 @@ Follow the contracts strictly:
 - Live deploy gate via /version SHA (tester judges live_url only)
 - Builder proof-of-work from git state only (ignore agent claims)
 - Secrets only via Vault consumer / service env — never in builder env
-- Composer process model must not kill detached builder workers on restart
 - Multi-step goals → multiple queue items
-- Prefer small blast radius; do not restart the queue host while builds run
 - Optional infra ensure is fail-closed; prefer bound cloud project IDs
+- Overnight helpers may observe only; they never implement product features
 
 Target layout (illustrative):
-- RATCHET_ROOT/control — composer app, lazy-mode, vault-mode, env files
+- RATCHET_ROOT/control — composer app, vault-mode, env files
 - RATCHET_ROOT/harness — harness (bin/ratchet, lib/, missions/, runs/)
 - RATCHET_ROOT/projects — project.json shells
 
 Start with: harness loop + mock adapters + mission schema validation.
 Then: Composer queue API + Build UI.
-Then: real adapters, Vault stub, Lazy observe.
+Then: real adapters and Vault stub.
 Do not invent machine-specific paths for the control-plane install.
 ```
 
@@ -43,7 +42,7 @@ Do not invent machine-specific paths for the control-plane install.
 Add a new product to Ratchet:
 
 1) Create RATCHET_ROOT/projects/<slug>/project.json with repo, live_url, version_url
-2) Ensure product serves GET /version with deployed SHA (public)
+2) Ensure product serves GET /version with deployed SHA
 3) Bind cloud project UUID if using a cloud host; prefer allow_create=false when bound
 4) Smoke: enqueue a tiny mission from Composer with folder=<slug>
 5) Watch runs/<name>-*/loop.out and live /version advance

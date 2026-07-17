@@ -93,7 +93,7 @@ GET /version
 
 Matching is case-insensitive; full SHA or 7+ char prefix.
 
-**Must not require basic auth** for this path if the gate polls unauthenticated. Open `/version` (and often `/health`) at the edge while leaving control-plane paths protected.
+The deploy gate must be able to read this path without control-plane credentials. Product `/version` is the honest signal the loop waits on.
 
 ---
 

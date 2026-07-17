@@ -27,7 +27,7 @@ Composer **Projects** UI creates/edits these shells and can clone repos into the
 1. A git remote the builder can push to with harness credentials
 2. Hosted deploy on push to `main` (any host that deploys from git)
 3. **`GET /version`** (or configured path) returns the **currently deployed** SHA
-4. Version path is **public** to the gate (no control-plane basic auth)
+4. Version path is reachable by the deploy gate
 5. Optional but recommended: bind cloud project UUID in `project.json` when using a cloud host
 
 ### Implementing `/version` (any stack)
@@ -81,12 +81,9 @@ Optional provision is powerful; leave it off unless you intentionally need stack
 
 ---
 
-## Deploy gate vs edge auth
+## Deploy gate and product `/version`
 
-If the **product** is behind basic auth, the version poll gets 401 forever.
-
-- Product sites are usually public
-- Control-plane (dash) may be basic-auth’d — then open only product `/version`, `/version.txt`, `/health` for the gate
+The gate needs a reachable version URL that returns the deployed SHA. If that URL is unreachable or always unauthorized, polls fail forever and loops look “stuck.” Product sites usually expose `/version` to the gate without control-plane credentials.
 
 ---
 

@@ -15,7 +15,7 @@
     },
     {
       "filename": "architecture.md",
-      "title": "System map, trust boundaries, end-to-end data flow, and process model"
+      "title": "System map, trust boundaries, end-to-end data flow"
     },
     {
       "filename": "principles.md",
@@ -35,7 +35,7 @@
     },
     {
       "filename": "lazy-medic-sentinel.md",
-      "title": "Overnight watchdogs: Lazy, Medic, and Sentinel product roles"
+      "title": "Optional overnight helpers: observe only, never implement product features"
     },
     {
       "filename": "vault.md",
@@ -47,7 +47,7 @@
     },
     {
       "filename": "operations.md",
-      "title": "Runtime services overview: roles, process model concept, and edge sketch"
+      "title": "Pack scope: what this guide includes and deliberately excludes"
     },
     {
       "filename": "rebuild.md",
@@ -67,7 +67,7 @@
     },
     {
       "filename": "diagrams.md",
-      "title": "Mermaid gallery: happy path, edge, trust boundaries, loop state, vault sequence, rebuild phases"
+      "title": "Mermaid gallery: happy path, trust boundaries, loop state, vault sequence, rebuild phases"
     },
     {
       "filename": "one-pager.md",

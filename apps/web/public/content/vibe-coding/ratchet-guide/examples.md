@@ -105,51 +105,27 @@ adapters:
 
 A typical multi-iteration campaign looks like:
 
-| Step | What happened                                               |
-| ---- | ----------------------------------------------------------- |
-| 1    | Project shell for product repo + live URL + `/version`      |
-| 2    | Mission: change homepage CTA + related copy on live site    |
-| 3    | Builder several iterations; host deploy                     |
-| 4    | Deploy gate waited until `/version` advanced                |
-| 5    | Tester checked acceptance text on live URL                  |
-| 6    | Exit 0 after consecutive PASSes; cost in `shared/cost.json` |
+| Step | What happened |
+| ---- | ------------- |
+| 1 | Project shell for product repo + live URL + `/version` |
+| 2 | Mission: change homepage CTA + related copy on live site |
+| 3 | Builder several iterations; host deploy |
+| 4 | Deploy gate waited until `/version` advanced |
+| 5 | Tester checked acceptance text on live URL |
+| 6 | Exit 0 after consecutive PASSes; cost in `shared/cost.json` |
 
 The product details are incidental — the **system** is the loop + control plane.
 
 ---
 
-## 6. Composer restart seatbelt (concept)
+## 6. What to open-source vs keep private
 
-Detached harness workers must survive Composer restarts (Admin Apply, model update). Configure your process model so a Composer bounce does **not** reap the whole process tree.
-
----
-
-## 7. Product version path (edge sketch)
-
-Products should leave deploy-gate probes open without control-plane auth:
-
-```nginx
-location = /version {
-    auth_basic off;
-    # proxy or serve the product app
-}
-location = /version.txt {
-    auth_basic off;
-}
-```
-
-Adapt to your edge and product host. The gate only needs a public SHA body at the configured `version_url`.
-
----
-
-## 8. What to open-source vs keep private
-
-| Share freely                              | Keep private                                |
-| ----------------------------------------- | ------------------------------------------- |
-| Harness, mission schema, mock adapters    | `secrets.env`, vault `data/`, consumer keys |
-| Composer UI patterns, queue builder tests | Basic-auth passwords, API tokens            |
-| This guide pack                           | Master passwords, cloud account tokens      |
-| Architecture diagrams                     | Install-specific hostnames if you care      |
+| Share freely | Keep private |
+| ------------ | ------------ |
+| Harness, mission schema, mock adapters | `secrets.env`, vault `data/`, consumer keys |
+| Composer UI patterns, queue builder tests | Basic-auth passwords, API tokens |
+| This guide pack | Master passwords, cloud account tokens |
+| Architecture diagrams | Install-specific hostnames if you care |
 
 ---
 

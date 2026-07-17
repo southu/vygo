@@ -11,7 +11,7 @@ Common design mistakes when building an AI build-and-verify control plane. These
 | Pitfall | Why it hurts | Design direction |
 | ------- | ------------ | ---------------- |
 | No public version endpoint | The deploy gate has nothing honest to poll | Every product serves `GET /version` with the deployed git SHA |
-| Auth on the version path | Gate polls fail forever; loops look “stuck” | Leave `/version` (and optional product `/health`) readable to the gate |
+| Auth blocking the version path for the gate | Gate polls fail forever; loops look “stuck” | Leave `/version` readable to the gate |
 | Repo and live URL from different products | Gate waits on the wrong deploy | Bind repo + `live_url` + version URL from one `project.json` shell |
 | Treating the builder tree as done | Live never caught up | Tester judges `live_url` only; gate waits for SHA match first |
 
@@ -35,16 +35,6 @@ Common design mistakes when building an AI build-and-verify control plane. These
 | Synthetic / non-JSON planner output as a mission | Queue fills with junk | Validate planner output; retry or force a structured draft |
 | Control-plane folder for product work | Wrong repo, wrong live URL | Scope each queue item to the product folder shell |
 | Clearing drafts with the goal still unfinished | Human re-plans from zero | Prefer clear modes that keep the on-screen draft when you want it |
-
----
-
-## Process boundaries
-
-| Pitfall | Why it hurts | Design direction |
-| ------- | ------------ | ---------------- |
-| Restarting the UI process kills active builders | In-flight work dies mid-push | Detached workers must outlive control-plane restarts |
-| Dual owners of the same ports | Orphans and port fights | One process model owns each service role |
-| Night-watch tools implementing product features | Ops automation invents UI instead of recovering state | Builders implement product; watchdogs only observe / salvage queue state |
 
 ---
 
@@ -72,7 +62,7 @@ Common design mistakes when building an AI build-and-verify control plane. These
 
 **Do**
 
-- Keep product `/version` honest and public to the gate
+- Keep product `/version` honest and reachable by the deploy gate
 - Scope work by project folder with matching repo + live URL
 - Prefer multi-step queues for multi-part goals
 - Keep secrets out of builder and tester environments
@@ -83,7 +73,7 @@ Common design mistakes when building an AI build-and-verify control plane. These
 - Blind-retry deploy failures without checking gate truth
 - Mix product acceptance with control-plane repo settings
 - Hardcode machine-specific paths into shared docs
-- Ask recovery tools to ship product features
+- Ask overnight helpers to ship product features
 - Commit or paste credentials into share packs or chat
 
 Continue → [Examples](./examples.md)
