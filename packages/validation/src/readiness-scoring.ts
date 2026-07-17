@@ -1039,6 +1039,23 @@ function stripRemediationLanguage(headline: string): string {
     .trim();
 }
 
+/**
+ * Max free-text length embedded into engagement reasoning / hero summary.
+ * Unbounded user paste must never expand layout-facing prose.
+ */
+export const REASONING_FREE_TEXT_MAX_CHARS = 160;
+/** Hard cap on the full multi-sentence reasoning string. */
+export const REASONING_BODY_MAX_CHARS = 900;
+
+/** Collapse whitespace and truncate with a clean ellipsis. */
+function clipReasoningText(value: string, max = REASONING_FREE_TEXT_MAX_CHARS): string {
+  const t = value.replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  if (t.length <= max) return t;
+  if (max <= 1) return "…";
+  return `${t.slice(0, max - 1)}…`;
+}
+
 /** First sentence of free text (period/question/exclamation), or the whole string. */
 function firstSentenceOf(text: string): string {
   const cleaned = text.replace(/\s+/g, " ").trim();
@@ -1066,13 +1083,14 @@ function looksLikePredicateFragment(text: string): boolean {
  * - Predicate fragments → `a product that "<fragment>"` (quotes prospect wording)
  * - Multi-sentence / full-sentence summaries → quote the first sentence only
  * - Short noun phrases → embed as-is
+ * Free-text is always length-bounded so hero/summary surfaces never overflow.
  */
 function formatSummaryAsDescribedObject(rawSummary: string): string {
   const trimmed = rawSummary.replace(/\s+/g, " ").trim();
   if (!trimmed || isUnknownField(trimmed)) return "a product";
 
   const first = firstSentenceOf(trimmed);
-  const body = first.replace(/[.!?]+$/u, "").trim();
+  const body = clipReasoningText(first.replace(/[.!?]+$/u, "").trim());
   if (!body) return "a product";
 
   if (looksLikePredicateFragment(body)) {
@@ -1082,7 +1100,9 @@ function formatSummaryAsDescribedObject(rawSummary: string): string {
 
   // Full sentence or multi-sentence report: quote first sentence so the
   // surrounding template can stay a single grammatical clause.
-  if (first !== trimmed || /[.!?]$/.test(first)) {
+  // Compare against the unclipped first sentence so grammar choice is stable.
+  const unclippedBody = first.replace(/[.!?]+$/u, "").trim();
+  if (first !== trimmed || /[.!?]$/.test(first) || unclippedBody.length > REASONING_FREE_TEXT_MAX_CHARS) {
     return `a product that "${body}"`;
   }
 
@@ -1098,9 +1118,10 @@ function joinReasoningProse(parts: string[]): string {
     .map((p) => p.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .join(" ");
-  return joined.replace(/([.!?])\s+([a-z])/g, (_m, punct: string, ch: string) => {
+  const smoothed = joined.replace(/([.!?])\s+([a-z])/g, (_m, punct: string, ch: string) => {
     return `${punct} ${ch.toUpperCase()}`;
   });
+  return clipReasoningText(smoothed, REASONING_BODY_MAX_CHARS);
 }
 
 export function buildEngagementReasoning(
@@ -1113,7 +1134,7 @@ export function buildEngagementReasoning(
     typeof report.summary === "string" && report.summary.trim()
       ? report.summary.trim()
       : signals.whoUses
-        ? `a product used by ${signals.whoUses.toLowerCase()}`
+        ? `a product used by ${clipReasoningText(signals.whoUses.toLowerCase(), 80)}`
         : "this product";
 
   // Object phrase for "describes/describing …" templates (grammar-smoothed).
@@ -1124,23 +1145,31 @@ export function buildEngagementReasoning(
     const first = firstSentenceOf(rawSummary).replace(/[.!?]+$/u, "").trim();
     if (!first) return "not specified";
     // Capitalize after a label like "Product context: …"
-    return first.charAt(0).toUpperCase() + first.slice(1);
+    const clipped = clipReasoningText(first);
+    if (!clipped) return "not specified";
+    return clipped.charAt(0).toUpperCase() + clipped.slice(1);
   })();
 
-  const tenancy =
+  const tenancy = clipReasoningText(
     typeof report.tenancy === "string" && report.tenancy.trim()
       ? report.tenancy.trim()
-      : "an unspecified tenancy model";
+      : "an unspecified tenancy model",
+    120,
+  );
 
-  const tests =
+  const tests = clipReasoningText(
     typeof report.tests === "string" && report.tests.trim()
       ? report.tests.trim()
-      : "unknown test posture";
-
-  const auth =
+      : "unknown test posture",
+    120,
+  );
+  const auth = clipReasoningText(
     typeof report.auth === "string" && report.auth.trim()
       ? report.auth.trim()
-      : "unspecified authentication";
+      : "unspecified authentication",
+    120,
+  );
+  const whoUses = clipReasoningText(signals.whoUses || "", 120);
 
   const s1 = dimensions.Security != null ? `Security ${dimensions.Security}` : "Security n/a";
   const s2 =
@@ -1149,7 +1178,7 @@ export function buildEngagementReasoning(
   if (bucket === "Harden") {
     return joinReasoningProse([
       `Based on your submission describing ${described}, with ${tenancy} and ${auth}, this looks like an internal tool with enough foundation to improve in a focused engagement.`,
-      `Scores (${s1}, ${s2}) and your user model (${signals.whoUses || "internal"}) support a Harden path rather than a full multi-tenant rebuild.`,
+      `Scores (${s1}, ${s2}) and your user model (${whoUses || "internal"}) support a Harden path rather than a full multi-tenant rebuild.`,
       `Tests were reported as: ${tests}.`,
     ]);
   }
@@ -1180,7 +1209,7 @@ export function buildEngagementReasoning(
 
   // Launch (including default) — comma before "used by" so multi-clause grammar stays valid.
   return joinReasoningProse([
-    `Your report describes ${described}, used by ${signals.whoUses || "external or mixed users"}, with foundational gaps in scores (${s1}, ${s2}).`,
+    `Your report describes ${described}, used by ${whoUses || "external or mixed users"}, with foundational gaps in scores (${s1}, ${s2}).`,
     `Stack signals include ${tenancy} and tests as: ${tests}.`,
     `Launch is the recommended engagement to put production foundations under a fixed scope before growth pressure compounds risk.`,
   ]);

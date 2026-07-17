@@ -454,6 +454,22 @@
 .readiness-report-recommendation,
 .readiness-report-pricing {
   max-width: 100%;
+  min-width: 0;
+}
+
+/* Defense in depth: long unbroken free-text (summary/concerns) must wrap. */
+.readiness-report-hero,
+.readiness-report-hero p,
+.readiness-report-hero h1,
+[data-testid="snapshot-verdict"],
+[data-testid="snapshot-reasoning"],
+[data-testid="snapshot-caveat"],
+.readiness-report-recommendation p,
+.readiness-report-recommendation li,
+.readiness-report-dimension p {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
 }
 
 .readiness-report-submetrics .card {

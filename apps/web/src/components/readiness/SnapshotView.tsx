@@ -144,6 +144,11 @@ function hasRenderableScores(data: SnapshotResponse): boolean {
   });
 }
 
+/** Max length for hero verdict / summary prose surfaces (layout-safe). */
+const VERDICT_MAX_CHARS = 320;
+/** Max length for full reasoning blocks on the results page. */
+const REASONING_DISPLAY_MAX_CHARS = 720;
+
 function firstSentence(text: string): string {
   const cleaned = text.replace(/\s+/g, " ").trim();
   if (!cleaned) return "";
@@ -155,11 +160,12 @@ function firstSentence(text: string): string {
 /**
  * One-line personalized verdict grounded in this submission (score, bucket,
  * report summary, or reasoning). Never generic placeholder copy.
+ * Always length-bounded so long free-text never overflows the hero.
  */
 function buildPersonalizedVerdict(data: SnapshotResponse, overall: number | null): string {
   const reasoningLine = data.reasoning ? firstSentence(data.reasoning) : "";
   if (reasoningLine && reasoningLine.length >= 40) {
-    return reasoningLine;
+    return quoteText(reasoningLine, VERDICT_MAX_CHARS) || quoteText(data.reasoning, VERDICT_MAX_CHARS);
   }
 
   const summary = quoteText(data.reportSummary?.summary, 90);
@@ -169,12 +175,18 @@ function buildPersonalizedVerdict(data: SnapshotResponse, overall: number | null
       : "Your readiness snapshot is ready";
   const bucketBit = data.bucket ? `Recommended path: ${data.bucket}` : "";
   if (summary) {
-    return [scoreBit, `for “${summary}”`, bucketBit].filter(Boolean).join(" — ") + ".";
+    return quoteText(
+      [scoreBit, `for “${summary}”`, bucketBit].filter(Boolean).join(" — ") + ".",
+      VERDICT_MAX_CHARS,
+    );
   }
   if (data.findings[0]) {
-    return `${scoreBit}. Top signal from your submission: ${quoteText(data.findings[0], 120)}.`;
+    return quoteText(
+      `${scoreBit}. Top signal from your submission: ${quoteText(data.findings[0], 120)}.`,
+      VERDICT_MAX_CHARS,
+    );
   }
-  return [scoreBit, bucketBit].filter(Boolean).join(". ") + ".";
+  return quoteText([scoreBit, bucketBit].filter(Boolean).join(". ") + ".", VERDICT_MAX_CHARS);
 }
 
 type SnapshotViewProps = {
@@ -692,7 +704,7 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
     >
       {/* ── 1. Hero: headline gauge + one-line personalized verdict ───────── */}
       <section
-        className="readiness-report-hero rounded-3xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8 sm:py-10 lg:px-10"
+        className="readiness-report-hero min-w-0 overflow-hidden rounded-3xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8 sm:py-10 lg:px-10"
         aria-labelledby="report-hero-heading"
         data-testid="snapshot-hero"
       >
@@ -729,24 +741,24 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
               {c.title}
             </h1>
             <p
-              className="mt-5 text-base font-medium leading-relaxed text-ink sm:text-lg"
+              className="mt-5 min-w-0 max-w-full break-words text-base font-medium leading-relaxed text-ink sm:text-lg"
               data-testid="snapshot-verdict"
               data-verdict="personalized"
             >
               {verdict}
             </p>
             {data.bucket ? (
-              <p className="mt-4 text-sm text-ink-soft" data-testid="snapshot-bucket">
+              <p className="mt-4 min-w-0 break-words text-sm text-ink-soft" data-testid="snapshot-bucket">
                 Recommended path:{" "}
                 <span className="font-display text-base font-bold text-purple">{data.bucket}</span>
               </p>
             ) : null}
             {data.caveat ? (
               <p
-                className="mt-5 rounded-xl border border-border bg-canvas px-4 py-3 text-left text-sm text-ink-soft"
+                className="mt-5 min-w-0 max-w-full break-words rounded-xl border border-border bg-canvas px-4 py-3 text-left text-sm text-ink-soft"
                 data-testid="snapshot-caveat"
               >
-                {data.caveat}
+                {quoteText(data.caveat, 480)}
               </p>
             ) : null}
           </div>
@@ -879,8 +891,8 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
             <div className="mt-6 space-y-5" data-testid="snapshot-recommendation-detail">
               <div data-testid="snapshot-recommendation-rationale">
                 <h3 className="text-sm font-semibold text-white/90">Why this engagement</h3>
-                <p className="mt-2 max-w-prose text-sm leading-relaxed text-white/80">
-                  {recommendation.rationale}
+                <p className="mt-2 min-w-0 max-w-prose break-words text-sm leading-relaxed text-white/80">
+                  {quoteText(recommendation.rationale, 800)}
                 </p>
               </div>
               {recommendation.citedFindings.length > 0 ? (
@@ -889,27 +901,31 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
                     Findings cited from your submission
                   </h3>
                   <ul className="mt-2 space-y-2 text-sm text-white/80">
-                    {recommendation.citedFindings.map((f) => (
+                    {recommendation.citedFindings.map((f) => {
+                      const finding = quoteText(f, 280);
+                      if (!finding) return null;
+                      return (
                       <li
-                        key={f}
-                        className="flex items-start gap-3"
+                        key={finding}
+                        className="flex min-w-0 items-start gap-3"
                         data-testid="snapshot-recommendation-finding"
                       >
                         <span
                           className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-green"
                           aria-hidden
                         />
-                        <span className="leading-relaxed">{f}</span>
+                        <span className="min-w-0 break-words leading-relaxed">{finding}</span>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 </div>
               ) : null}
               {recommendation.expectedOutcomes ? (
                 <div data-testid="snapshot-recommendation-outcomes">
                   <h3 className="text-sm font-semibold text-white/90">Expected outcomes</h3>
-                  <p className="mt-2 max-w-prose text-sm leading-relaxed text-white/80">
-                    {recommendation.expectedOutcomes}
+                  <p className="mt-2 min-w-0 max-w-prose break-words text-sm leading-relaxed text-white/80">
+                    {quoteText(recommendation.expectedOutcomes, 600)}
                   </p>
                 </div>
               ) : null}
@@ -918,30 +934,30 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
                   <h3 className="text-sm font-semibold text-white/90">
                     Suggested first-step scope of work
                   </h3>
-                  <p className="mt-2 max-w-prose text-sm leading-relaxed text-white/80">
-                    {recommendation.firstStepScope}
+                  <p className="mt-2 min-w-0 max-w-prose break-words text-sm leading-relaxed text-white/80">
+                    {quoteText(recommendation.firstStepScope, 600)}
                   </p>
                 </div>
               ) : null}
               <div className="sr-only" data-testid="snapshot-recommendation-body">
-                {recommendation.body}
+                {quoteText(recommendation.body, 1600)}
               </div>
             </div>
           ) : data.reasoning ? (
             <p
-              className="mt-4 max-w-prose text-sm leading-relaxed text-white/80"
+              className="mt-4 min-w-0 max-w-prose break-words text-sm leading-relaxed text-white/80"
               data-testid="snapshot-reasoning"
             >
-              {data.reasoning}
+              {quoteText(data.reasoning, REASONING_DISPLAY_MAX_CHARS)}
             </p>
           ) : null}
 
           {data.reasoning && recommendation ? (
             <p
-              className="mt-5 max-w-prose border-t border-white/15 pt-5 text-sm leading-relaxed text-white/65"
+              className="mt-5 min-w-0 max-w-prose break-words border-t border-white/15 pt-5 text-sm leading-relaxed text-white/65"
               data-testid="snapshot-reasoning"
             >
-              {data.reasoning}
+              {quoteText(data.reasoning, REASONING_DISPLAY_MAX_CHARS)}
             </p>
           ) : null}
 

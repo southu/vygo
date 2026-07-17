@@ -588,10 +588,12 @@ function parseDimensionAnalyses(raw: unknown): SnapshotDimensionAnalysis[] | nul
 
 const INSIGHT_TYPES: ReadonlySet<string> = new Set(["strength", "risk", "opportunity"]);
 
-function clipClientText(value: string, max: number): string {
-  const t = value.replace(/\s+/g, " ").trim();
+function clipClientText(value: unknown, max: number): string {
+  if (value == null) return "";
+  const t = String(value).replace(/\s+/g, " ").trim();
   if (!t) return "";
   if (t.length <= max) return t;
+  if (max <= 1) return "…";
   return `${t.slice(0, max - 1)}…`;
 }
 
@@ -801,10 +803,16 @@ export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse
     displayMode: body.displayMode === "range" ? "range" : "point",
     overall,
     bucket: typeof body.bucket === "string" ? body.bucket : null,
-    reasoning: typeof body.reasoning === "string" ? body.reasoning : null,
-    caveat: typeof body.caveat === "string" ? body.caveat : null,
+    reasoning:
+      typeof body.reasoning === "string"
+        ? clipClientText(body.reasoning, 900) || null
+        : null,
+    caveat: typeof body.caveat === "string" ? clipClientText(body.caveat, 480) || null : null,
     findings: Array.isArray(body.findings)
-      ? (body.findings as unknown[]).filter((f): f is string => typeof f === "string")
+      ? (body.findings as unknown[])
+          .filter((f): f is string => typeof f === "string")
+          .map((f) => clipClientText(f, 280))
+          .filter(Boolean)
       : [],
     recommendedEngagement:
       typeof body.recommendedEngagement === "string" ? body.recommendedEngagement : null,
@@ -822,10 +830,26 @@ export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse
         : null,
     reportSummary:
       body.reportSummary && typeof body.reportSummary === "object"
-        ? (body.reportSummary as Record<string, unknown>)
+        ? sanitizeClientReportSummary(body.reportSummary as Record<string, unknown>)
         : null,
     createdAt: typeof body.createdAt === "string" ? body.createdAt : undefined,
   };
+}
+
+function sanitizeClientReportSummary(raw: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === "string") {
+      out[k] = clipClientText(v, 280) || null;
+    } else if (Array.isArray(v)) {
+      out[k] = v.map((item) =>
+        typeof item === "string" ? clipClientText(item, 120) : item,
+      );
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
 }
 
 export async function emailReadinessSnapshot(input: {

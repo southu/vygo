@@ -412,13 +412,19 @@ function publicScorePreviewBody(
     /** Ranked evidence insights (tools, counts, practices) grounded in answers. */
     insights: sanitizePublicInsights(payload.insights),
     /** Per-dimension multi-paragraph written analysis grounded in sub-metric evidence. */
-    dimensionAnalyses: Array.isArray(payload.dimensionAnalyses) ? payload.dimensionAnalyses : [],
+    dimensionAnalyses: sanitizePublicDimensionAnalyses(payload.dimensionAnalyses),
     /** Pattern-branched detailed engagement recommendation. */
-    recommendation: payload.recommendation ?? null,
+    recommendation: sanitizePublicRecommendation(payload.recommendation),
     ranges: payload.ranges ?? null,
-    reasoning: payload.reasoning,
-    caveat: payload.caveat ?? null,
-    findings: payload.findings,
+    reasoning:
+      typeof payload.reasoning === "string"
+        ? clipPublicText(payload.reasoning, 900) || null
+        : null,
+    caveat:
+      typeof payload.caveat === "string" ? clipPublicText(payload.caveat, 480) || null : null,
+    findings: Array.isArray(payload.findings)
+      ? payload.findings.map((f) => clipPublicText(f, 280)).filter(Boolean)
+      : [],
     recommendedEngagement: payload.recommendedEngagement,
     offerKey: payload.offerKey,
     ctaLabel: payload.ctaLabel,
@@ -492,6 +498,81 @@ function sanitizePublicInsights(raw: unknown): unknown[] {
     out.push({ type, headline, detail, source_answer, dimension });
   }
   return out;
+}
+
+/** Bound multi-paragraph dimension analysis free-text. */
+function sanitizePublicDimensionAnalyses(raw: unknown): unknown[] {
+  if (!Array.isArray(raw)) return [];
+  const out: unknown[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const row = entry as Record<string, unknown>;
+    const dimension = typeof row.dimension === "string" ? row.dimension : "";
+    const score =
+      typeof row.score === "number" && Number.isFinite(row.score) ? row.score : null;
+    const paragraphs = Array.isArray(row.paragraphs)
+      ? row.paragraphs
+          .filter((p): p is string => typeof p === "string")
+          .map((p) => clipPublicText(p, 800))
+          .filter(Boolean)
+      : [];
+    const analysis = clipPublicText(
+      typeof row.analysis === "string" ? row.analysis : paragraphs.join("\n\n"),
+      1600,
+    );
+    if (!dimension) continue;
+    out.push({ dimension, score, paragraphs, analysis });
+  }
+  return out;
+}
+
+/** Bound recommendation free-text fields. */
+function sanitizePublicRecommendation(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const row = raw as Record<string, unknown>;
+  return {
+    patternKey: typeof row.patternKey === "string" ? row.patternKey : "",
+    engagement: clipPublicText(row.engagement, 160) || (typeof row.engagement === "string" ? row.engagement : ""),
+    rationale: clipPublicText(row.rationale, 800),
+    citedFindings: Array.isArray(row.citedFindings)
+      ? row.citedFindings
+          .filter((f): f is string => typeof f === "string")
+          .map((f) => clipPublicText(f, 280))
+          .filter(Boolean)
+          .slice(0, 12)
+      : [],
+    expectedOutcomes: clipPublicText(row.expectedOutcomes, 600),
+    firstStepScope: clipPublicText(row.firstStepScope, 600),
+    body: clipPublicText(row.body, 1600),
+  };
+}
+
+/** Bound free-text fields on the public report summary. */
+function sanitizePublicReportSummary(
+  report: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!report) return null;
+  const clipField = (v: unknown) => {
+    if (v == null) return null;
+    if (typeof v === "string") {
+      const clipped = clipPublicText(v, 280);
+      return clipped || null;
+    }
+    if (Array.isArray(v)) {
+      return v
+        .map((item) => (typeof item === "string" ? clipPublicText(item, 120) : item))
+        .filter((item) => item !== "");
+    }
+    return v;
+  };
+  return {
+    summary: clipField(report.summary),
+    tenancy: clipField(report.tenancy),
+    auth: clipField(report.auth),
+    tests: clipField(report.tests),
+    deploys: clipField(report.deploys),
+    pii_categories: clipField(report.pii_categories),
+  };
 }
 
 function publicSnapshotBody(submission: {
@@ -582,13 +663,8 @@ function publicSnapshotBody(submission: {
   }
 
   const insights = sanitizePublicInsights(scores.insights);
-  const dimensionAnalyses = Array.isArray(scores.dimensionAnalyses)
-    ? scores.dimensionAnalyses
-    : [];
-  const recommendation =
-    scores.recommendation && typeof scores.recommendation === "object"
-      ? scores.recommendation
-      : null;
+  const dimensionAnalyses = sanitizePublicDimensionAnalyses(scores.dimensionAnalyses);
+  const recommendation = sanitizePublicRecommendation(scores.recommendation);
 
   const dimScores =
     sanitizeDimensionScores(scores.dimensions) ?? sanitizeDimensionScores(scores.scores);
@@ -608,8 +684,10 @@ function publicSnapshotBody(submission: {
     displayMode: scores.displayMode ?? "point",
     overall,
     bucket: submission.bucket ?? scores.bucket ?? null,
-    reasoning: typeof scores.reasoning === "string" ? scores.reasoning : null,
-    caveat: typeof scores.caveat === "string" ? scores.caveat : null,
+    // Bound free-text so hero summary / reasoning never ship raw multi-KB paste.
+    reasoning:
+      typeof scores.reasoning === "string" ? clipPublicText(scores.reasoning, 900) || null : null,
+    caveat: typeof scores.caveat === "string" ? clipPublicText(scores.caveat, 480) || null : null,
     findings,
     recommendedEngagement:
       typeof scores.recommendedEngagement === "string" ? scores.recommendedEngagement : null,
@@ -635,17 +713,8 @@ function publicSnapshotBody(submission: {
                 : null,
         }
       : null,
-    // Intentionally omit how-to-fix / remediation keys.
-    reportSummary: report
-      ? {
-          summary: report.summary ?? null,
-          tenancy: report.tenancy ?? null,
-          auth: report.auth ?? null,
-          tests: report.tests ?? null,
-          deploys: report.deploys ?? null,
-          pii_categories: report.pii_categories ?? null,
-        }
-      : null,
+    // Intentionally omit how-to-fix / remediation keys; bound free-text fields.
+    reportSummary: sanitizePublicReportSummary(report),
     createdAt: submission.createdAt,
   };
 }
@@ -2363,15 +2432,21 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         dimensionDetails: payload.dimensionDetails,
         dimensionResults: payload.dimensionResults,
         insights: sanitizePublicInsights(payload.insights),
-        dimensionAnalyses: payload.dimensionAnalyses,
-        recommendation: payload.recommendation,
+        dimensionAnalyses: sanitizePublicDimensionAnalyses(payload.dimensionAnalyses),
+        recommendation: sanitizePublicRecommendation(payload.recommendation),
         ranges: payload.ranges ?? null,
         displayMode: payload.displayMode,
         overall: payload.overall,
         bucket: payload.bucket,
-        reasoning: payload.reasoning,
-        caveat: payload.caveat ?? null,
-        findings: payload.findings,
+        reasoning:
+          typeof payload.reasoning === "string"
+            ? clipPublicText(payload.reasoning, 900) || null
+            : null,
+        caveat:
+          typeof payload.caveat === "string" ? clipPublicText(payload.caveat, 480) || null : null,
+        findings: Array.isArray(payload.findings)
+          ? payload.findings.map((f) => clipPublicText(f, 280)).filter(Boolean)
+          : [],
         recommendedEngagement: payload.recommendedEngagement,
         offerKey: payload.offerKey,
         ctaLabel: payload.ctaLabel,
@@ -2628,16 +2703,24 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           dimensions: payload.dimensions,
           dimensionDetails: payload.dimensionDetails,
           dimensionResults: payload.dimensionResults,
-          insights: payload.insights,
-          dimensionAnalyses: payload.dimensionAnalyses,
-          recommendation: payload.recommendation,
+          insights: sanitizePublicInsights(payload.insights),
+          dimensionAnalyses: sanitizePublicDimensionAnalyses(payload.dimensionAnalyses),
+          recommendation: sanitizePublicRecommendation(payload.recommendation),
           ranges: payload.ranges ?? null,
           displayMode: payload.displayMode,
           overall: payload.overall,
           bucket: payload.bucket,
-          reasoning: payload.reasoning,
-          caveat: payload.caveat ?? null,
-          findings: payload.findings,
+          reasoning:
+            typeof payload.reasoning === "string"
+              ? clipPublicText(payload.reasoning, 900) || null
+              : null,
+          caveat:
+            typeof payload.caveat === "string"
+              ? clipPublicText(payload.caveat, 480) || null
+              : null,
+          findings: Array.isArray(payload.findings)
+            ? payload.findings.map((f) => clipPublicText(f, 280)).filter(Boolean)
+            : [],
           recommendedEngagement: payload.recommendedEngagement,
           offerKey: payload.offerKey,
           ctaLabel: payload.ctaLabel,

@@ -160,6 +160,8 @@ export {
   assignEngagementBucket,
   buildTopFindings,
   buildEngagementReasoning,
+  REASONING_FREE_TEXT_MAX_CHARS,
+  REASONING_BODY_MAX_CHARS,
   engagementMeta,
   hasScorableReportAnswers,
   scoringConfigFromDbRow,

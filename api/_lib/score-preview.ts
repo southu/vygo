@@ -228,9 +228,33 @@ function publicPreviewBody(
     /** Pattern-branched detailed engagement recommendation. */
     recommendation: payload.recommendation ?? null,
     ranges: payload.ranges ?? null,
-    reasoning: payload.reasoning,
-    caveat: payload.caveat ?? null,
-    findings: payload.findings,
+    // Bound free-text so layout-facing summary/reasoning never ships raw multi-KB paste.
+    reasoning:
+      typeof payload.reasoning === "string"
+        ? (() => {
+            const t = payload.reasoning.replace(/\s+/g, " ").trim();
+            if (!t) return null;
+            return t.length <= 900 ? t : `${t.slice(0, 899)}…`;
+          })()
+        : null,
+    caveat:
+      typeof payload.caveat === "string"
+        ? (() => {
+            const t = payload.caveat.replace(/\s+/g, " ").trim();
+            if (!t) return null;
+            return t.length <= 480 ? t : `${t.slice(0, 479)}…`;
+          })()
+        : null,
+    findings: Array.isArray(payload.findings)
+      ? payload.findings
+          .map((f) => {
+            if (typeof f !== "string") return "";
+            const t = f.replace(/\s+/g, " ").trim();
+            if (!t) return "";
+            return t.length <= 280 ? t : `${t.slice(0, 279)}…`;
+          })
+          .filter(Boolean)
+      : [],
     recommendedEngagement: payload.recommendedEngagement,
     offerKey: payload.offerKey,
     ctaLabel: payload.ctaLabel,

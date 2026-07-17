@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_SCORING_CONFIG,
   READINESS_DIMENSIONS,
+  REASONING_BODY_MAX_CHARS,
+  REASONING_FREE_TEXT_MAX_CHARS,
   assignEngagementBucket,
   computeReadinessScore,
   containsRemediationDetail,
@@ -453,6 +455,45 @@ describe("readiness scoring", () => {
       payload.reasoning,
       /The submission does not yet describe a working product surface we can score confidently\./,
     );
+  });
+
+  it("long free-text summary is truncated in engagement reasoning (hero surface)", () => {
+    const longSummary = "Z".repeat(2500);
+    const payload = computeReadinessScore({
+      report: {
+        ...UNKNOWN_REPORT,
+        summary: longSummary,
+        tests: "none",
+        secrets_pattern: "env vars",
+        authorization: "basic RBAC",
+      },
+      source: "manual",
+      stage1: {
+        productDescription: longSummary,
+        whoUses: "External customers or end users",
+        builtWith: "Cursor",
+        blockers: ["security"],
+        deadline: "No hard deadline",
+        deadlineDetail: "",
+      },
+    });
+
+    assert.ok(payload.reasoning);
+    assert.ok(
+      payload.reasoning.length <= REASONING_BODY_MAX_CHARS,
+      `reasoning length ${payload.reasoning.length} exceeds body max ${REASONING_BODY_MAX_CHARS}`,
+    );
+    assert.doesNotMatch(payload.reasoning, new RegExp("Z".repeat(REASONING_FREE_TEXT_MAX_CHARS + 20)));
+    assert.match(payload.reasoning, /…/);
+    assert.ok(!payload.reasoning.includes(longSummary), "full raw summary must not appear in reasoning");
+    // Embedded free-text snippet itself is bounded.
+    const describedMatch = payload.reasoning.match(/describes\s+([^,]+)/i);
+    if (describedMatch) {
+      assert.ok(
+        describedMatch[1]!.length <= REASONING_FREE_TEXT_MAX_CHARS + 40,
+        "described object must be length-bounded",
+      );
+    }
   });
 });
 
