@@ -72,7 +72,7 @@ export function calloutForWhoUses(value: string): AnswerCalloutPayload | null {
   if (!v) return null;
   return {
     id: "who-uses",
-    text: `Noted — users today: ${v}. That shapes reliability and operability expectations later.`,
+    text: `Got it — users today: ${v}.`,
   };
 }
 
@@ -82,12 +82,12 @@ export function calloutForBuiltWith(value: string): AnswerCalloutPayload | null 
   if (/mixed|multiple tools/i.test(v)) {
     return {
       id: "built-with-mixed",
-      text: `Got it — primarily built with mixed / multiple tools. We'll tailor the diagnostic for a multi-tool stack.`,
+      text: `Got it — primarily built with mixed / multiple tools.`,
     };
   }
   return {
     id: "built-with",
-    text: `Got it — primarily built with ${v}. The diagnostic prompt will match that toolchain.`,
+    text: `Got it — primarily built with ${v}.`,
   };
 }
 

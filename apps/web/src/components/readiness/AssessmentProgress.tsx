@@ -33,6 +33,7 @@ export function AssessmentProgress({
       data-testid={testId}
       data-step-current={safeCurrent}
       data-step-total={safeTotal}
+      data-visual-system="results-shared"
       role="group"
       aria-label={`Step ${safeCurrent} of ${safeTotal}${label ? ` — ${label}` : ""}`}
     >

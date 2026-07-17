@@ -91,12 +91,14 @@ describe("other stage-1 callouts", () => {
     const c = calloutForWhoUses("External users paying");
     assert.ok(c);
     assert.match(c!.text, /External users paying/);
+    assert.doesNotMatch(c!.text, FORBIDDEN_SCORE_CLAIMS);
   });
 
   it("echoes built-with tool", () => {
     const c = calloutForBuiltWith("Cursor");
     assert.ok(c);
     assert.match(c!.text, /Cursor/);
+    assert.doesNotMatch(c!.text, FORBIDDEN_SCORE_CLAIMS);
   });
 
   it("echoes deadline", () => {

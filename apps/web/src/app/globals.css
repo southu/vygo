@@ -332,6 +332,22 @@
 }
 
 /* ── Assessment step flow (shared with results visual system) ────────────── */
+/* Same tokens as .readiness-report / snapshot: canvas ink, surface cards, purple accent */
+
+.readiness-assessment-page {
+  color: var(--color-ink);
+  background: var(--color-canvas);
+  font-family: var(--font-body);
+}
+
+.readiness-assessment-page .font-display,
+.readiness-assessment-page h1,
+.readiness-assessment-page h2,
+.readiness-assessment-page h3,
+.readiness-assessment-page legend {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+}
 
 .readiness-assessment {
   max-width: 100%;

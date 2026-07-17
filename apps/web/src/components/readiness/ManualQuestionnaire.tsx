@@ -311,7 +311,11 @@ export function ManualQuestionnaire() {
   const optionIdle = "border-border bg-canvas hover:border-purple/40";
 
   return (
-    <div className="readiness-assessment mt-8" data-testid="manual-questionnaire">
+    <div
+      className="readiness-assessment mt-8"
+      data-testid="manual-questionnaire"
+      data-visual-system="results-shared"
+    >
       <AssessmentProgress
         current={stepIndex + 1}
         total={MANUAL_TOTAL_STEPS}
@@ -322,6 +326,7 @@ export function ManualQuestionnaire() {
         className="readiness-step-panel mt-4"
         data-testid={`manual-q-${currentQ.id}`}
         data-step={stepIndex + 1}
+        data-visual-system="results-shared"
       >
         <fieldset>
           <legend className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">

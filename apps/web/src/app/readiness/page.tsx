@@ -13,7 +13,11 @@ export default function ReadinessPage() {
   const c = readinessContent.page;
   const s3 = readinessContent.stage3;
   return (
-    <main id="main-content" className="readiness-assessment-page">
+    <main
+      id="main-content"
+      className="readiness-assessment-page"
+      data-visual-system="results-shared"
+    >
       <section className="section-pad">
         <div className="container-page max-w-2xl">
           <p className="eyebrow">{c.eyebrow}</p>

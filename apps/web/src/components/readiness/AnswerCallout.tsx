@@ -23,6 +23,7 @@ export function AnswerCallout({ callout, className = "" }: AnswerCalloutProps) {
       data-testid="assessment-answer-callout"
       data-callout-id={callout.id}
       data-callout-text={callout.text}
+      data-callout-animated="true"
     >
       <span className="assessment-answer-callout-accent" aria-hidden />
       <p

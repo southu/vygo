@@ -914,7 +914,7 @@ export function ReadinessFlow() {
     pasteText.trim().length >= 8
       ? {
           id: "paste-received",
-          text: `Got it — received your diagnostic paste (${pasteText.trim().length.toLocaleString()} characters). Submit when ready; nothing is scored yet.`,
+          text: `Got it — received your diagnostic paste (${pasteText.trim().length.toLocaleString()} characters).`,
         }
       : null;
 
@@ -1026,7 +1026,7 @@ export function ReadinessFlow() {
   if (view === "stage2" && promptBundle && howTo) {
     const stage2Callout: AnswerCalloutPayload = {
       id: "stage2-tool",
-      text: `Got it — diagnostic prompt tailored for ${howTo.toolName}${stage1.productDescription.trim() ? ` and “${stage1.productDescription.trim().slice(0, 80)}${stage1.productDescription.trim().length > 80 ? "…" : ""}”` : ""}.`,
+      text: `Got it — prompt ready for ${howTo.toolName}${stage1.productDescription.trim() ? ` · noted “${stage1.productDescription.trim().slice(0, 80)}${stage1.productDescription.trim().length > 80 ? "…" : ""}”` : ""}.`,
     };
     return (
       <div
@@ -1166,13 +1166,18 @@ export function ReadinessFlow() {
   const optionDisabled = "cursor-not-allowed border-border bg-canvas opacity-50";
 
   return (
-    <div className="readiness-assessment mt-8" data-testid="readiness-stage1" data-step={step}>
+    <div
+      className="readiness-assessment mt-8"
+      data-testid="readiness-stage1"
+      data-step={step}
+      data-visual-system="results-shared"
+    >
       <AssessmentProgress current={stepIndex + 1} total={FLOW_TOTAL_STEPS} label="Intake" />
       <p className="eyebrow mt-4">
         {c.stage1.progressLabel} · {stepIndex + 1}/{STAGE1_STEPS.length}
       </p>
 
-      <div className="readiness-step-panel mt-4">
+      <div className="readiness-step-panel mt-4" data-visual-system="results-shared">
         {step === "productDescription" ? (
           <fieldset>
             <legend className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
