@@ -10,13 +10,15 @@
  *   - a bold short summary phrase, and
  *   - the full finding text below it in regular weight.
  *
- * Long findings clamp to ~2 lines with an inline "Show more" expander. Rows are
- * ordered severity-first and a count summary sits at the top. Nothing is ever
- * hidden — every finding in the data becomes a row.
+ * Every row is a collapsible disclosure: the header (severity tag + area +
+ * summary) is always visible, and activating it mounts a detail region with the
+ * full finding text below. Rows are ordered severity-first and a count summary
+ * sits at the top. Nothing is ever hidden — every finding in the data becomes a
+ * row, and every row has a working expander.
  */
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import {
   countBySeverity,
   parseFindings,
@@ -79,6 +81,15 @@ function InfoIcon({ className }: IconProps) {
   );
 }
 
+/** Disclosure chevron; rotates when the row is expanded. */
+function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <svg {...svgBase} className={className}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
 interface SeverityStyle {
   Icon: (props: IconProps) => ReactNode;
   /** Announced to assistive tech. */
@@ -122,9 +133,6 @@ const SEVERITY_STYLES: Record<FindingSeverity, SeverityStyle> = {
   },
 };
 
-/** Longer than this (chars) clamps to ~2 lines behind a Show more control. */
-const CLAMP_THRESHOLD = 96;
-
 function FindingRow({
   severity,
   area,
@@ -137,61 +145,66 @@ function FindingRow({
   detail: string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const detailId = useId();
   const style = SEVERITY_STYLES[severity];
   const Icon = style.Icon;
-  const clampable = detail.length > CLAMP_THRESHOLD;
 
   return (
     <div
       role="listitem"
       data-testid="finding-row"
       data-severity={style.key}
-      className="flex gap-3 rounded-xl border border-border bg-canvas px-3.5 py-3"
+      className="overflow-hidden rounded-xl border border-border bg-canvas"
     >
-      <span
-        data-testid="finding-severity-indicator"
-        data-severity={style.key}
-        aria-label={style.srLabel}
-        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${style.badgeClass}`}
+      <button
+        type="button"
+        data-testid="finding-expander"
+        aria-expanded={expanded}
+        aria-controls={detailId}
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-start gap-3 px-3.5 py-3 text-left"
       >
-        <Icon className={`h-4 w-4 ${style.iconClass}`} />
-        <span className="sr-only">{style.srLabel}</span>
-      </span>
+        <span
+          data-testid="finding-severity-indicator"
+          data-severity={style.key}
+          aria-label={style.srLabel}
+          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${style.badgeClass}`}
+        >
+          <Icon className={`h-4 w-4 ${style.iconClass}`} />
+          <span className="sr-only">{style.srLabel}</span>
+        </span>
 
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <span
             data-testid="finding-area-chip"
             className="chip gap-1 border-border bg-surface text-[0.7rem] font-semibold uppercase tracking-wide text-muted"
           >
             {area}
           </span>
-          <p data-testid="finding-summary" className="min-w-0 text-sm font-bold text-ink">
-            {summary}
-          </p>
-        </div>
-
-        <p
-          data-testid="finding-detail"
-          className={`mt-1 text-sm font-normal text-ink-soft ${
-            clampable && !expanded ? "line-clamp-2" : ""
-          }`}
-        >
-          {detail}
-        </p>
-
-        {clampable ? (
-          <button
-            type="button"
-            data-testid="finding-show-more"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((v) => !v)}
-            className="mt-1 text-xs font-semibold text-purple hover:text-purple-dark"
+          <span
+            data-testid="finding-summary"
+            className="min-w-0 break-words text-sm font-bold text-ink"
           >
-            {expanded ? "Show less" : "Show more"}
-          </button>
-        ) : null}
-      </div>
+            {summary}
+          </span>
+        </span>
+
+        <ChevronDownIcon
+          className={`mt-1 h-4 w-4 shrink-0 text-muted transition-transform ${
+            expanded ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {expanded ? (
+        <div
+          id={detailId}
+          data-testid="finding-detail"
+          className="px-3.5 pb-3.5 pl-[3.75rem] text-sm font-normal text-ink-soft"
+        >
+          <p className="break-words">{detail}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

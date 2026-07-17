@@ -132,6 +132,8 @@ type ConfirmState = {
   sizeMetrics: SizeMetric[];
   /** Coarse size classification for the one-line summary sentence. */
   sizeClassification: SizeClassification | null;
+  /** Verbatim pasted text, shown by the raw fallback when nothing parses. */
+  raw: string;
 };
 
 /**
@@ -313,6 +315,7 @@ export function ReadinessFlow() {
                   findings,
                   parseStatus: String(remote.draft?.parseStatus || "partial"),
                   pending: remote.draft?.parseStatus === "pending" || findings.length === 0,
+                  raw: restoredPaste,
                   ...structuredConfirmFields(report, restoredPaste),
                 });
                 setView("confirm");
@@ -659,6 +662,7 @@ export function ReadinessFlow() {
       findings: clientFindings,
       parseStatus: clientFindings.length > 0 ? "partial" : "pending",
       pending: true,
+      raw: pasteText,
       ...structuredConfirmFields(clientPartial, pasteText),
     };
 
@@ -710,6 +714,7 @@ export function ReadinessFlow() {
         findings: merged.slice(0, 6),
         parseStatus: result.parseStatus,
         pending: result.parseStatus === "pending" || merged.length === 0,
+        raw: pasteText,
         ...structuredConfirmFields(structuredReport, pasteText),
       });
       trackAnalytics("stage_started", { stage: "confirm" });
@@ -909,24 +914,45 @@ export function ReadinessFlow() {
           </p>
         ) : null}
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <ConfirmStackCard
-            label={c.confirm.stackLabel}
-            entries={confirm.stackEntries}
-            stackText={confirm.stackText || confirm.stack}
-          />
-          <ConfirmSizeCard
-            label={c.confirm.sizeLabel}
-            metrics={confirm.sizeMetrics}
-            classification={confirm.sizeClassification}
-          />
-        </div>
+        {confirm.stackEntries.length === 0 &&
+        confirm.sizeMetrics.length === 0 &&
+        confirm.findings.length === 0 &&
+        confirm.raw.trim() ? (
+          <div className="readiness-step-panel mt-6" data-testid="readiness-confirm-raw-fallback">
+            <p className="eyebrow">Pasted input</p>
+            <p className="mt-2 text-sm text-muted">
+              We couldn&apos;t read a structured result from this paste. Here&apos;s exactly what
+              you pasted — re-paste your Readiness Check output, or continue.
+            </p>
+            <pre
+              data-testid="readiness-confirm-raw-text"
+              className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-canvas px-3.5 py-3 text-sm text-ink-soft"
+            >
+              {confirm.raw}
+            </pre>
+          </div>
+        ) : (
+          <>
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              <ConfirmStackCard
+                label={c.confirm.stackLabel}
+                entries={confirm.stackEntries}
+                stackText={confirm.stackText || confirm.stack}
+              />
+              <ConfirmSizeCard
+                label={c.confirm.sizeLabel}
+                metrics={confirm.sizeMetrics}
+                classification={confirm.sizeClassification}
+              />
+            </div>
 
-        <FindingsList
-          label={c.confirm.findingsLabel}
-          findings={confirm.findings}
-          emptyText="Findings will appear once parsing completes. You can re-paste or continue."
-        />
+            <FindingsList
+              label={c.confirm.findingsLabel}
+              findings={confirm.findings}
+              emptyText="Findings will appear once parsing completes. You can re-paste or continue."
+            />
+          </>
+        )}
 
         <AnswerCallout callout={confirmCallout} />
 
