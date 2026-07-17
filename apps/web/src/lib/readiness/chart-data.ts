@@ -5,8 +5,14 @@
  * POST /v1/readiness/score, no Turnstile / lead capture).
  */
 import { apiUrl } from "@/lib/api";
-import { getReadinessSnapshot } from "@/lib/readiness/api";
-import type { ChartDimension, ReadinessChartData } from "@/components/charts/types";
+import { getReadinessSnapshot, type SnapshotResponse } from "@/lib/readiness/api";
+import type {
+  ChartDimension,
+  ChartEvidence,
+  ChartSubMetric,
+  ReadinessChartData,
+} from "@/components/charts/types";
+import { hasChartEvidence, pickDimensionEvidence } from "@/components/charts/types";
 
 /**
  * Intentionally mixed posture report so dimensions and sub-metrics span
@@ -39,6 +45,12 @@ export const STAGING_MIXED_REPORT: Record<string, unknown> = {
   confidence: 0.7,
 };
 
+type PreviewEvidence = {
+  question_id?: string;
+  answer_value?: unknown;
+  reason?: string;
+};
+
 type PreviewBody = {
   overall?: number;
   dimensions?: Record<string, number>;
@@ -46,7 +58,12 @@ type PreviewBody = {
   dimensionResults?: Array<{
     dimension: string;
     score: number;
-    sub_metrics?: Array<{ name: string; score: number; weight?: number }>;
+    sub_metrics?: Array<{
+      name: string;
+      score: number;
+      weight?: number;
+      evidence?: PreviewEvidence;
+    }>;
   }>;
   dimensionDetails?: Record<
     string,
@@ -59,55 +76,100 @@ type PreviewBody = {
         name?: string;
         score?: number;
         weight?: number;
+        evidence?: PreviewEvidence;
       }>;
-      sub_metrics?: Array<{ name: string; score: number; weight?: number }>;
+      sub_metrics?: Array<{
+        name: string;
+        score: number;
+        weight?: number;
+        evidence?: PreviewEvidence;
+      }>;
     }
   >;
   bucket?: string;
   error?: { message?: string };
 };
 
+function parseEvidence(raw: PreviewEvidence | null | undefined): ChartEvidence | null {
+  if (!raw || typeof raw !== "object") return null;
+  const question_id = typeof raw.question_id === "string" ? raw.question_id.trim() : "";
+  const reason = typeof raw.reason === "string" ? raw.reason.trim() : "";
+  if (!question_id || !reason) return null;
+  return {
+    question_id,
+    answer_value: "answer_value" in raw ? raw.answer_value : null,
+    reason,
+  };
+}
+
+function withDimensionEvidence(dims: ChartDimension[]): ChartDimension[] {
+  return dims.map((d) => ({
+    ...d,
+    evidence: hasChartEvidence(d.evidence)
+      ? d.evidence
+      : pickDimensionEvidence(d.sub_metrics),
+  }));
+}
+
+function pickOverallEvidence(dims: ChartDimension[]): ChartEvidence | null {
+  const ranked = dims
+    .flatMap((d) => d.sub_metrics.map((sm) => ({ score: sm.score, evidence: sm.evidence })))
+    .filter((row) => hasChartEvidence(row.evidence))
+    .sort((a, b) => a.score - b.score);
+  return ranked[0]?.evidence ?? null;
+}
+
 function normalizeDimensions(body: PreviewBody): ChartDimension[] {
   if (Array.isArray(body.dimensionResults) && body.dimensionResults.length > 0) {
-    return body.dimensionResults.map((d) => ({
-      dimension: d.dimension,
-      score: typeof d.score === "number" ? d.score : 0,
-      sub_metrics: Array.isArray(d.sub_metrics)
-        ? d.sub_metrics.map((sm) => ({
-            name: sm.name,
-            score: typeof sm.score === "number" ? sm.score : 0,
-            weight: sm.weight,
-          }))
-        : [],
-    }));
+    return withDimensionEvidence(
+      body.dimensionResults.map((d) => {
+        const sub_metrics: ChartSubMetric[] = Array.isArray(d.sub_metrics)
+          ? d.sub_metrics.map((sm) => ({
+              name: sm.name,
+              score: typeof sm.score === "number" ? sm.score : 0,
+              weight: sm.weight,
+              evidence: parseEvidence(sm.evidence),
+            }))
+          : [];
+        return {
+          dimension: d.dimension,
+          score: typeof d.score === "number" ? d.score : 0,
+          sub_metrics,
+        };
+      }),
+    );
   }
 
   const details = body.dimensionDetails;
   if (details && typeof details === "object") {
-    return Object.entries(details).map(([key, detail]) => {
-      const checks = Array.isArray(detail.checks) ? detail.checks : [];
-      const subFromChecks = checks.map((c) => ({
-        name: c.name || c.label || c.key || "Check",
-        score: typeof c.score === "number" ? c.score : 0,
-        weight: c.weight,
-        key: c.key,
-      }));
-      const sub =
-        subFromChecks.length > 0
-          ? subFromChecks
-          : Array.isArray(detail.sub_metrics)
-            ? detail.sub_metrics.map((sm) => ({
-                name: sm.name,
-                score: typeof sm.score === "number" ? sm.score : 0,
-                weight: sm.weight,
-              }))
-            : [];
-      return {
-        dimension: detail.label || key,
-        score: typeof detail.score === "number" ? detail.score : 0,
-        sub_metrics: sub,
-      };
-    });
+    return withDimensionEvidence(
+      Object.entries(details).map(([key, detail]) => {
+        const checks = Array.isArray(detail.checks) ? detail.checks : [];
+        const subFromChecks: ChartSubMetric[] = checks.map((c) => ({
+          name: c.name || c.label || c.key || "Check",
+          score: typeof c.score === "number" ? c.score : 0,
+          weight: c.weight,
+          key: c.key,
+          evidence: parseEvidence(c.evidence),
+        }));
+        const sub: ChartSubMetric[] =
+          subFromChecks.length > 0
+            ? subFromChecks
+            : Array.isArray(detail.sub_metrics)
+              ? detail.sub_metrics.map((sm) => ({
+                  name: sm.name,
+                  score: typeof sm.score === "number" ? sm.score : 0,
+                  weight: sm.weight,
+                  evidence: parseEvidence(sm.evidence),
+                }))
+              : [];
+        return {
+          dimension: detail.label || key,
+          score: typeof detail.score === "number" ? detail.score : 0,
+          sub_metrics: sub,
+        };
+      }),
+    );
   }
 
   const scores = body.dimensions || body.scores || {};
@@ -115,6 +177,7 @@ function normalizeDimensions(body: PreviewBody): ChartDimension[] {
     dimension,
     score: typeof score === "number" ? score : 0,
     sub_metrics: [],
+    evidence: null,
   }));
 }
 
@@ -157,45 +220,51 @@ export async function fetchStagingChartPreview(): Promise<ReadinessChartData> {
   return {
     overall,
     dimensions,
+    overallEvidence: pickOverallEvidence(dimensions),
     sourceLabel: "Live score-preview · mixed test assessment",
     bucket: typeof body.bucket === "string" ? body.bucket : null,
   };
 }
 
-/** Load chart data from a real shareable snapshot id. */
-export async function fetchChartDataFromSnapshot(id: string): Promise<ReadinessChartData> {
-  const snap = await getReadinessSnapshot(id);
+/** Build chart data from an already-loaded snapshot response. */
+export function chartDataFromSnapshot(snap: SnapshotResponse): ReadinessChartData {
   const dimensions: ChartDimension[] = [];
 
   if (Array.isArray(snap.dimensionResults) && snap.dimensionResults.length > 0) {
     for (const d of snap.dimensionResults) {
+      const sub_metrics: ChartSubMetric[] = (d.sub_metrics || []).map((sm) => ({
+        name: sm.name,
+        score: sm.score,
+        weight: sm.weight,
+        evidence: parseEvidence(sm.evidence),
+      }));
       dimensions.push({
         dimension: d.dimension,
         score: d.score,
-        sub_metrics: (d.sub_metrics || []).map((sm) => ({
-          name: sm.name,
-          score: sm.score,
-          weight: sm.weight,
-        })),
+        sub_metrics,
+        evidence: pickDimensionEvidence(sub_metrics),
       });
     }
   } else if (snap.dimensionDetails) {
     for (const [key, detail] of Object.entries(snap.dimensionDetails)) {
+      const sub_metrics: ChartSubMetric[] = (detail.checks || []).map((c) => ({
+        name: c.name || c.label || c.key,
+        score: c.score,
+        weight: c.weight,
+        key: c.key,
+        evidence: parseEvidence(c.evidence ?? undefined),
+      }));
       dimensions.push({
         dimension: detail.label || key,
         score: detail.score,
-        sub_metrics: (detail.checks || []).map((c) => ({
-          name: c.name || c.label || c.key,
-          score: c.score,
-          weight: c.weight,
-          key: c.key,
-        })),
+        sub_metrics,
+        evidence: pickDimensionEvidence(sub_metrics),
       });
     }
   } else if (snap.scores) {
     for (const [dimension, score] of Object.entries(snap.scores)) {
       if (typeof score === "number") {
-        dimensions.push({ dimension, score, sub_metrics: [] });
+        dimensions.push({ dimension, score, sub_metrics: [], evidence: null });
       }
     }
   }
@@ -214,9 +283,16 @@ export async function fetchChartDataFromSnapshot(id: string): Promise<ReadinessC
   return {
     overall,
     dimensions,
+    overallEvidence: pickOverallEvidence(dimensions),
     sourceLabel: `Snapshot ${snap.id}`,
     bucket: snap.bucket,
   };
+}
+
+/** Load chart data from a real shareable snapshot id. */
+export async function fetchChartDataFromSnapshot(id: string): Promise<ReadinessChartData> {
+  const snap = await getReadinessSnapshot(id);
+  return chartDataFromSnapshot(snap);
 }
 
 /**

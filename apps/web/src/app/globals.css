@@ -214,6 +214,100 @@
   overflow-x: hidden;
 }
 
+/* ── Chart evidence tooltips + discoverability ───────────────────────────── */
+
+.chart-segment-interactive {
+  position: relative;
+}
+
+.chart-segment-control {
+  position: relative;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.chart-segment-control:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+  border-radius: 0.5rem;
+}
+
+.chart-segment-affordance {
+  position: absolute;
+  top: -0.15rem;
+  right: -0.15rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.chart-segment-info-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--color-purple);
+  box-shadow: 0 0 0 1.5px #fff;
+}
+
+.chart-segment-pulse {
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: rgba(91, 71, 224, 0.35);
+  animation: chart-segment-pulse 2.2s ease-out infinite;
+}
+
+@keyframes chart-segment-pulse {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+.chart-evidence-tooltip-anchor {
+  position: absolute;
+  left: 50%;
+  z-index: 30;
+  width: min(18rem, 80vw);
+  pointer-events: none;
+}
+
+.chart-evidence-tooltip-anchor-top {
+  bottom: calc(100% + 0.45rem);
+  transform: translateX(-50%);
+}
+
+.chart-evidence-tooltip-anchor-bottom {
+  top: calc(100% + 0.45rem);
+  transform: translateX(-50%);
+}
+
+.chart-evidence-tooltip {
+  pointer-events: none;
+  box-shadow: var(--shadow-card), 0 12px 32px rgba(22, 24, 29, 0.1);
+  animation: chart-tooltip-enter 0.16s ease-out both;
+}
+
+@keyframes chart-tooltip-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Reduced motion: disable / materially shorten animations and transitions */
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -227,5 +321,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .chart-segment-pulse {
+    animation: none !important;
+    opacity: 0.35;
   }
 }

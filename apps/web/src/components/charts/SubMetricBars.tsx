@@ -1,7 +1,8 @@
 "use client";
 
 import { clampScore, scoreBand, SCORE_BAND_META, type ScoreBand } from "./scoreBands";
-import type { ChartDimension } from "./types";
+import type { ChartDimension, ChartEvidence } from "./types";
+import { InteractiveChartSegment } from "./EvidenceTooltip";
 
 type SubMetricBarsProps = {
   dimensions: ChartDimension[];
@@ -10,7 +11,7 @@ type SubMetricBarsProps = {
 
 /**
  * Per-dimension horizontal sub-metric breakdowns with score-band coloring.
- * Each bar carries data-band="critical|warning|good" for machine verification.
+ * Bars with real evidence open a tooltip on hover / tap / keyboard focus.
  */
 export function SubMetricBars({ dimensions, className }: SubMetricBarsProps) {
   return (
@@ -34,7 +35,7 @@ function DimensionBars({ dimension }: { dimension: ChartDimension }) {
   const metrics =
     dimension.sub_metrics?.length > 0
       ? dimension.sub_metrics
-      : [{ name: dimension.dimension, score: dimension.score }];
+      : [{ name: dimension.dimension, score: dimension.score, evidence: dimension.evidence }];
 
   return (
     <section
@@ -70,6 +71,7 @@ function DimensionBars({ dimension }: { dimension: ChartDimension }) {
               name={m.name}
               score={score}
               band={band}
+              evidence={m.evidence}
             />
           );
         })}
@@ -82,10 +84,12 @@ function SubMetricBarRow({
   name,
   score,
   band,
+  evidence,
 }: {
   name: string;
   score: number;
   band: ScoreBand;
+  evidence?: ChartEvidence | null;
 }) {
   const meta = SCORE_BAND_META[band];
   const width = Math.max(score > 0 ? 3 : 0, score);
@@ -97,34 +101,44 @@ function SubMetricBarRow({
       data-score={Math.round(score)}
       data-testid={`sub-metric-bar-${slugify(name)}`}
     >
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-sm text-ink-soft">{name}</p>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="font-mono text-xs tabular-nums text-muted">{Math.round(score)}</span>
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.textClass}`}
-            style={{ background: meta.softBg }}
-            data-band={band}
-          >
-            {meta.label}
-          </span>
-        </div>
-      </div>
-      <div
-        className="h-2.5 overflow-hidden rounded-full bg-canvas"
-        role="meter"
-        aria-valuenow={Math.round(score)}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`${name}: ${Math.round(score)}, ${meta.label}`}
-        data-band={band}
+      <InteractiveChartSegment
+        score={score}
+        evidence={evidence}
+        label={name}
+        segmentKind="sub-metric-bar"
+        testId={`sub-metric-bar-control-${slugify(name)}`}
+        tooltipPlacement="top"
+        controlClassName="rounded-lg px-0.5 py-0.5"
       >
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-sm text-ink-soft">{name}</p>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="font-mono text-xs tabular-nums text-muted">{Math.round(score)}</span>
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.textClass}`}
+              style={{ background: meta.softBg }}
+              data-band={band}
+            >
+              {meta.label}
+            </span>
+          </div>
+        </div>
         <div
-          className={`readiness-bar-fill h-full rounded-full ${meta.barClass} score-band-${band}`}
+          className="h-2.5 overflow-hidden rounded-full bg-canvas"
+          role="meter"
+          aria-valuenow={Math.round(score)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${name}: ${Math.round(score)}, ${meta.label}`}
           data-band={band}
-          style={{ width: `${width}%` }}
-        />
-      </div>
+        >
+          <div
+            className={`readiness-bar-fill h-full rounded-full ${meta.barClass} score-band-${band}`}
+            data-band={band}
+            style={{ width: `${width}%` }}
+          />
+        </div>
+      </InteractiveChartSegment>
     </li>
   );
 }

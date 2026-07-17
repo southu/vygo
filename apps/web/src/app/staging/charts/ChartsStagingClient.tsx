@@ -86,7 +86,16 @@ export function ChartsStagingClient() {
           Semicircular gauge of the blended readiness score with entrance animation.
         </p>
         <div className="mt-6 flex justify-center">
-          <ReadinessGauge value={data.overall} className="w-full max-w-sm" />
+          <ReadinessGauge
+            value={data.overall}
+            className="w-full max-w-sm"
+            evidence={data.overallEvidence}
+            segments={data.dimensions.map((d) => ({
+              label: d.dimension,
+              score: d.score,
+              evidence: d.evidence,
+            }))}
+          />
         </div>
       </section>
 
@@ -100,7 +109,7 @@ export function ChartsStagingClient() {
         </h2>
         <p className="mt-2 max-w-prose text-sm text-muted">
           Spider chart across every scored dimension (Security, Reliability, Operability,
-          Maintainability, Compliance posture).
+          Maintainability, Compliance posture). Hover, tap, or focus an axis for evidence.
         </p>
         <div className="mx-auto mt-4 w-full max-w-lg px-1 sm:px-4">
           <ReadinessRadarChart dimensions={data.dimensions} />

@@ -13,6 +13,8 @@ import {
   type SnapshotResponse,
   type SnapshotSubMetricStatus,
 } from "@/lib/readiness/api";
+import { ReadinessGauge, ReadinessRadarChart, SubMetricBars } from "@/components/charts";
+import { chartDataFromSnapshot } from "@/lib/readiness/chart-data";
 
 const DIMENSIONS = [
   "Security",
@@ -382,6 +384,16 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
     return map;
   }, [data?.dimensionAnalyses]);
 
+  /** Chart payload with real per-sub-metric evidence for interactive tooltips. */
+  const chartData = useMemo(() => {
+    if (!data) return null;
+    try {
+      return chartDataFromSnapshot(data);
+    } catch {
+      return null;
+    }
+  }, [data]);
+
   if (loading) {
     return (
       <div className="mt-8 space-y-6" aria-busy="true" data-testid="snapshot-loading">
@@ -474,6 +486,66 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
           </p>
         ) : null}
       </section>
+
+      {chartData && chartData.dimensions.length > 0 ? (
+        <section
+          className="space-y-6"
+          aria-labelledby="snapshot-charts-heading"
+          data-testid="snapshot-charts"
+        >
+          <div>
+            <p className="eyebrow">Interactive charts</p>
+            <h2
+              id="snapshot-charts-heading"
+              className="mt-1 font-display text-xl font-bold text-ink"
+            >
+              Posture at a glance
+            </h2>
+            <p className="mt-2 max-w-prose text-sm text-muted">
+              Hover, tap, or keyboard-focus a radar axis, gauge segment, or sub-metric bar to see
+              the score, reason, and your submitted answer for that check.
+            </p>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="card p-5 sm:p-6" data-testid="snapshot-chart-gauge">
+              <h3 className="font-display text-base font-bold text-ink">Overall gauge</h3>
+              <p className="mt-1 text-xs text-muted">
+                Segment dots map to each dimension — open evidence on hover or tap.
+              </p>
+              <div className="mt-4 flex justify-center">
+                <ReadinessGauge
+                  value={chartData.overall}
+                  className="w-full max-w-sm"
+                  evidence={chartData.overallEvidence}
+                  segments={chartData.dimensions.map((d) => ({
+                    label: d.dimension,
+                    score: d.score,
+                    evidence: d.evidence,
+                  }))}
+                />
+              </div>
+            </div>
+
+            <div className="card p-5 sm:p-6" data-testid="snapshot-chart-radar">
+              <h3 className="font-display text-base font-bold text-ink">Dimension radar</h3>
+              <p className="mt-1 text-xs text-muted">
+                Each axis point carries real evidence from this submission.
+              </p>
+              <div className="mx-auto mt-2 w-full max-w-md">
+                <ReadinessRadarChart dimensions={chartData.dimensions} />
+              </div>
+            </div>
+          </div>
+
+          <div data-testid="snapshot-chart-bars">
+            <h3 className="mb-3 font-display text-base font-bold text-ink">
+              Sub-metric bars
+            </h3>
+            <SubMetricBars dimensions={chartData.dimensions} />
+          </div>
+        </section>
+      ) : null}
 
       <section aria-labelledby="scorecard-heading">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
