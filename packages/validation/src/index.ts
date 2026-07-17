@@ -189,10 +189,14 @@ export {
 
 export {
   buildEvidenceInsights,
+  clipDisplayText,
   extractNamedTools,
   extractIntegrationCount,
   extractTeamSignals,
   rawAnswerText,
+  INSIGHT_SOURCE_MAX_CHARS,
+  INSIGHT_DETAIL_MAX_CHARS,
+  INSIGHT_HEADLINE_MAX_CHARS,
   type EvidenceInsight,
   type InsightType,
 } from "./evidence-insights.js";

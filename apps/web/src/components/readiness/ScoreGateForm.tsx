@@ -104,11 +104,13 @@ export function ScoreGateForm({
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileFailed, setTurnstileFailed] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
-  const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "error" | "already_submitted">("idle");
   const [feedback, setFeedback] = useState("");
 
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
+  /** Synchronous double-submit guard (state alone can race before re-render). */
+  const inFlightRef = useRef(false);
   const siteKey = readinessE2E ? TURNSTILE_TEST_SITE_KEY : resolveTurnstileSiteKey();
 
   useEffect(() => {
@@ -198,7 +200,10 @@ export function ScoreGateForm({
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (status === "submitting") return;
+    // Double-click / replayed submit: one in-flight request only.
+    if (inFlightRef.current || status === "submitting" || status === "already_submitted") {
+      return;
+    }
 
     const next: Partial<Record<string, string>> = {};
     if (!name.trim()) next.name = "Name is required.";
@@ -214,6 +219,7 @@ export function ScoreGateForm({
       return;
     }
 
+    inFlightRef.current = true;
     setStatus("submitting");
     setFeedback("");
     try {
@@ -231,9 +237,15 @@ export function ScoreGateForm({
       if (result.bucket) {
         trackAnalytics("bucket_assigned", { bucket: result.bucket });
       }
+      if (result.alreadySubmitted) {
+        setStatus("already_submitted");
+        setFeedback(readinessContent.snapshot.alreadySubmitted);
+      }
+      // Keep inFlight true through navigation so a second click cannot re-score.
       onScored(result);
     } catch (err) {
-      const e = err as Error & { fields?: Record<string, string> };
+      inFlightRef.current = false;
+      const e = err as Error & { fields?: Record<string, string>; code?: string };
       if (e.fields) setErrors(e.fields);
       setFeedback(e.message || c.error);
       setStatus("error");

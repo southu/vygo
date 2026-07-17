@@ -155,6 +155,24 @@ function isUnknownish(value: unknown): boolean {
   return /^(unknown|n\/a|na|not sure|not yet determined|tbd|—|-)$/i.test(s);
 }
 
+/** Max length for insight source quotes / free-text surfaces (bounded display). */
+export const INSIGHT_SOURCE_MAX_CHARS = 280;
+/** Max length for insight detail / headline free-text surfaces. */
+export const INSIGHT_DETAIL_MAX_CHARS = 480;
+export const INSIGHT_HEADLINE_MAX_CHARS = 160;
+
+/**
+ * Collapse whitespace and truncate with a clean ellipsis for UI surfaces.
+ * Never returns pure whitespace.
+ */
+export function clipDisplayText(value: string, max = INSIGHT_SOURCE_MAX_CHARS): string {
+  const t = value.replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  if (t.length <= max) return t;
+  if (max <= 1) return "…";
+  return `${t.slice(0, max - 1)}…`;
+}
+
 /** Preserve original wording of a submitted answer as source_answer. */
 export function rawAnswerText(value: unknown): string {
   if (value == null) return "";
@@ -280,21 +298,28 @@ function dedupeKey(insight: Pick<EvidenceInsight, "headline" | "source_answer">)
 }
 
 function pushDraft(out: DraftInsight[], draft: DraftInsight): void {
-  if (
-    !draft.headline?.trim() ||
-    !draft.detail?.trim() ||
-    !draft.source_answer?.trim() ||
-    !draft.dimension?.trim()
-  ) {
+  const headline = clipDisplayText(draft.headline ?? "", INSIGHT_HEADLINE_MAX_CHARS);
+  const detail = clipDisplayText(draft.detail ?? "", INSIGHT_DETAIL_MAX_CHARS);
+  const source_answer = clipDisplayText(draft.source_answer ?? "", INSIGHT_SOURCE_MAX_CHARS);
+  const dimension = (draft.dimension ?? "").trim();
+  // Sparse / empty answers: never emit blank quotes or fabricated filler cards.
+  if (!headline || !detail || !source_answer || !dimension) {
     return;
   }
-  if (!/you|your/i.test(`${draft.headline} ${draft.detail}`)) {
+  if (!/you|your/i.test(`${headline} ${detail}`)) {
     // Mission requires second person; fail closed rather than emit generic copy.
     return;
   }
-  const key = dedupeKey(draft);
+  const normalized: DraftInsight = {
+    ...draft,
+    headline,
+    detail,
+    source_answer,
+    dimension,
+  };
+  const key = dedupeKey(normalized);
   if (out.some((d) => dedupeKey(d) === key)) return;
-  out.push(draft);
+  out.push(normalized);
 }
 
 function quoteList(items: string[]): string {
@@ -690,11 +715,18 @@ export function buildEvidenceInsights(
     return a.headline.localeCompare(b.headline);
   });
 
+  // Final pass: bounded strings only (defense in depth for long free-text).
   return drafts.map(({ type, headline, detail, source_answer, dimension }) => ({
     type,
-    headline,
-    detail,
-    source_answer,
-    dimension,
-  }));
+    headline: clipDisplayText(headline, INSIGHT_HEADLINE_MAX_CHARS),
+    detail: clipDisplayText(detail, INSIGHT_DETAIL_MAX_CHARS),
+    source_answer: clipDisplayText(source_answer, INSIGHT_SOURCE_MAX_CHARS),
+    dimension: dimension.trim(),
+  })).filter(
+    (i) =>
+      Boolean(i.headline) &&
+      Boolean(i.detail) &&
+      Boolean(i.source_answer) &&
+      Boolean(i.dimension),
+  );
 }

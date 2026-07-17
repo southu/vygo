@@ -297,6 +297,28 @@
     var(--shadow-card),
     0 12px 32px rgba(22, 24, 29, 0.1);
   animation: chart-tooltip-enter 0.16s ease-out both;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: min(18rem, 80vw);
+}
+
+.chart-evidence-tooltip [data-testid="chart-evidence-answer"],
+.chart-evidence-tooltip [data-testid="chart-evidence-reason"] {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-height: 8rem;
+  overflow-y: auto;
+}
+
+/* Fixed chart skeleton geometry — prevent layout shift on hydrate */
+.chart-skeleton {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-testid="snapshot-insight-quote"] {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 @keyframes chart-tooltip-enter {
@@ -414,6 +436,8 @@
 .assessment-answer-callout-text {
   margin: 0;
   padding-left: 0.35rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* ── Readiness report layout (results summary) ───────────────────────────── */

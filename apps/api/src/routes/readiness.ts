@@ -409,7 +409,7 @@ function publicScorePreviewBody(
     dimensionResults: payload.dimensionResults,
     results: payload.dimensionResults,
     /** Ranked evidence insights (tools, counts, practices) grounded in answers. */
-    insights: Array.isArray(payload.insights) ? payload.insights : [],
+    insights: sanitizePublicInsights(payload.insights),
     /** Per-dimension multi-paragraph written analysis grounded in sub-metric evidence. */
     dimensionAnalyses: Array.isArray(payload.dimensionAnalyses) ? payload.dimensionAnalyses : [],
     /** Pattern-branched detailed engagement recommendation. */
@@ -448,6 +448,51 @@ function redactReportDeep(report: Record<string, unknown>): Record<string, unkno
   return out;
 }
 
+/** Collapse whitespace + truncate free-text for client-safe surfaces. */
+function clipPublicText(value: unknown, max: number): string {
+  if (value == null) return "";
+  const t = String(value).replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
+function finiteScore(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function sanitizeDimensionScores(raw: unknown): Record<string, number> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = finiteScore(v);
+    if (n != null) out[k] = n;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/** Bound insight quotes so long free-text never overflows client surfaces. */
+function sanitizePublicInsights(raw: unknown): unknown[] {
+  if (!Array.isArray(raw)) return [];
+  const out: unknown[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const row = entry as Record<string, unknown>;
+    const type = typeof row.type === "string" ? row.type.trim() : "";
+    const headline = clipPublicText(row.headline, 160);
+    const detail = clipPublicText(row.detail, 480);
+    const source_answer = clipPublicText(
+      row.source_answer ?? row.sourceAnswer,
+      280,
+    );
+    const dimension = typeof row.dimension === "string" ? row.dimension.trim() : "";
+    // Sparse degrade: skip empty-quote insights rather than inventing content.
+    if (!headline || !source_answer) continue;
+    out.push({ type, headline, detail, source_answer, dimension });
+  }
+  return out;
+}
+
 function publicSnapshotBody(submission: {
   id: string;
   scores: Record<string, unknown> | null;
@@ -458,11 +503,67 @@ function publicSnapshotBody(submission: {
 }): Record<string, unknown> {
   const scores = (submission.scores ?? {}) as Partial<ReadinessScorePayload> &
     Record<string, unknown>;
+
+  // Explicit scoring-failure payload (malformed submission stored as error).
+  if (scores.scoringFailed === true) {
+    return {
+      id: submission.id,
+      snapshotId: submission.id,
+      scores: null,
+      dimensions: null,
+      dimensionDetails: null,
+      dimensionResults: null,
+      insights: [],
+      dimensionAnalyses: [],
+      recommendation: null,
+      ranges: null,
+      displayMode: "point",
+      overall: null,
+      bucket: null,
+      reasoning: null,
+      caveat:
+        typeof scores.errorMessage === "string"
+          ? scores.errorMessage
+          : "Scoring failed for this submission.",
+      findings: [],
+      recommendedEngagement: null,
+      offerKey: "audit",
+      ctaLabel: "Apply for the next audit opening",
+      pricing: null,
+      source: null,
+      contact: submission.contact
+        ? {
+            name:
+              typeof submission.contact.name === "string"
+                ? submission.contact.name
+                : typeof submission.contact.fullName === "string"
+                  ? submission.contact.fullName
+                  : null,
+            email: typeof submission.contact.email === "string" ? submission.contact.email : null,
+            company:
+              typeof submission.contact.company === "string"
+                ? submission.contact.company
+                : typeof submission.contact.companyName === "string"
+                  ? submission.contact.companyName
+                  : null,
+          }
+        : null,
+      reportSummary: null,
+      createdAt: submission.createdAt,
+      scoringFailed: true,
+      errorCode: "SCORING_FAILED",
+      errorMessage:
+        typeof scores.errorMessage === "string"
+          ? scores.errorMessage
+          : "Assessment answers were missing or malformed; no readiness score was computed.",
+    };
+  }
+
   const findings = Array.isArray(scores.findings)
     ? (scores.findings as unknown[])
         .filter((f): f is string => typeof f === "string")
-        .map((f) => f.slice(0, 280))
-        .filter((f) => !containsRemediationDetail(f))
+        .map((f) => clipPublicText(f, 280))
+        .filter((f) => f && !containsRemediationDetail(f))
         .slice(0, 3)
     : [];
 
@@ -479,7 +580,7 @@ function publicSnapshotBody(submission: {
     }
   }
 
-  const insights = Array.isArray(scores.insights) ? scores.insights : [];
+  const insights = sanitizePublicInsights(scores.insights);
   const dimensionAnalyses = Array.isArray(scores.dimensionAnalyses)
     ? scores.dimensionAnalyses
     : [];
@@ -488,11 +589,15 @@ function publicSnapshotBody(submission: {
       ? scores.recommendation
       : null;
 
+  const dimScores =
+    sanitizeDimensionScores(scores.dimensions) ?? sanitizeDimensionScores(scores.scores);
+  const overall = finiteScore(scores.overall);
+
   return {
     id: submission.id,
     snapshotId: submission.id,
-    scores: scores.dimensions ?? scores.scores ?? null,
-    dimensions: scores.dimensions ?? null,
+    scores: dimScores,
+    dimensions: dimScores,
     dimensionDetails: scores.dimensionDetails ?? null,
     dimensionResults,
     insights,
@@ -500,7 +605,7 @@ function publicSnapshotBody(submission: {
     recommendation,
     ranges: scores.ranges ?? null,
     displayMode: scores.displayMode ?? "point",
-    overall: scores.overall ?? null,
+    overall,
     bucket: submission.bucket ?? scores.bucket ?? null,
     reasoning: typeof scores.reasoning === "string" ? scores.reasoning : null,
     caveat: typeof scores.caveat === "string" ? scores.caveat : null,
@@ -1939,6 +2044,79 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       }
 
       const draft = session.draft;
+
+      // Idempotent re-submit: return the existing successful snapshot rather than duplicating.
+      // Failed scoring payloads are NOT treated as already-submitted so the user can retry.
+      const existingSubmissionId =
+        typeof draft.submissionId === "string" ? draft.submissionId.trim() : "";
+      if (
+        (session.stage === "scored" || draft.scoredAt) &&
+        existingSubmissionId &&
+        !existingSubmissionId.startsWith("draft:")
+      ) {
+        const existing = await findReadinessSubmissionById(dbHandle.db, existingSubmissionId);
+        const existingScores =
+          existing?.scores && typeof existing.scores === "object"
+            ? (existing.scores as Record<string, unknown>)
+            : null;
+        if (
+          existing &&
+          existingScores &&
+          existingScores.scoringFailed !== true &&
+          finiteScore(existingScores.overall) != null
+        ) {
+          const bodyOut = publicSnapshotBody({
+            id: existing.id,
+            scores: existingScores,
+            bucket: existing.bucket,
+            contact: existing.contact as Record<string, unknown> | null,
+            parsedReport: existing.parsedReport as Record<string, unknown> | null,
+            createdAt: existing.createdAt,
+          });
+          request.log.info(
+            { event: "readiness_score_already_submitted", snapshotId: existing.id },
+            "readiness score idempotent replay",
+          );
+          return reply.status(200).send({
+            ...bodyOut,
+            alreadySubmitted: true,
+            snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(existing.id)}`,
+          });
+        }
+      }
+
+      // Also catch race/replay when a scored submission row already exists for this session.
+      const latest = await findLatestSubmissionBySessionToken(dbHandle.db, token);
+      const latestScores =
+        latest?.scores && typeof latest.scores === "object"
+          ? (latest.scores as Record<string, unknown>)
+          : null;
+      if (
+        latest &&
+        !String(latest.id).startsWith("draft:") &&
+        latestScores &&
+        latestScores.scoringFailed !== true &&
+        finiteScore(latestScores.overall) != null
+      ) {
+        const bodyOut = publicSnapshotBody({
+          id: latest.id,
+          scores: latestScores,
+          bucket: latest.bucket,
+          contact: latest.contact as Record<string, unknown> | null,
+          parsedReport: latest.parsedReport as Record<string, unknown> | null,
+          createdAt: latest.createdAt,
+        });
+        request.log.info(
+          { event: "readiness_score_already_submitted", snapshotId: latest.id },
+          "readiness score idempotent replay (latest)",
+        );
+        return reply.status(200).send({
+          ...bodyOut,
+          alreadySubmitted: true,
+          snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(latest.id)}`,
+        });
+      }
+
       const sourceRaw =
         typeof draft.source === "string"
           ? draft.source
@@ -1962,6 +2140,64 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
 
       // Deep-redact free-text report fields before scoring/storage.
       report = redactReportDeep(report);
+
+      // Malformed / empty answer payload: fail closed with an honest error (no silent score).
+      const reportKeys = Object.keys(report).filter((k) => {
+        const v = report[k];
+        if (v == null) return false;
+        if (typeof v === "string") return v.trim().length > 0;
+        if (Array.isArray(v)) return v.length > 0;
+        return true;
+      });
+      if (reportKeys.length === 0) {
+        const contactFail: Record<string, unknown> = {
+          source: e2eBypass ? "readiness_score_gate_e2e" : "readiness_score_gate",
+          name,
+          fullName: name,
+          email,
+          privacyAccepted: true,
+          gatedAt: new Date().toISOString(),
+          ...(e2eBypass ? { e2e: true } : {}),
+        };
+        if (company) {
+          contactFail.company = company;
+          contactFail.companyName = company;
+        }
+        const failScores: Record<string, unknown> = {
+          scoringFailed: true,
+          errorCode: "SCORING_FAILED",
+          errorMessage:
+            "Assessment answers were missing or malformed; no readiness score was computed.",
+        };
+        const savedFail = await persistReadinessScore(dbHandle.db, {
+          token,
+          scores: failScores,
+          bucket: "Launch",
+          contact: contactFail,
+          parsedReport: report,
+          rawPasteRedacted: null,
+          discrepancyFlags: Array.isArray(draft.discrepancyFlags) ? draft.discrepancyFlags : [],
+        });
+        request.log.info(
+          { event: "readiness_score_failed_validation", snapshotId: savedFail.id },
+          "readiness scoring failed: empty/malformed answers",
+        );
+        return reply.status(200).send({
+          ...publicSnapshotBody({
+            id: savedFail.id,
+            scores: failScores,
+            bucket: null,
+            contact: contactFail,
+            parsedReport: report,
+            createdAt: savedFail.createdAt,
+          }),
+          snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(savedFail.id)}`,
+          scoringFailed: true,
+          errorCode: "SCORING_FAILED",
+          errorMessage:
+            "Assessment answers were missing or malformed; no readiness score was computed.",
+        });
+      }
 
       let pasteRedacted: string | null =
         typeof draft.rawPasteRedacted === "string"
@@ -1998,13 +2234,53 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       }
       const scoringConfig = scoringConfigFromDbRow(configRow);
 
-      const payload = computeReadinessScore({
-        report,
-        source,
-        stage1,
-        followups,
-        config: scoringConfig,
-      });
+      let payload: ReadinessScorePayload;
+      try {
+        payload = computeReadinessScore({
+          report,
+          source,
+          stage1,
+          followups,
+          config: scoringConfig,
+        });
+      } catch (scoreErr) {
+        request.log.error(
+          { event: "readiness_score_engine_failed" },
+          scoreErr instanceof Error ? scoreErr.message : "score engine failed",
+        );
+        return reply
+          .status(500)
+          .send(
+            safeError(
+              "SCORING_FAILED",
+              "We could not compute a readiness score from this submission. Please try again with complete answers.",
+            ),
+          );
+      }
+
+      // Never persist or return non-finite scores (NaN / Infinity).
+      if (!Number.isFinite(payload.overall)) {
+        return reply
+          .status(500)
+          .send(
+            safeError(
+              "SCORING_FAILED",
+              "Scoring produced an invalid result. No fallback score was substituted.",
+            ),
+          );
+      }
+      for (const v of Object.values(payload.dimensions ?? {})) {
+        if (typeof v !== "number" || !Number.isFinite(v)) {
+          return reply
+            .status(500)
+            .send(
+              safeError(
+                "SCORING_FAILED",
+                "Scoring produced an invalid dimension result. No fallback score was substituted.",
+              ),
+            );
+        }
+      }
 
       // Persist full score payload (includes reasoning) on submission row.
       const scoresJson: Record<string, unknown> = {
@@ -2013,6 +2289,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         reasoning: payload.reasoning,
         findings: payload.findings,
         bucket: payload.bucket,
+        insights: sanitizePublicInsights(payload.insights),
       };
 
       const contact: Record<string, unknown> = {
@@ -2089,7 +2366,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         dimensions: payload.dimensions,
         dimensionDetails: payload.dimensionDetails,
         dimensionResults: payload.dimensionResults,
-        insights: payload.insights,
+        insights: sanitizePublicInsights(payload.insights),
         dimensionAnalyses: payload.dimensionAnalyses,
         recommendation: payload.recommendation,
         ranges: payload.ranges ?? null,
@@ -2106,6 +2383,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         source: payload.source,
         snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(saved.id)}`,
         briefId: side.briefId,
+        alreadySubmitted: false,
         email: {
           snapshotQueued: side.snapshotQueued,
           opsBriefQueued: side.opsBriefQueued,

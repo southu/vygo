@@ -121,6 +121,10 @@ export const readinessContent = {
     emailError: "Could not queue the email. Try again.",
     loading: "Loading report…",
     notFound: "This snapshot could not be found.",
+    scoringFailedTitle: "We could not score this submission",
+    scoringFailedBody:
+      "The assessment answers were missing, incomplete, or malformed, so no readiness score could be computed. Nothing was fabricated in place of a score.",
+    alreadySubmitted: "This assessment was already submitted. Showing your existing results.",
   },
   fallback: {
     eyebrow: "Fallback questionnaire",

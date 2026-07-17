@@ -226,45 +226,59 @@ export async function fetchStagingChartPreview(): Promise<ReadinessChartData> {
   };
 }
 
+function finiteChartScore(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.min(100, value));
+  }
+  return fallback;
+}
+
 /** Build chart data from an already-loaded snapshot response. */
 export function chartDataFromSnapshot(snap: SnapshotResponse): ReadinessChartData {
   const dimensions: ChartDimension[] = [];
 
   if (Array.isArray(snap.dimensionResults) && snap.dimensionResults.length > 0) {
     for (const d of snap.dimensionResults) {
+      if (typeof d.score !== "number" || !Number.isFinite(d.score)) continue;
       const sub_metrics: ChartSubMetric[] = (d.sub_metrics || []).map((sm) => ({
         name: sm.name,
-        score: sm.score,
+        score: finiteChartScore(sm.score),
         weight: sm.weight,
         evidence: parseEvidence(sm.evidence),
       }));
       dimensions.push({
         dimension: d.dimension,
-        score: d.score,
+        score: finiteChartScore(d.score),
         sub_metrics,
         evidence: pickDimensionEvidence(sub_metrics),
       });
     }
   } else if (snap.dimensionDetails) {
     for (const [key, detail] of Object.entries(snap.dimensionDetails)) {
+      if (typeof detail.score !== "number" || !Number.isFinite(detail.score)) continue;
       const sub_metrics: ChartSubMetric[] = (detail.checks || []).map((c) => ({
         name: c.name || c.label || c.key,
-        score: c.score,
+        score: finiteChartScore(c.score),
         weight: c.weight,
         key: c.key,
         evidence: parseEvidence(c.evidence ?? undefined),
       }));
       dimensions.push({
         dimension: detail.label || key,
-        score: detail.score,
+        score: finiteChartScore(detail.score),
         sub_metrics,
         evidence: pickDimensionEvidence(sub_metrics),
       });
     }
   } else if (snap.scores) {
     for (const [dimension, score] of Object.entries(snap.scores)) {
-      if (typeof score === "number") {
-        dimensions.push({ dimension, score, sub_metrics: [], evidence: null });
+      if (typeof score === "number" && Number.isFinite(score)) {
+        dimensions.push({
+          dimension,
+          score: finiteChartScore(score),
+          sub_metrics: [],
+          evidence: null,
+        });
       }
     }
   }
@@ -274,8 +288,8 @@ export function chartDataFromSnapshot(snap: SnapshotResponse): ReadinessChartDat
   }
 
   const overall =
-    typeof snap.overall === "number"
-      ? snap.overall
+    typeof snap.overall === "number" && Number.isFinite(snap.overall)
+      ? finiteChartScore(snap.overall)
       : Math.round(
           dimensions.reduce((sum, d) => sum + d.score, 0) / Math.max(1, dimensions.length),
         );

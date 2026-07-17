@@ -51,22 +51,37 @@ export function hasChartEvidence(
   );
 }
 
+/** Bound free-text answers in tooltips / callouts so layout never overflows. */
+export const EVIDENCE_ANSWER_MAX_CHARS = 220;
+
+/** Collapse whitespace and truncate with a clean ellipsis. */
+export function clipEvidenceText(value: string, max = EVIDENCE_ANSWER_MAX_CHARS): string {
+  const t = value.replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  if (t.length <= max) return t;
+  if (max <= 1) return "…";
+  return `${t.slice(0, max - 1)}…`;
+}
+
 /** Format a prospect answer value for tooltip display (never placeholder filler). */
-export function formatEvidenceAnswer(value: unknown): string {
+export function formatEvidenceAnswer(value: unknown, max = EVIDENCE_ANSWER_MAX_CHARS): string {
   if (value == null) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (Array.isArray(value)) {
-    return value
+  let raw = "";
+  if (typeof value === "string") raw = value.trim();
+  else if (typeof value === "number" || typeof value === "boolean") raw = String(value);
+  else if (Array.isArray(value)) {
+    raw = value
       .map((v) => (typeof v === "string" ? v : JSON.stringify(v)))
       .filter(Boolean)
       .join(", ");
+  } else {
+    try {
+      raw = JSON.stringify(value);
+    } catch {
+      raw = String(value);
+    }
   }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
+  return clipEvidenceText(raw, max);
 }
 
 /**

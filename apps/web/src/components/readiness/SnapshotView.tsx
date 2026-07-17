@@ -14,7 +14,13 @@ import {
   type SnapshotResponse,
   type SnapshotSubMetricStatus,
 } from "@/lib/readiness/api";
-import { ReadinessGauge, ReadinessRadarChart, SubMetricBars } from "@/components/charts";
+import {
+  ChartSkeleton,
+  ReadinessGauge,
+  ReadinessRadarChart,
+  SubMetricBars,
+  clampScore,
+} from "@/components/charts";
 import type { ChartDimension } from "@/components/charts/types";
 import { chartDataFromSnapshot } from "@/lib/readiness/chart-data";
 
@@ -89,13 +95,21 @@ const STATUS_META: Record<
 };
 
 function statusForScore(score: number): SnapshotSubMetricStatus {
+  if (!Number.isFinite(score)) return "unknown";
   if (score >= 70) return "strong";
   if (score >= 55) return "adequate";
   return "at_risk";
 }
 
 function clampPct(value: number): number {
+  if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
+}
+
+/** Format a finite 0–100 score for display; never emits NaN/undefined/null. */
+function formatScore(value: unknown): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return String(Math.round(clampScore(value)));
 }
 
 function quoteText(value: unknown, max = 160): string {
@@ -110,8 +124,24 @@ function quoteText(value: unknown, max = 160): string {
       : "";
   const t = raw.replace(/\s+/g, " ").trim();
   if (!t) return "";
+  // Never surface the string forms of invalid scores as "quotes".
+  if (/^(nan|undefined|null)$/i.test(t)) return "";
   if (t.length <= max) return t;
   return `${t.slice(0, max - 1)}…`;
+}
+
+/**
+ * True when the snapshot has at least one finite numeric score we can render.
+ * Missing / non-finite scores are a scoring failure — not a silent zero.
+ */
+function hasRenderableScores(data: SnapshotResponse): boolean {
+  if (typeof data.overall === "number" && Number.isFinite(data.overall)) return true;
+  const scores = data.dimensions ?? data.scores ?? null;
+  if (!scores || typeof scores !== "object") return false;
+  return DIMENSIONS.some((dim) => {
+    const v = scores[dim];
+    return typeof v === "number" && Number.isFinite(v);
+  });
 }
 
 function firstSentence(text: string): string {
@@ -167,9 +197,22 @@ function dimSlug(name: string): string {
 
 /** Build insight cards from API insights, with evidence fallbacks when needed. */
 function resolveInsightCards(data: SnapshotResponse): SnapshotInsight[] {
-  const fromApi = (data.insights ?? []).filter(
-    (i) => i.headline && (i.source_answer || i.detail),
-  );
+  // Require a non-empty source quote so we never render empty-quote callouts or
+  // fabricate insights from blank / whitespace-only answers (sparse degrade).
+  const fromApi = (data.insights ?? [])
+    .filter(
+      (i) =>
+        Boolean(i.headline?.trim()) &&
+        Boolean(i.source_answer?.trim()) &&
+        Boolean(i.detail?.trim() || i.source_answer?.trim()),
+    )
+    .map((i) => ({
+      ...i,
+      headline: quoteText(i.headline, 160) || i.headline.trim(),
+      detail: quoteText(i.detail, 480),
+      source_answer: quoteText(i.source_answer, 180),
+    }))
+    .filter((i) => i.source_answer.length > 0);
   if (fromApi.length > 0) return fromApi.slice(0, 9);
 
   const fallbacks: SnapshotInsight[] = [];
@@ -180,8 +223,18 @@ function resolveInsightCards(data: SnapshotResponse): SnapshotInsight[] {
       if (fallbacks.length >= 6) break;
       const answer = quoteText(check.evidence?.answer_value, 120);
       if (!answer) continue;
+      // Skip unknown / unanswered checks — sparse input must not pad with filler.
+      if (check.status === "unknown" || check.answered === false) continue;
       const type: SnapshotInsightType =
         check.status === "strong" ? "strength" : check.status === "at_risk" ? "risk" : "opportunity";
+      const scoreLabel =
+        typeof check.score === "number" && Number.isFinite(check.score)
+          ? `${Math.round(clampScore(check.score))}/100`
+          : null;
+      const detail =
+        quoteText(check.evidence?.reason, 240) ||
+        (scoreLabel ? `${check.label} scored ${scoreLabel}.` : "");
+      if (!detail) continue;
       fallbacks.push({
         type,
         headline:
@@ -190,7 +243,7 @@ function resolveInsightCards(data: SnapshotResponse): SnapshotInsight[] {
             : check.status === "at_risk"
               ? `Your ${check.label} answer flags production risk`
               : `Your ${check.label} answer leaves room to harden`,
-        detail: check.evidence?.reason || `${check.label} scored ${Math.round(check.score)}/100.`,
+        detail,
         source_answer: answer,
         dimension: dim,
       });
@@ -200,8 +253,10 @@ function resolveInsightCards(data: SnapshotResponse): SnapshotInsight[] {
 }
 
 function InsightCard({ insight }: { insight: SnapshotInsight }) {
-  const meta = INSIGHT_META[insight.type];
+  const meta = INSIGHT_META[insight.type] ?? INSIGHT_META.opportunity;
   const quote = quoteText(insight.source_answer, 180);
+  // Never render a card whose only "quote" would be empty / whitespace.
+  if (!quote) return null;
   return (
     <article
       className={`relative overflow-hidden rounded-2xl border bg-surface p-5 shadow-card ${meta.border}`}
@@ -209,7 +264,7 @@ function InsightCard({ insight }: { insight: SnapshotInsight }) {
       data-insight-type={insight.type}
     >
       <span className={`absolute inset-y-0 left-0 w-1 ${meta.accent}`} aria-hidden />
-      <div className="pl-2">
+      <div className="min-w-0 pl-2">
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] ${meta.pill}`}
         >
@@ -220,20 +275,20 @@ function InsightCard({ insight }: { insight: SnapshotInsight }) {
             {insight.dimension}
           </span>
         ) : null}
-        <h3 className="mt-3 font-display text-base font-bold leading-snug text-ink">
-          {insight.headline}
+        <h3 className="mt-3 break-words font-display text-base font-bold leading-snug text-ink">
+          {quoteText(insight.headline, 160) || insight.headline}
         </h3>
         {insight.detail ? (
-          <p className="mt-2 text-sm leading-relaxed text-ink-soft">{insight.detail}</p>
+          <p className="mt-2 break-words text-sm leading-relaxed text-ink-soft">
+            {quoteText(insight.detail, 480)}
+          </p>
         ) : null}
-        {quote ? (
-          <blockquote
-            className="mt-3 border-l-2 border-border pl-3 text-sm italic leading-relaxed text-ink"
-            data-testid="snapshot-insight-quote"
-          >
-            “{quote}”
-          </blockquote>
-        ) : null}
+        <blockquote
+          className="mt-3 break-words border-l-2 border-border pl-3 text-sm italic leading-relaxed text-ink"
+          data-testid="snapshot-insight-quote"
+        >
+          “{quote}”
+        </blockquote>
       </div>
     </article>
   );
@@ -255,8 +310,9 @@ function DimensionSection({
   chartDim?: ChartDimension | null;
   analysis?: SnapshotDimensionAnalysis | null;
 }) {
-  const headline = showRange && range ? range.mid : point;
-  const status = statusForScore(headline);
+  const rawHeadline = showRange && range && Number.isFinite(range.mid) ? range.mid : point;
+  const headline = Number.isFinite(rawHeadline) ? clampScore(rawHeadline) : null;
+  const status = headline == null ? "unknown" : statusForScore(headline);
   const meta = STATUS_META[status];
   const analysisParagraphs =
     analysis?.paragraphs?.filter((p) => typeof p === "string" && p.trim()) ??
@@ -267,35 +323,52 @@ function DimensionSection({
           .filter(Boolean)
       : []);
 
+  const scoreLabel = headline == null ? null : formatScore(headline);
   // Guarantee non-empty analysis text for the section.
   const paragraphs =
     analysisParagraphs.length > 0
-      ? analysisParagraphs
+      ? analysisParagraphs.map((p) => quoteText(p, 800) || p)
       : [
-          `On ${dimension}, your aggregate score is ${Math.round(headline)}/100 (${meta.label.toLowerCase()}). This section reflects the sub-metric checks from your submission rather than a generic maturity label.`,
+          scoreLabel
+            ? `On ${dimension}, your aggregate score is ${scoreLabel}/100 (${meta.label.toLowerCase()}). This section reflects the sub-metric checks from your submission rather than a generic maturity label.`
+            : `On ${dimension}, a numeric score was not available for this snapshot. Re-run the assessment with complete answers for a scored dimension view.`,
           chartDim && chartDim.sub_metrics.length > 0
             ? `Key sub-metrics include ${chartDim.sub_metrics
                 .slice(0, 3)
                 .map((m) => {
                   const ans = quoteText(m.evidence?.answer_value, 60);
-                  return ans
-                    ? `${m.name} (${Math.round(m.score)}/100; “${ans}”)`
-                    : `${m.name} (${Math.round(m.score)}/100)`;
+                  const sm = formatScore(m.score);
+                  if (!sm) return ans ? `${m.name} (“${ans}”)` : m.name;
+                  return ans ? `${m.name} (${sm}/100; “${ans}”)` : `${m.name} (${sm}/100)`;
                 })
                 .join("; ")}.`
             : `Sub-metric detail for ${dimension} was limited in this snapshot; treat the dimension score as the primary signal and re-run with a fuller diagnostic paste for deeper analysis.`,
         ];
 
   const barsPayload: ChartDimension[] = chartDim
-    ? [chartDim]
+    ? [
+        {
+          ...chartDim,
+          score: headline ?? clampScore(chartDim.score),
+          sub_metrics: chartDim.sub_metrics.map((m) => ({
+            ...m,
+            score: Number.isFinite(m.score) ? clampScore(m.score) : 0,
+          })),
+        },
+      ]
     : [
         {
           dimension,
-          score: headline,
+          score: headline ?? 0,
           sub_metrics: [],
           evidence: null,
         },
       ];
+
+  const rangeLow = range && Number.isFinite(range.low) ? Math.round(range.low) : null;
+  const rangeHigh = range && Number.isFinite(range.high) ? Math.round(range.high) : null;
+  const showRangeDisplay = showRange && rangeLow != null && rangeHigh != null;
+  const pointLabel = formatScore(point);
 
   return (
     <section
@@ -321,12 +394,14 @@ function DimensionSection({
           </span>
         </div>
         <p className="font-display text-3xl font-bold tabular-nums text-ink">
-          {showRange && range ? (
+          {showRangeDisplay ? (
             <span data-testid={`snapshot-dim-score-${dimension}`}>
-              {range.low}–{range.high}
+              {rangeLow}–{rangeHigh}
             </span>
           ) : (
-            <span data-testid={`snapshot-dim-score-${dimension}`}>{Math.round(point)}</span>
+            <span data-testid={`snapshot-dim-score-${dimension}`}>
+              {pointLabel ?? "—"}
+            </span>
           )}
           <span className="ml-1 text-base font-semibold text-muted">/100</span>
         </p>
@@ -335,14 +410,19 @@ function DimensionSection({
       <div
         className="h-2.5 max-w-md overflow-hidden rounded-full bg-canvas"
         role="meter"
-        aria-valuenow={Math.round(clampPct(headline))}
+        aria-valuenow={headline == null ? 0 : Math.round(clampPct(headline))}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label={`${dimension} score`}
       >
         <div
           className={`h-full rounded-full ${meta.bar}`}
-          style={{ width: `${Math.max(4, clampPct(headline))}%` }}
+          style={{
+            width:
+              headline == null
+                ? "0%"
+                : `${Math.max(headline > 0 ? 4 : 0, clampPct(headline))}%`,
+          }}
           data-testid={`snapshot-dim-bar-${dimension}`}
         />
       </div>
@@ -444,13 +524,15 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
   const scores = data?.dimensions ?? data?.scores ?? null;
 
   const overallScore = useMemo(() => {
-    if (typeof data?.overall === "number" && Number.isFinite(data.overall)) return data.overall;
+    if (typeof data?.overall === "number" && Number.isFinite(data.overall)) {
+      return clampScore(data.overall);
+    }
     if (!scores) return null;
     const values = DIMENSIONS.map((dim) => scores[dim]).filter(
       (v): v is number => typeof v === "number" && Number.isFinite(v),
     );
     if (!values.length) return null;
-    return values.reduce((a, b) => a + b, 0) / values.length;
+    return clampScore(values.reduce((a, b) => a + b, 0) / values.length);
   }, [data?.overall, scores]);
 
   const analysesByDim = useMemo(() => {
@@ -480,22 +562,44 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
 
   const insights = useMemo(() => (data ? resolveInsightCards(data) : []), [data]);
 
+  const scoringFailed = Boolean(data && !hasRenderableScores(data));
+
   const verdict = useMemo(
-    () => (data ? buildPersonalizedVerdict(data, overallScore) : ""),
-    [data, overallScore],
+    () => (data && !scoringFailed ? buildPersonalizedVerdict(data, overallScore) : ""),
+    [data, overallScore, scoringFailed],
   );
 
   if (loading) {
     return (
-      <div className="mt-8 space-y-6" aria-busy="true" data-testid="snapshot-loading">
-        <div className="card animate-pulse">
-          <div className="h-4 w-40 rounded bg-canvas" />
-          <div className="mt-4 h-32 w-full max-w-sm rounded-2xl bg-canvas" />
-        </div>
-        <div className="card animate-pulse">
-          <div className="h-4 w-56 rounded bg-canvas" />
-          <div className="mt-4 h-40 rounded-xl bg-canvas" />
-        </div>
+      <div
+        className="readiness-report mt-6 space-y-12 sm:mt-8 sm:space-y-14"
+        aria-busy="true"
+        data-testid="snapshot-loading"
+      >
+        <section
+          className="rounded-3xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8 sm:py-10"
+          data-testid="snapshot-loading-hero"
+        >
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-12">
+            <div className="mx-auto w-full max-w-sm shrink-0 lg:mx-0">
+              <ChartSkeleton kind="gauge" label="Loading readiness gauge" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-4">
+              <div className="h-3 w-28 animate-pulse rounded bg-canvas" />
+              <div className="h-8 w-3/4 max-w-md animate-pulse rounded bg-canvas" />
+              <div className="h-16 w-full max-w-prose animate-pulse rounded bg-canvas" />
+            </div>
+          </div>
+        </section>
+        <section data-testid="snapshot-loading-radar">
+          <div className="mb-4 h-6 w-48 animate-pulse rounded bg-canvas" />
+          <div className="mx-auto w-full max-w-xl rounded-3xl border border-border bg-surface p-4 shadow-card sm:p-6">
+            <ChartSkeleton kind="radar" label="Loading readiness radar" />
+          </div>
+        </section>
+        <section data-testid="snapshot-loading-bars">
+          <ChartSkeleton kind="bars" label="Loading sub-metric bars" />
+        </section>
         <p className="text-sm text-muted">{c.loading}</p>
       </div>
     );
@@ -513,28 +617,60 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
     );
   }
 
+  // Scoring failure: never invent a silent fallback score (0 / NaN / undefined).
+  if (scoringFailed) {
+    return (
+      <div
+        className="card mt-8 border-red/30"
+        role="alert"
+        data-testid="snapshot-scoring-error"
+        data-scoring-state="failed"
+      >
+        <p className="font-semibold text-ink">{c.scoringFailedTitle}</p>
+        <p className="mt-2 text-sm text-muted" data-testid="snapshot-scoring-error-message">
+          {c.scoringFailedBody}
+        </p>
+        <p className="mt-3 text-sm text-ink-soft">
+          We could not compute a valid readiness score from this submission. No fallback score was
+          substituted. Please re-run the assessment with complete answers.
+        </p>
+        <Link href="/readiness" className="btn-primary mt-4 inline-flex">
+          Start a readiness check
+        </Link>
+      </div>
+    );
+  }
+
   const recommendation: SnapshotRecommendation | null = data.recommendation ?? null;
   const engagementName =
     recommendation?.engagement || data.recommendedEngagement || data.bucket || "Launch";
 
+  const finiteDimScore = (dim: string): number | null => {
+    const v = scores?.[dim];
+    return typeof v === "number" && Number.isFinite(v) ? clampScore(v) : null;
+  };
+
   const gaugeSegments =
     chartData?.dimensions.map((d) => ({
       label: d.dimension,
-      score: d.score,
+      score: Number.isFinite(d.score) ? clampScore(d.score) : 0,
       evidence: d.evidence,
     })) ??
     DIMENSIONS.map((dim) => ({
       label: dim,
-      score: typeof scores?.[dim] === "number" ? scores[dim] : 0,
+      score: finiteDimScore(dim) ?? 0,
       evidence: null,
     }));
 
   const radarDimensions: ChartDimension[] =
     chartData?.dimensions && chartData.dimensions.length > 0
-      ? chartData.dimensions
+      ? chartData.dimensions.map((d) => ({
+          ...d,
+          score: Number.isFinite(d.score) ? clampScore(d.score) : 0,
+        }))
       : DIMENSIONS.map((dim) => ({
           dimension: dim,
-          score: typeof scores?.[dim] === "number" ? scores[dim] : 0,
+          score: finiteDimScore(dim) ?? 0,
           sub_metrics: [],
           evidence: null,
         }));
@@ -552,7 +688,11 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
         data-testid="snapshot-hero"
       >
         <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-12">
-          <div className="mx-auto w-full max-w-sm shrink-0 lg:mx-0" data-testid="snapshot-hero-gauge">
+          <div
+            className="mx-auto w-full max-w-sm shrink-0 lg:mx-0"
+            data-testid="snapshot-hero-gauge"
+            style={{ minHeight: 220 }}
+          >
             {overallScore !== null ? (
               <ReadinessGauge
                 value={overallScore}
@@ -562,8 +702,11 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
                 segments={gaugeSegments}
               />
             ) : (
-              <div className="flex h-48 items-center justify-center rounded-2xl bg-canvas text-sm text-muted">
-                Score pending
+              <div
+                className="flex h-[220px] items-center justify-center rounded-2xl border border-border bg-canvas text-sm text-muted"
+                data-testid="snapshot-score-unavailable"
+              >
+                Score unavailable
               </div>
             )}
           </div>
@@ -624,8 +767,13 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
           className="mx-auto w-full max-w-xl rounded-3xl border border-border bg-surface p-4 shadow-card sm:p-6"
           data-testid="snapshot-chart-radar"
           data-chart="radar"
+          style={{ minHeight: 320 }}
         >
-          <ReadinessRadarChart dimensions={radarDimensions} />
+          {radarDimensions.length > 0 ? (
+            <ReadinessRadarChart dimensions={radarDimensions} />
+          ) : (
+            <ChartSkeleton kind="radar" label="Chart unavailable" />
+          )}
         </div>
       </section>
 
@@ -674,17 +822,20 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
             submission.
           </p>
         </div>
-        {DIMENSIONS.map((dim) => (
-          <DimensionSection
-            key={dim}
-            dimension={dim}
-            point={scores?.[dim] ?? 0}
-            range={data.ranges?.[dim] ?? null}
-            showRange={data.displayMode === "range" && Boolean(data.ranges?.[dim])}
-            chartDim={chartDimByName.get(dim) ?? null}
-            analysis={analysesByDim.get(dim) ?? null}
-          />
-        ))}
+        {DIMENSIONS.map((dim) => {
+          const point = finiteDimScore(dim);
+          return (
+            <DimensionSection
+              key={dim}
+              dimension={dim}
+              point={point ?? Number.NaN}
+              range={data.ranges?.[dim] ?? null}
+              showRange={data.displayMode === "range" && Boolean(data.ranges?.[dim])}
+              chartDim={chartDimByName.get(dim) ?? null}
+              analysis={analysesByDim.get(dim) ?? null}
+            />
+          );
+        })}
       </div>
 
       {/* ── 5. Detailed recommendation + CTA ─────────────────────────────── */}

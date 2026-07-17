@@ -72,7 +72,7 @@ export function calloutForWhoUses(value: string): AnswerCalloutPayload | null {
   if (!v) return null;
   return {
     id: "who-uses",
-    text: `Got it — users today: ${v}.`,
+    text: `Got it — users today: ${clip(v, 100)}.`,
   };
 }
 

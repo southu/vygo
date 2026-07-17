@@ -2,9 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildEvidenceInsights,
+  clipDisplayText,
   extractIntegrationCount,
   extractNamedTools,
   extractTeamSignals,
+  INSIGHT_SOURCE_MAX_CHARS,
   type EvidenceInsight,
 } from "./evidence-insights.js";
 import { computeReadinessScore } from "./readiness-scoring.js";
@@ -109,6 +111,55 @@ describe("buildEvidenceInsights", () => {
       b.map((i) => i.headline),
     );
     assert.ok(Array.isArray(a));
+  });
+});
+
+describe("sparse and long free-text insights", () => {
+  it("clipDisplayText truncates with ellipsis and never returns whitespace-only", () => {
+    assert.equal(clipDisplayText("   "), "");
+    assert.equal(clipDisplayText("short"), "short");
+    const long = "A".repeat(500);
+    const clipped = clipDisplayText(long, 40);
+    assert.ok(clipped.length <= 40);
+    assert.ok(clipped.endsWith("…"));
+  });
+
+  it("sparse report yields fewer insights and no empty source quotes", () => {
+    const sparse = buildEvidenceInsights({ summary: "x", tests: "none" });
+    const rich = buildEvidenceInsights(RICH_REPORT);
+    assert.ok(
+      sparse.length <= rich.length,
+      `sparse (${sparse.length}) should not exceed rich (${rich.length})`,
+    );
+    assert.ok(sparse.length < rich.length || sparse.length <= 3, "sparse should degrade");
+    for (const insight of sparse) {
+      assertInsightShape(insight);
+      assert.ok(insight.source_answer.trim().length > 0, "never empty source_answer");
+    }
+  });
+
+  it("empty report fabricates no insights", () => {
+    const empty = buildEvidenceInsights({});
+    assert.equal(empty.length, 0);
+  });
+
+  it("very long free-text answers are truncated in source_answer and detail", () => {
+    const long = `Production secrets gap: ${"x".repeat(2200)}`;
+    const insights = buildEvidenceInsights({
+      summary: long,
+      secrets_pattern: long,
+      integrations: "Zapier, Make — 5 integrations",
+      tests: "none",
+    });
+    assert.ok(insights.length >= 1);
+    for (const insight of insights) {
+      assert.ok(
+        insight.source_answer.length <= INSIGHT_SOURCE_MAX_CHARS,
+        `source_answer too long: ${insight.source_answer.length}`,
+      );
+      assert.ok(insight.detail.length <= 480, `detail too long: ${insight.detail.length}`);
+      assert.ok(!insight.source_answer.includes("x".repeat(500)), "raw overflow retained");
+    }
   });
 });
 

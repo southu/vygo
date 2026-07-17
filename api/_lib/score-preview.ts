@@ -200,8 +200,29 @@ function publicPreviewBody(
     dimensionResults,
     /** Alias so callers may treat the body as results-first. */
     results: dimensionResults,
-    /** Ranked evidence insights grounded in submitted answers. */
-    insights: Array.isArray(payload.insights) ? payload.insights : [],
+    /** Ranked evidence insights grounded in submitted answers (bounded free-text). */
+    insights: Array.isArray(payload.insights)
+      ? payload.insights
+          .map((i) => {
+            if (!i || typeof i !== "object") return null;
+            const clip = (s: unknown, max: number) => {
+              const t = typeof s === "string" ? s.replace(/\s+/g, " ").trim() : "";
+              if (!t) return "";
+              return t.length <= max ? t : `${t.slice(0, max - 1)}…`;
+            };
+            const source_answer = clip(i.source_answer, 280);
+            const headline = clip(i.headline, 160);
+            if (!source_answer || !headline) return null;
+            return {
+              ...i,
+              headline,
+              detail: clip(i.detail, 480),
+              source_answer,
+              dimension: typeof i.dimension === "string" ? i.dimension.trim() : "",
+            };
+          })
+          .filter(Boolean)
+      : [],
     /** Per-dimension multi-paragraph written analysis grounded in sub-metric evidence. */
     dimensionAnalyses: Array.isArray(payload.dimensionAnalyses) ? payload.dimensionAnalyses : [],
     /** Pattern-branched detailed engagement recommendation. */

@@ -12,17 +12,19 @@ type AnswerCalloutProps = {
  * parent controls. Uses CSS enter animation (fade + slide).
  */
 export function AnswerCallout({ callout, className = "" }: AnswerCalloutProps) {
-  if (!callout?.text) return null;
+  const text = callout?.text?.replace(/\s+/g, " ").trim() ?? "";
+  // Never render an empty / whitespace-only callout (sparse skip path).
+  if (!callout || !text) return null;
 
   return (
     <div
-      key={callout.id + callout.text}
+      key={callout.id + text}
       className={`assessment-answer-callout ${className}`.trim()}
       role="status"
       aria-live="polite"
       data-testid="assessment-answer-callout"
       data-callout-id={callout.id}
-      data-callout-text={callout.text}
+      data-callout-text={text}
       data-callout-animated="true"
     >
       <span className="assessment-answer-callout-accent" aria-hidden />
@@ -30,7 +32,7 @@ export function AnswerCallout({ callout, className = "" }: AnswerCalloutProps) {
         className="assessment-answer-callout-text text-sm leading-relaxed text-ink-soft"
         data-testid="assessment-answer-callout-text"
       >
-        {callout.text}
+        {text}
       </p>
     </div>
   );

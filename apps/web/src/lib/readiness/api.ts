@@ -250,6 +250,8 @@ export type ScoreResponse = {
   pricing?: Record<string, string>;
   source?: string;
   snapshotPath?: string;
+  /** True when the session was already scored; response reuses the existing snapshot. */
+  alreadySubmitted?: boolean;
 };
 
 export type SnapshotSubMetricStatus = "strong" | "adequate" | "at_risk" | "unknown";
@@ -429,19 +431,26 @@ export async function scoreReadiness(input: {
   if (!snapshotId) {
     throw new Error("Score response missing snapshot id.");
   }
+  const overallRaw = body.overall;
+  const overall =
+    typeof overallRaw === "number" && Number.isFinite(overallRaw) ? overallRaw : undefined;
+
   return {
     snapshotId,
     id: snapshotId,
     scores:
-      body.scores && typeof body.scores === "object" && !Array.isArray(body.scores)
-        ? (body.scores as Record<string, number>)
-        : body.dimensions && typeof body.dimensions === "object"
-          ? (body.dimensions as Record<string, number>)
-          : {},
-    dimensions:
-      body.dimensions && typeof body.dimensions === "object"
-        ? (body.dimensions as Record<string, number>)
+      sanitizeScoreMap(
+        body.scores && typeof body.scores === "object" && !Array.isArray(body.scores)
+          ? (body.scores as Record<string, unknown>)
+          : body.dimensions && typeof body.dimensions === "object"
+            ? (body.dimensions as Record<string, unknown>)
+            : {},
+      ) ?? {},
+    dimensions: sanitizeScoreMap(
+      body.dimensions && typeof body.dimensions === "object" && !Array.isArray(body.dimensions)
+        ? (body.dimensions as Record<string, unknown>)
         : undefined,
+    ),
     dimensionDetails: parseDimensionDetails(body.dimensionDetails),
     dimensionResults: parseDimensionResults(body.dimensionResults),
     dimensionAnalyses: parseDimensionAnalyses(body.dimensionAnalyses),
@@ -452,7 +461,7 @@ export async function scoreReadiness(input: {
         ? (body.ranges as ScoreResponse["ranges"])
         : null,
     displayMode: body.displayMode === "range" ? "range" : "point",
-    overall: typeof body.overall === "number" ? body.overall : undefined,
+    overall,
     bucket: typeof body.bucket === "string" ? body.bucket : "Launch",
     reasoning: typeof body.reasoning === "string" ? body.reasoning : "",
     caveat: typeof body.caveat === "string" ? body.caveat : null,
@@ -472,7 +481,20 @@ export async function scoreReadiness(input: {
       typeof body.snapshotPath === "string"
         ? body.snapshotPath
         : `/readiness/snapshot?id=${encodeURIComponent(snapshotId)}`,
+    alreadySubmitted: body.alreadySubmitted === true,
   };
+}
+
+/** Keep only finite numeric dimension scores (drop NaN / null / strings). */
+function sanitizeScoreMap(
+  raw: Record<string, unknown> | undefined | null,
+): Record<string, number> | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 const SUB_METRIC_STATUSES: ReadonlySet<string> = new Set([
@@ -566,6 +588,13 @@ function parseDimensionAnalyses(raw: unknown): SnapshotDimensionAnalysis[] | nul
 
 const INSIGHT_TYPES: ReadonlySet<string> = new Set(["strength", "risk", "opportunity"]);
 
+function clipClientText(value: string, max: number): string {
+  const t = value.replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
 function parseInsights(raw: unknown): SnapshotInsight[] | null {
   if (!Array.isArray(raw)) return null;
   const out: SnapshotInsight[] = [];
@@ -574,16 +603,20 @@ function parseInsights(raw: unknown): SnapshotInsight[] | null {
     const row = entry as Record<string, unknown>;
     const typeRaw = typeof row.type === "string" ? row.type.trim().toLowerCase() : "";
     if (!INSIGHT_TYPES.has(typeRaw)) continue;
-    const headline = typeof row.headline === "string" ? row.headline.trim() : "";
-    const detail = typeof row.detail === "string" ? row.detail.trim() : "";
-    const source_answer =
+    const headline =
+      typeof row.headline === "string" ? clipClientText(row.headline, 160) : "";
+    const detail = typeof row.detail === "string" ? clipClientText(row.detail, 480) : "";
+    const source_answer = clipClientText(
       typeof row.source_answer === "string"
-        ? row.source_answer.trim()
+        ? row.source_answer
         : typeof row.sourceAnswer === "string"
-          ? row.sourceAnswer.trim()
-          : "";
+          ? row.sourceAnswer
+          : "",
+      280,
+    );
     const dimension = typeof row.dimension === "string" ? row.dimension.trim() : "";
-    if (!headline) continue;
+    // Require non-empty quote so sparse/empty answers never become blank callouts.
+    if (!headline || !source_answer) continue;
     out.push({
       type: typeRaw as SnapshotInsightType,
       headline,
@@ -709,11 +742,48 @@ export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse
     throw new Error(msg);
   }
   const scores =
-    body.dimensions && typeof body.dimensions === "object"
-      ? (body.dimensions as Record<string, number>)
-      : body.scores && typeof body.scores === "object" && !Array.isArray(body.scores)
-        ? (body.scores as Record<string, number>)
-        : null;
+    sanitizeScoreMap(
+      body.dimensions && typeof body.dimensions === "object" && !Array.isArray(body.dimensions)
+        ? (body.dimensions as Record<string, unknown>)
+        : body.scores && typeof body.scores === "object" && !Array.isArray(body.scores)
+          ? (body.scores as Record<string, unknown>)
+          : null,
+    ) ?? null;
+  const overallRaw = body.overall;
+  const overall =
+    typeof overallRaw === "number" && Number.isFinite(overallRaw) ? overallRaw : null;
+  // Explicit scoring failure flag from API (malformed / empty answer payload).
+  if (body.scoringFailed === true || body.errorCode === "SCORING_FAILED") {
+    return {
+      id: typeof body.id === "string" ? body.id : id,
+      snapshotId: typeof body.snapshotId === "string" ? body.snapshotId : id,
+      scores: null,
+      dimensions: null,
+      dimensionDetails: null,
+      dimensionResults: null,
+      dimensionAnalyses: null,
+      insights: null,
+      recommendation: null,
+      ranges: null,
+      displayMode: "point",
+      overall: null,
+      bucket: null,
+      reasoning: null,
+      caveat:
+        typeof body.errorMessage === "string"
+          ? body.errorMessage
+          : "Scoring failed for this submission.",
+      findings: [],
+      recommendedEngagement: null,
+      offerKey: "audit",
+      ctaLabel: "Apply for the next audit opening",
+      pricing: null,
+      source: null,
+      contact: null,
+      reportSummary: null,
+      createdAt: typeof body.createdAt === "string" ? body.createdAt : undefined,
+    };
+  }
   return {
     id: typeof body.id === "string" ? body.id : id,
     snapshotId: typeof body.snapshotId === "string" ? body.snapshotId : id,
@@ -729,7 +799,7 @@ export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse
         ? (body.ranges as SnapshotResponse["ranges"])
         : null,
     displayMode: body.displayMode === "range" ? "range" : "point",
-    overall: typeof body.overall === "number" ? body.overall : null,
+    overall,
     bucket: typeof body.bucket === "string" ? body.bucket : null,
     reasoning: typeof body.reasoning === "string" ? body.reasoning : null,
     caveat: typeof body.caveat === "string" ? body.caveat : null,

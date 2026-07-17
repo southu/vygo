@@ -192,8 +192,12 @@ export function ManualQuestionnaire() {
     if (stepIndex > 0) setStepIndex((i) => i - 1);
   };
 
+  const submitInFlightRef = useRef(false);
+
   const onSubmit = async () => {
-    if (!token || !complete || status === "submitting") return;
+    // Double-click / double-submit guard (sync ref + status).
+    if (!token || !complete || status === "submitting" || submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
     setStatus("submitting");
     setErrorMessage("");
     try {
@@ -220,6 +224,8 @@ export function ManualQuestionnaire() {
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Could not save answers.");
       setStatus("form");
+    } finally {
+      submitInFlightRef.current = false;
     }
   };
 
