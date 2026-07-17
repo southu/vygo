@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { READINESS_REPORT_V1_END, READINESS_REPORT_V1_START } from "./report-schema.js";
+import { parseReadinessPastePartial } from "./paste-normalize.js";
 import {
   classifyFindingSeverity,
   classifyReadinessSize,
@@ -8,6 +9,7 @@ import {
   parseStackEntries,
   parseStructuredFindings,
   parseStructuredReadiness,
+  structuredReadinessFromReport,
   type StackEntry,
 } from "./paste-structured.js";
 
@@ -188,6 +190,52 @@ describe("parseStructuredFindings — uncertain fallback", () => {
     assert.equal(first.area, "Deploy");
     assert.equal(first.text, "automated via CI");
     assert.equal(first.severity, "ok");
+  });
+});
+
+describe("structuredReadinessFromReport — report-based entry point", () => {
+  it("shapes structured data from an already-parsed report without re-parsing", () => {
+    const report = {
+      languages: "TypeScript",
+      frontend: "Next.js 15, React 19, Tailwind, shadcn/ui",
+      backend: "Fastify",
+      database: "Supabase (Postgres)",
+      deploys: "Cloudflare Pages + Railway, automated via GitHub Actions",
+      auth: "session cookies + magic link",
+      size: "518 git-tracked files, 370+ TS/TSX modules, 2 apps, 3 shared packages",
+    };
+    const result = structuredReadinessFromReport(report, "raw fallback text");
+
+    assert.equal(result.raw, "raw fallback text");
+    const stackNames = names(result.stack);
+    for (const expected of ["TypeScript", "Next.js 15", "React 19", "Supabase", "Railway"]) {
+      assert.ok(stackNames.includes(expected), `stack should include ${expected}`);
+    }
+    const byLabel = new Map(result.size.metrics.map((m) => [m.label, m]));
+    assert.equal(byLabel.get("git-tracked files")?.value, 518);
+    assert.equal(result.size.classification, "medium");
+  });
+
+  it("matches parseStructuredReadiness when fed the loosely-parsed report", () => {
+    const viaRaw = parseStructuredReadiness(VYGO_PASTE);
+    const viaReport = structuredReadinessFromReport(
+      parseReadinessPastePartial(VYGO_PASTE),
+      VYGO_PASTE,
+    );
+    assert.deepEqual(viaReport.stack, viaRaw.stack);
+    assert.deepEqual(viaReport.size, viaRaw.size);
+    assert.deepEqual(viaReport.findings, viaRaw.findings);
+    assert.equal(viaReport.raw, viaRaw.raw);
+  });
+
+  it("is total on an empty report and a non-object argument", () => {
+    const empty = structuredReadinessFromReport({});
+    assert.equal(empty.raw, "");
+    assert.deepEqual(empty.stack, []);
+    assert.deepEqual(empty.size.metrics, []);
+    assert.deepEqual(empty.findings, []);
+    // @ts-expect-error — exercising a non-object call at runtime.
+    assert.doesNotThrow(() => structuredReadinessFromReport(null));
   });
 });
 

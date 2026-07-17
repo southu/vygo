@@ -348,6 +348,37 @@ export function parseStructuredFindings(findings: readonly string[]): Structured
 }
 
 /**
+ * Build the structured view from an ALREADY-parsed report. Pure and total.
+ * The server parse path and the resume-from-session path both already hold a
+ * `ReadinessReportV1Partial`, so they can shape structured display data with
+ * this without re-running the loose paste parser. `raw` is preserved verbatim
+ * on the result as the ultimate fallback (pass the original paste when known).
+ */
+export function structuredReadinessFromReport(
+  report: ReadinessReportV1Partial,
+  raw = "",
+): StructuredReadiness {
+  const safeRaw = typeof raw === "string" ? raw : "";
+  const safeReport: ReadinessReportV1Partial = report && typeof report === "object" ? report : {};
+
+  const stackText = describeStack(safeReport);
+  const stack = parseStackEntries(stackSourceFromReport(safeReport, safeRaw));
+
+  const sizeText = typeof safeReport.size === "string" ? safeReport.size : "";
+  const metrics = parseSizeMetrics(sizeText);
+  const size: StructuredSize = {
+    text: describeSize(safeReport),
+    metrics,
+    classification: classifyReadinessSize(sizeText, metrics),
+  };
+
+  const findingsText = buildConfirmationFindings(safeReport, 12);
+  const findings = parseStructuredFindings(findingsText);
+
+  return { raw: safeRaw, stack, stackText, size, findings, findingsText };
+}
+
+/**
  * Parse a raw Stage 3 diagnostic paste into structured display data. Pure and
  * total: on garbage input it returns empty structured collections while
  * preserving the raw text (and today's free-text/bullet renderings) so nothing
@@ -356,20 +387,5 @@ export function parseStructuredFindings(findings: readonly string[]): Structured
 export function parseStructuredReadiness(raw: string): StructuredReadiness {
   const safeRaw = typeof raw === "string" ? raw : "";
   const report: ReadinessReportV1Partial = safeRaw ? parseReadinessPastePartial(safeRaw) : {};
-
-  const stackText = describeStack(report);
-  const stack = parseStackEntries(stackSourceFromReport(report, safeRaw));
-
-  const sizeText = typeof report.size === "string" ? report.size : "";
-  const metrics = parseSizeMetrics(sizeText);
-  const size: StructuredSize = {
-    text: describeSize(report),
-    metrics,
-    classification: classifyReadinessSize(sizeText, metrics),
-  };
-
-  const findingsText = buildConfirmationFindings(report, 12);
-  const findings = parseStructuredFindings(findingsText);
-
-  return { raw: safeRaw, stack, stackText, size, findings, findingsText };
+  return structuredReadinessFromReport(report, safeRaw);
 }

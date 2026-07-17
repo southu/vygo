@@ -88,6 +88,7 @@ export {
   classifyFindingSeverity,
   parseStructuredFindings,
   parseStructuredReadiness,
+  structuredReadinessFromReport,
   type StackCategory,
   type StackEntry,
   type SizeClassification,
