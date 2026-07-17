@@ -22,9 +22,13 @@ export function AnswerCallout({ callout, className = "" }: AnswerCalloutProps) {
       aria-live="polite"
       data-testid="assessment-answer-callout"
       data-callout-id={callout.id}
+      data-callout-text={callout.text}
     >
       <span className="assessment-answer-callout-accent" aria-hidden />
-      <p className="assessment-answer-callout-text text-sm leading-relaxed text-ink-soft">
+      <p
+        className="assessment-answer-callout-text text-sm leading-relaxed text-ink-soft"
+        data-testid="assessment-answer-callout-text"
+      >
         {callout.text}
       </p>
     </div>

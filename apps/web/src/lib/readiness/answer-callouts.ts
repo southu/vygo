@@ -15,15 +15,24 @@ export type AnswerCalloutPayload = {
 export function parseListedItems(text: string): string[] {
   const raw = text.replace(/\s+/g, " ").trim();
   if (!raw) return [];
+  // Prefer known tool catalog hits (order preserved).
   const named = extractNamedTools(raw);
-  if (named.length >= 1) return named;
+  if (named.length >= 2) return named;
+  if (named.length === 1) return named;
+
+  // Fallback: only treat as a list when separators look list-like (comma/semicolon/
+  // newline/bullet), not prose joined by "and" alone (avoids "We need X and Y").
+  const hasListSeparator = /[,;\n•]|&/.test(raw) || /\s+and\s+/i.test(raw);
+  if (!hasListSeparator) return [];
 
   const parts = raw
     .split(/,|;|\n|\band\b|&/i)
     .map((s) => s.replace(/^[\s\-•*]+|[\s\-•*.]+$/g, "").trim())
     .filter((s) => s.length >= 2 && s.length <= 48);
-  // Prefer multi-item lists; single long sentences are not "platforms".
-  if (parts.length >= 2) return parts;
+  // Prefer multi-item lists of short name-like tokens; long phrases are not platforms.
+  if (parts.length >= 2 && parts.every((p) => p.split(/\s+/).length <= 4)) {
+    return parts;
+  }
   return [];
 }
 
@@ -120,6 +129,20 @@ export function calloutForFreeText(
   const trimmed = value.trim();
   if (!trimmed) return null;
 
+  // Security-marked fields (auth, secrets, concerns) always surface the security
+  // dimension — even when a tool name like Auth0 is also present.
+  const securityCue =
+    opts?.securityRelated ||
+    /security|secret|auth|sso|saml|hipaa|soc\s*2|encrypt|password|vault|pii|compliance/i.test(
+      trimmed,
+    );
+  if (securityCue) {
+    return {
+      id: `${fieldId}-security`,
+      text: `This answer feeds the security dimension — noted “${clip(trimmed, 90)}”.`,
+    };
+  }
+
   const platforms = parseListedItems(trimmed);
   if (platforms.length >= 2) {
     const names = platforms.slice(0, 6).join(", ");
@@ -134,18 +157,6 @@ export function calloutForFreeText(
     return {
       id: `${fieldId}-tool`,
       text: `Got it — noted ${platforms[0]}.`,
-    };
-  }
-
-  const securityCue =
-    opts?.securityRelated ||
-    /security|secret|auth|sso|saml|hipaa|soc\s*2|encrypt|password|vault|pii|compliance/i.test(
-      trimmed,
-    );
-  if (securityCue) {
-    return {
-      id: `${fieldId}-security`,
-      text: `This answer feeds the security dimension — noted “${clip(trimmed, 90)}”.`,
     };
   }
 
@@ -197,11 +208,7 @@ export function calloutForManualField(
   }
 
   // Security-adjacent fields
-  if (
-    questionId === "auth" ||
-    questionId === "secrets_pattern" ||
-    questionId === "concerns"
-  ) {
+  if (questionId === "auth" || questionId === "secrets_pattern" || questionId === "concerns") {
     return calloutForFreeText(questionId, v, { securityRelated: true });
   }
 

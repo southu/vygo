@@ -408,9 +408,7 @@ export function ReadinessFlow() {
       case "blockers":
         return calloutForBlockers(stage1.blockers);
       case "deadline":
-        return stage1.deadline
-          ? calloutForDeadline(stage1.deadline, stage1.deadlineDetail)
-          : null;
+        return stage1.deadline ? calloutForDeadline(stage1.deadline, stage1.deadlineDetail) : null;
       default:
         return null;
     }
@@ -745,11 +743,7 @@ export function ReadinessFlow() {
 
   if (view === "loading") {
     return (
-      <div
-        className="readiness-step-panel mt-8"
-        aria-busy="true"
-        data-testid="readiness-loading"
-      >
+      <div className="readiness-step-panel mt-8" aria-busy="true" data-testid="readiness-loading">
         <p className="text-sm text-muted">Loading your readiness check…</p>
       </div>
     );
@@ -773,11 +767,13 @@ export function ReadinessFlow() {
 
   if (view === "off_ramp_not_built") {
     return (
-      <div
-        className="readiness-assessment mt-8"
-        data-testid="readiness-off-ramp-not-built"
-      >
-        <div className="readiness-step-panel">
+      <div className="readiness-assessment mt-8" data-testid="readiness-off-ramp-not-built">
+        <AssessmentProgress
+          current={Math.min(stepIndex + 1, FLOW_TOTAL_STEPS)}
+          total={FLOW_TOTAL_STEPS}
+          label="Path check"
+        />
+        <div className="readiness-step-panel mt-4">
           <h2 className="font-display text-2xl font-bold text-ink">{c.offRampNotBuilt.title}</h2>
           <p className="mt-4 text-ink-soft">{c.offRampNotBuilt.body}</p>
           <Link href="/" className="btn-primary mt-6 inline-flex">
@@ -790,11 +786,13 @@ export function ReadinessFlow() {
 
   if (view === "off_ramp_features") {
     return (
-      <div
-        className="readiness-assessment mt-8"
-        data-testid="readiness-off-ramp-features"
-      >
-        <div className="readiness-step-panel">
+      <div className="readiness-assessment mt-8" data-testid="readiness-off-ramp-features">
+        <AssessmentProgress
+          current={Math.min(stepIndex + 1, FLOW_TOTAL_STEPS)}
+          total={FLOW_TOTAL_STEPS}
+          label="Path check"
+        />
+        <div className="readiness-step-panel mt-4">
           <h2 className="font-display text-2xl font-bold text-ink">{c.offRampFeatures.title}</h2>
           <p className="mt-4 text-ink-soft">{c.offRampFeatures.body}</p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -1168,16 +1166,8 @@ export function ReadinessFlow() {
   const optionDisabled = "cursor-not-allowed border-border bg-canvas opacity-50";
 
   return (
-    <div
-      className="readiness-assessment mt-8"
-      data-testid="readiness-stage1"
-      data-step={step}
-    >
-      <AssessmentProgress
-        current={stepIndex + 1}
-        total={FLOW_TOTAL_STEPS}
-        label="Intake"
-      />
+    <div className="readiness-assessment mt-8" data-testid="readiness-stage1" data-step={step}>
+      <AssessmentProgress current={stepIndex + 1} total={FLOW_TOTAL_STEPS} label="Intake" />
       <p className="eyebrow mt-4">
         {c.stage1.progressLabel} · {stepIndex + 1}/{STAGE1_STEPS.length}
       </p>
@@ -1389,6 +1379,8 @@ export function ReadinessFlow() {
             disabled={!canAdvance}
             onClick={() => void goNext()}
             data-testid="readiness-continue"
+            data-callout-blocks="false"
+            aria-disabled={!canAdvance}
           >
             {c.stage1.continue}
           </button>

@@ -293,7 +293,9 @@
 
 .chart-evidence-tooltip {
   pointer-events: none;
-  box-shadow: var(--shadow-card), 0 12px 32px rgba(22, 24, 29, 0.1);
+  box-shadow:
+    var(--shadow-card),
+    0 12px 32px rgba(22, 24, 29, 0.1);
   animation: chart-tooltip-enter 0.16s ease-out both;
 }
 
@@ -335,12 +337,14 @@
   max-width: 100%;
 }
 
+/* Shared surface treatment with readiness-report-hero / results cards */
 .readiness-step-panel {
   border-radius: 1.5rem; /* matches report hero rounded-3xl */
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
   padding: 1.5rem;
+  color: var(--color-ink);
 }
 
 @media (min-width: 640px) {
@@ -378,7 +382,10 @@
   background: color-mix(in srgb, var(--color-purple-soft) 55%, var(--color-surface));
   padding: 0.85rem 1rem 0.85rem 1.15rem;
   animation: assessment-callout-enter 0.35s ease-out both;
-  transition: opacity 0.3s ease, transform 0.3s ease, border-color 0.2s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease,
+    border-color 0.2s ease;
 }
 
 .assessment-answer-callout-accent {

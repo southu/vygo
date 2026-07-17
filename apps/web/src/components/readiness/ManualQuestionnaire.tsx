@@ -336,11 +336,7 @@ export function ManualQuestionnaire() {
           {currentQ.helper ? <p className="mt-2 text-sm text-muted">{currentQ.helper}</p> : null}
 
           {currentQ.type === "single" && currentQ.options ? (
-            <div
-              className="mt-4 flex flex-col gap-2"
-              role="radiogroup"
-              aria-label={currentQ.label}
-            >
+            <div className="mt-4 flex flex-col gap-2" role="radiogroup" aria-label={currentQ.label}>
               {currentQ.options.map((opt) => (
                 <label
                   key={opt}
@@ -367,7 +363,9 @@ export function ManualQuestionnaire() {
             <textarea
               name={currentQ.id}
               rows={
-                currentQ.id === "summary" || currentQ.id === "concerns" || currentQ.id === "languages"
+                currentQ.id === "summary" ||
+                currentQ.id === "concerns" ||
+                currentQ.id === "languages"
                   ? 3
                   : 2
               }
@@ -412,6 +410,8 @@ export function ManualQuestionnaire() {
               disabled={!canAdvanceCurrent}
               onClick={goNext}
               data-testid="manual-continue"
+              data-callout-blocks="false"
+              aria-disabled={!canAdvanceCurrent}
             >
               Continue
             </button>
