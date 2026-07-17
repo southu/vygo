@@ -5,6 +5,7 @@ import { CtaLink } from "@/components/CtaLink";
 import { SectionHeading } from "@/components/SectionHeading";
 import { VibeLoopDiagram } from "@/components/VibeLoopDiagram";
 import { TopicCard } from "@/components/TopicCard";
+import { GuideOffer } from "@/components/vibe-coding/GuideOffer";
 
 export const metadata: Metadata = {
   title: site.metadata.vibeCodingTitle,
@@ -36,6 +37,9 @@ export default function VibeCodingPage() {
           </div>
         </div>
       </section>
+
+      {/* Get the guide — free v1.2 pack download offer */}
+      <GuideOffer />
 
       {/* What vibe coding is — and what it is not */}
       <section className="section-pad border-t border-border bg-surface" data-section="definition">

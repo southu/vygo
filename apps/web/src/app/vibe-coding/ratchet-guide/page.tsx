@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ModulePage } from "@/components/vibe-coding/ModulePage";
+import { GuideOffer } from "@/components/vibe-coding/GuideOffer";
 import { getVibeModulePage } from "@/content/vibe-coding-modules";
 import { guideDocs, guidePackEntryHref, isRenderedGuideDoc } from "@/content/ratchet-guide";
 import { readGuidePackManifest } from "@/lib/guide-source";
@@ -21,6 +22,8 @@ export const metadata: Metadata = {
 export default function RatchetGuidePage() {
   return (
     <ModulePage module={module}>
+      <GuideOffer />
+
       <section className="section-pad border-t border-border bg-surface" data-section="guide-docs">
         <div className="container-page max-w-4xl">
           <h2 className="font-display text-2xl font-bold">Read the guide</h2>

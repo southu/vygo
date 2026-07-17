@@ -27,6 +27,7 @@
     "foundation-status": "tsx scripts/generate-foundation-status.ts",
     "provision": "tsx scripts/provision-railway.ts",
     "secret-scan": "tsx scripts/secret-scan.ts",
+    "build:guide-zip": "tsx scripts/build-guide-zip.ts",
     "seed:local": "tsx scripts/seed-local.ts",
     "availability:set": "tsx scripts/set-availability.ts",
     "db:migrate": "tsx packages/db/src/cli-migrate.ts",
