@@ -8,7 +8,7 @@
 
 Each product is a folder under `COMPOSER_PROJECTS_ROOT` (default `RATCHET_ROOT/projects/<slug>`) with a `project.json` (see [layout.md](./layout.md)).
 
-Composer **Projects** UI creates/edits these shells and can clone repos onto the VPC.
+Composer **Projects** UI creates/edits these shells and can clone repos into the projects tree.
 
 ### Folder vs product
 
@@ -24,23 +24,22 @@ Composer **Projects** UI creates/edits these shells and can clone repos onto the
 
 ## Product requirements for version-endpoint strategy
 
-1. **GitHub (or other) remote** the builder can push to with harness credentials
-2. **Hosted deploy** on push to `main` (Railway, Vercel, …)
+1. A git remote the builder can push to with harness credentials
+2. Hosted deploy on push to `main` (any host that deploys from git)
 3. **`GET /version`** (or configured path) returns the **currently deployed** SHA
-4. Version path is **public** to the gate’s curl (no basic auth)
-5. Optional but recommended: bind cloud project UUID in `project.json`
+4. Version path is **public** to the gate (no control-plane basic auth)
+5. Optional but recommended: bind cloud project UUID in `project.json` when using a cloud host
 
 ### Implementing `/version` (any stack)
 
 Minimal static/export idea:
 
 ```text
-// write at build time
-process.env.VERCEL_GIT_COMMIT_SHA
+// write at build time from your host's commit SHA env
 // or git rev-parse HEAD in CI → public/version.txt
 ```
 
-Railway/Docker: embed `SOURCE_VERSION` or build arg SHA into a tiny route.
+Docker/image deploys: embed a build-arg SHA into a tiny route.
 
 Acceptance for the endpoint itself:
 
@@ -52,55 +51,33 @@ Acceptance for the endpoint itself:
 
 ## Git identity
 
-Set globally on the build host **and** in `composer.env`:
+Set globally on the build host **and** in non-secret service config:
 
 ```bash
 git config --global user.name "YourTeamBotOrHuman"
 git config --global user.email "you@example.com"
 ```
 
-Also set `GIT_AUTHOR_*` / `GIT_COMMITTER_*` for non-interactive commits from Python/shell helpers.
+Also set `GIT_AUTHOR_*` / `GIT_COMMITTER_*` for non-interactive commits from helpers.
 
-### Vercel “Deployment was blocked”
-
-| Signal                          | Meaning              |
-| ------------------------------- | -------------------- |
-| GitHub shows new commit         | Push worked          |
-| `gh` deployment status: blocked | Host rejected author |
-| Live `/version` stuck           | Gate will timeout    |
-
-**Unblock:** empty commit as an allowed author and push; or fix allowlist / identity permanently.
-
-Production short-circuit: after first version mismatch, check GitHub deployment statuses for “blocked” and fail fast instead of waiting 600s.
+Some host platforms block commits from unknown bot authors. Symptom pattern: push to GitHub succeeds; live `/version` never moves; deploy gate times out. Fix is product/process design: use a team author allowlisted on the host.
 
 ---
 
-## Railway
+## Cloud hosts (concept)
 
 ### Prefer reuse over create
 
-1. Create one project in Railway UI
-2. Copy the project UUID from the dashboard URL (e.g. `https://cloud.example.com/project/<uuid>`)
-3. Set `deploy.railway_project` in `project.json`
-4. Provisioner: `allow_create=false` when set
+1. Create one project in your cloud host UI
+2. Copy the project UUID from the dashboard
+3. Set it on `project.json` under deploy
+4. When bound, provision should not create new projects
 
-### Token health
+### Token health (design rule)
 
-- Workspace tokens need GraphQL queries that **workspace tokens can call**
-- Broken pattern: `me { projects { … } }` → 400 → name match fails → **create spam**
-- Fixed pattern: top-level `projects { edges … }` (or equivalent) + bound UUID
+Workspace tokens need API queries that workspace tokens can call. Broken list queries look like “no match” and can spam create. Prefer bound UUIDs and fail-closed identity checks before any ensure step.
 
-Preflight every day you care about provision:
-
-```text
-vault consumer → railway.whoami → ok:true
-```
-
-If not ok: **do not** requeue provision-enabled missions.
-
-### Cleanup
-
-Delete orphan same-name projects in Railway UI; keep the bound UUID only.
+Optional provision is powerful; leave it off unless you intentionally need stack bootstrap.
 
 ---
 
@@ -108,8 +85,8 @@ Delete orphan same-name projects in Railway UI; keep the bound UUID only.
 
 If the **product** is behind basic auth, the version poll gets 401 forever.
 
-- Product sites usually public
-- Control-plane (dash) may be basic-auth’d — then open only `/version`, `/version.txt`, `/health`
+- Product sites are usually public
+- Control-plane (dash) may be basic-auth’d — then open only product `/version`, `/version.txt`, `/health` for the gate
 
 ---
 

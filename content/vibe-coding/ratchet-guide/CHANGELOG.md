@@ -8,6 +8,28 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ---
 
+## v1.2 / guide-2026-07-17f — strip operator procedures
+
+### Removed
+
+- Production deploy/host troubleshooting tables and queue-recovery procedures from [`footguns.md`](./footguns.md)
+- Deploy-timeout diagnostic prompt from [`ai-prompts.md`](./ai-prompts.md)
+- Cloud token / vault failure-mode runbooks and process-manager operational recipes across vault, rebuild, projects-and-deploy, operations
+- Runtime service administration steps that read as host ops rather than product architecture
+
+### Changed
+
+- [`footguns.md`](./footguns.md) reframed as design pitfalls (contracts and boundaries)
+- [`vault.md`](./vault.md), [`operations.md`](./operations.md), [`rebuild.md`](./rebuild.md), [`lazy-medic-sentinel.md`](./lazy-medic-sentinel.md) kept as product-level roles and shapes only
+- [`ai-prompts.md`](./ai-prompts.md) reduced to rebuild / new-product / friend-share prompts
+- One-pager print HTML aligned with sanitized non-negotiables
+
+### Not published
+
+- Host-private ops runbooks, vault administration procedures, and cloud provisioning playbooks remain out of this share pack
+
+---
+
 ## v1.2 / guide-2026-07-17e — public ops sanitization
 
 ### Removed

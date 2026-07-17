@@ -46,9 +46,9 @@ flowchart LR
 4. **Streak** — usually 2 consecutive PASSes
 5. **No secrets in builder env** — Vault consumer only
 6. **Composer restarts must not kill builders** — detached workers outlive Admin Apply
-7. **Team git author** — bot authors may be blocked by Vercel etc.
+7. **Team git author** — unknown bot authors may be blocked by hosts
 8. **Multi-step goals** → about **4–8** queue items for real product work; bind cloud project UUIDs
-9. **Vault arm persists** across consumer restart (still unlock after full DEK loss / reboot)
+9. **Credentials stay brokered** — builder and tester never hold cloud tokens
 
 ---
 
@@ -73,7 +73,7 @@ flowchart LR
 
 ## Rebuild in one breath
 
-Host + Claude/Grok CLIs → trees `RATCHET_ROOT/{control,harness,projects}` → process manager (workers survive restarts) → edge → Vault arm → mock loop → product with `/version` → tiny real mission → harden (Sentinel, Lazy, docs).
+Host + model CLIs → trees `RATCHET_ROOT/{control,harness,projects}` → process model (workers survive restarts) → edge → vault consumer → mock loop → product with `/version` → tiny real mission → harden (Sentinel, Lazy, docs).
 
 ---
 

@@ -1,97 +1,70 @@
-# Footguns (production lessons)
+# Footguns (design pitfalls)
 
 ← [AI prompts](./ai-prompts.md) · [Index](./README.md) · Next: [Examples](./examples.md)
 
-Symptom → likely cause → fix direction. Re-verify live; dates refer to when we learned them (~2026-07).
+Common design mistakes when building an AI build-and-verify control plane. These are product-level lessons about contracts and boundaries — not a host operations runbook.
 
 ---
 
-## Deploy & host
+## Deploy truth
 
-| Symptom                                | Likely cause                               | Fix direction                                                    |
-| -------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------- |
-| Deploy-timeout forever                 | Live `/version` not updating               | Check host deploy; not the tester                                |
-| Vercel “Deployment was blocked”        | Commit author not allowlisted              | Team git identity; empty commit as allowed author; allowlist bot |
-| Version poll 401 forever               | Auth on product version path               | Leave `/version` (and optional `/health`) public for the gate    |
-| Gate waits full 600s on blocked deploy | No short-circuit                           | Check host deployment statuses after first mismatch              |
-| GitHub ahead of live                   | Host pipeline stuck                        | Host dashboard — Ratchet only waits                              |
-
----
-
-## Composer process model
-
-| Symptom                      | Likely cause                                      | Fix direction                                  |
-| ---------------------------- | ------------------------------------------------- | ---------------------------------------------- |
-| ABORTED mid-build storms     | Process manager kills the whole tree on restart   | Detached workers must survive Composer restart |
-| Builds die after Admin Apply | Same                                              | Avoid restart during builds; seatbelt above    |
-| Dual ad-hoc + managed start  | Port fight / orphans                              | One process manager owns the ports             |
+| Pitfall | Why it hurts | Design direction |
+| ------- | ------------ | ---------------- |
+| No public version endpoint | The deploy gate has nothing honest to poll | Every product serves `GET /version` with the deployed git SHA |
+| Auth on the version path | Gate polls fail forever; loops look “stuck” | Leave `/version` (and optional product `/health`) readable to the gate |
+| Repo and live URL from different products | Gate waits on the wrong deploy | Bind repo + `live_url` + version URL from one `project.json` shell |
+| Treating the builder tree as done | Live never caught up | Tester judges `live_url` only; gate waits for SHA match first |
 
 ---
 
-## Queue & missions
+## Builder proof-of-work
 
-| Symptom                                     | Likely cause                              | Fix direction                                           |
-| ------------------------------------------- | ----------------------------------------- | ------------------------------------------------------- |
-| deploy-timeout on product work              | `repo=composer-live` + `live_url=product` | Drafts must use project.json repo/live                  |
-| One giant mission                           | Writer collapsed multi-part goal          | Multi-step expand (~4–8); resplit thin drafts; tests    |
-| Draft is synthetic junk / cheerleading      | Planner returned affirmation or non-JSON  | Force-draft / retry path; fix model CLI flags           |
-| Cleared queue lost my draft                 | Used a wipe-all clear mode                | Prefer **All (keep running)** when you want drafts kept |
-| Product UI shows control-plane availability | Wrong folder on Build home                | Target product folder                                   |
-| `running` forever, no PID                   | Zombie after crash                        | Close or requeue carefully via Medic / queue tools      |
-| Abort storm after restarts                  | See process model                         | Close aborted items; fix restart policy                 |
+| Pitfall | Why it hurts | Design direction |
+| ------- | ------------ | ---------------- |
+| Trusting agent claims over git | “Done” with no real commit | Harness checks HEAD advance, ancestry, remote match, clean tree |
+| Empty “success” commits | Streaks without product change | Require content-changing commits |
+| Force-push / rewrite of shared history | Breaks deploy and review trails | Reject non-fast-forward proof-of-work |
 
 ---
 
-## Railway / provision
+## Missions & queue shape
 
-| Symptom                               | Likely cause                             | Fix direction                                                       |
-| ------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------- |
-| Many projects named `acme`/`composer` | list_projects failed → create every time | Fix GraphQL for workspace token; bind UUID; `allow_create=false`    |
-| whoami Not Authorized / http_400      | Dead or wrong token type                 | Replace **account/workspace** token in Vault; fail-fast provisioner |
-| 90s hangs on ensure                   | No fail-fast                             | Abort when whoami not ok                                            |
-| Provision on every mission            | Provision left enabled                   | Prefer Provision OFF unless bootstrapping                           |
-
----
-
-## Vault
-
-| Symptom                                 | Likely cause                                      | Fix direction                                                 |
-| --------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------- |
-| Actions fail after full reboot          | Locked (DEK not loaded) and/or arm window expired | Unlock with master password; re-arm if window gone            |
-| Arm “lost” after short consumer restart | Expected old in-memory-only behavior              | Arm is **persisted**; unlock if needed, check remaining hours |
-| Unlock always fails                     | Wrong password or foreign ciphertext              | vault-rebuild only with explicit OK                           |
-| Secrets in logs                         | Mis-wired env into builder                        | Audit adapters; never export vault secrets                    |
+| Pitfall | Why it hurts | Design direction |
+| ------- | ------------ | ---------------- |
+| One mega-mission for multi-part goals | Hard to accept, hard to resume | Expand real product goals into several focused steps (~4–8) |
+| Synthetic / non-JSON planner output as a mission | Queue fills with junk | Validate planner output; retry or force a structured draft |
+| Control-plane folder for product work | Wrong repo, wrong live URL | Scope each queue item to the product folder shell |
+| Clearing drafts with the goal still unfinished | Human re-plans from zero | Prefer clear modes that keep the on-screen draft when you want it |
 
 ---
 
-## Claude / models
+## Process boundaries
 
-| Symptom                                   | Likely cause                             | Fix direction                                           |
-| ----------------------------------------- | ---------------------------------------- | ------------------------------------------------------- |
-| 401 Invalid API key for every Claude call | Stale `ANTHROPIC_API_KEY` in secrets.env | Prefer CLI login; comment out bad key                   |
-| Kimi / assist draft fails oddly           | Wrong CLI flags for prompt mode          | Match flags to CLI (no incompatible yolo+prompt combos) |
-| Unknown model → fake prose mission        | Error treated as model output            | Surface real CLI stderr; fix registry id                |
-| Self-missions can’t clone                 | No bare origin                           | Seed `composer-origin.git` + checkout                   |
-| Model Apply fails on missing origin       | Strict origin required                   | Local apply mode or set origin                          |
+| Pitfall | Why it hurts | Design direction |
+| ------- | ------------ | ---------------- |
+| Restarting the UI process kills active builders | In-flight work dies mid-push | Detached workers must outlive control-plane restarts |
+| Dual owners of the same ports | Orphans and port fights | One process model owns each service role |
+| Night-watch tools implementing product features | Ops automation invents UI instead of recovering state | Builders implement product; watchdogs only observe / salvage queue state |
 
 ---
 
-## Lazy / Medic
+## Secrets & credentials
 
-| Symptom                               | Likely cause               | Fix direction                                  |
-| ------------------------------------- | -------------------------- | ---------------------------------------------- |
-| “OK · applied” but still broken       | Only notes/lessons         | Check queue JSON + processes                   |
-| ARG_MAX / prompt too long             | Screenshots in argv        | `--prompt-file`                                |
-| Medic “fixes” product bugs            | Wrong tool                 | Builder implements product; Medic recovers ops |
-| Header has duplicate Lazy/Medic links | Inject + site-nav both add | Dedupe; nav owns links, slot owns toggle       |
+| Pitfall | Why it hurts | Design direction |
+| ------- | ------------ | ---------------- |
+| Cloud tokens in builder or tester env | Secrets leak into prompts and logs | Broker credentials outside agent workspaces |
+| Printing secret env into chat | Irreversible exposure | Never paste keys; keep private notes out of share packs |
+| Optional infra ensure always on | Accidental project spam or long hangs | Prefer bound project IDs; treat ensure as opt-in and fail-closed |
 
 ---
 
-## Edge
+## Models & adapters
 
-| Symptom                 | Likely cause   | Fix direction                                |
-| ----------------------- | -------------- | -------------------------------------------- |
-| Admin weird from remote | IP trust model | Don’t pass client IP if code trusts loopback |
+| Pitfall | Why it hurts | Design direction |
+| ------- | ------------ | ---------------- |
+| Wrong CLI flags for a model mode | Silent failure or odd drafts | Match adapter flags to what the binary supports |
+| Unknown model id treated as success prose | Fake missions look real | Surface real adapter errors; fail closed on registry misses |
+| Self-improvement without a cloneable origin | Apply / self-missions cannot push | Seed a real remote when the control plane is also a product |
 
 ---
 
@@ -99,18 +72,18 @@ Symptom → likely cause → fix direction. Re-verify live; dates refer to when 
 
 **Do**
 
-- Restart control-plane services through one process manager
-- Keep `PUBLIC_BASE_URL` and Lazy public URL set
-- CORS Lazy ↔ dash
-- Unified site nav on all pages
-- Record durable behavior changes in your private changelog
+- Keep product `/version` honest and public to the gate
+- Scope work by project folder with matching repo + live URL
+- Prefer multi-step queues for multi-part goals
+- Keep secrets out of builder and tester environments
+- Record durable behavior changes in private install notes (not this pack)
 
 **Don’t**
 
-- Mix ad-hoc start scripts with a managed unit on the same ports
-- Hardcode laptop paths in shared docs
-- Blind-requeue deploy-timeouts
-- Print `secrets.env` into chat
-- Cancel healthy long builds only because wall clock is high
+- Blind-retry deploy failures without checking gate truth
+- Mix product acceptance with control-plane repo settings
+- Hardcode machine-specific paths into shared docs
+- Ask recovery tools to ship product features
+- Commit or paste credentials into share packs or chat
 
 Continue → [Examples](./examples.md)

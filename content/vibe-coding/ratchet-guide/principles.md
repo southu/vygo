@@ -24,7 +24,7 @@ The harness verifies **git state**, not agent claims:
 - Pre-run HEAD remains an ancestor (no force-push / rewrite of shared history)
 - New commits change content (no empty-only “success”)
 - Working tree clean
-- `git ls-remote origin <branch>` matches local HEAD
+- Remote branch HEAD matches local HEAD
 
 Failed check → exactly one retry with the check text appended; second failure ends the run (exit 5).
 
@@ -42,9 +42,9 @@ A single `FAIL` resets the streak. Bugs remain in `TESTLOG.md` until resolved.
 
 ## 4. Secrets never in builder env
 
-Railway tokens, cloud API keys, vault master passwords:
+Cloud tokens, vault master passwords, API keys:
 
-- Live in **Vault** (encrypted at rest) and/or `secrets.env` for _services_
+- Live in **Vault** (encrypted at rest) and/or service-only secret env
 - Reach the harness via **consumer broker / leases**
 - Must **not** appear in builder or tester process environments or prompts
 
@@ -54,7 +54,7 @@ If a secret shows up in a run transcript, treat it as an incident.
 
 ## 5. Composer restarts must not kill builds
 
-A naive process-manager restart of Composer can kill every child when Admin Apply or model update bounces the service.
+A naive restart of Composer can kill every child when Admin Apply or model update bounces the service.
 
 **Required:** detached builder workers must **outlive** Composer restarts.
 
@@ -64,7 +64,7 @@ A naive process-manager restart of Composer can kill every child when Admin Appl
 
 ## 6. Git identity is part of deploy
 
-Host platforms (notably Vercel Production) may block commits from bot authors like `Ratchet <ratchet@localhost>`.
+Host platforms may block commits from unknown bot authors.
 
 Symptoms: push to GitHub succeeds; live `/version` never moves; deploy gate times out.
 
@@ -74,21 +74,21 @@ Symptoms: push to GitHub succeeds; live `/version` never moves; deploy gate time
 
 ## 7. One project folder = one queue
 
-Queue items are scoped by folder (`acme`, `composer`, …).
+Queue items are scoped by folder.
 
 - Product work must target the **product** folder — not the control-plane `composer` folder
 - Multi-part goals must become **2+ queue steps**, not one mega-mission
-- Poison pattern: `repo=composer-live` + `live_url=product.example` → eternal deploy-timeout
+- Poison pattern: control-plane repo + product `live_url` → eternal deploy-timeout
 
 ---
 
-## 8. Provision is optional and fail-fast
+## 8. Optional infra ensure stays small
 
-Infrastructure ensure (e.g. Railway project create) is powerful and dangerous:
+Infrastructure ensure (create/bind cloud projects) is powerful and dangerous:
 
-- Prefer binding `deploy.railway_project` UUID in `project.json`
-- When bound, **do not create** new projects (`allow_create=false`)
-- If `whoami` / token is dead, **fail immediately** — never hang 90s+ on ensure
+- Prefer binding a known project UUID in `project.json`
+- When bound, **do not create** new projects
+- If identity checks fail, **fail immediately** — never hang forever on ensure
 
 Turn provision **off** unless you intentionally need stack bootstrap.
 
@@ -98,7 +98,7 @@ Turn provision **off** unless you intentionally need stack bootstrap.
 
 Lazy / Medic / Sentinel:
 
-- May unquarantine, close zombies, requeue aborted-with-policy
+- May surface stuck runs and apply allowlisted queue recoveries
 - Must **not** restart Composer while a builder worker is active
 - Must **not** implement product features (that’s the builder’s job)
 
@@ -106,7 +106,7 @@ Lazy / Medic / Sentinel:
 
 ## 10. Fresh sessions beat chat history
 
-Durable knowledge belongs in a **docs pack** next to the install. Fresh Grok/Claude sessions should read that pack first — not depend on a laptop transcript.
+Durable knowledge belongs in a **docs pack** next to the install. Fresh coding sessions should read that pack first — not depend on a laptop transcript.
 
 This share guide is the portable cousin of private install notes.
 

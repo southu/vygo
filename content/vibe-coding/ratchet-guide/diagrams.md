@@ -16,10 +16,10 @@ flowchart TD
   B --> Q[Queue builder<br/>multi-step if needed]
   Q --> I[Queue item<br/>per project folder]
   I --> R[Ratchet run workspace]
-  R --> BL[Build: Claude<br/>commit + push]
+  R --> BL[Build: coding agent<br/>commit + push]
   BL --> DG[Deploy gate<br/>poll live /version]
-  DG -->|SHA matches| T[Test: Grok<br/>live_url only]
-  DG -->|timeout / blocked| X3[Exit 3 deploy-timeout]
+  DG -->|SHA matches| T[Test: live_url only]
+  DG -->|timeout| X3[Exit 3 deploy-timeout]
   T -->|PASS| ST{Streak ≥ N?}
   T -->|FAIL| BL2[Next build uses<br/>builder_prompt]
   BL2 --> BL
@@ -48,14 +48,14 @@ flowchart TB
 
   subgraph outside [Outside]
     GH[GitHub product repo]
-    LIVE[Live app<br/>Railway / Vercel / …]
+    LIVE[Live app<br/>host of your choice]
   end
 
   DASH --> C
   FILES --> L
   BOT --> V
   C -->|spawn workers| H
-  L -->|ops / salvage| C
+  L -->|observe / salvage| C
   V -->|consumer broker| H
   H -->|push| GH
   GH -->|host deploy| LIVE
@@ -136,7 +136,7 @@ flowchart TB
 
   QB --> BL --> TS
   SN -.->|watch / quarantine| QB
-  LZ -.->|restart / zombie| QB
+  LZ -.->|observe / salvage| QB
   MD -.->|allowlisted recovery| QB
 ```
 
@@ -150,16 +150,16 @@ sequenceDiagram
   participant V as Vault UI
   participant H as Harness
   participant B as Broker
-  participant R as Railway API
+  participant C as Cloud API
   participant A as Builder agent
 
-  Hum->>V: unlock + arm + Access ON
+  Hum->>V: store credentials + grant consumer access
   Hum->>H: consumer key path only
-  H->>B: railway.whoami / provision
-  B->>R: token never leaves Vault process
-  R-->>B: ok / projects
+  H->>B: identity / resolve
+  B->>C: token never leaves Vault process
+  C-->>B: ok / projects
   B-->>H: result without secrets
-  Note over A: Builder env has NO Railway token
+  Note over A: Builder env has NO cloud token
   H->>A: mission + repo only
 ```
 
@@ -169,8 +169,8 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-  A[A Host + CLIs] --> B[B Config + services]
-  B --> C[C Vault]
+  A[A Foundations] --> B[B Config + services]
+  B --> C[C Credentials boundary]
   C --> D[D First product]
   D --> E[E Harden + docs]
   D --> M[Mock loop first]

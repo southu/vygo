@@ -8,7 +8,7 @@ Paths use the placeholder root `RATCHET_ROOT`.
 
 ## 1. Mock loop (zero API cost)
 
-Proves orchestration without Claude/Grok spend.
+Proves orchestration without model spend.
 
 ```bash
 cd RATCHET_ROOT/harness   # or your harness root
@@ -32,9 +32,9 @@ export RATCHET_ENV_LIVE_URL="$(cat tmp-target/fake-deploy/url)"
 bin/ratchet run missions/full-loop.yaml
 ```
 
-- Builder (Claude) fixes links and pushes
+- Builder fixes links and pushes
 - Fake deployer publishes content + SHA
-- Tester (Grok) verifies live site
+- Tester verifies live site
 - Loop continues until consecutive PASS
 
 Only external dependency: the two AI CLIs.
@@ -90,8 +90,8 @@ adapters:
   "deploy": {
     "live_url": "https://www.acme.example",
     "version_url": "https://www.acme.example/version",
-    "provider": "railway",
-    "railway_project": "PUT-UUID-HERE"
+    "provider": "example-host",
+    "cloud_project": "PUT-UUID-HERE"
   },
   "defaults": {
     "lazy_babysit": false
@@ -109,9 +109,9 @@ A typical multi-iteration campaign looks like:
 | ---- | ----------------------------------------------------------- |
 | 1    | Project shell for product repo + live URL + `/version`      |
 | 2    | Mission: change homepage CTA + related copy on live site    |
-| 3    | Builder (Claude) several iterations; cloud deploy           |
+| 3    | Builder several iterations; host deploy                     |
 | 4    | Deploy gate waited until `/version` advanced                |
-| 5    | Tester (Grok) checked acceptance text on live URL           |
+| 5    | Tester checked acceptance text on live URL                  |
 | 6    | Exit 0 after consecutive PASSes; cost in `shared/cost.json` |
 
 The product details are incidental — the **system** is the loop + control plane.
@@ -120,7 +120,7 @@ The product details are incidental — the **system** is the loop + control plan
 
 ## 6. Composer restart seatbelt (concept)
 
-Detached harness workers must survive Composer restarts (Admin Apply, model update). Configure your process manager so a Composer bounce does **not** reap the whole process tree.
+Detached harness workers must survive Composer restarts (Admin Apply, model update). Configure your process model so a Composer bounce does **not** reap the whole process tree.
 
 ---
 

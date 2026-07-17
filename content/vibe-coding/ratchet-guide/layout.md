@@ -24,7 +24,7 @@ RATCHET_ROOT/control/              # control-plane source + env
 RATCHET_ROOT/harness/              # harness runtime
   bin/ratchet                      # CLI entrypoint
   lib/                             # loop, config, state, adapters
-  lib/adapters/real.sh             # claude + deploy gate + grok
+  lib/adapters/real.sh             # builder + deploy gate + tester
   lib/adapters/mock.sh             # zero-cost loop tests
   mission.schema.yaml              # every mission field documented
   missions/                        # YAML missions (examples + generated)
@@ -36,7 +36,7 @@ RATCHET_ROOT/harness/              # harness runtime
 
 RATCHET_ROOT/projects/             # COMPOSER_PROJECTS_ROOT
   <slug>/
-    project.json                   # repo, live_url, version, railway id, …
+    project.json                   # repo, live_url, version, cloud id, …
     (optional full git clone)
 ```
 
@@ -56,7 +56,7 @@ Typical keys (names only — values are site-specific):
 | `COMPOSER_RATCHET_DIR` / `RATCHET_RUNS_DIR`  | Under `RATCHET_ROOT/harness`                             |
 | `COMPOSER_APP_REPO`                          | Path used for assist self-facts                          |
 | `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL`       | Team identity for harness commits                        |
-| `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` | Match author in production                               |
+| `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` | Match author                                             |
 | `VAULT_URL`                                  | e.g. `http://127.0.0.1:8379`                             |
 | `VAULT_CONSUMER_KEY_PATH`                    | Path to consumer key file (0600)                         |
 
@@ -66,14 +66,14 @@ Typical keys (names only — values are site-specific):
 | ----------- | ------------------------------------------------------- |
 | Model / CLI | provider API keys if not using CLI login                |
 | Lazy        | `LAZY_CONTROL_TOKEN`                                    |
-| Cloud       | optional `RAILWAY_API_TOKEN` (prefer Vault for product) |
+| Cloud       | optional cloud tokens (prefer Vault for product work)   |
 
 **Rules**
 
 - `chmod 600`
-- Loaded by the process manager for services only
+- Loaded by services only — never by builder/tester agent env
 - Never commit into git; never paste into chat
-- Stale `ANTHROPIC_API_KEY` can **break** Claude CLI login — remove if using `claude` browser login
+- Stale provider API keys can break CLI login — remove if using browser/CLI login instead
 
 ---
 
@@ -92,9 +92,9 @@ Typical keys (names only — values are site-specific):
   "deploy": {
     "live_url": "https://www.example.com",
     "version_url": "https://www.example.com/version",
-    "provider": "railway",
-    "railway_project": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    "railway_env": ""
+    "provider": "example-host",
+    "cloud_project": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "cloud_env": ""
   },
   "defaults": {
     "builder_model": null,
@@ -111,8 +111,10 @@ Typical keys (names only — values are site-specific):
 | `repo.url`               | Builder clone/push target         |
 | `deploy.live_url`        | Tester + deploy gate base         |
 | `deploy.version_url`     | Must return deployed SHA          |
-| `deploy.railway_project` | **Bind UUID** to stop create-spam |
+| `deploy.cloud_project`   | **Bind UUID** to stop create-spam |
 | `defaults.lazy_babysit`  | Opt product into overnight watch  |
+
+Field names may vary by install; the product idea is **one shell = one repo + one live truth**.
 
 ---
 

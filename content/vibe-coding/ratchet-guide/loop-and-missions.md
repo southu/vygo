@@ -79,7 +79,7 @@ Configured under `deploy.strategy`:
 | ---------------------------- | ------------------------------------------------------------------- | ------------------------------------------- |
 | `version-endpoint` (default) | Poll `live_url` + `version_endpoint` until body matches pushed SHA  | Real products                               |
 | `fixed-delay`                | Sleep N seconds, assume success                                     | Throwaways with no version URL              |
-| `command`                    | Re-run shell command until exit 0 (`RATCHET_EXPECTED_SHA` exported) | `gh run watch` etc. (trusted missions only) |
+| `command`                    | Re-run shell command until exit 0 (`RATCHET_EXPECTED_SHA` exported) | Trusted missions only                       |
 
 ### Version endpoint contract
 
@@ -93,9 +93,7 @@ GET /version
 
 Matching is case-insensitive; full SHA or 7+ char prefix.
 
-**Must not require basic auth** for this path if the gate polls from the VPC unauthenticated. Open `/version` (and often `/health`) at the edge while leaving the rest protected.
-
-Production hardening also short-circuits when GitHub deployment status says **“Deployment was blocked”** instead of waiting the full timeout.
+**Must not require basic auth** for this path if the gate polls unauthenticated. Open `/version` (and often `/health`) at the edge while leaving control-plane paths protected.
 
 ---
 
@@ -122,9 +120,9 @@ acceptance:
   - /version returns the deployed git SHA
 
 builder:
-  model: claude-opus-4-8 # must exist in your models registry / adapter map
+  model: example-builder-model # must exist in your models registry / adapter map
 tester:
-  model: grok-4.5
+  model: example-tester-model
   read_only: true
 
 limits:
@@ -163,9 +161,9 @@ architect → provision → build → test → deploy-gate
 ```
 
 - **Architect** — plan (JSON); treated as untrusted input to provisioner allowlist
-- **Provision** — Vault consumer actions (e.g. `railway.resolve_or_provision`)
+- **Provision** — Vault consumer actions (resolve/bind cloud projects)
 
-Offline testing:
+Leave optional until the core loop is reliable. Offline testing can mock vault:
 
 ```bash
 VAULT_MOCK=1 ARCHITECT_FORCE_DETERMINISTIC=1 \

@@ -4,13 +4,15 @@
 
 Use this as a phased plan for a human or coding agent. Check off in order; do not skip mock loop before real APIs. Paths use the placeholder root `RATCHET_ROOT`.
 
+This is a product rebuild outline — not a host operations runbook.
+
 ---
 
-## Phase A — Host
+## Phase A — Foundations
 
-1. Machine with a modern Linux or container host and package manager access
-2. Packages: `python3`, `git`, a reverse proxy of your choice, YAML tooling, build tools as needed
-3. Install/auth **Claude** and **Grok** CLIs; confirm headless flags work under your service `PATH`
+1. Development machine or container host with a package manager
+2. Packages: `python3`, `git`, YAML tooling, build tools as needed
+3. Install/auth model CLIs you will use (for example Claude and Grok); confirm headless flags work
 4. Create trees:
 
    ```bash
@@ -24,25 +26,23 @@ Use this as a phased plan for a human or coding agent. Check off in order; do no
 
 ## Phase B — Configuration & services
 
-1. Write `composer.env` (see [layout.md](./layout.md))
-2. Write `secrets.env` mode `600` (tokens, `LAZY_CONTROL_TOKEN`)
-3. Configure **team git identity** (not a blocked bot name)
-4. Install process-manager units/services; ensure Composer restarts do **not** kill detached builders
-5. Start composer, lazy, vault, sentinel
-6. Edge TLS + basic auth; proxy three hostnames to the loopback control-plane ports
+1. Write non-secret service config (see [layout.md](./layout.md))
+2. Keep secrets in a separate file mode `600` (never in this pack)
+3. Configure **team git identity** for harness commits (host platforms may block bot authors)
+4. Start composer, lazy, vault, sentinel under your process model
+5. Ensure Composer restarts do **not** kill detached builders (product contract)
+6. Optional edge TLS + auth for control-plane hostnames
 7. Open product `/version` (and optional `/health`) without control-plane basic auth
-
-Verify with your process manager’s status command and each service’s `/health` (or equivalent).
 
 ---
 
-## Phase C — Vault
+## Phase C — Credentials boundary
 
-1. Start vault; complete first-run master password
-2. Add Railway (or other) credentials; Access ON; folder scope
-3. Enable consumer key; arm for hours; store key path `0600`
-4. Wire `VAULT_URL` + `VAULT_CONSUMER_KEY_PATH`
-5. Preflight `railway.whoami` (or mock) before any provision mission
+1. Stand up the vault (private master password — never in this pack)
+2. Store cloud credentials with access scoped to project folders
+3. Give the harness a consumer key path only (no tokens in builder env)
+4. Wire `VAULT_URL` + consumer key path into harness env only
+5. Confirm broker identity checks succeed **before** any optional infra step
 
 ---
 
@@ -50,7 +50,7 @@ Verify with your process manager’s status command and each service’s `/healt
 
 1. Create `RATCHET_ROOT/projects/<slug>/project.json` with repo + live_url + version_url
 2. Implement product `/version` returning deploy SHA
-3. Bind cloud project UUID if using Railway
+3. Bind cloud project UUID if you use a cloud host (prefer reuse over create)
 4. **Mock loop** zero-cost:
 
    ```bash
@@ -67,11 +67,11 @@ Verify with your process manager’s status command and each service’s `/healt
 ## Phase E — Hardening
 
 1. Arm Sentinel when you want automated queue supervision
-2. Configure Lazy bedtime + Medic playbooks
+2. Configure Lazy / Medic for overnight observation (product features still go through builders)
 3. Keep private ops notes separate from this share pack
 4. Install this guide under your docs tree for friends/AIs
-5. Backup strategy for vault ciphertext + secrets.env (encrypted off-box)
-6. Document who is allowed to unlock vault and arm consumers
+5. Backup strategy for vault ciphertext + secret env (encrypted off-box; private)
+6. Document vault access policy privately (who may unlock / arm)
 
 ---
 
@@ -102,6 +102,6 @@ You are done with MVP when:
 9. Sentinel
 10. Medic recovery surfaces
 
-Skip cloud provision until core loop is boringly reliable.
+Skip optional cloud provision until core loop is boringly reliable.
 
 Continue → [AI prompts](./ai-prompts.md)

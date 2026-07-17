@@ -14,9 +14,9 @@ flowchart TD
   B --> Q[Queue builder<br/>multi-step if needed]
   Q --> I[Queue item · project folder]
   I --> R[Ratchet run]
-  R --> BL[Build: Claude · commit + push]
+  R --> BL[Build: coding agent · commit + push]
   BL --> DG[Deploy gate · poll live /version]
-  DG --> T[Test: Grok · live_url only]
+  DG --> T[Test: live_url only]
   T -->|FAIL · builder_prompt| BL
   T -->|PASS| ST{Streak ≥ N?}
   ST -->|no| BL
@@ -44,9 +44,9 @@ More diagrams: [diagrams.md](./diagrams.md) · Printable: [one-pager-print](./on
 | --------------- | --------------------------------------------------------------- | ---------------------------------- |
 | **Composer**    | Human UI: Build home, projects, queue, dashboard, admin, assist | `127.0.0.1:8377`                   |
 | **Sentinel**    | Supervisor: arm/disarm, watch composer/queue health             | no public port                     |
-| **Lazy Mode**   | Independent overnight watchdog (observe / ops)                  | `127.0.0.1:8378`                   |
+| **Lazy Mode**   | Independent overnight watchdog (observe)                        | `127.0.0.1:8378`                   |
 | **Medic**       | Recovery console for queues (on Lazy host, `/medic`)            | same as Lazy                       |
-| **Vault**       | Master-password credentials; broker for Railway etc.            | `127.0.0.1:8379`                   |
+| **Vault**       | Master-password credentials; broker for cloud APIs              | `127.0.0.1:8379`                   |
 | **Ratchet CLI** | Orchestration loop (builder / deploy gate / tester)             | `RATCHET_ROOT/harness`             |
 | **Projects**    | One folder per product (`project.json` + optional clone)        | `RATCHET_ROOT/projects/<slug>`     |
 
@@ -61,7 +61,7 @@ All control-plane HTTP is **loopback only** in the reference design. Public acce
 | Single mission | Streak of `PASS` verdicts ≥ `limits.consecutive_passes_required`      |
 | Deploy gate    | Live `version_endpoint` returns builder’s pushed SHA                  |
 | Builder step   | Git proof-of-work: real commits, ancestry ok, remote HEAD matches     |
-| Product queue  | Each step succeeded (or discarded intentionally); no zombie `running` |
+| Product queue  | Each step succeeded (or discarded intentionally); no stuck `running`  |
 
 ---
 
@@ -69,7 +69,7 @@ All control-plane HTTP is **loopback only** in the reference design. Public acce
 
 - Not a general chat UI for product users
 - Not a CI replacement (though it pairs with host deploy pipelines)
-- Not “Medic implements features” — Medic recovers ops state; builders implement product
+- Not “Medic implements features” — Medic recovers queue state; builders implement product
 - Not a place to put secrets in agent prompts or builder env
 
 ---

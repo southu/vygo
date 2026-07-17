@@ -13,7 +13,7 @@
 
 - API keys, vault master passwords, edge passwords, consumer keys
 - Private host credentials
-- Day-to-day host operations runbooks (process-manager recipes, SSH production ops, heal timers)
+- Day-to-day host operations runbooks (process-manager recipes, SSH production ops, deploy/host diagnostics, queue recovery procedures, cloud provisioning runbooks)
 
 Reference layout in this pack uses the placeholder root **`RATCHET_ROOT/{control,harness,projects}`**. Rename freely when rebuilding — these are not a real host’s paths.
 
@@ -40,13 +40,13 @@ Reference layout in this pack uses the placeholder root **`RATCHET_ROOT/{control
 | 4   | [layout.md](./layout.md)                                              | Directory trees, env files, `project.json`         |
 | 5   | [loop-and-missions.md](./loop-and-missions.md)                        | Ratchet loop, mission YAML, exit codes, `/version` |
 | 6   | [composer.md](./composer.md)                                          | Build UI, queue, assist, admin, header nav         |
-| 7   | [lazy-medic-sentinel.md](./lazy-medic-sentinel.md)                    | Overnight watchdogs and recovery                   |
-| 8   | [vault.md](./vault.md)                                                | Credentials, consumer broker, Railway actions      |
-| 9   | [projects-and-deploy.md](./projects-and-deploy.md)                    | Product shells, git identity, host deploys         |
+| 7   | [lazy-medic-sentinel.md](./lazy-medic-sentinel.md)                    | Overnight watchdogs (product roles)                |
+| 8   | [vault.md](./vault.md)                                                | Credentials boundary and consumer broker shape     |
+| 9   | [projects-and-deploy.md](./projects-and-deploy.md)                    | Product shells and `/version` requirements         |
 | 10  | [operations.md](./operations.md)                                      | Runtime services overview (roles, edge sketch)     |
 | 11  | [rebuild.md](./rebuild.md)                                            | Greenfield checklist (phases A–E)                  |
-| 12  | [ai-prompts.md](./ai-prompts.md)                                      | Coding / debug / new-product prompts               |
-| 13  | [footguns.md](./footguns.md)                                          | Failure modes and fix directions                   |
+| 12  | [ai-prompts.md](./ai-prompts.md)                                      | Coding / new-product / friend-share prompts        |
+| 13  | [footguns.md](./footguns.md)                                          | Design pitfalls and fix directions                 |
 | 14  | [examples.md](./examples.md)                                          | Mock loop, full loop, sample product campaign      |
 | —   | [diagrams.md](./diagrams.md)                                          | Mermaid gallery                                    |
 | —   | [one-pager-print](./one-pager-print) / [one-pager.md](./one-pager.md) | Printable sheet                                    |

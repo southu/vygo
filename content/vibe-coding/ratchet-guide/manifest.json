@@ -2,7 +2,7 @@
   "name": "ratchet-guide",
   "title": "Ratchet system guide",
   "version": "v1.2",
-  "description": "Shareable documentation pack for the Ratchet self-hosted AI build-and-verify control plane. Neutral illustrative RATCHET_ROOT paths only; no secrets, no real hostnames, no host operations runbooks.",
+  "description": "Shareable documentation pack for the Ratchet self-hosted AI build-and-verify control plane. Neutral illustrative RATCHET_ROOT paths only; no secrets, no real hostnames, no host operations runbooks or operator procedures.",
   "basePath": "/content/vibe-coding/ratchet-guide/",
   "documents": [
     {
@@ -35,31 +35,31 @@
     },
     {
       "filename": "lazy-medic-sentinel.md",
-      "title": "Overnight watchdogs: Lazy observe/ops modes, Medic recovery console, and Sentinel supervisor"
+      "title": "Overnight watchdogs: Lazy, Medic, and Sentinel product roles"
     },
     {
       "filename": "vault.md",
-      "title": "Credentials vault: crypto, arm persistence, consumer broker, and provisioner integration"
+      "title": "Credentials boundary: consumer broker shape and optional infra rules"
     },
     {
       "filename": "projects-and-deploy.md",
-      "title": "Project shells, product /version requirements, git identity, and host deploys"
+      "title": "Project shells, product /version requirements, and multi-step work"
     },
     {
       "filename": "operations.md",
-      "title": "Runtime services overview: roles, process-manager contract, and edge sketch"
+      "title": "Runtime services overview: roles, process model concept, and edge sketch"
     },
     {
       "filename": "rebuild.md",
-      "title": "Greenfield rebuild checklist in phases A–E, from host setup to hardening"
+      "title": "Greenfield rebuild checklist in phases A–E"
     },
     {
       "filename": "ai-prompts.md",
-      "title": "Paste-ready prompts for rebuild, deploy-timeout debug, new product, and friend share"
+      "title": "Paste-ready prompts for rebuild, new product, and friend share"
     },
     {
       "filename": "footguns.md",
-      "title": "Production failure modes: symptom, likely cause, and fix direction"
+      "title": "Design pitfalls: contracts, boundaries, and fix directions"
     },
     {
       "filename": "examples.md",

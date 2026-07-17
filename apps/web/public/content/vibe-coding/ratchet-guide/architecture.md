@@ -23,14 +23,14 @@ flowchart TB
 
   subgraph outside [Outside]
     GH[GitHub product repo]
-    LIVE[Live app · Railway / Vercel / …]
+    LIVE[Live app · host of your choice]
   end
 
   DASH --> C
   FILES --> L
   BOT --> V
   C -->|spawn workers| H
-  L -->|ops / salvage| C
+  L -->|observe / salvage| C
   V -->|consumer broker| H
   H -->|commit + push| GH
   GH -->|host deploy| LIVE
@@ -55,12 +55,12 @@ Gallery: [diagrams.md](./diagrams.md)
 | -------------------------- | ----------------------- | -------------------------------------------------------------------- |
 | **Browser (human)**        | Human                   | Basic auth at edge; treat as privileged                              |
 | **Loopback control plane** | Composer / Lazy / Vault | Bind `127.0.0.1` only; edge is the only public face                  |
-| **Builder workspace**      | Claude CLI              | Can edit product repo; **no** vault secrets in env                   |
-| **Tester workspace**       | Grok CLI                | Prefer read-only; only **live_url**, not local builder tree as truth |
-| **Vault consumer**         | Harness / provisioner   | Short-lived arm + key file; never log secret values                  |
+| **Builder workspace**      | Coding agent CLI        | Can edit product repo; **no** vault secrets in env                   |
+| **Tester workspace**       | Tester CLI              | Prefer read-only; only **live_url**, not local builder tree as truth |
+| **Vault consumer**         | Harness                 | Short-lived arm + key file; never log secret values                  |
 | **Product live**           | Public users            | Must expose `/version` without control-plane basic auth              |
 
-**Edge detail (Composer admin):** some write APIs treat “loopback peer” as trusted. If you put Composer behind a reverse proxy, **do not** forward `X-Forwarded-For` / `X-Real-IP` in a way that makes remote clients look local _if_ your code keys off peer address — or redesign auth properly.
+**Edge detail (Composer admin):** some write APIs treat “loopback peer” as trusted. If you put Composer behind a reverse proxy, do not make remote clients look local _if_ your code keys off peer address — or redesign auth properly.
 
 ---
 
@@ -95,12 +95,12 @@ flowchart LR
 
 1. Human opens Build (`/`) or Composer (`/composer`).
 2. Types a goal (optional image attachments on Build).
-3. **Queue builder** turns prose into one or more queue items scoped to a **project folder** (`acme`, `composer`, …).
+3. **Queue builder** turns prose into one or more queue items scoped to a **project folder**.
 
 ### 2. Mission materialization
 
 1. Queue item → mission YAML (name, repo, live_url, acceptance, models, limits).
-2. Optional: `architect` / `provision` steps consult Vault (e.g. Railway ensure).
+2. Optional: architect / provision steps may consult Vault for infra (prefer off until core loop is solid).
 3. Run directory created: `runs/<name>-<timestamp>/`.
 
 ### 3. Loop iteration
@@ -114,19 +114,19 @@ flowchart LR
 
 1. Exit code + `shared/report.md` + cost JSON.
 2. Queue item marked succeeded / failed / hard-fail.
-3. Sentinel / Lazy may requeue, quarantine, or surface alerts — **without** implementing product features themselves.
+3. Sentinel / Lazy may surface stuck state or alerts — **without** implementing product features themselves.
 
 ---
 
 ## Process model (roles)
 
-| Role                         | Typical entry                         | Notes                                              |
-| ---------------------------- | ------------------------------------- | -------------------------------------------------- |
-| Composer server              | `python3 server.py`                   | Restarts must leave detached workers alive         |
-| Detached `ratchet __worker`  | child of composer launch path         | Must outlive Admin Apply / control-plane restarts  |
-| Sentinel                     | `python3 -m sentinel`                 | Optional supervisor; can be armed/disarmed         |
-| Lazy / Medic                 | `python3 -m lazy.web.server`          | CORS to dash origin for header toggle              |
-| Vault                        | `python3 -m vault.server`             | Encrypted data dir                                 |
+| Role                        | Typical role in the design                    | Notes                                             |
+| --------------------------- | --------------------------------------------- | ------------------------------------------------- |
+| Composer server             | Human UI + queue API                          | Restarts must leave detached workers alive        |
+| Detached harness worker     | Child of the launch path                      | Must outlive control-plane restarts               |
+| Sentinel                    | Optional supervisor                           | Can be armed/disarmed                             |
+| Lazy / Medic                | Overnight observe / recovery surfaces         | CORS to dash origin for header toggle             |
+| Vault                       | Credentials + consumer broker                 | Encrypted data dir                                |
 
 ---
 
@@ -145,9 +145,9 @@ adapters:
 
 | Role    | Mock                 | Real (typical)                           |
 | ------- | -------------------- | ---------------------------------------- |
-| builder | scripted “work”      | Claude CLI + git proof-of-work           |
+| builder | scripted “work”      | Coding CLI + git proof-of-work           |
 | deploy  | instant / scenario   | version-endpoint / fixed-delay / command |
-| tester  | scenario file line N | Grok against live_url + verdict schema   |
+| tester  | scenario file line N | Tester CLI against live_url + verdict    |
 
 Mix roles while rolling out (e.g. real builder + mock tester).
 

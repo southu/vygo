@@ -47,12 +47,12 @@ Default bind: `127.0.0.1:8377`.
 3. **Worker** materializes mission YAML and invokes `bin/ratchet`
 4. UI and Sentinel poll state; costs land in `shared/cost.json`
 
-### Queue builder rules (learned the hard way)
+### Queue builder rules
 
 - Multi-part goals **must** expand to several steps — not one mega-mission
 - Prefer **~4–8** steps: small enough to verify live, large enough to make progress
 - Thin drafts (single vague step) may be **resplit** by the planner path before enqueue
-- Planner must return real multi-step JSON; pure affirmations / non-JSON → **force draft / retry**, never silent junk prose as a “mission”
+- Planner must return real multi-step JSON; pure affirmations / non-JSON → force draft / retry, never silent junk prose as a “mission”
 - Folder must match product (`acme`), not accidentally `composer`
 - Repo/live_url must come from **project.json**, not control-plane APP_FACTS
 - Tests live alongside code (e.g. `tests/test_queue_builder_split.py`)
@@ -72,12 +72,13 @@ Other clear modes may wipe more aggressively — read the button label before co
 
 - Registry: `models.json` (builder / tester / assist / writer roles)
 - Defaults: Admin form → `POST /api/settings` → `load_settings()` single store
-- Assist can route to Claude / Grok / Codex / **Kimi** / other registered ids
-- CLI adapters must use flags the binary actually supports (e.g. some prompt modes reject “yolo”-style flags)
+- Assist can route to registered model ids
+- CLI adapters must use flags the binary actually supports
 - Invalid or unknown model names should surface **real CLI errors**, not synthetic success prose
 - **Apply model updates** may write local `models.json` if bare origin repo missing
 
-Claude on VPC often uses **CLI login** rather than a long-lived API key in `secrets.env`.
+Claude-style CLIs often use **CLI login** rather than a long-lived API key in secret env.
+
 ---
 
 ## Unified header nav
@@ -104,7 +105,7 @@ Cross-host URLs are absolute when leaving the current origin.
 
 `POST /api/assist` turns plain language into a draft mission payload (name, mission text, acceptance). Used from Compose UI and as a building block for enqueue.
 
-Self-facts for “edit Composer itself” come from env (`PUBLIC_BASE_URL`, `COMPOSER_APP_REPO`) — **not** laptop paths.
+Self-facts for “edit Composer itself” come from env (`PUBLIC_BASE_URL`, `COMPOSER_APP_REPO`) — **not** machine-specific laptop paths.
 
 ---
 
@@ -114,7 +115,7 @@ Composer can be improved _by_ Ratchet:
 
 - Needs a **cloneable** git remote (`composer-origin.git` bare + live tree)
 - Live version endpoint must be reachable without basic auth
-- Prefer loopback `http://127.0.0.1:8377` for self-missions when possible
+- Prefer loopback for self-missions when possible
 
 ---
 
@@ -128,6 +129,6 @@ Composer can be improved _by_ Ratchet:
 | `home.html` / `home.js`                        | Build UX                                  |
 | `models.json`                                  | Model registry                            |
 | `styles.css` / `site-nav.js` / `mobile-nav.js` | Shell UI                                  |
-| `lazy-client.js`                               | Header Lazy toggle (token from inject)    |
+| `lazy-client.js`                               | Header Lazy toggle                        |
 
 Continue → [Lazy / Medic / Sentinel](./lazy-medic-sentinel.md)
