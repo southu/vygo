@@ -583,6 +583,11 @@ export function ReadinessFlow() {
    */
   const onPasteSubmit = async () => {
     if (pasteSubmitting) return;
+    // Flush/cancel paste debounce so it cannot overwrite the parse result.
+    if (pasteDebounceRef.current) {
+      clearTimeout(pasteDebounceRef.current);
+      pasteDebounceRef.current = null;
+    }
     trackAnalytics("paste_attempted", { lengthBucket: pasteText.length > 2000 ? "long" : "short" });
     const scan = scanPasteForSecrets(pasteText);
     if (!scan.clean) {
@@ -706,11 +711,23 @@ export function ReadinessFlow() {
 
   const onLooksRight = async () => {
     trackAnalytics("stage_completed", { stage: "confirm" });
+    // Cancel any pending paste-debounce PATCH so it cannot race after confirm.
+    if (pasteDebounceRef.current) {
+      clearTimeout(pasteDebounceRef.current);
+      pasteDebounceRef.current = null;
+    }
+    // Re-attach a client-side partial report so scoring still has evidence even
+    // if a prior partial PATCH dropped the server parse payload (server also
+    // merges drafts and re-parses pasteText as a fallback).
+    const clientPartial = pasteText ? parseReadinessPastePartial(pasteText) : {};
     await persist(stage1, "confirm", {
       pasteText,
       source: "paste",
       parseStatus: confirm?.parseStatus || "ok",
       confirmedAt: new Date().toISOString(),
+      ...(Object.keys(clientPartial).length > 0
+        ? { report: clientPartial as Record<string, unknown> }
+        : {}),
     });
     setConfirm((prev) =>
       prev ? { ...prev, pending: false, parseStatus: prev.parseStatus || "ok" } : prev,

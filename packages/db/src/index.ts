@@ -65,6 +65,7 @@ export {
   findReadinessSubmissionById,
   getActiveReadinessScoringConfig,
   seedReadinessScoringConfig,
+  mergeReadinessDrafts,
   persistReadinessScore,
   appendSubmissionDiscrepancyFlags,
   seedReadinessFollowupQuestions,

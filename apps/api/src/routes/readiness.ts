@@ -54,6 +54,7 @@ import {
   followupSeedMetadata,
   hasScorableReportAnswers,
   manualAnswersToReport,
+  parseReadinessPastePartial,
   redactPasteSecrets,
   runDeterministicParse,
   scoringConfigFromDbRow,
@@ -2228,6 +2229,30 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         report = { ...(body.report as Record<string, unknown>) };
       }
 
+      // Fallback: re-parse paste text when a partial session PATCH wiped report
+      // but left pasteText / rawPasteRedacted (common race before draft merge).
+      if (!hasScorableReportAnswers(report)) {
+        const pasteFallback =
+          (typeof draft.rawPasteRedacted === "string" && draft.rawPasteRedacted) ||
+          (typeof draft.pasteText === "string" && draft.pasteText) ||
+          (typeof body.paste === "string" && body.paste) ||
+          "";
+        if (pasteFallback.trim()) {
+          try {
+            const recovered = parseReadinessPastePartial(pasteFallback) as Record<string, unknown>;
+            if (hasScorableReportAnswers(recovered)) {
+              report = recovered;
+              request.log.info(
+                { event: "readiness_score_report_recovered_from_paste" },
+                "recovered report from pasteText after missing draft.report",
+              );
+            }
+          } catch {
+            /* keep empty report → fail closed below */
+          }
+        }
+      }
+
       // Deep-redact free-text report fields before scoring/storage.
       report = redactReportDeep(report);
 
@@ -2609,6 +2634,23 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           report = manualAnswersToReport(draft.manualAnswers as never) as Record<string, unknown>;
         } else if (body.report && typeof body.report === "object" && !Array.isArray(body.report)) {
           report = { ...(body.report as Record<string, unknown>) };
+        }
+        if (!hasScorableReportAnswers(report, scoringConfig ?? undefined)) {
+          const pasteFallback =
+            (typeof draft.rawPasteRedacted === "string" && draft.rawPasteRedacted) ||
+            (typeof draft.pasteText === "string" && draft.pasteText) ||
+            (typeof body.paste === "string" && body.paste) ||
+            "";
+          if (pasteFallback.trim()) {
+            try {
+              const recovered = parseReadinessPastePartial(pasteFallback) as Record<string, unknown>;
+              if (hasScorableReportAnswers(recovered, scoringConfig ?? undefined)) {
+                report = recovered;
+              }
+            } catch {
+              /* fail closed below */
+            }
+          }
         }
         report = redactReportDeep(report);
 

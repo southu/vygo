@@ -179,6 +179,48 @@ export async function findReadinessSessionByToken(
   return toReadinessSessionPublic(row);
 }
 
+/**
+ * Shallow-merge session drafts so partial client PATCHes (paste debounce,
+ * confirm, email) never wipe server-owned parse fields like `report`.
+ * Nested `stage1` / `manualAnswers` objects are also merged key-wise.
+ */
+export function mergeReadinessDrafts(
+  existing: Record<string, unknown> | null | undefined,
+  incoming: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const prev =
+    existing && typeof existing === "object" && !Array.isArray(existing)
+      ? { ...existing }
+      : {};
+  const next =
+    incoming && typeof incoming === "object" && !Array.isArray(incoming)
+      ? { ...incoming }
+      : {};
+
+  const mergeNested = (key: string) => {
+    const a =
+      prev[key] && typeof prev[key] === "object" && !Array.isArray(prev[key])
+        ? (prev[key] as Record<string, unknown>)
+        : null;
+    const b =
+      next[key] && typeof next[key] === "object" && !Array.isArray(next[key])
+        ? (next[key] as Record<string, unknown>)
+        : null;
+    if (a && b) {
+      next[key] = { ...a, ...b };
+    } else if (a && !b) {
+      // keep prev when incoming omits the nested object entirely
+      if (!(key in next)) next[key] = a;
+    }
+  };
+  mergeNested("stage1");
+  mergeNested("manualAnswers");
+  mergeNested("followupAnswers");
+  mergeNested("report");
+
+  return { ...prev, ...next };
+}
+
 /** Patch stage and/or draft for an existing token. Returns null when not found. */
 export async function patchReadinessSessionByToken(
   db: Db,
@@ -195,7 +237,15 @@ export async function patchReadinessSessionByToken(
     updates.stage = normalizeStage(input.stage);
   }
   if (input.draft !== undefined) {
-    updates.draft = redactSessionDraft(normalizeDraft(input.draft));
+    // Merge with existing draft so partial client updates cannot drop report /
+    // parse metadata produced by POST /v1/readiness/parse.
+    const current = await findReadinessSessionByToken(db, trimmed);
+    const existingDraft =
+      current?.draft && typeof current.draft === "object" && !Array.isArray(current.draft)
+        ? (current.draft as Record<string, unknown>)
+        : {};
+    const incoming = normalizeDraft(input.draft) as Record<string, unknown>;
+    updates.draft = redactSessionDraft(mergeReadinessDrafts(existingDraft, incoming));
   }
 
   const rows = await db
