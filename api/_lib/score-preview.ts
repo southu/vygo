@@ -5,13 +5,20 @@
  * no lead creation, no email, no PII persistence. Used by automated callers
  * on www.vygo.ai to observe answer-driven dimension scores.
  */
+/**
+ * Uses relative monorepo imports (not the edge runtime package graph) so unit
+ * tests under api/_lib can exercise the same engine as Railway without
+ * bundling @vygo/validation into the Vercel Hobby function.
+ */
 import {
   computeReadinessScore,
-  manualAnswersToReport,
   type DimensionScoreResult,
-  type ManualAnswers,
   type ReadinessScorePayload,
-} from "@vygo/validation";
+} from "../../packages/validation/src/readiness-scoring.js";
+import {
+  manualAnswersToReport,
+  type ManualAnswers,
+} from "../../packages/validation/src/manual-questionnaire.js";
 
 /** Built-in weak posture (materially low scores across dimensions). */
 export const SCORE_PREVIEW_PROFILE_WEAK: Record<string, unknown> = {

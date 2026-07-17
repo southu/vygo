@@ -9,7 +9,6 @@
     "test": "tsx --test _lib/**/*.test.ts"
   },
   "dependencies": {
-    "@vygo/validation": "workspace:*",
     "postgres": "^3.4.7"
   },
   "devDependencies": {

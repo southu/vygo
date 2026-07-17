@@ -42,7 +42,6 @@ import {
   edgeRedactSecrets,
   edgeSelectFollowups,
 } from "../_lib/readiness-stage34.js";
-import { runScorePreview } from "../_lib/score-preview.js";
 import {
   contentTypeBase,
   evaluateOrigin,
@@ -1133,8 +1132,11 @@ async function handleScore(req: EdgeRequest): Promise<ReadinessHandlerResult> {
 
 /**
  * Dry-run score: no Turnstile, no lead, no PII persistence.
- * Prefer edge-local pure compute so www.vygo.ai stays verifiable even when
- * Railway is lagging on new routes; still try upstream first when available.
+ *
+ * Proxies to Railway Fastify (POST /v1/readiness/score-preview). Does not import
+ * @vygo/validation on the edge — workspace TS packages are not reliably
+ * bundlable in this Hobby function and would crash the whole [op] handler.
+ * Built-in dual profiles also remain on GET /api/readiness sampleAssessments.
  */
 async function handleScorePreview(req: EdgeRequest): Promise<ReadinessHandlerResult> {
   const rl = checkEdgeRateLimit(req);
@@ -1165,7 +1167,6 @@ async function handleScorePreview(req: EdgeRequest): Promise<ReadinessHandlerRes
       ? (parsedBody.value as Record<string, unknown>)
       : {};
 
-  // Prefer Railway when the route exists so config/version stays unified.
   const upstream = await proxyScorePreview(body, process.env, req.headers);
   if (upstream.status >= 200 && upstream.status < 300) {
     return upstream;
@@ -1177,51 +1178,26 @@ async function handleScorePreview(req: EdgeRequest): Promise<ReadinessHandlerRes
       retryAfterSeconds: upstream.retryAfterSeconds ?? 60,
     };
   }
-  // Pass through clear client errors from upstream validation when route is live.
   if (upstream.status === 400 || upstream.status === 415) {
-    const code = (upstream.body.error as { code?: string } | undefined)?.code;
-    if (code === "VALIDATION_ERROR" || code === "UNSUPPORTED_MEDIA_TYPE" || code === "BAD_REQUEST") {
-      return upstream;
-    }
+    return upstream;
   }
 
-  // Edge-local pure compute fallback (same engine; no secrets/DB/PII).
-  const local = runScorePreview({
-    report:
-      body.report && typeof body.report === "object" && !Array.isArray(body.report)
-        ? (body.report as Record<string, unknown>)
-        : null,
-    answers:
-      body.answers && typeof body.answers === "object" && !Array.isArray(body.answers)
-        ? (body.answers as Record<string, unknown>)
-        : null,
-    manualAnswers:
-      body.manualAnswers && typeof body.manualAnswers === "object" && !Array.isArray(body.manualAnswers)
-        ? (body.manualAnswers as Record<string, unknown>)
-        : null,
-    source: typeof body.source === "string" ? body.source : null,
-    stage1:
-      body.stage1 && typeof body.stage1 === "object" && !Array.isArray(body.stage1)
-        ? (body.stage1 as Record<string, unknown>)
-        : null,
-    followups:
-      body.followups && typeof body.followups === "object" && !Array.isArray(body.followups)
-        ? (body.followups as Record<string, unknown>)
-        : null,
-    profile: typeof body.profile === "string" ? body.profile : null,
-  });
-
-  if (!local.ok) {
+  // Fail closed with a clear error — never invent scores or degrade silently.
+  if (upstream.status === 404 || upstream.status >= 500 || upstream.status === 0) {
     return {
-      status: local.status,
-      body: { error: { code: local.code, message: local.message } },
+      status: 503,
+      body: {
+        error: {
+          code: "SCORING_UNAVAILABLE",
+          message:
+            "Score preview is temporarily unavailable. Retry shortly, or use GET /api/readiness analysis.sampleAssessments for the built-in weak/strong profiles.",
+        },
+        sampleAssessmentsPath: "/api/readiness",
+      },
     };
   }
 
-  return {
-    status: 200,
-    body: { ...local.body, path: "edge_compute" },
-  };
+  return upstream;
 }
 
 async function handleSnapshotGet(req: EdgeRequest): Promise<ReadinessHandlerResult> {
