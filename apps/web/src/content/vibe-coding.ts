@@ -3,14 +3,15 @@
  *
  * The Topics grid is data-driven: it renders by iterating `vibeCodingModules`,
  * so adding a future module only requires appending one entry here — no page
- * redesign. Coming-soon modules carry `route: null` and never link anywhere.
+ * redesign. Coming-soon modules with a published stub page carry their route
+ * and link to it; only modules without any page keep `route: null`.
  */
 export type VibeModuleStatus = "available" | "coming-soon";
 
 export type VibeCodingModule = {
   title: string;
   blurb: string;
-  /** Public route for available modules; null while coming-soon (no dead links). */
+  /** Public route once a page exists (full module or stub); null when there is no page yet. */
   route: string | null;
   status: VibeModuleStatus;
 };
@@ -20,7 +21,7 @@ export const vibeCodingModules: VibeCodingModule[] = [
     title: "Ratchet system guide",
     blurb:
       "The full documentation pack: overview, architecture, the loop contract, Composer, Vault, operations, and the Mermaid diagram gallery.",
-    route: "/content/vibe-coding/ratchet-guide/README.md",
+    route: "/vibe-coding/ratchet-guide",
     status: "available",
   },
   {
@@ -29,6 +30,34 @@ export const vibeCodingModules: VibeCodingModule[] = [
       "Greenfield rebuild in phases A–E: host setup, control plane, deploy gate, first real mission, then hardening.",
     route: "/content/vibe-coding/ratchet-guide/rebuild.md",
     status: "available",
+  },
+  {
+    title: "Writing missions",
+    blurb:
+      "Scoping goals into 4–8 verifiable steps with acceptance criteria a live tester can actually check.",
+    route: "/vibe-coding/writing-missions",
+    status: "coming-soon",
+  },
+  {
+    title: "Live verify & testing",
+    blurb:
+      "How the deploy gate and read-only tester grade the live product, and why only a streak of passes counts.",
+    route: "/vibe-coding/live-verify-testing",
+    status: "coming-soon",
+  },
+  {
+    title: "Models & costs",
+    blurb:
+      "Builder/tester model tiers, what a mission costs end to end, and where FAIL cycles add up.",
+    route: "/vibe-coding/models-and-costs",
+    status: "coming-soon",
+  },
+  {
+    title: "Case studies",
+    blurb:
+      "Real missions annotated from goal to streak of passes, with deploy-gate evidence and honest numbers.",
+    route: "/vibe-coding/case-studies",
+    status: "coming-soon",
   },
   {
     title: "Composer walkthrough",
