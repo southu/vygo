@@ -18,7 +18,7 @@ export default function ReadinessSnapshotPage() {
   return (
     <main id="main-content">
       <section className="section-pad">
-        <div className="container-page max-w-2xl">
+        <div className="container-page max-w-4xl">
           <Suspense
             fallback={
               <div className="card mt-8" aria-busy="true">
