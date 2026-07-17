@@ -235,6 +235,7 @@ export type ScoreResponse = {
   /** Mission-shaped: [{ dimension, score, sub_metrics: [{ name, score, weight, evidence }] }] */
   dimensionResults?: SnapshotDimensionResult[] | null;
   dimensionAnalyses?: SnapshotDimensionAnalysis[] | null;
+  insights?: SnapshotInsight[] | null;
   recommendation?: SnapshotRecommendation | null;
   ranges?: Record<string, { low: number; high: number; mid: number }> | null;
   displayMode?: "point" | "range";
@@ -314,6 +315,17 @@ export type SnapshotRecommendation = {
   body: string;
 };
 
+/** Ranked evidence insight grounded in the prospect's own answers. */
+export type SnapshotInsightType = "strength" | "risk" | "opportunity";
+
+export type SnapshotInsight = {
+  type: SnapshotInsightType;
+  headline: string;
+  detail: string;
+  source_answer: string;
+  dimension: string;
+};
+
 export type SnapshotResponse = {
   id: string;
   snapshotId?: string;
@@ -322,6 +334,8 @@ export type SnapshotResponse = {
   dimensionDetails?: Record<string, SnapshotDimensionDetail> | null;
   dimensionResults?: SnapshotDimensionResult[] | null;
   dimensionAnalyses?: SnapshotDimensionAnalysis[] | null;
+  /** Ranked strength / risk / opportunity cards from the insights layer. */
+  insights?: SnapshotInsight[] | null;
   recommendation?: SnapshotRecommendation | null;
   ranges?: Record<string, { low: number; high: number; mid: number }> | null;
   displayMode?: "point" | "range";
@@ -431,6 +445,7 @@ export async function scoreReadiness(input: {
     dimensionDetails: parseDimensionDetails(body.dimensionDetails),
     dimensionResults: parseDimensionResults(body.dimensionResults),
     dimensionAnalyses: parseDimensionAnalyses(body.dimensionAnalyses),
+    insights: parseInsights(body.insights),
     recommendation: parseRecommendation(body.recommendation),
     ranges:
       body.ranges && typeof body.ranges === "object"
@@ -544,6 +559,37 @@ function parseDimensionAnalyses(raw: unknown): SnapshotDimensionAnalysis[] | nul
               .map((p) => p.trim())
               .filter(Boolean),
       analysis,
+    });
+  }
+  return out.length > 0 ? out : null;
+}
+
+const INSIGHT_TYPES: ReadonlySet<string> = new Set(["strength", "risk", "opportunity"]);
+
+function parseInsights(raw: unknown): SnapshotInsight[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: SnapshotInsight[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const row = entry as Record<string, unknown>;
+    const typeRaw = typeof row.type === "string" ? row.type.trim().toLowerCase() : "";
+    if (!INSIGHT_TYPES.has(typeRaw)) continue;
+    const headline = typeof row.headline === "string" ? row.headline.trim() : "";
+    const detail = typeof row.detail === "string" ? row.detail.trim() : "";
+    const source_answer =
+      typeof row.source_answer === "string"
+        ? row.source_answer.trim()
+        : typeof row.sourceAnswer === "string"
+          ? row.sourceAnswer.trim()
+          : "";
+    const dimension = typeof row.dimension === "string" ? row.dimension.trim() : "";
+    if (!headline) continue;
+    out.push({
+      type: typeRaw as SnapshotInsightType,
+      headline,
+      detail,
+      source_answer,
+      dimension,
     });
   }
   return out.length > 0 ? out : null;
@@ -676,6 +722,7 @@ export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse
     dimensionDetails: parseDimensionDetails(body.dimensionDetails),
     dimensionResults: parseDimensionResults(body.dimensionResults),
     dimensionAnalyses: parseDimensionAnalyses(body.dimensionAnalyses),
+    insights: parseInsights(body.insights),
     recommendation: parseRecommendation(body.recommendation),
     ranges:
       body.ranges && typeof body.ranges === "object"

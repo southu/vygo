@@ -109,8 +109,8 @@ export const readinessContent = {
     error: "Could not score right now. Check the fields and try again.",
   },
   snapshot: {
-    eyebrow: "Readiness snapshot",
-    title: "Your production readiness scorecard",
+    eyebrow: "Readiness report",
+    title: "Your production readiness report",
     recommendedLabel: "Recommended engagement",
     findingsLabel: "Top findings",
     pricingLabel: "Indicative engagement ranges",
@@ -118,7 +118,7 @@ export const readinessContent = {
     emailSending: "Sending…",
     emailSuccess: "Accepted — check your inbox shortly.",
     emailError: "Could not queue the email. Try again.",
-    loading: "Loading snapshot…",
+    loading: "Loading report…",
     notFound: "This snapshot could not be found.",
   },
   fallback: {

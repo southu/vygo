@@ -8,12 +8,14 @@ import {
   emailReadinessSnapshot,
   getReadinessSnapshot,
   type SnapshotDimensionAnalysis,
-  type SnapshotDimensionDetail,
+  type SnapshotInsight,
+  type SnapshotInsightType,
   type SnapshotRecommendation,
   type SnapshotResponse,
   type SnapshotSubMetricStatus,
 } from "@/lib/readiness/api";
 import { ReadinessGauge, ReadinessRadarChart, SubMetricBars } from "@/components/charts";
+import type { ChartDimension } from "@/components/charts/types";
 import { chartDataFromSnapshot } from "@/lib/readiness/chart-data";
 
 const DIMENSIONS = [
@@ -30,6 +32,30 @@ const DEFAULT_PRICING = {
   scale: "Scale from $145K",
   enterprise: "Enterprise $275K+",
   auditNote: "The audit locks scope and price and the $15K audit is credited toward the build.",
+};
+
+const INSIGHT_META: Record<
+  SnapshotInsightType,
+  { label: string; pill: string; border: string; accent: string }
+> = {
+  strength: {
+    label: "Strength",
+    pill: "bg-[#e7f5ee] text-green-dark",
+    border: "border-green/30",
+    accent: "bg-green",
+  },
+  risk: {
+    label: "Risk",
+    pill: "bg-[#fbebe9] text-red",
+    border: "border-red/25",
+    accent: "bg-red",
+  },
+  opportunity: {
+    label: "Opportunity",
+    pill: "bg-[#f0edff] text-purple-dark",
+    border: "border-purple/25",
+    accent: "bg-purple",
+  },
 };
 
 const STATUS_META: Record<
@@ -72,6 +98,55 @@ function clampPct(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
+function quoteText(value: unknown, max = 160): string {
+  if (value == null) return "";
+  const raw = Array.isArray(value)
+    ? value
+        .map((v) => (typeof v === "string" || typeof v === "number" ? String(v) : ""))
+        .filter(Boolean)
+        .join(", ")
+    : typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+      ? String(value)
+      : "";
+  const t = raw.replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
+function firstSentence(text: string): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  const match = cleaned.match(/^(.+?[.!?])(?:\s|$)/);
+  const sentence = match?.[1];
+  return sentence ? sentence.trim() : cleaned;
+}
+
+/**
+ * One-line personalized verdict grounded in this submission (score, bucket,
+ * report summary, or reasoning). Never generic placeholder copy.
+ */
+function buildPersonalizedVerdict(data: SnapshotResponse, overall: number | null): string {
+  const reasoningLine = data.reasoning ? firstSentence(data.reasoning) : "";
+  if (reasoningLine && reasoningLine.length >= 40) {
+    return reasoningLine;
+  }
+
+  const summary = quoteText(data.reportSummary?.summary, 90);
+  const scoreBit =
+    overall !== null && Number.isFinite(overall)
+      ? `Overall readiness scored ${Math.round(overall)}/100`
+      : "Your readiness snapshot is ready";
+  const bucketBit = data.bucket ? `Recommended path: ${data.bucket}` : "";
+  if (summary) {
+    return [scoreBit, `for “${summary}”`, bucketBit].filter(Boolean).join(" — ") + ".";
+  }
+  if (data.findings[0]) {
+    return `${scoreBit}. Top signal from your submission: ${quoteText(data.findings[0], 120)}.`;
+  }
+  return [scoreBit, bucketBit].filter(Boolean).join(". ") + ".";
+}
+
 type SnapshotViewProps = {
   snapshotId: string;
 };
@@ -86,118 +161,98 @@ function buildApplyHref(snapshot: SnapshotResponse): string {
   return `/waitlist?${params.toString()}`;
 }
 
-/** Circular gauge for the overall readiness score (pure SVG, no canvas). */
-function ScoreRing({ value, caption }: { value: number; caption: string }) {
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius;
-  const pct = clampPct(value);
-  const filled = (pct / 100) * circumference;
+function dimSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+/** Build insight cards from API insights, with evidence fallbacks when needed. */
+function resolveInsightCards(data: SnapshotResponse): SnapshotInsight[] {
+  const fromApi = (data.insights ?? []).filter(
+    (i) => i.headline && (i.source_answer || i.detail),
+  );
+  if (fromApi.length > 0) return fromApi.slice(0, 9);
+
+  const fallbacks: SnapshotInsight[] = [];
+  const details = data.dimensionDetails ?? {};
+  for (const dim of DIMENSIONS) {
+    const checks = details[dim]?.checks ?? [];
+    for (const check of checks) {
+      if (fallbacks.length >= 6) break;
+      const answer = quoteText(check.evidence?.answer_value, 120);
+      if (!answer) continue;
+      const type: SnapshotInsightType =
+        check.status === "strong" ? "strength" : check.status === "at_risk" ? "risk" : "opportunity";
+      fallbacks.push({
+        type,
+        headline:
+          check.status === "strong"
+            ? `Your ${check.label} check is a relative strength`
+            : check.status === "at_risk"
+              ? `Your ${check.label} answer flags production risk`
+              : `Your ${check.label} answer leaves room to harden`,
+        detail: check.evidence?.reason || `${check.label} scored ${Math.round(check.score)}/100.`,
+        source_answer: answer,
+        dimension: dim,
+      });
+    }
+  }
+  return fallbacks;
+}
+
+function InsightCard({ insight }: { insight: SnapshotInsight }) {
+  const meta = INSIGHT_META[insight.type];
+  const quote = quoteText(insight.source_answer, 180);
   return (
-    <div
-      className="relative h-40 w-40 shrink-0"
-      role="img"
-      aria-label={`Overall readiness score ${Math.round(pct)} out of 100`}
-      data-testid="snapshot-overall"
+    <article
+      className={`relative overflow-hidden rounded-2xl border bg-surface p-5 shadow-card ${meta.border}`}
+      data-testid={`snapshot-insight-${insight.type}`}
+      data-insight-type={insight.type}
     >
-      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-        <defs>
-          <linearGradient id="snapshot-ring-fill" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="var(--color-purple)" />
-            <stop offset="100%" stopColor="var(--color-purple-dark)" />
-          </linearGradient>
-        </defs>
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          fill="none"
-          stroke="var(--color-purple-soft)"
-          strokeWidth="10"
-        />
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          fill="none"
-          stroke="url(#snapshot-ring-fill)"
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeDasharray={`${filled} ${circumference}`}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-4xl font-bold leading-none text-ink">
-          {Math.round(pct)}
-        </span>
-        <span className="mt-1 text-xs font-medium uppercase tracking-[0.08em] text-muted">
-          {caption}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-/** One nested sub-metric check row: label, status pill, meter, and evidence reason. */
-function CheckRow({
-  dimension,
-  check,
-}: {
-  dimension: string;
-  check: SnapshotDimensionDetail["checks"][number];
-}) {
-  const status = check.answered ? check.status : "unknown";
-  const meta = STATUS_META[status];
-  const width = status === "unknown" ? 0 : clampPct(check.score);
-  const reason =
-    check.evidence && typeof check.evidence.reason === "string" ? check.evidence.reason : null;
-  return (
-    <li className="py-2.5" data-testid={`snapshot-check-${dimension}-${check.key}`}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-sm text-ink-soft">{check.label}</p>
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="font-mono text-xs tabular-nums text-muted">
-            {status === "unknown" ? "—" : Math.round(check.score)}
-          </span>
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.pill}`}
-          >
-            {meta.label}
-          </span>
-        </div>
-      </div>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-canvas">
-        <div
-          className={`h-full rounded-full ${meta.bar}`}
-          style={{ width: `${Math.max(width > 0 ? 3 : 0, width)}%` }}
-          aria-hidden
-        />
-      </div>
-      {reason ? (
-        <p
-          className="mt-1.5 text-xs leading-snug text-muted"
-          data-testid={`snapshot-check-reason-${dimension}-${check.key}`}
+      <span className={`absolute inset-y-0 left-0 w-1 ${meta.accent}`} aria-hidden />
+      <div className="pl-2">
+        <span
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] ${meta.pill}`}
         >
-          {reason}
-        </p>
-      ) : null}
-    </li>
+          {meta.label}
+        </span>
+        {insight.dimension ? (
+          <span className="ml-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted">
+            {insight.dimension}
+          </span>
+        ) : null}
+        <h3 className="mt-3 font-display text-base font-bold leading-snug text-ink">
+          {insight.headline}
+        </h3>
+        {insight.detail ? (
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">{insight.detail}</p>
+        ) : null}
+        {quote ? (
+          <blockquote
+            className="mt-3 border-l-2 border-border pl-3 text-sm italic leading-relaxed text-ink"
+            data-testid="snapshot-insight-quote"
+          >
+            “{quote}”
+          </blockquote>
+        ) : null}
+      </div>
+    </article>
   );
 }
 
-/** Elevated per-dimension scorecard: headline score, progress bar, nested checks. */
-function DimensionCard({
+/** Per-dimension report section: score, sub-metric bars, written analysis. */
+function DimensionSection({
   dimension,
   point,
   range,
   showRange,
-  detail,
+  chartDim,
   analysis,
 }: {
   dimension: string;
   point: number;
   range?: { low: number; high: number; mid: number } | null;
   showRange: boolean;
-  detail?: SnapshotDimensionDetail | null;
+  chartDim?: ChartDimension | null;
   analysis?: SnapshotDimensionAnalysis | null;
 }) {
   const headline = showRange && range ? range.mid : point;
@@ -211,19 +266,61 @@ function DimensionCard({
           .map((p) => p.trim())
           .filter(Boolean)
       : []);
+
+  // Guarantee non-empty analysis text for the section.
+  const paragraphs =
+    analysisParagraphs.length > 0
+      ? analysisParagraphs
+      : [
+          `On ${dimension}, your aggregate score is ${Math.round(headline)}/100 (${meta.label.toLowerCase()}). This section reflects the sub-metric checks from your submission rather than a generic maturity label.`,
+          chartDim && chartDim.sub_metrics.length > 0
+            ? `Key sub-metrics include ${chartDim.sub_metrics
+                .slice(0, 3)
+                .map((m) => {
+                  const ans = quoteText(m.evidence?.answer_value, 60);
+                  return ans
+                    ? `${m.name} (${Math.round(m.score)}/100; “${ans}”)`
+                    : `${m.name} (${Math.round(m.score)}/100)`;
+                })
+                .join("; ")}.`
+            : `Sub-metric detail for ${dimension} was limited in this snapshot; treat the dimension score as the primary signal and re-run with a fuller diagnostic paste for deeper analysis.`,
+        ];
+
+  const barsPayload: ChartDimension[] = chartDim
+    ? [chartDim]
+    : [
+        {
+          dimension,
+          score: headline,
+          sub_metrics: [],
+          evidence: null,
+        },
+      ];
+
   return (
-    <article className="card flex flex-col p-5 sm:p-6" data-testid={`snapshot-dim-${dimension}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-display text-base font-bold text-ink">{dimension}</h3>
+    <section
+      className="readiness-report-dimension scroll-mt-24 space-y-5 border-t border-border pt-10"
+      aria-labelledby={`dim-heading-${dimSlug(dimension)}`}
+      data-testid={`snapshot-dim-${dimension}`}
+      data-dimension={dimension}
+    >
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="eyebrow">Dimension</p>
+          <h2
+            id={`dim-heading-${dimSlug(dimension)}`}
+            className="mt-1 font-display text-2xl font-bold tracking-tight text-ink"
+          >
+            {dimension}
+          </h2>
           <span
-            className={`mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.pill}`}
+            className={`mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${meta.pill}`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden />
             {meta.label}
           </span>
         </div>
-        <p className="font-display text-2xl font-bold tabular-nums text-ink">
+        <p className="font-display text-3xl font-bold tabular-nums text-ink">
           {showRange && range ? (
             <span data-testid={`snapshot-dim-score-${dimension}`}>
               {range.low}–{range.high}
@@ -231,57 +328,50 @@ function DimensionCard({
           ) : (
             <span data-testid={`snapshot-dim-score-${dimension}`}>{Math.round(point)}</span>
           )}
-          <span className="ml-1 text-sm font-semibold text-muted">/100</span>
+          <span className="ml-1 text-base font-semibold text-muted">/100</span>
         </p>
-      </div>
-      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-canvas">
+      </header>
+
+      <div
+        className="h-2.5 max-w-md overflow-hidden rounded-full bg-canvas"
+        role="meter"
+        aria-valuenow={Math.round(clampPct(headline))}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${dimension} score`}
+      >
         <div
-          className="h-full rounded-full bg-purple"
+          className={`h-full rounded-full ${meta.bar}`}
           style={{ width: `${Math.max(4, clampPct(headline))}%` }}
-          aria-hidden
+          data-testid={`snapshot-dim-bar-${dimension}`}
         />
       </div>
-      {analysisParagraphs.length >= 2 ? (
-        <div
-          className="mt-4 space-y-3 border-t border-border pt-4"
-          data-testid={`snapshot-dim-analysis-${dimension}`}
-        >
-          {analysisParagraphs.map((para, idx) => (
-            <p
-              key={`${dimension}-analysis-${idx}`}
-              className="text-sm leading-relaxed text-ink-soft"
-              data-testid={`snapshot-dim-analysis-p-${dimension}-${idx}`}
-            >
-              {para}
-            </p>
-          ))}
-        </div>
-      ) : null}
-      {detail && detail.checks.length > 0 ? (
-        <div className="mt-4 border-t border-border pt-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-            Sub-metric checks
-          </p>
-          <ul
-            className="mt-1 divide-y divide-border/60"
-            data-testid={`snapshot-checks-${dimension}`}
-          >
-            {detail.checks.map((check) => (
-              <CheckRow key={check.key} dimension={dimension} check={check} />
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </article>
-  );
-}
 
-function SummaryStat({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-canvas px-4 py-3">
-      <p className={`font-display text-xl font-bold tabular-nums ${accent}`}>{value}</p>
-      <p className="mt-0.5 text-xs font-medium text-muted">{label}</p>
-    </div>
+      <div data-testid={`snapshot-dim-submetrics-${dimension}`}>
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.08em] text-muted">
+          Sub-metric bars
+        </h3>
+        <SubMetricBars dimensions={barsPayload} className="readiness-report-submetrics" />
+      </div>
+
+      <div
+        className="max-w-prose space-y-4 rounded-2xl border border-border bg-canvas/60 px-5 py-5 sm:px-6"
+        data-testid={`snapshot-dim-analysis-${dimension}`}
+      >
+        <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-muted">
+          Written analysis
+        </h3>
+        {paragraphs.map((para, idx) => (
+          <p
+            key={`${dimension}-analysis-${idx}`}
+            className="text-sm leading-relaxed text-ink-soft sm:text-[0.95rem]"
+            data-testid={`snapshot-dim-analysis-p-${dimension}-${idx}`}
+          >
+            {para}
+          </p>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -363,19 +453,6 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
     return values.reduce((a, b) => a + b, 0) / values.length;
   }, [data?.overall, scores]);
 
-  const checkStats = useMemo(() => {
-    const details = data?.dimensionDetails;
-    if (!details) return null;
-    const checks = Object.values(details).flatMap((d) => d.checks);
-    if (!checks.length) return null;
-    const answered = checks.filter((ch) => ch.answered && ch.status !== "unknown");
-    return {
-      total: checks.length,
-      strong: answered.filter((ch) => ch.status === "strong").length,
-      atRisk: answered.filter((ch) => ch.status === "at_risk").length,
-    };
-  }, [data?.dimensionDetails]);
-
   const analysesByDim = useMemo(() => {
     const map = new Map<string, SnapshotDimensionAnalysis>();
     for (const a of data?.dimensionAnalyses ?? []) {
@@ -384,7 +461,6 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
     return map;
   }, [data?.dimensionAnalyses]);
 
-  /** Chart payload with real per-sub-metric evidence for interactive tooltips. */
   const chartData = useMemo(() => {
     if (!data) return null;
     try {
@@ -394,18 +470,31 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
     }
   }, [data]);
 
+  const chartDimByName = useMemo(() => {
+    const map = new Map<string, ChartDimension>();
+    for (const d of chartData?.dimensions ?? []) {
+      map.set(d.dimension, d);
+    }
+    return map;
+  }, [chartData]);
+
+  const insights = useMemo(() => (data ? resolveInsightCards(data) : []), [data]);
+
+  const verdict = useMemo(
+    () => (data ? buildPersonalizedVerdict(data, overallScore) : ""),
+    [data, overallScore],
+  );
+
   if (loading) {
     return (
       <div className="mt-8 space-y-6" aria-busy="true" data-testid="snapshot-loading">
         <div className="card animate-pulse">
           <div className="h-4 w-40 rounded bg-canvas" />
-          <div className="mt-4 h-32 w-32 rounded-full bg-canvas" />
+          <div className="mt-4 h-32 w-full max-w-sm rounded-2xl bg-canvas" />
         </div>
         <div className="card animate-pulse">
           <div className="h-4 w-56 rounded bg-canvas" />
-          <div className="mt-4 h-2.5 rounded-full bg-canvas" />
-          <div className="mt-3 h-2.5 rounded-full bg-canvas" />
-          <div className="mt-3 h-2.5 rounded-full bg-canvas" />
+          <div className="mt-4 h-40 rounded-xl bg-canvas" />
         </div>
         <p className="text-sm text-muted">{c.loading}</p>
       </div>
@@ -424,256 +513,319 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
     );
   }
 
-  const findings = (data.findings || []).slice(0, 3);
   const recommendation: SnapshotRecommendation | null = data.recommendation ?? null;
   const engagementName =
     recommendation?.engagement || data.recommendedEngagement || data.bucket || "Launch";
 
+  const gaugeSegments =
+    chartData?.dimensions.map((d) => ({
+      label: d.dimension,
+      score: d.score,
+      evidence: d.evidence,
+    })) ??
+    DIMENSIONS.map((dim) => ({
+      label: dim,
+      score: typeof scores?.[dim] === "number" ? scores[dim] : 0,
+      evidence: null,
+    }));
+
+  const radarDimensions: ChartDimension[] =
+    chartData?.dimensions && chartData.dimensions.length > 0
+      ? chartData.dimensions
+      : DIMENSIONS.map((dim) => ({
+          dimension: dim,
+          score: typeof scores?.[dim] === "number" ? scores[dim] : 0,
+          sub_metrics: [],
+          evidence: null,
+        }));
+
   return (
-    <div className="mt-8 space-y-8" data-testid="readiness-snapshot">
-      <header>
-        <p className="eyebrow">{c.eyebrow}</p>
-        <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-          {c.title}
-        </h1>
-      </header>
-
-      <section className="card p-6 sm:p-8" aria-labelledby="overview-heading">
-        <h2 id="overview-heading" className="sr-only">
-          Overall readiness
-        </h2>
-        <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:gap-10">
-          {overallScore !== null ? <ScoreRing value={overallScore} caption="Overall" /> : null}
-          <div className="min-w-0 flex-1">
-            {data.bucket ? (
-              <p className="text-base text-ink-soft" data-testid="snapshot-bucket">
-                Recommended path:{" "}
-                <span className="font-display text-lg font-bold text-purple">{data.bucket}</span>
-              </p>
-            ) : null}
-            <p className="mt-2 text-sm leading-relaxed text-muted">
-              {data.displayMode === "range"
-                ? "Manual entry — indicative score ranges (not single point scores)."
-                : "Weighted blend of five dimensions, each scored 0–100 from nested sub-metric checks."}
-            </p>
-            {checkStats ? (
-              <div className="mt-5 grid grid-cols-3 gap-3" data-testid="snapshot-check-stats">
-                <SummaryStat
-                  label="Checks evaluated"
-                  value={String(checkStats.total)}
-                  accent="text-ink"
-                />
-                <SummaryStat
-                  label="Strong areas"
-                  value={String(checkStats.strong)}
-                  accent="text-green-dark"
-                />
-                <SummaryStat
-                  label="Needs attention"
-                  value={String(checkStats.atRisk)}
-                  accent={checkStats.atRisk > 0 ? "text-red" : "text-ink"}
-                />
+    <article
+      className="readiness-report mt-6 space-y-12 sm:mt-8 sm:space-y-14"
+      data-testid="readiness-snapshot"
+      data-report-layout="consultant"
+    >
+      {/* ── 1. Hero: headline gauge + one-line personalized verdict ───────── */}
+      <section
+        className="readiness-report-hero rounded-3xl border border-border bg-surface px-5 py-8 shadow-card sm:px-8 sm:py-10 lg:px-10"
+        aria-labelledby="report-hero-heading"
+        data-testid="snapshot-hero"
+      >
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:gap-12">
+          <div className="mx-auto w-full max-w-sm shrink-0 lg:mx-0" data-testid="snapshot-hero-gauge">
+            {overallScore !== null ? (
+              <ReadinessGauge
+                value={overallScore}
+                label="Overall readiness"
+                className="w-full"
+                evidence={chartData?.overallEvidence}
+                segments={gaugeSegments}
+              />
+            ) : (
+              <div className="flex h-48 items-center justify-center rounded-2xl bg-canvas text-sm text-muted">
+                Score pending
               </div>
-            ) : null}
+            )}
           </div>
-        </div>
-        {data.caveat ? (
-          <p
-            className="mt-6 rounded-xl border border-border bg-canvas px-4 py-3 text-sm text-ink-soft"
-            data-testid="snapshot-caveat"
-          >
-            {data.caveat}
-          </p>
-        ) : null}
-      </section>
 
-      {chartData && chartData.dimensions.length > 0 ? (
-        <section
-          className="space-y-6"
-          aria-labelledby="snapshot-charts-heading"
-          data-testid="snapshot-charts"
-        >
-          <div>
-            <p className="eyebrow">Interactive charts</p>
-            <h2
-              id="snapshot-charts-heading"
-              className="mt-1 font-display text-xl font-bold text-ink"
+          <div className="min-w-0 flex-1 text-center lg:text-left">
+            <p className="eyebrow">{c.eyebrow}</p>
+            <h1
+              id="report-hero-heading"
+              className="mt-3 font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl"
             >
-              Posture at a glance
-            </h2>
-            <p className="mt-2 max-w-prose text-sm text-muted">
-              Hover, tap, or keyboard-focus a radar axis, gauge segment, or sub-metric bar to see
-              the score, reason, and your submitted answer for that check.
+              {c.title}
+            </h1>
+            <p
+              className="mt-5 text-base font-medium leading-relaxed text-ink sm:text-lg"
+              data-testid="snapshot-verdict"
+              data-verdict="personalized"
+            >
+              {verdict}
             </p>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="card p-5 sm:p-6" data-testid="snapshot-chart-gauge">
-              <h3 className="font-display text-base font-bold text-ink">Overall gauge</h3>
-              <p className="mt-1 text-xs text-muted">
-                Segment dots map to each dimension — open evidence on hover or tap.
+            {data.bucket ? (
+              <p className="mt-4 text-sm text-ink-soft" data-testid="snapshot-bucket">
+                Recommended path:{" "}
+                <span className="font-display text-base font-bold text-purple">{data.bucket}</span>
               </p>
-              <div className="mt-4 flex justify-center">
-                <ReadinessGauge
-                  value={chartData.overall}
-                  className="w-full max-w-sm"
-                  evidence={chartData.overallEvidence}
-                  segments={chartData.dimensions.map((d) => ({
-                    label: d.dimension,
-                    score: d.score,
-                    evidence: d.evidence,
-                  }))}
-                />
-              </div>
-            </div>
-
-            <div className="card p-5 sm:p-6" data-testid="snapshot-chart-radar">
-              <h3 className="font-display text-base font-bold text-ink">Dimension radar</h3>
-              <p className="mt-1 text-xs text-muted">
-                Each axis point carries real evidence from this submission.
+            ) : null}
+            {data.caveat ? (
+              <p
+                className="mt-5 rounded-xl border border-border bg-canvas px-4 py-3 text-left text-sm text-ink-soft"
+                data-testid="snapshot-caveat"
+              >
+                {data.caveat}
               </p>
-              <div className="mx-auto mt-2 w-full max-w-md">
-                <ReadinessRadarChart dimensions={chartData.dimensions} />
-              </div>
-            </div>
+            ) : null}
           </div>
+        </div>
+      </section>
 
-          <div data-testid="snapshot-chart-bars">
-            <h3 className="mb-3 font-display text-base font-bold text-ink">
-              Sub-metric bars
-            </h3>
-            <SubMetricBars dimensions={chartData.dimensions} />
-          </div>
-        </section>
-      ) : null}
-
-      <section aria-labelledby="scorecard-heading">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="scorecard-heading" className="font-display text-xl font-bold text-ink">
-            Five-dimension scorecard
+      {/* ── 2. Readiness radar across dimensions ─────────────────────────── */}
+      <section
+        className="readiness-report-radar space-y-4"
+        aria-labelledby="report-radar-heading"
+        data-testid="snapshot-radar-section"
+      >
+        <div className="max-w-prose">
+          <p className="eyebrow">Posture map</p>
+          <h2
+            id="report-radar-heading"
+            className="mt-1 font-display text-2xl font-bold tracking-tight text-ink"
+          >
+            Readiness radar
           </h2>
-          <p className="text-sm text-muted">
-            {data.displayMode === "range"
-              ? "Indicative ranges per dimension."
-              : "Scores 0–100 per dimension, with nested sub-metric checks."}
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            Five assessment dimensions on a single radial view. Each axis reflects scores from your
+            submitted answers.
           </p>
         </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-1 lg:grid-cols-2" data-testid="snapshot-scorecard">
-          {DIMENSIONS.map((dim) => (
-            <DimensionCard
-              key={dim}
-              dimension={dim}
-              point={scores?.[dim] ?? 0}
-              range={data.ranges?.[dim] ?? null}
-              showRange={data.displayMode === "range" && Boolean(data.ranges?.[dim])}
-              detail={data.dimensionDetails?.[dim] ?? null}
-              analysis={analysesByDim.get(dim) ?? null}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section
-        className="card p-6 sm:p-8"
-        aria-labelledby="engagement-heading"
-        data-testid="snapshot-engagement"
-      >
-        <h2 id="engagement-heading" className="font-display text-xl font-bold text-ink">
-          {c.recommendedLabel}
-        </h2>
-        <p
-          className="mt-2 font-display text-lg font-bold text-purple"
-          data-testid="snapshot-engagement-name"
+        <div
+          className="mx-auto w-full max-w-xl rounded-3xl border border-border bg-surface p-4 shadow-card sm:p-6"
+          data-testid="snapshot-chart-radar"
+          data-chart="radar"
         >
-          {engagementName}
-        </p>
-        {recommendation ? (
-          <div className="mt-4 space-y-4" data-testid="snapshot-recommendation-detail">
-            <div data-testid="snapshot-recommendation-rationale">
-              <h3 className="text-sm font-semibold text-ink">Why this engagement</h3>
-              <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">
-                {recommendation.rationale}
-              </p>
-            </div>
-            {recommendation.citedFindings.length > 0 ? (
-              <div data-testid="snapshot-recommendation-findings">
-                <h3 className="text-sm font-semibold text-ink">Findings cited from your submission</h3>
-                <ul className="mt-2 space-y-2 text-sm text-ink-soft">
-                  {recommendation.citedFindings.map((f) => (
-                    <li
-                      key={f}
-                      className="flex items-start gap-3"
-                      data-testid="snapshot-recommendation-finding"
-                    >
-                      <span
-                        className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple"
-                        aria-hidden
-                      />
-                      <span className="leading-relaxed">{f}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {recommendation.expectedOutcomes ? (
-              <div data-testid="snapshot-recommendation-outcomes">
-                <h3 className="text-sm font-semibold text-ink">Expected outcomes</h3>
-                <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">
-                  {recommendation.expectedOutcomes}
-                </p>
-              </div>
-            ) : null}
-            {recommendation.firstStepScope ? (
-              <div data-testid="snapshot-recommendation-first-step">
-                <h3 className="text-sm font-semibold text-ink">Suggested first-step scope of work</h3>
-                <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">
-                  {recommendation.firstStepScope}
-                </p>
-              </div>
-            ) : null}
-            {/* Full body also present for page-source / tester consumers */}
-            <div className="sr-only" data-testid="snapshot-recommendation-body">
-              {recommendation.body}
-            </div>
-          </div>
-        ) : data.reasoning ? (
-          <p
-            className="mt-3 max-w-prose text-sm leading-relaxed text-ink-soft"
-            data-testid="snapshot-reasoning"
-          >
-            {data.reasoning}
-          </p>
-        ) : null}
-        {data.reasoning && recommendation ? (
-          <p
-            className="mt-4 max-w-prose border-t border-border pt-4 text-sm leading-relaxed text-muted"
-            data-testid="snapshot-reasoning"
-          >
-            {data.reasoning}
-          </p>
-        ) : null}
+          <ReadinessRadarChart dimensions={radarDimensions} />
+        </div>
       </section>
 
+      {/* ── 3. What we learned from your data ────────────────────────────── */}
       <section
-        className="card p-6 sm:p-8"
-        aria-labelledby="findings-heading"
-        data-testid="snapshot-findings"
+        className="readiness-report-insights space-y-5"
+        aria-labelledby="report-insights-heading"
+        data-testid="snapshot-insights"
       >
-        <h2 id="findings-heading" className="font-display text-xl font-bold text-ink">
-          {c.findingsLabel}
-        </h2>
-        <ul className="mt-4 space-y-3 text-sm text-ink-soft">
-          {findings.map((f) => (
-            <li key={f} className="flex items-start gap-3" data-testid="snapshot-finding">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple" aria-hidden />
-              <span className="leading-relaxed">{f}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="max-w-prose">
+          <p className="eyebrow">Evidence strip</p>
+          <h2
+            id="report-insights-heading"
+            className="mt-1 font-display text-2xl font-bold tracking-tight text-ink"
+          >
+            What we learned from your data
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            Strengths, risks, and opportunities ranked from your own inputs — each card quotes what
+            you actually entered.
+          </p>
+        </div>
+        {insights.length > 0 ? (
+          <div
+            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            data-testid="snapshot-insight-cards"
+          >
+            {insights.map((insight, idx) => (
+              <InsightCard key={`${insight.type}-${insight.headline}-${idx}`} insight={insight} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">No structured insights were available for this snapshot.</p>
+        )}
       </section>
 
+      {/* ── 4. Per-dimension sections ────────────────────────────────────── */}
+      <div className="readiness-report-dimensions space-y-2" data-testid="snapshot-dimensions">
+        <div className="max-w-prose pb-2">
+          <p className="eyebrow">Deep dive</p>
+          <h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink">
+            Dimension-by-dimension analysis
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            Sub-metric bars and written analysis for each assessment dimension, grounded in your
+            submission.
+          </p>
+        </div>
+        {DIMENSIONS.map((dim) => (
+          <DimensionSection
+            key={dim}
+            dimension={dim}
+            point={scores?.[dim] ?? 0}
+            range={data.ranges?.[dim] ?? null}
+            showRange={data.displayMode === "range" && Boolean(data.ranges?.[dim])}
+            chartDim={chartDimByName.get(dim) ?? null}
+            analysis={analysesByDim.get(dim) ?? null}
+          />
+        ))}
+      </div>
+
+      {/* ── 5. Detailed recommendation + CTA ─────────────────────────────── */}
       <section
-        className="card p-6 sm:p-8"
+        className="readiness-report-recommendation relative overflow-hidden rounded-3xl border-2 border-purple/40 bg-gradient-to-br from-[#1b1633] via-[#241d45] to-[#16141f] px-6 py-8 text-white shadow-card sm:px-8 sm:py-10"
+        aria-labelledby="report-recommendation-heading"
+        data-testid="snapshot-recommendation"
+        data-section="detailed-recommendation"
+      >
+        <div
+          className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-purple/30 blur-3xl"
+          aria-hidden
+        />
+        <div className="relative">
+          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-green">
+            Detailed recommendation
+          </p>
+          <h2
+            id="report-recommendation-heading"
+            className="mt-2 font-display text-2xl font-bold tracking-tight text-white sm:text-3xl"
+          >
+            {c.recommendedLabel}
+          </h2>
+          <p
+            className="mt-3 font-display text-xl font-bold text-[#c4b5fd] sm:text-2xl"
+            data-testid="snapshot-engagement-name"
+          >
+            {engagementName}
+          </p>
+
+          {recommendation ? (
+            <div className="mt-6 space-y-5" data-testid="snapshot-recommendation-detail">
+              <div data-testid="snapshot-recommendation-rationale">
+                <h3 className="text-sm font-semibold text-white/90">Why this engagement</h3>
+                <p className="mt-2 max-w-prose text-sm leading-relaxed text-white/80">
+                  {recommendation.rationale}
+                </p>
+              </div>
+              {recommendation.citedFindings.length > 0 ? (
+                <div data-testid="snapshot-recommendation-findings">
+                  <h3 className="text-sm font-semibold text-white/90">
+                    Findings cited from your submission
+                  </h3>
+                  <ul className="mt-2 space-y-2 text-sm text-white/80">
+                    {recommendation.citedFindings.map((f) => (
+                      <li
+                        key={f}
+                        className="flex items-start gap-3"
+                        data-testid="snapshot-recommendation-finding"
+                      >
+                        <span
+                          className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-green"
+                          aria-hidden
+                        />
+                        <span className="leading-relaxed">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {recommendation.expectedOutcomes ? (
+                <div data-testid="snapshot-recommendation-outcomes">
+                  <h3 className="text-sm font-semibold text-white/90">Expected outcomes</h3>
+                  <p className="mt-2 max-w-prose text-sm leading-relaxed text-white/80">
+                    {recommendation.expectedOutcomes}
+                  </p>
+                </div>
+              ) : null}
+              {recommendation.firstStepScope ? (
+                <div data-testid="snapshot-recommendation-first-step">
+                  <h3 className="text-sm font-semibold text-white/90">
+                    Suggested first-step scope of work
+                  </h3>
+                  <p className="mt-2 max-w-prose text-sm leading-relaxed text-white/80">
+                    {recommendation.firstStepScope}
+                  </p>
+                </div>
+              ) : null}
+              <div className="sr-only" data-testid="snapshot-recommendation-body">
+                {recommendation.body}
+              </div>
+            </div>
+          ) : data.reasoning ? (
+            <p
+              className="mt-4 max-w-prose text-sm leading-relaxed text-white/80"
+              data-testid="snapshot-reasoning"
+            >
+              {data.reasoning}
+            </p>
+          ) : null}
+
+          {data.reasoning && recommendation ? (
+            <p
+              className="mt-5 max-w-prose border-t border-white/15 pt-5 text-sm leading-relaxed text-white/65"
+              data-testid="snapshot-reasoning"
+            >
+              {data.reasoning}
+            </p>
+          ) : null}
+
+          {/* CTA closes the recommendation section */}
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Link
+              href={applyHref}
+              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-green px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-dark"
+              data-testid="snapshot-primary-cta"
+              data-offer={data.offerKey || (data.bucket === "Harden" ? "harden" : "audit")}
+              onClick={() =>
+                trackAnalytics("cta_clicked", {
+                  offer: data.offerKey || (data.bucket === "Harden" ? "harden" : "audit"),
+                  bucket: data.bucket || "unknown",
+                })
+              }
+            >
+              {ctaLabel}
+            </Link>
+            <button
+              type="button"
+              className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/25 bg-transparent px-6 py-3 text-sm font-semibold text-white transition-colors hover:border-white/50"
+              onClick={() => void onEmailCopy()}
+              disabled={emailStatus === "sending"}
+              data-testid="snapshot-email-copy"
+            >
+              {emailStatus === "sending" ? c.emailSending : c.emailCopy}
+            </button>
+          </div>
+          {emailFeedback ? (
+            <p
+              className={`mt-3 text-sm ${emailStatus === "success" ? "text-white/80" : "text-red-200"}`}
+              data-testid="snapshot-email-feedback"
+              role="status"
+            >
+              {emailFeedback}
+            </p>
+          ) : null}
+        </div>
+      </section>
+
+      {/* Indicative pricing (secondary, print-friendly) */}
+      <section
+        className="readiness-report-pricing rounded-2xl border border-border bg-surface p-6 sm:p-8"
         aria-labelledby="pricing-heading"
         data-testid="snapshot-pricing"
       >
@@ -710,41 +862,6 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
           {pricing.auditNote}
         </p>
       </section>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Link
-          href={applyHref}
-          className="btn-primary inline-flex justify-center"
-          data-testid="snapshot-primary-cta"
-          data-offer={data.offerKey || (data.bucket === "Harden" ? "harden" : "audit")}
-          onClick={() =>
-            trackAnalytics("cta_clicked", {
-              offer: data.offerKey || (data.bucket === "Harden" ? "harden" : "audit"),
-              bucket: data.bucket || "unknown",
-            })
-          }
-        >
-          {ctaLabel}
-        </Link>
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => void onEmailCopy()}
-          disabled={emailStatus === "sending"}
-          data-testid="snapshot-email-copy"
-        >
-          {emailStatus === "sending" ? c.emailSending : c.emailCopy}
-        </button>
-      </div>
-      {emailFeedback ? (
-        <p
-          className={`text-sm ${emailStatus === "success" ? "text-ink-soft" : "text-red"}`}
-          data-testid="snapshot-email-feedback"
-          role="status"
-        >
-          {emailFeedback}
-        </p>
-      ) : null}
-    </div>
+    </article>
   );
 }

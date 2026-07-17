@@ -328,3 +328,110 @@
     opacity: 0.35;
   }
 }
+
+/* ── Readiness report layout (results summary) ───────────────────────────── */
+
+.readiness-report {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.readiness-report-hero,
+.readiness-report-radar,
+.readiness-report-insights,
+.readiness-report-dimensions,
+.readiness-report-recommendation,
+.readiness-report-pricing {
+  max-width: 100%;
+}
+
+.readiness-report-submetrics .card {
+  box-shadow: none;
+}
+
+/* Print / PDF-friendly report styles */
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #16181d !important;
+    font-size: 11pt;
+    overflow: visible !important;
+    padding-bottom: 0 !important;
+  }
+
+  .skip-link,
+  header,
+  footer,
+  [data-testid="availability-bar"],
+  [data-testid="sticky-mobile-cta"],
+  .sticky,
+  nav {
+    display: none !important;
+  }
+
+  .readiness-report-page {
+    padding: 0 !important;
+  }
+
+  .readiness-report {
+    margin: 0 !important;
+    gap: 0 !important;
+    space-y: 0 !important;
+  }
+
+  .readiness-report > * + * {
+    margin-top: 18pt !important;
+  }
+
+  .readiness-report-hero,
+  .readiness-report-radar .rounded-3xl,
+  .readiness-report-insights article,
+  .readiness-report-recommendation,
+  .readiness-report-pricing,
+  .readiness-report-dimension,
+  .card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border-color: #d4d4d8 !important;
+  }
+
+  .readiness-report-recommendation {
+    background: #f4f2ff !important;
+    color: #16181d !important;
+    border: 1.5pt solid #5b47e0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .readiness-report-recommendation h2,
+  .readiness-report-recommendation h3,
+  .readiness-report-recommendation p,
+  .readiness-report-recommendation li,
+  .readiness-report-recommendation span {
+    color: #16181d !important;
+  }
+
+  .readiness-report a[data-testid="snapshot-primary-cta"],
+  .readiness-report button {
+    border: 1pt solid #5b47e0 !important;
+    color: #5b47e0 !important;
+    background: transparent !important;
+  }
+
+  .readiness-report canvas,
+  .readiness-report svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Avoid clipping wide charts when printing */
+  .readiness-report * {
+    overflow: visible !important;
+  }
+}

@@ -4,9 +4,9 @@ import { readinessContent } from "@/content/readiness";
 import { SnapshotPageClient } from "./SnapshotPageClient";
 
 export const metadata: Metadata = {
-  title: "Readiness snapshot",
+  title: "Readiness report",
   description:
-    "Your production readiness scorecard, recommended engagement, and top findings — shareable results from the vygo readiness check.",
+    "Your production readiness report — headline gauge, dimension radar, evidence insights, written analysis, and recommended engagement from the vygo readiness check.",
   robots: { index: false, follow: false },
 };
 
@@ -16,9 +16,9 @@ export const metadata: Metadata = {
  */
 export default function ReadinessSnapshotPage() {
   return (
-    <main id="main-content">
+    <main id="main-content" className="readiness-report-page">
       <section className="section-pad">
-        <div className="container-page max-w-4xl">
+        <div className="container-page max-w-5xl">
           <Suspense
             fallback={
               <div className="card mt-8" aria-busy="true">
