@@ -2,8 +2,8 @@
   "artifact": "railway-backend-foundation",
   "app": "vygo",
   "project": "vygo",
-  "gitSha": "e2becbd9149cabf1ac64fabaf970cacf269ca85a",
-  "generatedAt": "2026-07-17T00:25:36.952Z",
+  "gitSha": "b011674c7ea7341758d4a1b100451389a9753b71",
+  "generatedAt": "2026-07-17T15:53:42.605Z",
   "hosting": {
     "summary": "Site → Vercel. API / DB / Redis / worker → Railway (project vygo).",
     "site": {

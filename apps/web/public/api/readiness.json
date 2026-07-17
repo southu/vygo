@@ -2,8 +2,8 @@
   "ready": false,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "b1b06aaaa3a5c94b4e415521df84be74e7b40e0d",
-  "generatedAt": "2026-07-17T04:02:06.227Z",
+  "gitSha": "b011674c7ea7341758d4a1b100451389a9753b71",
+  "generatedAt": "2026-07-17T15:53:43.340Z",
   "railwayFoundation": {
     "statusUrl": "/api/railway-foundation",
     "project": "vygo",
@@ -20,7 +20,7 @@
   "analysis": {
     "scoringModel": {
       "configKey": "default",
-      "version": 2,
+      "version": 3,
       "engine": "packages/validation/src/readiness-scoring.ts",
       "dimensions": [
         {
@@ -1427,7 +1427,7 @@
               },
               {
                 "name": "Frontend stack",
-                "score": 25,
+                "score": 24,
                 "weight": 0.5,
                 "evidence": {
                   "question_id": "frontend",
@@ -1437,7 +1437,7 @@
               },
               {
                 "name": "Backend stack",
-                "score": 25,
+                "score": 24,
                 "weight": 0.5,
                 "evidence": {
                   "question_id": "backend",

@@ -1,73 +1,90 @@
 import type { Metadata } from "next";
 import { ModulePage } from "@/components/vibe-coding/ModulePage";
 import { getVibeModulePage } from "@/content/vibe-coding-modules";
+import { guideDocs, guidePackEntryHref, isRenderedGuideDoc } from "@/content/ratchet-guide";
+import { readGuidePackManifest } from "@/lib/guide-source";
 
 const module = getVibeModulePage("ratchet-guide");
+const manifest = readGuidePackManifest();
 
 export const metadata: Metadata = {
   title: `${module.title} — Vibe coding`,
   description: module.description,
 };
 
-/** Entry points into the versioned markdown pack served from /content. */
-const packLinks = [
-  {
-    href: "/content/vibe-coding/ratchet-guide/README.md",
-    title: "Guide index (README)",
-    blurb: "The pack's table of contents: every document and what it covers.",
-  },
-  {
-    href: "/content/vibe-coding/ratchet-guide/overview.md",
-    title: "Overview",
-    blurb: "What Ratchet is and why the loop never moves backward.",
-  },
-  {
-    href: "/content/vibe-coding/ratchet-guide/architecture.md",
-    title: "Architecture",
-    blurb: "Composer, Ratchet, and Vault — how the pieces fit together.",
-  },
-  {
-    href: "/content/vibe-coding/ratchet-guide/loop-and-missions.md",
-    title: "The loop & missions",
-    blurb: "The build–deploy–test contract every mission runs under.",
-  },
-  {
-    href: "/content/vibe-coding/ratchet-guide/vault.md",
-    title: "Vault",
-    blurb: "How credentials stay out of the builder environment entirely.",
-  },
-  {
-    href: "/content/vibe-coding/ratchet-guide/rebuild.md",
-    title: "Rebuild checklist",
-    blurb: "Greenfield rebuild in phases A–E, from host setup to hardening.",
-  },
-];
-
+/**
+ * Guide index: the pack's read order as rendered pages (the six key docs),
+ * then the full structure of the sanitized v1.2 pack with a link to every
+ * document — rendered pages where one exists, the raw versioned markdown
+ * served under /content otherwise.
+ */
 export default function RatchetGuidePage() {
   return (
     <ModulePage module={module}>
-      <section
-        className="section-pad border-t border-border bg-surface"
-        data-section="guide-contents"
-      >
-        <div className="container-page max-w-3xl">
-          <h2 className="font-display text-2xl font-bold">Start reading</h2>
+      <section className="section-pad border-t border-border bg-surface" data-section="guide-docs">
+        <div className="container-page max-w-4xl">
+          <h2 className="font-display text-2xl font-bold">Read the guide</h2>
           <p className="mt-4 text-muted">
-            The guide is a plain-markdown pack served alongside this site, so every document opens
-            directly in the browser. Begin with the index, then the overview.
+            The six key documents of the {manifest.version} pack, rendered as pages on this site and
+            chained prev/next in read order.
           </p>
-          <ul className="mt-8 grid gap-4 sm:grid-cols-2">
-            {packLinks.map((link) => (
-              <li key={link.href}>
+          <ol className="mt-8 grid gap-4 sm:grid-cols-2">
+            {guideDocs.map((doc, index) => (
+              <li key={doc.slug}>
                 <a
-                  href={link.href}
+                  href={doc.href}
                   className="card block h-full transition-colors hover:border-purple"
                 >
-                  <h3 className="font-display text-base font-semibold">{link.title}</h3>
-                  <p className="mt-2 text-sm text-muted">{link.blurb}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    {index + 1} of {guideDocs.length}
+                  </p>
+                  <h3 className="mt-2 font-display text-base font-semibold">{doc.title}</h3>
+                  <p className="mt-2 text-sm text-muted">{doc.blurb}</p>
                 </a>
               </li>
             ))}
+          </ol>
+          <div className="mt-8">
+            <a href={guideDocs[0].href} className="btn-secondary" data-guide-next>
+              Start reading: {guideDocs[0].title} →
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section className="section-pad border-t border-border" data-section="pack-structure">
+        <div className="container-page max-w-4xl">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="font-display text-2xl font-bold">Pack contents</h2>
+            <span className="chip" data-pack-version>
+              {manifest.version}
+            </span>
+          </div>
+          <p className="mt-4 text-muted">
+            Every document in the sanitized pack, in manifest order. Entries marked “Guide page” are
+            rendered on this site; the rest open as the pack&apos;s plain markdown or self-contained
+            HTML, served alongside it.
+          </p>
+          <ul className="mt-8 space-y-3">
+            {manifest.documents.map((entry) => {
+              const rendered = isRenderedGuideDoc(entry.filename);
+              return (
+                <li key={entry.filename} className="card">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <a
+                      href={guidePackEntryHref(entry.filename)}
+                      className="font-mono text-sm font-semibold text-purple hover:underline"
+                    >
+                      {entry.filename}
+                    </a>
+                    <span className="chip" data-entry-kind={rendered ? "page" : "file"}>
+                      {rendered ? "Guide page" : "Pack file"}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm text-muted">{entry.title}</p>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </section>
