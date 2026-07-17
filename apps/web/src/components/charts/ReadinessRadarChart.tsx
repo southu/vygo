@@ -194,14 +194,19 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
       data-chart="radar"
     >
       <div ref={wrapRef} className="relative w-full">
+        {/* pointer-events-none: axis hotspots sit above and must receive hover/tap */}
         <canvas
           ref={canvasRef}
           id={`readiness-radar-${uid}`}
+          className="pointer-events-none block h-auto w-full"
           role="img"
           aria-label={`Overall readiness radar across dimensions: ${ariaSummary}`}
         />
         {/* Focusable axis hotspots over each radar point (DOM for a11y + tooltips) */}
-        <div className="pointer-events-none absolute inset-0" data-testid="radar-axis-hotspots">
+        <div
+          className="pointer-events-none absolute inset-0 z-10"
+          data-testid="radar-hotspots"
+        >
           {hotspots.map((h) => {
             const dim = h.dimension;
             const score = clampScore(dim.score);
@@ -220,8 +225,8 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
             return (
               <div
                 key={`axis-${dim.dimension}`}
-                className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${h.left}%`, top: `${h.top}%`, zIndex: 2 }}
+                className="pointer-events-auto absolute z-20 -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${h.left}%`, top: `${h.top}%` }}
               >
                 <InteractiveChartSegment
                   score={score}
@@ -230,7 +235,7 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   segmentKind="radar-axis"
                   testId={`radar-axis-${slugify(dim.dimension)}`}
                   tooltipPlacement={h.top < 40 ? "bottom" : "top"}
-                  controlClassName="flex h-8 w-8 items-center justify-center rounded-full"
+                  controlClassName="flex h-10 w-10 items-center justify-center rounded-full"
                 >
                   <span
                     className="inline-block h-3.5 w-3.5 rounded-full bg-purple-dark ring-2 ring-white"

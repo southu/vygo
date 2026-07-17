@@ -99,6 +99,28 @@ type InteractiveChartSegmentProps = {
   testId?: string;
 };
 
+function useFineHover(): boolean {
+  const [fineHover, setFineHover] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
+    }
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const apply = () => setFineHover(mq.matches);
+    apply();
+    // Safari < 14 uses addListener; modern browsers use addEventListener.
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", apply);
+      return () => mq.removeEventListener("change", apply);
+    }
+    mq.addListener(apply);
+    return () => mq.removeListener(apply);
+  }, []);
+
+  return fineHover;
+}
+
 /**
  * Wraps a chart segment with hover / focus / tap evidence tooltips.
  * When evidence is missing, renders children only — no affordance, no tooltip.
@@ -118,11 +140,8 @@ export function InteractiveChartSegment({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const hasEvidence = hasChartEvidence(evidence);
-  /** Fine-pointer + hover: use hover open; coarse/touch: toggle on tap. */
-  const fineHover =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  /** Fine-pointer + hover: open on hover; coarse/touch: toggle on tap. */
+  const fineHover = useFineHover();
 
   const close = useCallback(() => setOpen(false), []);
   const openTip = useCallback(() => {
@@ -144,6 +163,19 @@ export function InteractiveChartSegment({
       document.removeEventListener("mousedown", onPointer);
       document.removeEventListener("touchstart", onPointer);
     };
+  }, [open, close]);
+
+  // Escape closes even when focus is not on the control (document capture).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [open, close]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -204,6 +236,8 @@ export function InteractiveChartSegment({
         onClick={(e) => {
           e.stopPropagation();
           // Desktop hover already shows the card; only toggle for touch / coarse pointers.
+          // Always ensure open on click so emulated mobile clicks still work when
+          // the browser reports fine pointer (common in headless automation).
           if (fineHover) {
             openTip();
             return;
@@ -214,9 +248,16 @@ export function InteractiveChartSegment({
       >
         {children}
         {/* Discoverability: pulse ring + info dot (only when real evidence exists) */}
-        <span className="chart-segment-affordance" aria-hidden data-testid="chart-segment-affordance">
+        <span
+          className="chart-segment-affordance"
+          aria-hidden
+          data-testid="chart-segment-affordance"
+        >
           <span className="chart-segment-pulse" />
-          <span className="chart-segment-info-dot" />
+          <span
+            className="chart-segment-info-dot animate-pulse"
+            data-testid="chart-segment-info-dot"
+          />
         </span>
       </div>
       {open ? (

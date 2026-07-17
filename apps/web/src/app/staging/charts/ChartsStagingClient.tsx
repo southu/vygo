@@ -63,9 +63,16 @@ export function ChartsStagingClient() {
   }
 
   return (
-    <div className="mt-6 space-y-8 readiness-charts-stage" data-testid="charts-staging-ready">
+    <div
+      className="mt-6 space-y-8 readiness-charts-stage"
+      data-testid="charts-staging-ready"
+      data-chart-results-preview="true"
+    >
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
         <span className="chip">Staging · not linked in nav</span>
+        <span className="rounded-full border border-border bg-canvas px-2.5 py-0.5 font-semibold text-ink-soft">
+          Verification surface (no Turnstile)
+        </span>
         {data.sourceLabel ? <span data-testid="charts-source-label">{data.sourceLabel}</span> : null}
         {data.bucket ? (
           <span className="rounded-full bg-purple-soft px-2.5 py-0.5 font-semibold text-purple-dark">
@@ -73,6 +80,12 @@ export function ChartsStagingClient() {
           </span>
         ) : null}
       </div>
+      <p className="text-sm text-muted" data-testid="charts-verify-hint">
+        Live score-preview (or snapshot <code className="text-xs">?id=</code>) powers the same radar,
+        gauge, and sub-metric bars as{" "}
+        <code className="text-xs">/readiness/snapshot</code>. Hover, tap, or Tab to a segment for the
+        score, reason, and submitted answer.
+      </p>
 
       <section
         className="card readiness-charts-enter p-5 sm:p-8"

@@ -103,7 +103,7 @@ export function ReadinessGauge({
       >
         <svg
           viewBox="0 0 200 130"
-          className="h-auto w-full overflow-visible"
+          className="pointer-events-none h-auto w-full overflow-visible"
           aria-hidden
         >
           <defs>
@@ -154,7 +154,10 @@ export function ReadinessGauge({
 
         {/* Interactive gauge segments as positioned hit targets on the arc */}
         {segArcs.length > 0 ? (
-          <div className="pointer-events-none absolute inset-0" data-testid="gauge-segments">
+          <div
+            className="pointer-events-none absolute inset-0 z-10"
+            data-testid="gauge-hit-targets"
+          >
             {segArcs.map(({ seg, hit, band: sb }) => {
               // viewBox 0 0 200 130 → percent positions
               const left = (hit.x / 200) * 100;
@@ -162,7 +165,7 @@ export function ReadinessGauge({
               return (
                 <div
                   key={seg.label}
-                  className="pointer-events-auto absolute"
+                  className="pointer-events-auto absolute z-20"
                   style={{
                     left: `${left}%`,
                     top: `${top}%`,
@@ -176,7 +179,7 @@ export function ReadinessGauge({
                     segmentKind="gauge-segment"
                     testId={`gauge-segment-${slugify(seg.label)}`}
                     tooltipPlacement="bottom"
-                    controlClassName="flex h-7 w-7 items-center justify-center rounded-full"
+                    controlClassName="flex h-9 w-9 items-center justify-center rounded-full"
                   >
                     <span
                       className="chart-gauge-segment-dot inline-block h-3 w-3 rounded-full ring-2 ring-white"
@@ -191,10 +194,10 @@ export function ReadinessGauge({
           </div>
         ) : overallHasEvidence ? (
           <div
-            className="pointer-events-none absolute inset-x-0 top-[18%] flex justify-center"
-            data-testid="gauge-segments"
+            className="pointer-events-none absolute inset-x-0 top-[18%] z-10 flex justify-center"
+            data-testid="gauge-hit-targets"
           >
-            <div className="pointer-events-auto">
+            <div className="pointer-events-auto z-20">
               <InteractiveChartSegment
                 score={pct}
                 evidence={evidence}
