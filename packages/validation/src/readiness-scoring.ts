@@ -25,6 +25,11 @@ import {
   buildEvidenceInsights,
   type EvidenceInsight,
 } from "./evidence-insights.js";
+import {
+  buildDetailedAnalysis,
+  type DetailedRecommendation,
+  type DimensionAnalysis,
+} from "./detailed-analysis.js";
 
 /** Canonical dimension labels (API + UI). */
 export const READINESS_DIMENSIONS = [
@@ -137,6 +142,16 @@ export type ReadinessScorePayload = {
    * alter dimension scores or existing findings shape.
    */
   insights: EvidenceInsight[];
+  /**
+   * Per-dimension multi-paragraph written analysis grounded in sub-metric
+   * evidence and insights. Additive; does not alter scores.
+   */
+  dimensionAnalyses: DimensionAnalysis[];
+  /**
+   * Pattern-branched detailed engagement recommendation (tier, rationale with
+   * ≥3 cited findings, expected outcomes, first-step scope).
+   */
+  recommendation: DetailedRecommendation;
   ranges?: DimensionRanges;
   overall: number;
   bucket: EngagementBucket;
@@ -1168,6 +1183,24 @@ export function computeReadinessScore(input: ComputeScoreInput): ReadinessScoreP
   const findings = buildTopFindings(report, dimensions, signals);
   const reasoning = buildEngagementReasoning(report, signals, bucketResult.bucket, dimensions);
   const meta = engagementMeta(bucketResult.bucket);
+  const detailed = buildDetailedAnalysis({
+    report,
+    dimensions,
+    dimensionDetails,
+    insights,
+    bucket: bucketResult.bucket,
+  });
+
+  // Prefer pattern-branched engagement name when it specializes the coarse bucket
+  // (e.g. security-first Harden). Keep offerKey aligned with the specialized path.
+  const specializedEngagement = detailed.recommendation.engagement;
+  const specializedOffer =
+    detailed.recommendation.patternKey === "security_first_high_adoption" ||
+    detailed.recommendation.patternKey === "bucket_harden"
+      ? ("harden" as const)
+      : detailed.recommendation.patternKey === "bucket_not_a_fit"
+        ? ("general" as const)
+        : meta.offerKey;
 
   const displayMode: "point" | "range" = source === "manual" ? "range" : "point";
   const ranges =
@@ -1183,14 +1216,16 @@ export function computeReadinessScore(input: ComputeScoreInput): ReadinessScoreP
     dimensionDetails,
     dimensionResults,
     insights,
+    dimensionAnalyses: detailed.dimensionAnalyses,
+    recommendation: detailed.recommendation,
     ranges,
     overall,
     bucket: bucketResult.bucket,
     reasoning,
     caveat: bucketResult.caveat,
     findings,
-    recommendedEngagement: meta.recommendedEngagement,
-    offerKey: meta.offerKey,
+    recommendedEngagement: specializedEngagement || meta.recommendedEngagement,
+    offerKey: specializedOffer,
     ctaLabel: meta.ctaLabel,
     pricing: { ...config.pricing },
     configKey: config.configKey,

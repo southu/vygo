@@ -197,6 +197,19 @@ export {
   type InsightType,
 } from "./evidence-insights.js";
 
+export {
+  buildDetailedAnalysis,
+  buildDimensionAnalysis,
+  buildAllDimensionAnalyses,
+  buildDetailedRecommendation,
+  selectRecommendationPattern,
+  deriveAdoptionSignals,
+  type DimensionAnalysis,
+  type DetailedRecommendation,
+  type DetailedAnalysisPayload,
+  type AdoptionSignals,
+} from "./detailed-analysis.js";
+
 export const availabilityStatusSchema = z.enum(["open", "waitlist", "paused"]);
 
 export type AvailabilityStatus = z.infer<typeof availabilityStatusSchema>;

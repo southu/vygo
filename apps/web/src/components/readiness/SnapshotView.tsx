@@ -7,7 +7,9 @@ import { trackAnalytics } from "@/lib/analytics";
 import {
   emailReadinessSnapshot,
   getReadinessSnapshot,
+  type SnapshotDimensionAnalysis,
   type SnapshotDimensionDetail,
+  type SnapshotRecommendation,
   type SnapshotResponse,
   type SnapshotSubMetricStatus,
 } from "@/lib/readiness/api";
@@ -187,16 +189,26 @@ function DimensionCard({
   range,
   showRange,
   detail,
+  analysis,
 }: {
   dimension: string;
   point: number;
   range?: { low: number; high: number; mid: number } | null;
   showRange: boolean;
   detail?: SnapshotDimensionDetail | null;
+  analysis?: SnapshotDimensionAnalysis | null;
 }) {
   const headline = showRange && range ? range.mid : point;
   const status = statusForScore(headline);
   const meta = STATUS_META[status];
+  const analysisParagraphs =
+    analysis?.paragraphs?.filter((p) => typeof p === "string" && p.trim()) ??
+    (analysis?.analysis
+      ? analysis.analysis
+          .split(/\n\n+/)
+          .map((p) => p.trim())
+          .filter(Boolean)
+      : []);
   return (
     <article className="card flex flex-col p-5 sm:p-6" data-testid={`snapshot-dim-${dimension}`}>
       <div className="flex items-start justify-between gap-3">
@@ -227,6 +239,22 @@ function DimensionCard({
           aria-hidden
         />
       </div>
+      {analysisParagraphs.length >= 2 ? (
+        <div
+          className="mt-4 space-y-3 border-t border-border pt-4"
+          data-testid={`snapshot-dim-analysis-${dimension}`}
+        >
+          {analysisParagraphs.map((para, idx) => (
+            <p
+              key={`${dimension}-analysis-${idx}`}
+              className="text-sm leading-relaxed text-ink-soft"
+              data-testid={`snapshot-dim-analysis-p-${dimension}-${idx}`}
+            >
+              {para}
+            </p>
+          ))}
+        </div>
+      ) : null}
       {detail && detail.checks.length > 0 ? (
         <div className="mt-4 border-t border-border pt-3">
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
@@ -346,6 +374,14 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
     };
   }, [data?.dimensionDetails]);
 
+  const analysesByDim = useMemo(() => {
+    const map = new Map<string, SnapshotDimensionAnalysis>();
+    for (const a of data?.dimensionAnalyses ?? []) {
+      if (a?.dimension) map.set(a.dimension, a);
+    }
+    return map;
+  }, [data?.dimensionAnalyses]);
+
   if (loading) {
     return (
       <div className="mt-8 space-y-6" aria-busy="true" data-testid="snapshot-loading">
@@ -377,6 +413,9 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
   }
 
   const findings = (data.findings || []).slice(0, 3);
+  const recommendation: SnapshotRecommendation | null = data.recommendation ?? null;
+  const engagementName =
+    recommendation?.engagement || data.recommendedEngagement || data.bucket || "Launch";
 
   return (
     <div className="mt-8 space-y-8" data-testid="readiness-snapshot">
@@ -447,7 +486,7 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
               : "Scores 0–100 per dimension, with nested sub-metric checks."}
           </p>
         </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-2" data-testid="snapshot-scorecard">
+        <div className="mt-4 grid gap-4 md:grid-cols-1 lg:grid-cols-2" data-testid="snapshot-scorecard">
           {DIMENSIONS.map((dim) => (
             <DimensionCard
               key={dim}
@@ -456,6 +495,7 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
               range={data.ranges?.[dim] ?? null}
               showRange={data.displayMode === "range" && Boolean(data.ranges?.[dim])}
               detail={data.dimensionDetails?.[dim] ?? null}
+              analysis={analysesByDim.get(dim) ?? null}
             />
           ))}
         </div>
@@ -473,11 +513,68 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
           className="mt-2 font-display text-lg font-bold text-purple"
           data-testid="snapshot-engagement-name"
         >
-          {data.recommendedEngagement || data.bucket || "Launch"}
+          {engagementName}
         </p>
-        {data.reasoning ? (
+        {recommendation ? (
+          <div className="mt-4 space-y-4" data-testid="snapshot-recommendation-detail">
+            <div data-testid="snapshot-recommendation-rationale">
+              <h3 className="text-sm font-semibold text-ink">Why this engagement</h3>
+              <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">
+                {recommendation.rationale}
+              </p>
+            </div>
+            {recommendation.citedFindings.length > 0 ? (
+              <div data-testid="snapshot-recommendation-findings">
+                <h3 className="text-sm font-semibold text-ink">Findings cited from your submission</h3>
+                <ul className="mt-2 space-y-2 text-sm text-ink-soft">
+                  {recommendation.citedFindings.map((f) => (
+                    <li
+                      key={f}
+                      className="flex items-start gap-3"
+                      data-testid="snapshot-recommendation-finding"
+                    >
+                      <span
+                        className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-purple"
+                        aria-hidden
+                      />
+                      <span className="leading-relaxed">{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {recommendation.expectedOutcomes ? (
+              <div data-testid="snapshot-recommendation-outcomes">
+                <h3 className="text-sm font-semibold text-ink">Expected outcomes</h3>
+                <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">
+                  {recommendation.expectedOutcomes}
+                </p>
+              </div>
+            ) : null}
+            {recommendation.firstStepScope ? (
+              <div data-testid="snapshot-recommendation-first-step">
+                <h3 className="text-sm font-semibold text-ink">Suggested first-step scope of work</h3>
+                <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-soft">
+                  {recommendation.firstStepScope}
+                </p>
+              </div>
+            ) : null}
+            {/* Full body also present for page-source / tester consumers */}
+            <div className="sr-only" data-testid="snapshot-recommendation-body">
+              {recommendation.body}
+            </div>
+          </div>
+        ) : data.reasoning ? (
           <p
             className="mt-3 max-w-prose text-sm leading-relaxed text-ink-soft"
+            data-testid="snapshot-reasoning"
+          >
+            {data.reasoning}
+          </p>
+        ) : null}
+        {data.reasoning && recommendation ? (
+          <p
+            className="mt-4 max-w-prose border-t border-border pt-4 text-sm leading-relaxed text-muted"
             data-testid="snapshot-reasoning"
           >
             {data.reasoning}

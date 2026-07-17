@@ -234,6 +234,8 @@ export type ScoreResponse = {
   dimensionDetails?: Record<string, SnapshotDimensionDetail> | null;
   /** Mission-shaped: [{ dimension, score, sub_metrics: [{ name, score, weight, evidence }] }] */
   dimensionResults?: SnapshotDimensionResult[] | null;
+  dimensionAnalyses?: SnapshotDimensionAnalysis[] | null;
+  recommendation?: SnapshotRecommendation | null;
   ranges?: Record<string, { low: number; high: number; mid: number }> | null;
   displayMode?: "point" | "range";
   overall?: number;
@@ -293,6 +295,25 @@ export type SnapshotDimensionResult = {
   }>;
 };
 
+/** Multi-paragraph written analysis for one scoring dimension. */
+export type SnapshotDimensionAnalysis = {
+  dimension: string;
+  score: number;
+  paragraphs: string[];
+  analysis: string;
+};
+
+/** Pattern-branched detailed engagement recommendation. */
+export type SnapshotRecommendation = {
+  patternKey: string;
+  engagement: string;
+  rationale: string;
+  citedFindings: string[];
+  expectedOutcomes: string;
+  firstStepScope: string;
+  body: string;
+};
+
 export type SnapshotResponse = {
   id: string;
   snapshotId?: string;
@@ -300,6 +321,8 @@ export type SnapshotResponse = {
   dimensions?: Record<string, number> | null;
   dimensionDetails?: Record<string, SnapshotDimensionDetail> | null;
   dimensionResults?: SnapshotDimensionResult[] | null;
+  dimensionAnalyses?: SnapshotDimensionAnalysis[] | null;
+  recommendation?: SnapshotRecommendation | null;
   ranges?: Record<string, { low: number; high: number; mid: number }> | null;
   displayMode?: "point" | "range";
   overall?: number | null;
@@ -393,6 +416,8 @@ export async function scoreReadiness(input: {
         : undefined,
     dimensionDetails: parseDimensionDetails(body.dimensionDetails),
     dimensionResults: parseDimensionResults(body.dimensionResults),
+    dimensionAnalyses: parseDimensionAnalyses(body.dimensionAnalyses),
+    recommendation: parseRecommendation(body.recommendation),
     ranges:
       body.ranges && typeof body.ranges === "object"
         ? (body.ranges as ScoreResponse["ranges"])
@@ -474,6 +499,71 @@ function parseDimensionResults(raw: unknown): SnapshotDimensionResult[] | null {
     });
   }
   return out.length > 0 ? out : null;
+}
+
+function parseDimensionAnalyses(raw: unknown): SnapshotDimensionAnalysis[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: SnapshotDimensionAnalysis[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const row = entry as Record<string, unknown>;
+    const dimension = typeof row.dimension === "string" ? row.dimension.trim() : "";
+    if (!dimension) continue;
+    const paragraphs = Array.isArray(row.paragraphs)
+      ? (row.paragraphs as unknown[])
+          .filter((p): p is string => typeof p === "string" && p.trim().length > 0)
+          .map((p) => p.trim())
+      : [];
+    const analysis =
+      typeof row.analysis === "string" && row.analysis.trim()
+        ? row.analysis.trim()
+        : paragraphs.join("\n\n");
+    if (paragraphs.length < 2 && analysis.split(/\n\n+/).filter(Boolean).length < 2) continue;
+    out.push({
+      dimension,
+      score: typeof row.score === "number" && Number.isFinite(row.score) ? row.score : 0,
+      paragraphs:
+        paragraphs.length >= 2
+          ? paragraphs
+          : analysis
+              .split(/\n\n+/)
+              .map((p) => p.trim())
+              .filter(Boolean),
+      analysis,
+    });
+  }
+  return out.length > 0 ? out : null;
+}
+
+function parseRecommendation(raw: unknown): SnapshotRecommendation | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const engagement = typeof r.engagement === "string" ? r.engagement.trim() : "";
+  const rationale = typeof r.rationale === "string" ? r.rationale.trim() : "";
+  const expectedOutcomes =
+    typeof r.expectedOutcomes === "string" ? r.expectedOutcomes.trim() : "";
+  const firstStepScope = typeof r.firstStepScope === "string" ? r.firstStepScope.trim() : "";
+  if (!engagement || !rationale) return null;
+  const citedFindings = Array.isArray(r.citedFindings)
+    ? (r.citedFindings as unknown[])
+        .filter((f): f is string => typeof f === "string" && f.trim().length > 0)
+        .map((f) => f.trim())
+    : [];
+  const body =
+    typeof r.body === "string" && r.body.trim()
+      ? r.body.trim()
+      : [rationale, expectedOutcomes && `Expected outcomes: ${expectedOutcomes}`, firstStepScope && `Suggested first-step scope of work: ${firstStepScope}`]
+          .filter(Boolean)
+          .join("\n\n");
+  return {
+    patternKey: typeof r.patternKey === "string" ? r.patternKey : "",
+    engagement,
+    rationale,
+    citedFindings,
+    expectedOutcomes,
+    firstStepScope,
+    body,
+  };
 }
 
 function parseDimensionDetails(raw: unknown): Record<string, SnapshotDimensionDetail> | null {
@@ -571,6 +661,8 @@ export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse
     dimensions: scores,
     dimensionDetails: parseDimensionDetails(body.dimensionDetails),
     dimensionResults: parseDimensionResults(body.dimensionResults),
+    dimensionAnalyses: parseDimensionAnalyses(body.dimensionAnalyses),
+    recommendation: parseRecommendation(body.recommendation),
     ranges:
       body.ranges && typeof body.ranges === "object"
         ? (body.ranges as SnapshotResponse["ranges"])

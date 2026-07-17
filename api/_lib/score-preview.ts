@@ -202,6 +202,10 @@ function publicPreviewBody(
     results: dimensionResults,
     /** Ranked evidence insights grounded in submitted answers. */
     insights: Array.isArray(payload.insights) ? payload.insights : [],
+    /** Per-dimension multi-paragraph written analysis grounded in sub-metric evidence. */
+    dimensionAnalyses: Array.isArray(payload.dimensionAnalyses) ? payload.dimensionAnalyses : [],
+    /** Pattern-branched detailed engagement recommendation. */
+    recommendation: payload.recommendation ?? null,
     ranges: payload.ranges ?? null,
     reasoning: payload.reasoning,
     caveat: payload.caveat ?? null,

@@ -280,6 +280,10 @@ function publicScorePreviewBody(
     results: payload.dimensionResults,
     /** Ranked evidence insights (tools, counts, practices) grounded in answers. */
     insights: Array.isArray(payload.insights) ? payload.insights : [],
+    /** Per-dimension multi-paragraph written analysis grounded in sub-metric evidence. */
+    dimensionAnalyses: Array.isArray(payload.dimensionAnalyses) ? payload.dimensionAnalyses : [],
+    /** Pattern-branched detailed engagement recommendation. */
+    recommendation: payload.recommendation ?? null,
     ranges: payload.ranges ?? null,
     reasoning: payload.reasoning,
     caveat: payload.caveat ?? null,
@@ -346,6 +350,13 @@ function publicSnapshotBody(submission: {
   }
 
   const insights = Array.isArray(scores.insights) ? scores.insights : [];
+  const dimensionAnalyses = Array.isArray(scores.dimensionAnalyses)
+    ? scores.dimensionAnalyses
+    : [];
+  const recommendation =
+    scores.recommendation && typeof scores.recommendation === "object"
+      ? scores.recommendation
+      : null;
 
   return {
     id: submission.id,
@@ -355,6 +366,8 @@ function publicSnapshotBody(submission: {
     dimensionDetails: scores.dimensionDetails ?? null,
     dimensionResults,
     insights,
+    dimensionAnalyses,
+    recommendation,
     ranges: scores.ranges ?? null,
     displayMode: scores.displayMode ?? "point",
     overall: scores.overall ?? null,
@@ -1934,6 +1947,8 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         dimensionDetails: payload.dimensionDetails,
         dimensionResults: payload.dimensionResults,
         insights: payload.insights,
+        dimensionAnalyses: payload.dimensionAnalyses,
+        recommendation: payload.recommendation,
         ranges: payload.ranges ?? null,
         displayMode: payload.displayMode,
         overall: payload.overall,
