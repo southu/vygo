@@ -58,7 +58,7 @@
   </header>
 
   <h2>What it is</h2>
-  <p>Self-hosted <strong>AI build-and-verify control plane</strong>. Human types a goal → system queues missions → AI <strong>builder</strong> pushes code → <strong>deploy gate</strong> waits for live <code>/version</code> SHA → AI <strong>tester</strong> grades the <strong>live</strong> site → repeat until a <strong>streak</strong> of passes. Name = contract: only moves forward.</p>
+  <p>Self-hosted <strong>AI build-and-verify control plane</strong>. Human types a goal → system queues missions → AI <strong>builder</strong> pushes code → <strong>deploy gate</strong> waits for live version signal → AI <strong>tester</strong> grades the <strong>live</strong> site → repeat until a <strong>streak</strong> of passes. Name = contract: only moves forward.</p>
 
   <h2>Happy path</h2>
   <figure>
@@ -94,7 +94,7 @@
         <text x="780" y="52" font-size="12">PASS streak</text>
 
         <path d="M692,84 L692,128 L430,128 L430,88" fill="none" stroke="#111" stroke-width="1.4" marker-end="url(#ah)"></path>
-        <text x="561" y="144" font-size="12">FAIL → builder_prompt → next iteration</text>
+        <text x="561" y="144" font-size="12">FAIL → feedback → next iteration</text>
       </g>
     </svg>
   </figure>
@@ -102,43 +102,43 @@
   <h2>Stack (roles)</h2>
   <table>
     <tr><th>Piece</th><th>Place</th><th>Job</th></tr>
-    <tr><td>Composer</td><td>control plane UI</td><td>Goals, queue, projects</td></tr>
-    <tr><td>Ratchet CLI</td><td><code>RATCHET_ROOT/harness</code></td><td>Loop orchestration</td></tr>
-    <tr><td>Vault</td><td>credentials boundary</td><td>Secrets + consumer broker</td></tr>
-    <tr><td>Projects</td><td><code>RATCHET_ROOT/projects</code></td><td><code>project.json</code> shells</td></tr>
+    <tr><td>Composer</td><td>control plane UI</td><td>Goals, queue, product shells</td></tr>
+    <tr><td>Ratchet loop</td><td>harness</td><td>Build → gate → live test</td></tr>
+    <tr><td>Vault</td><td>credentials boundary</td><td>Secrets + brokered access</td></tr>
+    <tr><td>Products</td><td>product shells</td><td>Repo + live URL + version signal</td></tr>
     <tr><td>Overnight helpers</td><td>optional</td><td>Observe only; no product features</td></tr>
   </table>
 
   <div class="cols">
     <h2>Non-negotiables</h2>
     <ol>
-      <li><strong>Live is truth</strong> — tester hits <code>live_url</code>, not local tree</li>
-      <li><strong><code>/version</code></strong> — product must return deployed git SHA for the deploy gate</li>
-      <li><strong>Proof of work</strong> — harness checks git; ignore agent claims</li>
-      <li><strong>Streak</strong> — usually 2 consecutive PASSes</li>
-      <li><strong>No secrets in builder env</strong> — Vault consumer only</li>
+      <li><strong>Live is truth</strong> — tester hits the live URL, not the local tree</li>
+      <li><strong>Version signal</strong> — product must return the deployed git SHA for the deploy gate</li>
+      <li><strong>Proof of work</strong> — loop checks git; ignore agent claims</li>
+      <li><strong>Streak</strong> — usually several consecutive passes</li>
+      <li><strong>No secrets in builder env</strong> — credentials boundary only</li>
       <li><strong>Team git author</strong> — unknown bot authors may be blocked by hosts</li>
-      <li><strong>Multi-step goals</strong> → about <strong>4–8</strong> queue items for real product work; bind cloud project UUIDs</li>
+      <li><strong>Multi-step goals</strong> → several focused queue items; bind cloud project identities</li>
       <li><strong>Credentials stay brokered</strong> — builder and tester never hold cloud tokens</li>
     </ol>
 
-    <h2>Loop exits</h2>
+    <h2>Loop outcomes</h2>
     <table>
-      <tr><th>Code</th><th>Meaning</th></tr>
-      <tr><td>0</td><td>Success (streak)</td></tr>
-      <tr><td>2</td><td>Max iterations</td></tr>
-      <tr><td>3</td><td>Deploy timeout</td></tr>
-      <tr><td>4</td><td>Tester contract</td></tr>
-      <tr><td>5</td><td>Builder proof-of-work</td></tr>
-      <tr><td>6</td><td>Budget</td></tr>
+      <tr><th>Outcome</th><th>Meaning</th></tr>
+      <tr><td>Success</td><td>Required streak</td></tr>
+      <tr><td>Max iterations</td><td>Attempts exhausted</td></tr>
+      <tr><td>Deploy timeout</td><td>Version never caught up</td></tr>
+      <tr><td>Tester contract</td><td>Bad structured result</td></tr>
+      <tr><td>Builder proof-of-work</td><td>No real git progress</td></tr>
+      <tr><td>Budget</td><td>Spend limit exceeded</td></tr>
     </table>
   </div>
 
   <h2>Mental model</h2>
-  <p><strong>Composer</strong> = factory office · <strong>Ratchet</strong> = factory floor · <strong>Vault</strong> = key cabinet · <strong>Product <code>/version</code></strong> = time clock.</p>
+  <p><strong>Composer</strong> = factory office · <strong>Ratchet</strong> = factory floor · <strong>Vault</strong> = key cabinet · <strong>Product version signal</strong> = time clock.</p>
 
   <h2>Rebuild in one breath</h2>
-  <p>Host + model CLIs → trees <code>RATCHET_ROOT/{control,harness,projects}</code> → vault consumer → mock loop → product with <code>/version</code> → tiny real mission → docs pack for friends/AIs.</p>
+  <p>Model CLIs → control plane + harness + product shells → credentials boundary → mock loop → product with version signal → tiny real mission → docs pack for friends/AIs.</p>
 
   <h2>Share / go deeper</h2>
   <table>
@@ -150,7 +150,7 @@
     <tr><td>Guide history</td><td><a href="./CHANGELOG.md">CHANGELOG.md</a></td></tr>
   </table>
 
-  <footer>No secrets in this pack. Guide pack <strong>v1.2</strong> · product design reference only · paths use placeholder <code>RATCHET_ROOT/</code>.</footer>
+  <footer>No secrets in this pack. Guide pack <strong>v1.2</strong> · product design reference only · no install-private paths or operator runbooks.</footer>
 </main>
 </body>
 </html>

@@ -4,203 +4,152 @@
 
 ---
 
-## Multi-step campaigns (Composer drafts)
+## Multi-step campaigns
 
-A **campaign** is often many queue items, not one YAML. From Build home the planner should draft about **4–8** focused steps for a real product goal (each step becomes its own mission when loaded). One mega-mission that “does everything” is a footgun: hard to accept, hard to resume, easy for the builder to partial-complete.
+A real product goal is often **many missions**, not one. Prefer several focused steps (roughly a handful) over a single mega-mission that “does everything.”
 
-See [composer.md](./composer.md) for queue-builder rules, resplit of thin drafts, and clear modes that keep the draft panel.
+Why:
+
+- Each step is easier to accept on the live site
+- Failures are easier to resume
+- Builders are less likely to partial-complete a giant brief
+
+See [composer.md](./composer.md) for how the human surface turns a goal into a queue.
 
 ---
 
-## The loop contract
-
-Implemented in `lib/loop.sh`. Builder / deploy / tester steps are adapter functions.
-
-**Definitions**
-
-- **Iteration** — one full build → deploy → test cycle
-- **Streak** — count of consecutive `PASS` verdicts
+## The loop contract (product idea)
 
 ```mermaid
 stateDiagram-v2
   [*] --> Setup
   Setup --> Build
   Build --> DeployGate: proof-of-work OK
-  Build --> BuilderFail: exit 5
-  DeployGate --> Test: live SHA matches
-  DeployGate --> DeployTimeout: exit 3
+  Build --> BuilderFail: no real git progress
+  DeployGate --> Test: live version matches
+  DeployGate --> DeployTimeout: version never caught up
   Test --> Pass: PASS
   Test --> Fail: FAIL
-  Test --> TesterFail: exit 4
+  Test --> TesterFail: bad verdict contract
   Pass --> Done: streak reached
   Pass --> Build: keep going
-  Fail --> Build: builder_prompt
+  Fail --> Build: feedback to next build
   Done --> [*]
   BuilderFail --> [*]
   DeployTimeout --> [*]
   TesterFail --> [*]
 ```
 
-### Steps
+### Steps (ideas)
 
-| #   | Step        | What happens                                                                                      |
-| --- | ----------- | ------------------------------------------------------------------------------------------------- |
-| 0   | Setup       | Load mission; create `runs/<name>-<ts>/{builder,tester,shared,history}`                           |
-| 1   | Build       | Iteration 1: mission text. Later: previous FAIL’s `builder_prompt`. Commit + push `deploy.branch` |
-| 2   | Deploy gate | Wait until deploy is demonstrable (see strategies)                                                |
-| 3   | Test        | Exercise **live_url**; write `shared/verdict.json`; update `TESTLOG.md`                           |
-| 4   | Decide      | PASS → streak++; FAIL → streak=0. Stop when streak ≥ required or limits hit                       |
+| Step | What it means |
+| ---- | ------------- |
+| Setup | Load the mission; create an isolated run workspace |
+| Build | Coding agent changes the product; real commits and push |
+| Deploy gate | Wait until live version matches what was pushed |
+| Test | Exercise the **live** app; return structured pass/fail |
+| Decide | PASS advances the streak; FAIL resets it. Stop on streak or limits |
 
-### Exit codes
+### Outcomes (conceptual)
 
-| Code | Meaning                                                 |
-| ---- | ------------------------------------------------------- |
-| 0    | Success — streak reached `consecutive_passes_required`  |
-| 1    | Usage/config/archive error                              |
-| 2    | `max_iterations` without streak                         |
-| 3    | Deploy gate timeout                                     |
-| 4    | Tester contract failure / missing or bad `verdict.json` |
-| 5    | Builder proof-of-work failure (after retry)             |
-| 6    | Budget exceeded (`max_budget_usd`)                      |
+Runs end for product reasons such as:
 
-CLI summary line example:
+- Success (required streak of consecutive passes)
+- Iteration budget exhausted without a streak
+- Deploy gate never saw the new version
+- Tester returned an unusable result
+- Builder never produced provable git work
+- Spend budget exceeded
 
-```text
-summary: iterations=5 streak=2 reason=success cost_usd=14.43 exit=0
-```
+Exact exit numbers and CLI flags are install-private; the **meanings** are the public contract.
 
 ---
 
-## Deploy strategies
+## Deploy gate and the version signal
 
-Configured under `deploy.strategy`:
+The default honesty check is simple:
 
-| Strategy                     | Behavior                                                            | When to use                                 |
-| ---------------------------- | ------------------------------------------------------------------- | ------------------------------------------- |
-| `version-endpoint` (default) | Poll `live_url` + `version_endpoint` until body matches pushed SHA  | Real products                               |
-| `fixed-delay`                | Sleep N seconds, assume success                                     | Throwaways with no version URL              |
-| `command`                    | Re-run shell command until exit 0 (`RATCHET_EXPECTED_SHA` exported) | Trusted missions only                       |
+1. Builder pushes a known commit
+2. Host deploys from git
+3. Product serves a **version signal** that returns the currently deployed commit
+4. Gate waits until that signal matches the push (or times out)
 
-### Version endpoint contract
+### Version signal contract (product)
 
-Product must serve:
+Every product under this design should expose something equivalent to:
 
 ```http
 GET /version
 → 200
-→ body: deployed git SHA (plain text, or JSON with sha / version / commit)
+→ body: deployed git SHA (plain text, or JSON carrying sha / version / commit)
 ```
 
-Matching is case-insensitive; full SHA or 7+ char prefix.
+Matching is case-insensitive; full SHA or a long-enough prefix is enough.
 
-The deploy gate must be able to read this path without control-plane credentials. Product `/version` is the honest signal the loop waits on.
+The path must be readable by the gate without control-plane login. If the version path is behind auth or always wrong, loops look “stuck” even when AI is fine.
+
+Other gate strategies (fixed wait, custom command) exist as ideas for throwaways — production-minded products prefer an honest version signal.
 
 ---
 
-## Minimal mission YAML
+## What a mission is
+
+A mission is a **scoped unit of product work**:
+
+| Field idea | Purpose |
+| ---------- | ------- |
+| Name | Human-readable label for the run |
+| Repo + branch | Where the builder pushes |
+| Live URL | What the tester grades |
+| Version signal | What the gate polls |
+| Mission text | What to change (and what not to touch) |
+| Acceptance | Observable checks on the live app |
+| Limits | Max iterations, required streak, optional spend cap |
+| Roles | Which builder / tester / gate implementations to use |
+
+A tiny illustrative shape (placeholders only):
 
 ```yaml
 name: fix-homepage-cta
 repo: https://git.example.com/you/app.git
 live_url: https://www.example.com
 version_endpoint: /version
-
-deploy:
-  branch: main
-  strategy: version-endpoint
-  wait_timeout_seconds: 600
-  poll_interval_seconds: 10
-
 mission: |
   Change the homepage CTA label to "Get started".
   Do not change pricing or auth.
-
 acceptance:
   - GET / returns 200 with visible text "Get started"
   - /version returns the deployed git SHA
-
-builder:
-  model: example-builder-model # must exist in your models registry / adapter map
-tester:
-  model: example-tester-model
-  read_only: true
-
 limits:
   max_iterations: 8
   consecutive_passes_required: 2
-  max_budget_usd: 25
-
-adapters:
-  builder: real
-  tester: real
-  deploy: real
 ```
 
-Full field documentation lives in `mission.schema.yaml` in the harness tree. That file is the source of truth for every key.
-
-### Config flattening
-
-`lib/config.sh` turns YAML into `RATCHET_*` environment variables, e.g.:
-
-| YAML                | Env                                                     |
-| ------------------- | ------------------------------------------------------- |
-| `name: x`           | `RATCHET_NAME=x`                                        |
-| `deploy.branch`     | `RATCHET_DEPLOY_BRANCH`                                 |
-| `acceptance: [a,b]` | `RATCHET_ACCEPTANCE_COUNT=2`, `RATCHET_ACCEPTANCE_1`, … |
-
-Parsing uses `yq` when present, else Python/PyYAML.
+Field names and extras vary by install. The product idea is stable: **repo + live truth + acceptance + limits**.
 
 ---
 
-## Optional: architect + provision
+## Optional prep steps (concept)
 
-Some missions add infra steps **before** build:
+Some missions may plan or ensure infrastructure **before** build. Product rules:
 
-```text
-architect → provision → build → test → deploy-gate
-```
+- Treat planner output as untrusted input to an allowlist
+- Prefer binding a known cloud project identity over creating new ones
+- Fail closed when identity checks fail
+- Leave optional ensure off until the core loop is reliable
 
-- **Architect** — plan (JSON); treated as untrusted input to provisioner allowlist
-- **Provision** — Vault consumer actions (resolve/bind cloud projects)
-
-Leave optional until the core loop is reliable. Offline testing can mock vault:
-
-```bash
-VAULT_MOCK=1 ARCHITECT_FORCE_DETERMINISTIC=1 \
-  bin/ratchet run missions/some-bootstrap.yaml --scenario fixtures/scenarios/happy.txt
-```
+No provisioner recipes or host steps live in this pack.
 
 ---
 
-## CLI quick reference
+## Verdict contract (tester → loop)
 
-```bash
-# zero-cost full loop
-bin/ratchet run missions/mock-loop.yaml --scenario fixtures/scenarios/happy.txt
+The tester must return a structured result the loop can act on:
 
-# dry-run resolve
-bin/ratchet run missions/example-debug.yaml --dry-run
+- Overall **PASS** or **FAIL**
+- On FAIL: actionable feedback for the next builder iteration
+- Open issues aligned with durable campaign notes
 
-# real builder against local fixture
-fixtures/make-target-repo.sh
-bin/ratchet run missions/builder-smoke.yaml
-
-# status / kill
-bin/ratchet status
-bin/ratchet kill <run>
-bin/ratchet report <run-dir>
-```
-
----
-
-## Verdict contract (tester → harness)
-
-`shared/verdict.json` must be valid and include at least:
-
-- overall result: `PASS` or `FAIL`
-- on FAIL: actionable `builder_prompt` for the next iteration
-- open bugs aligned with `TESTLOG.md` discipline
-
-Malformed/missing verdict → exit 4 (contract violation).
+Missing or malformed results are a contract failure — not a silent green.
 
 Continue → [Composer](./composer.md)

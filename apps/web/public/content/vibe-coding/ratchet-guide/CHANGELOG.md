@@ -8,6 +8,30 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ---
 
+## v1.2 / guide-2026-07-17h — deep public sanitization (concepts only)
+
+### Removed
+
+- Internal file/module/storage layouts and install tree maps
+- Private UI/API route tables, source-module inventories, and queue-storage paths
+- Environment variable catalogs, key-path details, and consumer-key sketches
+- Operational queue/admin actions, CLI run recipes, and process exit-code cookbooks
+- Step-by-step host/control-plane/Vault setup and monitoring/babysitting workflows
+- Deploy strategy configuration tables and fixture command recipes
+
+### Changed
+
+- Entire pack rewritten around **public-safe product contracts** (live truth, proof-of-work, streaks, brokered secrets, multi-step queues)
+- [`layout.md`](./layout.md) is logical product areas only — not a filesystem map
+- [`composer.md`](./composer.md), [`loop-and-missions.md`](./loop-and-missions.md), [`vault.md`](./vault.md), [`rebuild.md`](./rebuild.md), and related docs describe roles and contracts without operator procedures
+- Rendered pages and zip members stay substantive educational articles; every public route remains reachable
+
+### Not published
+
+- Host-private install notes, recovery runbooks, and real topology remain out of this share pack
+
+---
+
 ## v1.2 / guide-2026-07-17g — public pack is product design only
 
 ### Removed

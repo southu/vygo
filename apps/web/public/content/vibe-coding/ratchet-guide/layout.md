@@ -1,145 +1,76 @@
-# Directory layout & configuration
+# Logical layout (product concepts)
 
 ← [Principles](./principles.md) · [Index](./README.md) · Next: [Loop & missions](./loop-and-missions.md)
 
----
-
-## Reference trees
-
-Paths below are **illustrative**. Pick any install root and substitute for `RATCHET_ROOT`.
-
-```text
-RATCHET_ROOT/control/              # control-plane source + env
-  AGENTS.md                        # rules for coding agents on the box
-  docs/                            # optional private notes (not this pack)
-  docs/ratchet-guide/              # this shareable guide (optional install)
-  composer.env                     # non-secret service configuration
-  secrets.env                      # secrets only (chmod 600)
-  composer-live/                   # Composer UI + server + sentinel package
-  lazy-mode/                       # Lazy + Medic
-  vault-mode/                      # Vault server + SPEC
-  bin/                             # helpers
-  composer-origin.git/             # optional bare remote for self-missions / apply
-
-RATCHET_ROOT/harness/              # harness runtime
-  bin/ratchet                      # CLI entrypoint
-  lib/                             # loop, config, state, adapters
-  lib/adapters/real.sh             # builder + deploy gate + tester
-  lib/adapters/mock.sh             # zero-cost loop tests
-  mission.schema.yaml              # every mission field documented
-  missions/                        # YAML missions (examples + generated)
-  runs/                            # per-run workspaces (large; often gitignored)
-  composer-queue/                  # per-folder queue JSON
-  composer-sentinel/               # sentinel durable state
-  templates/                       # builder/tester prompt templates
-  fixtures/                        # local fake deploy + scenarios
-
-RATCHET_ROOT/projects/             # COMPOSER_PROJECTS_ROOT
-  <slug>/
-    project.json                   # repo, live_url, version, cloud id, …
-    (optional full git clone)
-```
+This page describes **logical parts** of a Ratchet-style control plane — not a host filesystem map, not environment variable tables, and not install-private configuration.
 
 ---
 
-## Environment files
+## Three product areas
 
-### `composer.env` (non-secret)
+| Area | What it is for |
+| ---- | -------------- |
+| **Control plane** | Human UI for goals, product shells, and the mission queue |
+| **Harness** | The build → deploy gate → live test loop and its run workspaces |
+| **Products** | One shell per shipped app: repo + live URL + version signal |
 
-Typical keys (names only — values are site-specific):
-
-| Variable                                     | Purpose                                                  |
-| -------------------------------------------- | -------------------------------------------------------- |
-| `PUBLIC_BASE_URL`                            | Canonical Composer URL (site-specific)                   |
-| `COMPOSER_PROJECTS_ROOT`                     | `RATCHET_ROOT/projects`                                  |
-| `COMPOSER_RATCHET_DIR` / `RATCHET_RUNS_DIR`  | Under `RATCHET_ROOT/harness`                             |
-| `COMPOSER_APP_REPO`                          | Path used for assist self-facts                          |
-| `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL`       | Team identity for harness commits                        |
-| `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` | Match author                                             |
-| `VAULT_URL`                                  | Base URL for the vault consumer (install-specific)       |
-| `VAULT_CONSUMER_KEY_PATH`                    | Path to consumer key file (0600)                         |
-
-### `secrets.env` (secret)
-
-| Kind        | Examples (names)                                        |
-| ----------- | ------------------------------------------------------- |
-| Model / CLI | provider API keys if not using CLI login                |
-| Cloud       | optional cloud tokens (prefer Vault for product work)   |
-
-**Rules**
-
-- `chmod 600`
-- Loaded by services only — never by builder/tester agent env
-- Never commit into git; never paste into chat
-- Stale provider API keys can break CLI login — remove if using browser/CLI login instead
+You may place these anywhere on disk when rebuilding. This pack deliberately does **not** publish a real install tree, module list, or storage layout.
 
 ---
 
-## `project.json` schema (practical)
+## What each area owns (ideas only)
 
-```json
-{
-  "slug": "acme",
-  "name": "Acme",
-  "vision": "Short product description for humans and assist.",
-  "repo": {
-    "url": "https://git.example.com/you/acme.git",
-    "default_branch": "main",
-    "local_path": "RATCHET_ROOT/projects/acme"
-  },
-  "deploy": {
-    "live_url": "https://www.example.com",
-    "version_url": "https://www.example.com/version",
-    "provider": "example-host",
-    "cloud_project": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    "cloud_env": ""
-  },
-  "defaults": {
-    "builder_model": null,
-    "tester_model": null,
-    "writer_model": null,
-    "lazy_babysit": false
-  },
-  "tags": ["product"]
-}
-```
+### Control plane
 
-| Field                    | Why it matters                    |
-| ------------------------ | --------------------------------- |
-| `repo.url`               | Builder clone/push target         |
-| `deploy.live_url`        | Tester + deploy gate base         |
-| `deploy.version_url`     | Must return deployed SHA          |
-| `deploy.cloud_project`   | **Bind UUID** to stop create-spam |
-| `defaults.lazy_babysit`  | Opt product into optional helpers |
+- Capture natural-language goals
+- Expand multi-part goals into several focused missions
+- Hold the human view of queue status
+- Link humans to credentials management (without putting secrets in chat)
 
-Field names may vary by install; the product idea is **one shell = one repo + one live truth**.
+### Harness
+
+- Materialize a mission into an isolated run workspace
+- Drive builder, deploy gate, and tester roles
+- Record durable campaign notes and end-of-run summaries
+- Keep agent environments free of long-lived secrets
+
+### Product shells
+
+Each product is a **binding**, not a bag of unrelated URLs:
+
+| Binding | Why it matters |
+| ------- | -------------- |
+| Git remote | Where the builder pushes |
+| Live URL | What the tester grades |
+| Version URL | What the deploy gate polls for honesty |
+| Optional cloud project identity | Prefer reuse over accidental create |
+
+When those four disagree, the loop cannot tell truth from coincidence.
 
 ---
 
-## Run workspace layout
+## What a run workspace *means*
 
-```text
-runs/<name>-<timestamp>/
-  builder/          # agent checkout + work
-  tester/           # tester scratch
-  shared/
-    state.json      # phase, pid, streak, cost, exit_reason
-    verdict.json    # last tester output (contract)
-    cost.json       # USD totals per iteration
-    TESTLOG.md      # durable bug list
-    report.md       # end-of-run summary
-    history/        # archived prompts / outputs
-  loop.out          # orchestrator log
-```
+Conceptually, every mission attempt needs:
+
+- A place for the builder to work
+- A place for the tester to scratch
+- A shared place for verdicts, costs, and durable notes
+- A clear end state: success streak, budget stop, contract failure, or abandon
+
+Exact directory names and filenames are install-private.
 
 ---
 
-## Queue files
+## Configuration hygiene (product rules)
 
-Path pattern: `RATCHET_ROOT/harness/composer-queue/<folder>-<id>.json`
+| Rule | Why |
+| ---- | --- |
+| Separate secret material from non-secret service config | Reduces accidental commit and paste |
+| Load secrets only into services that need them | Never into builder/tester agent env |
+| Prefer team git identity the host accepts | Deploy gates depend on real deploys landing |
+| Document private install choices offline | This pack stays shareable |
 
-Items typically carry: `id`, `status` / `phase`, goal text, links to run dir, timestamps.
-
-Statuses you will see: `queued`, `running`, `succeeded`, `failed`, `hard-fail`, `discarded`, `aborted`.
+No environment variable names, key-file paths, or host topology appear here on purpose.
 
 Continue → [Loop & missions](./loop-and-missions.md)

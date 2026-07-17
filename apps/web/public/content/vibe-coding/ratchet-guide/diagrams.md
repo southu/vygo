@@ -12,19 +12,19 @@ ASCII versions remain in [architecture.md](./architecture.md) for terminals that
 
 ```mermaid
 flowchart TD
-  H[Human goal] --> B[Composer Build UI]
+  H[Human goal] --> B[Composer · goal capture]
   B --> Q[Queue builder<br/>multi-step if needed]
-  Q --> I[Queue item<br/>per project folder]
-  I --> R[Ratchet run workspace]
+  Q --> I[Queue item<br/>per product shell]
+  I --> R[Run workspace]
   R --> BL[Build: coding agent<br/>commit + push]
-  BL --> DG[Deploy gate<br/>poll live /version]
-  DG -->|SHA matches| T[Test: live_url only]
-  DG -->|timeout| X3[Exit 3 deploy-timeout]
+  BL --> DG[Deploy gate<br/>poll live version]
+  DG -->|version matches| T[Test: live URL only]
+  DG -->|timeout| X3[Deploy gate timeout]
   T -->|PASS| ST{Streak ≥ N?}
-  T -->|FAIL| BL2[Next build uses<br/>builder_prompt]
+  T -->|FAIL| BL2[Next build uses<br/>tester feedback]
   BL2 --> BL
   ST -->|no| BL
-  ST -->|yes| OK[Exit 0 success]
+  ST -->|yes| OK[Success]
 ```
 
 ---
@@ -37,16 +37,16 @@ flowchart TB
     QB[Queue builder]
     BL[Builder]
     TS[Tester]
-    LIVE[Live app · /version]
+    LIVE[Live app · version signal]
   end
 
   subgraph helpers [Optional helpers]
-    V[Vault consumer]
+    V[Credentials boundary]
     NW[Overnight observe only]
   end
 
   QB --> BL --> TS --> LIVE
-  V -.->|broker actions · no tokens to builder| BL
+  V -.->|brokered access · no tokens to builder| BL
   NW -.->|report stuck state| QB
 ```
 
@@ -58,7 +58,7 @@ flowchart TB
 flowchart LR
   subgraph privileged [Privileged]
     OP[Human + Composer]
-    VC[Vault consumer key]
+    VC[Credentials broker]
   end
 
   subgraph agents [Agents — no secrets]
@@ -67,12 +67,12 @@ flowchart LR
   end
 
   subgraph public [Public]
-    PL[Product live + /version]
+    PL[Product live + version signal]
   end
 
   OP --> BU
   OP --> TE
-  VC -.->|broker actions only| OP
+  VC -.->|brokered actions only| OP
   BU -->|push code| PL
   TE -->|HTTP checks only| PL
 ```
@@ -87,15 +87,15 @@ stateDiagram-v2
   Setup --> Build
   Build --> ProofOfWork: push branch
   ProofOfWork --> DeployGate: git checks pass
-  ProofOfWork --> BuilderFail: exit 5 after retry
-  DeployGate --> Test: live SHA == HEAD
-  DeployGate --> DeployTimeout: exit 3
+  ProofOfWork --> BuilderFail: no real git progress
+  DeployGate --> Test: live version matches
+  DeployGate --> DeployTimeout: version never caught up
   Test --> Pass: verdict PASS
   Test --> Fail: verdict FAIL
-  Test --> TesterFail: bad verdict exit 4
+  Test --> TesterFail: bad verdict
   Pass --> Done: streak reached
   Pass --> Build: streak incomplete
-  Fail --> Build: builder_prompt
+  Fail --> Build: feedback to next build
   Done --> [*]
   BuilderFail --> [*]
   DeployTimeout --> [*]
@@ -104,7 +104,7 @@ stateDiagram-v2
 
 ---
 
-## 5. Secrets path (Vault)
+## 5. Secrets path (credentials boundary)
 
 ```mermaid
 sequenceDiagram
@@ -115,10 +115,10 @@ sequenceDiagram
   participant C as Cloud API
   participant A as Builder agent
 
-  Hum->>V: store credentials + grant consumer access
-  Hum->>H: consumer key path only
+  Hum->>V: store credentials
+  Hum->>H: brokered access only
   H->>B: identity / resolve
-  B->>C: token never leaves Vault
+  B->>C: token never leaves vault
   C-->>B: ok / projects
   B-->>H: result without secrets
   Note over A: Builder env has NO cloud token
@@ -127,11 +127,11 @@ sequenceDiagram
 
 ---
 
-## 6. Rebuild phases
+## 6. Rebuild phases (product milestones)
 
 ```mermaid
 flowchart LR
-  A[A Foundations] --> B[B Config]
+  A[A Foundations] --> B[B Config rules]
   B --> C[C Credentials boundary]
   C --> D[D First product]
   D --> E[E Harden + docs]

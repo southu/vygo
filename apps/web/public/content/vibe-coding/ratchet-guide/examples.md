@@ -2,58 +2,40 @@
 
 ← [Footguns](./footguns.md) · [Index](./README.md)
 
-Paths use the placeholder root `RATCHET_ROOT`.
+Illustrative **product shapes** only — not host recipes, not install paths, not operator commands.
 
 ---
 
-## 1. Mock loop (zero API cost)
+## 1. Mock campaign (zero model spend)
 
-Proves orchestration without model spend.
+Prove orchestration without model spend by simulating builder, gate, and tester roles.
 
-```bash
-cd RATCHET_ROOT/harness   # or your harness root
-bin/ratchet run missions/mock-loop.yaml --scenario fixtures/scenarios/happy.txt
-```
+Expect: the loop still walks setup → build → gate → test, applies streak rules, and ends successfully when the simulated scenario reaches the required consecutive passes.
 
-Scenario files script tester verdicts (line N = iteration N). Expect exit 0 when the scenario reaches the required streak.
-
-Other scenarios under `fixtures/scenarios/` intentionally FAIL or thrash — useful for adapter tests.
+Other scenarios intentionally fail or thrash — useful for testing adapter contracts, not for production babysitting.
 
 ---
 
-## 2. Full real loop on local fixture
+## 2. Full loop on a local fixture (shape)
 
-From the harness README pattern:
+A common educational fixture pattern:
 
-```bash
-fixtures/make-target-repo.sh          # broken static site
-fixtures/fake-deploy.sh start         # serves site + /version
-export RATCHET_ENV_LIVE_URL="$(cat tmp-target/fake-deploy/url)"
-bin/ratchet run missions/full-loop.yaml
-```
+1. A tiny broken static site in a throwaway repo
+2. A fake deployer that publishes content and a version signal
+3. Real builder and tester CLIs against that fake live URL
+4. Loop continues until consecutive passes
 
-- Builder fixes links and pushes
-- Fake deployer publishes content + SHA
-- Tester verifies live site
-- Loop continues until consecutive PASS
-
-Only external dependency: the two AI CLIs.
+Only external dependency: the model CLIs you choose. Exact fixture scripts stay install-private.
 
 ---
 
-## 3. Minimal mission YAML (product-shaped)
+## 3. Minimal mission shape (product-shaped)
 
 ```yaml
 name: fix-homepage-cta
 repo: https://git.example.com/you/app.git
 live_url: https://www.example.com
 version_endpoint: /version
-
-deploy:
-  branch: main
-  strategy: version-endpoint
-  wait_timeout_seconds: 600
-  poll_interval_seconds: 10
 
 mission: |
   Change the homepage CTA label to "Get started".
@@ -66,17 +48,13 @@ acceptance:
 limits:
   max_iterations: 8
   consecutive_passes_required: 2
-  max_budget_usd: 25
-
-adapters:
-  builder: real
-  tester: real
-  deploy: real
 ```
+
+Field names may vary; the product idea is stable.
 
 ---
 
-## 4. project.json (product shell)
+## 4. Product shell shape
 
 ```json
 {
@@ -84,35 +62,31 @@ adapters:
   "name": "Acme",
   "repo": {
     "url": "https://git.example.com/you/acme.git",
-    "default_branch": "main",
-    "local_path": "RATCHET_ROOT/projects/acme"
+    "default_branch": "main"
   },
   "deploy": {
     "live_url": "https://www.acme.example",
     "version_url": "https://www.acme.example/version",
     "provider": "example-host",
     "cloud_project": "PUT-UUID-HERE"
-  },
-  "defaults": {
-    "lazy_babysit": false
   }
 }
 ```
+
+Bind repo + live URL + version URL together. Prefer a known cloud project identity over create-on-every-run.
 
 ---
 
 ## 5. Reference product campaign (shape, not secrets)
 
-A typical multi-iteration campaign looks like:
-
 | Step | What happened |
 | ---- | ------------- |
-| 1 | Project shell for product repo + live URL + `/version` |
+| 1 | Product shell for repo + live URL + version signal |
 | 2 | Mission: change homepage CTA + related copy on live site |
-| 3 | Builder several iterations; host deploy |
-| 4 | Deploy gate waited until `/version` advanced |
+| 3 | Builder several iterations; host deploy from git |
+| 4 | Deploy gate waited until version signal advanced |
 | 5 | Tester checked acceptance text on live URL |
-| 6 | Exit 0 after consecutive PASSes; cost in `shared/cost.json` |
+| 6 | Success after consecutive passes |
 
 The product details are incidental — the **system** is the loop + control plane.
 
@@ -122,8 +96,8 @@ The product details are incidental — the **system** is the loop + control plan
 
 | Share freely | Keep private |
 | ------------ | ------------ |
-| Harness, mission schema, mock adapters | `secrets.env`, vault `data/`, consumer keys |
-| Composer UI patterns, queue builder tests | Basic-auth passwords, API tokens |
+| Loop design, mission shape, mock role ideas | Secret config, vault ciphertext, consumer credentials |
+| Composer UX patterns and queue-builder product rules | Passwords, API tokens, host topology |
 | This guide pack | Master passwords, cloud account tokens |
 | Architecture diagrams | Install-specific hostnames if you care |
 

@@ -6,116 +6,78 @@
 
 ## Role
 
-Composer is the human-facing factory:
+Composer is the human-facing factory for a Ratchet-style control plane:
 
-- Capture goals
-- Draft / split missions
-- Manage projects and queues
-- Show run status
-- Host settings and links to Vault
+- Capture goals in natural language
+- Draft and split multi-step missions
+- Manage product shells and the mission queue
+- Show run status at a glance
+- Point humans at credentials management (without putting secrets in chat)
 
-Implementation: Python `server.py` + static HTML/JS under `composer-live/`.
-
----
-
-## Primary surfaces
-
-| Path | Purpose |
-| ---- | ------- |
-| `/` | **Build** home — natural language goal → multi-step queue draft |
-| `/composer` | Classic mission form + enqueue |
-| `/projects` | Create / manage shells under `COMPOSER_PROJECTS_ROOT` |
-| `/queue` | Per-folder queue |
-| `/dashboard` | Runs overview |
-| `/admin` | Models, settings |
-| `/api/*` | Queue, assist, runs, settings, … |
+It is a **product surface**, not a published module map or private API catalog.
 
 ---
 
-## Goal → queue → run
+## Primary capabilities (product ideas)
 
-1. **Build** (`home.html` / `home.js` + `queue_builder_mod.py`)
-   - Human describes work; optional images
-   - Writer/planner produces a **multi-step draft** (target about **4–8** executable steps for real product goals)
-2. **Enqueue** into folder-scoped queue JSON under `RATCHET_ROOT/harness/composer-queue/`
-3. **Worker** materializes mission YAML and invokes `bin/ratchet`
-4. UI polls state; costs land in `shared/cost.json`
+| Capability | Purpose |
+| ---------- | ------- |
+| **Build / goal home** | Natural language goal → multi-step queue draft |
+| **Classic compose** | Structured mission form when you already know the brief |
+| **Product shells** | Create and edit the binding of repo + live URL + version signal |
+| **Queue** | See and manage work scoped per product |
+| **Runs overview** | What is running, finished, or blocked |
+| **Settings** | Models and defaults for assist / builder / tester roles |
 
-### Queue builder rules
+Exact routes, filenames, and internal APIs are install-private and intentionally omitted here.
+
+---
+
+## Goal → queue → run (product flow)
+
+1. **Describe** — human states product work; optional attachments where the UI supports them
+2. **Draft** — a planner expands multi-part goals into several focused steps (roughly a handful for real product work)
+3. **Enqueue** — each step becomes a queue item scoped to a **product shell**
+4. **Run** — the harness materializes a mission and drives build → deploy gate → live test
+5. **Observe** — UI reflects status; humans decide whether to re-plan or clear unfinished work
+
+### Queue-builder product rules
 
 - Multi-part goals **must** expand to several steps — not one mega-mission
-- Prefer **~4–8** steps: small enough to verify live, large enough to make progress
-- Thin drafts (single vague step) may be **resplit** by the planner path before enqueue
-- Planner must return real multi-step JSON; pure affirmations / non-JSON → force draft / retry, never silent junk prose as a “mission”
-- Folder must match product (`acme`), not accidentally `composer`
-- Repo/live_url must come from **project.json**, not control-plane APP_FACTS
-- Tests live alongside code (e.g. `tests/test_queue_builder_split.py`)
+- Prefer steps small enough to verify live, large enough to make progress
+- Thin drafts (single vague step) should be resplit before enqueue
+- Planner output must be structured mission material — not silent junk prose
+- Scope must match the **product** shell, not the control plane by accident
+- Repo and live URL come from the product shell binding, not control-plane self-facts
 
-### Queue clear
+### Clearing work (design idea)
 
-Bulk clear on Build / Queue supports variants such as **All (keep running)**:
-
-- Stops or drops queued/active work according to the chosen filter
-- **Keeps the on-screen draft steps** so you can re-load or re-enqueue without re-planning
-
-Other clear modes may wipe more aggressively — read the button label before confirming.
+Bulk clear should make the filter obvious: some modes drop queued work while **keeping an on-screen draft** so humans can re-enqueue without re-planning from zero. Aggressive wipe modes exist as a product choice — the label should say what it does.
 
 ---
 
-## Models & settings
+## Models & assist (concepts)
 
-- Registry: `models.json` (builder / tester / assist / writer roles)
-- Defaults: Admin form → `POST /api/settings` → `load_settings()` single store
-- Assist can route to registered model ids
-- CLI adapters must use flags the binary actually supports
-- Invalid or unknown model names should surface **real CLI errors**, not synthetic success prose
-
-Claude-style CLIs often use **CLI login** rather than a long-lived API key in secret env.
+- Roles such as builder, tester, assist, and writer may use different model defaults
+- Assist turns plain language into a draft mission payload
+- Invalid or unknown model choices should surface real errors — never synthetic “success” prose
+- Some CLIs use interactive login rather than long-lived keys in secret env; either way, secrets stay out of agent workspaces
 
 ---
 
-## Unified header nav
+## Navigation product rule
 
-Every page should show the **same** primary links so humans never get lost:
-
-```text
-Build · Projects · Composer · Queue · Dashboard · Admin · Vault
-```
-
-Implementation pattern:
-
-- HTML fallback `<nav class="site-nav">` on each page
-- Shared `site-nav.js` rewrites links for current host
-- Collapse under hamburger below ~1100px so links never clip
-
----
-
-## Assist (draft help)
-
-`POST /api/assist` turns plain language into a draft mission payload (name, mission text, acceptance). Used from Compose UI and as a building block for enqueue.
-
-Self-facts for “edit Composer itself” come from env (`PUBLIC_BASE_URL`, `COMPOSER_APP_REPO`) — **not** machine-specific laptop paths.
+Every primary surface should show the **same** high-level destinations so humans never get lost: goal capture, products, compose, queue, runs, settings, credentials. Responsive collapse is a UX detail, not an install recipe.
 
 ---
 
 ## Self-hosting Composer as a product
 
-Composer can be improved _by_ Ratchet:
+The control plane can itself be improved by the same loop:
 
-- Needs a **cloneable** git remote for the control-plane tree
-- Live version endpoint must be reachable by the deploy gate
+- Needs a cloneable git remote for its own tree
+- Needs a live version signal the deploy gate can read
 
----
-
-## Key source files (orientation)
-
-| File | Role |
-| ---- | ---- |
-| `server.py` | HTTP API + static serving |
-| `queue_builder_mod.py` | Goal → multi-step queue |
-| `projects_mod.py` | Project shells + git identity for commits |
-| `home.html` / `home.js` | Build UX |
-| `models.json` | Model registry |
-| `styles.css` / `site-nav.js` / `mobile-nav.js` | Shell UI |
+That is a product symmetry, not a host procedure.
 
 Continue → [Lazy / Medic / Sentinel](./lazy-medic-sentinel.md)

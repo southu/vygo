@@ -2,100 +2,97 @@
 
 ← [Architecture](./architecture.md) · [Index](./README.md) · Next: [Layout](./layout.md)
 
-These rules are load-bearing. Breaking them recreates the failure modes in [footguns.md](./footguns.md).
+These rules are load-bearing product contracts. Breaking them recreates the failure modes in [footguns.md](./footguns.md).
 
 ---
 
 ## 1. Live is truth
 
-The tester judges the **deployed** app at `live_url`, not the builder’s working tree.
+The tester judges the **deployed** app, not the builder’s working tree.
 
-The deploy gate blocks testing until the world has caught up (by default: live `/version` equals the SHA the builder just pushed).
+The deploy gate blocks testing until the world has caught up — by default, until the live version signal matches the commit the builder just pushed.
 
-**Implication:** every product needs an honest version endpoint. No endpoint → timeouts, not “AI is bad.”
+**Implication:** every product needs an honest public version signal. No signal → timeouts, not “the AI is bad.”
 
 ---
 
 ## 2. Proof of work for the builder
 
-The harness verifies **git state**, not agent claims:
+The loop verifies **git reality**, not agent claims:
 
-- HEAD advanced from pre-run HEAD
-- Pre-run HEAD remains an ancestor (no force-push / rewrite of shared history)
-- New commits change content (no empty-only “success”)
-- Working tree clean
-- Remote branch HEAD matches local HEAD
+- History actually advanced
+- Shared history was not rewritten
+- New commits change content (empty “success” commits do not count)
+- Remote branch matches what the builder claims
 
-Failed check → exactly one retry with the check text appended; second failure ends the run (exit 5).
-
-Each iteration resets hard to `origin/<branch>` first so builds start from pushed truth.
+If proof fails, the iteration fails closed. Claims without commits are not progress.
 
 ---
 
 ## 3. Streak, not one-shot
 
-`limits.consecutive_passes_required` (commonly **2**) prevents “passed once, flaked forever.”
+Requiring several consecutive passes prevents “passed once, flaked forever.”
 
-A single `FAIL` resets the streak. Bugs remain in `TESTLOG.md` until resolved.
+A single fail resets the streak. Open issues stay visible until resolved.
 
 ---
 
 ## 4. Secrets never in builder env
 
-Cloud tokens, vault master passwords, API keys:
+Cloud tokens, vault master passwords, and long-lived API keys:
 
-- Live in **Vault** (encrypted at rest) and/or service-only secret env
-- Reach the harness via **consumer broker / leases**
+- Live behind a **credentials boundary**
+- Reach the harness only through **brokered, short-lived actions**
 - Must **not** appear in builder or tester process environments or prompts
 
-If a secret shows up in a run transcript, treat it as an incident.
+If a secret shows up in a run transcript, treat it as an incident — not a footnote.
 
 ---
 
 ## 5. Git identity is part of deploy
 
-Host platforms may block commits from unknown bot authors.
+Some hosts ignore or block commits from unknown bot authors.
 
-Symptoms: push to GitHub succeeds; live `/version` never moves; deploy gate times out.
+Symptom pattern at product level: push appears to succeed, but live version never moves and the deploy gate times out.
 
-**Fix:** configure harness/global git as a **team author** allowlisted on the host, or allowlist the bot in the host’s settings.
-
----
-
-## 6. One project folder = one queue
-
-Queue items are scoped by folder.
-
-- Product work must target the **product** folder — not the control-plane `composer` folder
-- Multi-part goals must become **2+ queue steps**, not one mega-mission
-- Poison pattern: control-plane repo + product `live_url` → eternal deploy-timeout
+**Design fix:** use a team author the host accepts, or allowlist the automation identity on the host. The product contract still depends on honest live version.
 
 ---
 
-## 7. Optional infra ensure stays small
+## 6. One product shell = one queue scope
 
-Infrastructure ensure (create/bind cloud projects) is powerful and dangerous:
+Queue items are scoped to a product.
 
-- Prefer binding a known project UUID in `project.json`
-- When bound, **do not create** new projects
-- If identity checks fail, **fail immediately** — never hang forever on ensure
+- Product work targets the **product** shell — not the control-plane itself by accident
+- Multi-part goals become **several focused steps**, not one mega-mission
+- Poison pattern: control-plane repo paired with a product live URL → eternal deploy-gate waits
 
-Turn provision **off** unless you intentionally need stack bootstrap.
+---
+
+## 7. Optional infrastructure ensure stays small
+
+Creating or binding cloud projects is powerful and dangerous:
+
+- Prefer a known project identity already bound on the product shell
+- When bound, do not create new projects as a side effect
+- If identity checks fail, fail immediately — never hang forever on ensure
+
+Leave optional ensure **off** until the core loop is boringly reliable.
 
 ---
 
 ## 8. Small blast radius for automation
 
-Optional overnight helpers (Lazy / Medic / Sentinel):
+Optional overnight helpers:
 
-- May surface stuck runs for a human
+- May surface stuck work for a human
 - Must **not** implement product features (that’s the builder’s job)
 
 ---
 
 ## 9. Fresh sessions beat chat history
 
-Durable knowledge belongs in a **docs pack** next to the install. Fresh coding sessions should read that pack first — not depend on a laptop transcript.
+Durable knowledge belongs in a **docs pack** next to the design. Fresh coding sessions should read that pack first — not depend on a laptop transcript.
 
 This share guide is the portable cousin of private install notes.
 

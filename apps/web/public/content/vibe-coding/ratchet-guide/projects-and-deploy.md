@@ -4,63 +4,46 @@
 
 ---
 
-## Project shells
+## Product shells
 
-Each product is a folder under `COMPOSER_PROJECTS_ROOT` (default `RATCHET_ROOT/projects/<slug>`) with a `project.json` (see [layout.md](./layout.md)).
+Each product is a **shell**: a named binding of git remote, live URL, and version signal. Composer’s product UI creates and edits these shells.
 
-Composer **Projects** UI creates/edits these shells and can clone repos into the projects tree.
+### Folder vs product (design)
 
-### Folder vs product
+| Shell kind | Typical use |
+| ---------- | ----------- |
+| Product app | The shipped app the tester grades |
+| Control plane | Optional self-improvement of the factory itself |
+| Sandbox / fixtures | Experiments and local fake deploys |
 
-| Folder               | Typical use                    |
-| -------------------- | ------------------------------ |
-| `acme` (example)     | Example product app            |
-| `composer`           | Control-plane self-improvement |
-| `sandbox` / fixtures | Experiments                    |
-
-**Never** enqueue product acceptance against Composer’s repo while pointing `live_url` at the product domain. That mismatch is a classic deploy-timeout poison pill.
+**Never** enqueue product acceptance against the control-plane repo while pointing the live URL at a different product domain. That mismatch is a classic deploy-gate poison pill.
 
 ---
 
-## Product requirements for version-endpoint strategy
+## Product requirements for a version-based gate
 
-1. A git remote the builder can push to with harness credentials
-2. Hosted deploy on push to `main` (any host that deploys from git)
-3. **`GET /version`** (or configured path) returns the **currently deployed** SHA
-4. Version path is reachable by the deploy gate
-5. Optional but recommended: bind cloud project UUID in `project.json` when using a cloud host
+1. A git remote the builder can push to
+2. Hosted deploy on push to the deploy branch (any host that deploys from git)
+3. A **version signal** that returns the **currently deployed** commit
+4. That signal is reachable by the deploy gate without control-plane login
+5. Optional: bind a cloud project identity on the shell when using a cloud host (prefer reuse over create)
 
-### Implementing `/version` (any stack)
+### Implementing a version signal (any stack)
 
-Minimal static/export idea:
+At product level:
 
-```text
-// write at build time from your host's commit SHA env
-// or git rev-parse HEAD in CI → public/version.txt
-```
+- Write the deploy SHA at build or image-bake time into whatever the public route returns
+- Acceptance: HTTP success, body matches the commit that is actually live, updates when a new deploy finishes
 
-Docker/image deploys: embed a build-arg SHA into a tiny route.
-
-Acceptance for the endpoint itself:
-
-- 200 response
-- Body matches what `git rev-parse HEAD` was at the deploy that is live
-- Updates when a new deploy finishes
+Stack-specific recipes stay out of this pack.
 
 ---
 
-## Git identity
+## Git identity (product rule)
 
-Set globally on the build host **and** in non-secret service config:
+Harness commits need an author identity the host accepts. Unknown bot authors may be ignored by some platforms.
 
-```bash
-git config --global user.name "YourTeamBotOrHuman"
-git config --global user.email "you@example.com"
-```
-
-Also set `GIT_AUTHOR_*` / `GIT_COMMITTER_*` for non-interactive commits from helpers.
-
-Some host platforms block commits from unknown bot authors. Symptom pattern: push to GitHub succeeds; live `/version` never moves; deploy gate times out. Fix is product/process design: use a team author allowlisted on the host.
+Symptom pattern: push appears to succeed; live version never moves; deploy gate times out. The design fix is team identity (or host allowlisting) — not “retry harder.”
 
 ---
 
@@ -68,22 +51,15 @@ Some host platforms block commits from unknown bot authors. Symptom pattern: pus
 
 ### Prefer reuse over create
 
-1. Create one project in your cloud host UI
-2. Copy the project UUID from the dashboard
-3. Set it on `project.json` under deploy
-4. When bound, provision should not create new projects
+1. Create one project in your cloud host’s UI when you mean to
+2. Bind that project identity on the product shell
+3. When bound, optional ensure should not create new projects
 
 ### Token health (design rule)
 
-Workspace tokens need API queries that workspace tokens can call. Broken list queries look like “no match” and can spam create. Prefer bound UUIDs and fail-closed identity checks before any ensure step.
+Broken list queries can look like “no match” and tempt create-spam. Prefer bound identities and fail-closed identity checks before any ensure step.
 
 Optional provision is powerful; leave it off unless you intentionally need stack bootstrap.
-
----
-
-## Deploy gate and product `/version`
-
-The gate needs a reachable version URL that returns the deployed SHA. If that URL is unreachable or always unauthorized, polls fail forever and loops look “stuck.” Product sites usually expose `/version` to the gate without control-plane credentials.
 
 ---
 
@@ -91,12 +67,12 @@ The gate needs a reachable version URL that returns the deployed SHA. If that UR
 
 Example goal: “Update homepage CTA, refresh the banner copy, fix pricing page text.”
 
-Expected queue:
+Expected queue shape:
 
-1. CTA + API
+1. CTA
 2. Banner UI
 3. Pricing copy
 
-Not: one mission with twelve acceptance lines and thrashing deploys.
+Not: one mission with a dozen acceptance lines and thrashing deploys.
 
 Continue → [Operations](./operations.md)

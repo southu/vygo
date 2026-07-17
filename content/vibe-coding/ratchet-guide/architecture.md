@@ -6,141 +6,119 @@
 
 ## System map
 
+At product level, Ratchet is four cooperating ideas:
+
 ```mermaid
 flowchart TB
   subgraph human [Human intent]
-    UI[Composer · Build UI]
-    QB[Queue builder]
+    UI[Composer · goal capture]
+    Q[Mission queue]
   end
 
-  subgraph factory [Ratchet harness]
-    H[Build → deploy gate → test loop]
+  subgraph factory [Build-and-verify loop]
+    H[Build → deploy gate → live test]
   end
 
-  subgraph outside [Outside]
+  subgraph outside [Outside the loop]
     GH[Product git remote]
     LIVE[Live app]
-    V[Vault · credentials broker]
+    V[Credentials boundary]
   end
 
-  UI --> QB --> H
-  V -.->|consumer actions only| H
+  UI --> Q --> H
+  V -.->|brokered access only| H
   H -->|commit + push| GH
   GH -->|host deploy| LIVE
-  H -->|poll GET /version| LIVE
+  H -->|check deployed version| LIVE
 ```
 
 ASCII fallback:
 
 ```
-Human goal → Composer → Queue → Ratchet harness
+Human goal → Composer → Queue → Build-and-verify loop
                                   ├→ push product repo
-                                  ├→ wait for live /version
-                                  └→ test live_url only
+                                  ├→ wait for live version signal
+                                  └→ test the live app only
 ```
 
 Gallery: [diagrams.md](./diagrams.md)
 
 ---
 
-## Trust boundaries
+## Trust boundaries (product ideas)
 
-| Zone | Who | Trust rules |
-| ---- | --- | ----------- |
-| **Human + Composer** | Operator | Privileged UI for goals, projects, and queues |
-| **Builder workspace** | Coding agent CLI | Can edit the product repo; **no** vault secrets in env |
-| **Tester workspace** | Tester CLI | Prefer read-only; only **live_url**, not the local builder tree as truth |
-| **Vault consumer** | Harness | Short-lived arm + key file; never log secret values |
-| **Product live** | Public users | Must expose `/version` so the deploy gate can wait on truth |
+| Zone | Who | Product rule |
+| ---- | --- | ------------ |
+| **Human + Composer** | Operator | Captures goals, owns the queue of missions |
+| **Builder workspace** | Coding agent | May edit the product repo; never holds cloud secrets |
+| **Tester workspace** | Tester agent | Judges the **live** app only — not the builder’s local tree |
+| **Credentials boundary** | Harness-side broker | Short-lived, named actions — tokens never enter agent env |
+| **Product live** | Public users | Exposes an honest version signal the loop can wait on |
 
-Secrets stay out of agent prompts and builder/tester environments. The harness may use a consumer path to request named broker actions; tokens never land in the builder env.
+Secrets stay out of agent prompts and builder/tester environments. That boundary is the architecture; how any one install implements it is private.
 
 ---
 
-## End-to-end data flow
+## End-to-end product flow
 
 ```mermaid
 flowchart LR
   subgraph intent [1 Intent]
-    UI[Build / Composer]
-    QB[Queue builder]
+    UI[Goal capture]
+    Q[Queue]
   end
-  subgraph mat [2 Materialize]
-    MY[Mission YAML]
-    RD[runs/name-ts]
-  end
-  subgraph loop [3 Iterate]
+  subgraph work [2 Work]
     BL[Build]
     DG[Deploy gate]
-    TE[Test]
+    TE[Live test]
   end
-  subgraph done [4 Finish]
-    EX[Exit + report]
+  subgraph done [3 Finish]
+    EX[Streak of passes]
   end
-  UI --> QB --> MY --> RD --> BL --> DG --> TE
+  UI --> Q --> BL --> DG --> TE
   TE -->|FAIL| BL
   TE -->|PASS streak| EX
 ```
 
-### 1. Intent capture
+### 1. Intent
 
-1. Human opens Build or Composer.
-2. Types a goal (optional image attachments on Build).
-3. **Queue builder** turns prose into one or more queue items scoped to a **project folder**.
+A human describes product work. The control plane turns that into one or more focused missions scoped to a product — not one mega-mission for a multi-part goal.
 
-### 2. Mission materialization
+### 2. Build → deploy gate → test
 
-1. Queue item → mission YAML (name, repo, live_url, acceptance, models, limits).
-2. Optional architect / provision steps may consult Vault for infra (prefer off until the core loop is solid).
-3. Run directory created: `runs/<name>-<timestamp>/`.
+1. **Build** — a coding agent changes the product repo and pushes the deploy branch.
+2. **Deploy gate** — the loop waits until the **live** app reports the same version the builder just pushed.
+3. **Test** — a tester agent exercises the live site and returns pass or fail with actionable feedback.
 
-### 3. Loop iteration
+### 3. Finish
 
-1. **Build** — agent works in `builder/` checkout; commits; pushes `deploy.branch`.
-2. **Deploy gate** — poll `live_url` + `version_endpoint` until SHA matches (or fixed-delay / command strategy).
-3. **Test** — agent exercises live site; writes `shared/verdict.json`.
-4. **PASS** → streak++; **FAIL** → streak=0, next build prompt = tester’s `builder_prompt`.
-
-### 4. Completion
-
-1. Exit code + `shared/report.md` + cost JSON.
-2. Queue item marked succeeded / failed / hard-fail.
+The run ends only after a **streak** of consecutive passes. A single fail resets the streak. Durable notes stay with the campaign so the next iteration knows what still fails.
 
 ---
 
-## Adapter matrix
+## Pluggable roles (concept)
 
-The harness roles are pluggable:
+The loop has three replaceable roles:
 
-```yaml
-adapters: mock # all simulated
-# or
-adapters:
-  builder: real
-  tester: real
-  deploy: real
-```
+| Role | Purpose |
+| ---- | ------- |
+| **Builder** | Change product code and prove real git work happened |
+| **Deploy gate** | Wait until live version matches what was pushed |
+| **Tester** | Grade the live URL only; emit structured pass/fail |
 
-| Role | Mock | Real (typical) |
-| ---- | ---- | -------------- |
-| builder | scripted “work” | Coding CLI + git proof-of-work |
-| deploy | instant / scenario | version-endpoint / fixed-delay / command |
-| tester | scenario file line N | Tester CLI against live_url + verdict |
-
-Mix roles while rolling out (e.g. real builder + mock tester).
+Early development can simulate any role; production-minded installs use real agents against a real live URL. Mixing simulated and real roles is a rollout technique, not a host recipe.
 
 ---
 
-## Where product state lives
+## Where product state *conceptually* lives
 
-Paths use the illustrative root `RATCHET_ROOT` — rename to match your install.
+No install paths here — only the ideas:
 
-| State | Location |
-| ----- | -------- |
-| Queue items | `RATCHET_ROOT/harness/composer-queue/<folder>-*.json` |
-| Run workspaces | `RATCHET_ROOT/harness/runs/<name>-<ts>/` |
-| Mission templates / seeds | `RATCHET_ROOT/harness/missions/` |
-| Project shells | `RATCHET_ROOT/projects/<slug>/project.json` |
-| Vault ciphertext | vault-mode `data/` (gitignored) |
+| State | Product idea |
+| ----- | ------------ |
+| Queue | Ordered missions per product |
+| Run workspace | One isolated workspace per mission attempt |
+| Product shell | Repo + live URL + version URL bound together |
+| Credentials store | Encrypted secrets outside agent workspaces |
 
 Continue → [Principles](./principles.md)

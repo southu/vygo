@@ -6,7 +6,7 @@
 
 ## What it is
 
-Self-hosted **AI build-and-verify control plane**. Human types a goal → system queues missions → AI **builder** pushes code → **deploy gate** waits for live `/version` SHA → AI **tester** grades the **live** site → repeat until a **streak** of passes. Name = contract: only moves forward.
+Self-hosted **AI build-and-verify control plane**. Human types a goal → system queues missions → AI **builder** pushes code → **deploy gate** waits for live version signal → AI **tester** grades the **live** site → repeat until a **streak** of passes. Name = contract: only moves forward.
 
 ---
 
@@ -29,49 +29,49 @@ flowchart LR
 
 | Piece | Place | Job |
 | ----- | ----- | --- |
-| Composer | control plane UI | Goals, queue, projects |
-| Ratchet CLI | `RATCHET_ROOT/harness` | Loop orchestration |
-| Vault | credentials boundary | Secrets + consumer broker |
-| Projects | `RATCHET_ROOT/projects` | `project.json` shells |
+| Composer | control plane UI | Goals, queue, product shells |
+| Ratchet loop | harness | Build → gate → live test |
+| Vault | credentials boundary | Secrets + brokered access |
+| Products | product shells | Repo + live URL + version signal |
 | Overnight helpers | optional | Observe only; no product features |
 
 ---
 
 ## Non‑negotiables
 
-1. **Live is truth** — tester hits `live_url`, not local tree
-2. **`/version`** — product must return deployed git SHA for the deploy gate
-3. **Proof of work** — harness checks git; ignore agent claims
-4. **Streak** — usually 2 consecutive PASSes
-5. **No secrets in builder env** — Vault consumer only
+1. **Live is truth** — tester hits the live URL, not the local tree
+2. **Version signal** — product must return the deployed git SHA for the deploy gate
+3. **Proof of work** — loop checks git; ignore agent claims
+4. **Streak** — usually several consecutive passes
+5. **No secrets in builder env** — credentials boundary only
 6. **Team git author** — unknown bot authors may be blocked by hosts
-7. **Multi-step goals** → about **4–8** queue items for real product work; bind cloud project UUIDs
+7. **Multi-step goals** → several focused queue items; bind cloud project identities
 8. **Credentials stay brokered** — builder and tester never hold cloud tokens
 
 ---
 
-## Loop exits
+## Loop outcomes (concepts)
 
-| Code | Meaning |
-| ---- | ------- |
-| 0 | Success (streak) |
-| 2 | Max iterations |
-| 3 | Deploy timeout |
-| 4 | Tester contract |
-| 5 | Builder proof-of-work |
-| 6 | Budget |
+| Outcome | Meaning |
+| ------- | ------- |
+| Success | Required streak of consecutive passes |
+| Max iterations | Budget of attempts exhausted |
+| Deploy timeout | Live version never caught up |
+| Tester contract | Missing or bad structured result |
+| Builder proof-of-work | No real git progress |
+| Budget | Spend limit exceeded |
 
 ---
 
 ## Mental model
 
-**Composer** = factory office · **Ratchet** = factory floor · **Vault** = key cabinet · **Product `/version`** = time clock.
+**Composer** = factory office · **Ratchet** = factory floor · **Vault** = key cabinet · **Product version signal** = time clock.
 
 ---
 
 ## Rebuild in one breath
 
-Host + model CLIs → trees `RATCHET_ROOT/{control,harness,projects}` → vault consumer → mock loop → product with `/version` → tiny real mission → docs pack for friends/AIs.
+Model CLIs → control plane + harness + product shells → credentials boundary → mock loop → product with version signal → tiny real mission → docs pack for friends/AIs.
 
 ---
 

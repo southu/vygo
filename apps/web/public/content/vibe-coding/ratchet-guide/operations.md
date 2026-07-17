@@ -9,16 +9,17 @@ This pack is **product design documentation** for an AI build-and-verify control
 ## What you will find here
 
 - How a human goal becomes missions, builds, deploy gates, and live tests
-- Contracts that make the loop honest (`/version`, proof-of-work, streaks)
+- Contracts that make the loop honest (live version signal, proof-of-work, streaks)
 - Credentials boundary ideas (broker secrets; never put them in builder env)
-- Greenfield rebuild outline and paste-ready coding-agent prompts
+- Greenfield rebuild outline at product-concept level and paste-ready educational prompts
 
 ## What you will not find here
 
 - Day-to-day host operations or process-manager recipes
 - Production recovery or admin playbooks for a running install
 - SSH, deploy-host diagnostics, cloud provisioning steps, or vault unlock procedures
-- Install-private topology or network binding details
+- Install-private topology, module maps, storage layouts, or environment key catalogs
+- Queue-admin procedures, monitoring workflows, or babysitting runbooks
 
 Private install notes belong outside this share pack.
 
@@ -28,12 +29,12 @@ Private install notes belong outside this share pack.
 
 | Piece | Product role |
 | ----- | ------------ |
-| **Composer** | Human UI: goals, project shells, mission queue |
-| **Ratchet harness** | Build → deploy gate → test loop per mission |
-| **Vault** | Encrypted credentials; short-lived consumer access for harness actions |
-| **Lazy / Medic / Sentinel** | Optional overnight helpers — observe and report only; never implement product features |
-| **Product live app** | The deployed app the tester grades; must expose honest `/version` |
+| **Composer** | Human UI: goals, product shells, mission queue |
+| **Ratchet loop** | Build → deploy gate → live test per mission |
+| **Vault** | Encrypted credentials; brokered access for harness actions |
+| **Optional helpers** | Observe and report only; never implement product features |
+| **Product live app** | The deployed app the tester grades; must expose an honest version signal |
 
-Names and layouts in this pack use the placeholder root `RATCHET_ROOT`. Rename freely when rebuilding.
+Names in this pack use only illustrative placeholders. Rename freely when rebuilding.
 
 Continue → [Rebuild](./rebuild.md)

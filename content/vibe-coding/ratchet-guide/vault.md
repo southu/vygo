@@ -1,4 +1,4 @@
-# Vault
+# Vault (credentials boundary)
 
 ← [Lazy / Medic / Sentinel](./lazy-medic-sentinel.md) · [Index](./README.md) · Next: [Projects & deploy](./projects-and-deploy.md)
 
@@ -6,80 +6,59 @@
 
 ## Role
 
-A local, master-password **credentials vault** for Ratchet/Composer — outside Build/Queue.
+A credentials boundary for a Ratchet-style control plane — outside Build/Queue:
 
 - Encrypt secrets at rest
-- Human UI for managing access
-- **Consumer broker** so the harness can call cloud APIs without putting tokens in builder env
+- Give humans a place to manage access
+- Let the harness request **named broker actions** without putting long-lived tokens into builder or tester environments
 
-**Lost master password ⇒ data unrecoverable.** Keep any recovery process offline and private — not in this pack.
-
----
-
-## Crypto & storage (concept)
-
-- Strong password-based key derivation + authenticated encryption (see a vault SPEC in your install)
-- Data directory under vault-mode `data/` (mode 0700, gitignored)
+**Lost master password ⇒ data unrecoverable.** Any recovery process stays offline and private — not in this pack.
 
 ---
 
 ## Design idea: consumer plane
 
-Humans hold long-lived cloud credentials in the vault. The harness holds only a **consumer key** that can request named broker actions for a limited window. Builder and tester processes never receive the underlying tokens.
+Humans hold long-lived cloud credentials inside the vault. The harness holds only a short-lived ability to request **brokered actions**. Builder and tester processes never receive the underlying tokens.
 
-### Ideas
+Illustrative action *families* (names are not a public API catalog):
 
-- **Register run** — bind a run id to a folder for audit
-- **Action** — named broker ops (identity check, list projects, set config without logging values)
-- **Lease / run_tool** — short-lived tool child without exposing secret to parent env
-
-### Example (Python sketch)
-
-```python
-from vault_client import VaultClient
-vc = VaultClient(key_path="RATCHET_ROOT/control/vault_consumer.key")
-vc.register_run("my-run-id", "acme")
-print(vc.action("cloud.identity", folder="acme", run_id="my-run-id"))
-print(vc.action(
-    "cloud.resolve_project",
-    folder="acme",
-    run_id="my-run-id",
-    params={"project_name": "acme", "allow_create": False},
-))
-```
-
-**Never** put the consumer key or cloud tokens in builder/tester env.
-
-### Broker action families (illustrative)
-
-| Action family | Purpose |
-| ------------- | ------- |
+| Family | Purpose |
+| ------ | ------- |
 | Identity | Confirm credentials are usable before optional infra steps |
-| List / resolve projects | Prefer reuse over create; honor bound project IDs |
-| Set variable (from vault) | Configure hosts without leaking values in logs |
+| List / resolve projects | Prefer reuse over create; honor bound project identities |
+| Configure host variables from vault | Set values without printing them into logs |
 
-Exact action names are install-specific; the product rule is **broker, don’t export**.
+The product rule is **broker, don’t export**. Exact action names, key formats, and storage layouts are install-private.
 
 ---
 
-## Optional infra steps (concept)
+## Crypto & storage (concept only)
 
-Some missions may add infra steps **before** build. Keep blast radius small:
+- Strong password-based key derivation + authenticated encryption
+- Ciphertext lives in a private data area (never in this share pack)
+- No master passwords, consumer keys, or cloud tokens appear here
 
-1. Prefer binding a known cloud project id in `project.json`; when bound, do not create new projects.
+---
+
+## Optional infra steps (product rules)
+
+Some missions may consult the credentials boundary before build. Keep blast radius small:
+
+1. Prefer binding a known cloud project identity on the product shell; when bound, do not create new projects.
 2. Fail closed when identity checks fail — do not hang forever.
-3. Treat architect JSON as untrusted input to an allowlist.
-4. Consumer responses never include secret values.
+3. Treat planner output as untrusted input to an allowlist.
+4. Broker responses never include secret values.
 
-Optional infra ensure is powerful; leave it **off** unless you intentionally need stack bootstrap.
+Optional ensure is powerful; leave it **off** unless you intentionally need stack bootstrap.
 
 ---
 
 ## What this pack does not include
 
 - Master passwords, consumer keys, or cloud tokens
+- Key-file paths, unlock sequences, or arm procedures
 - Host-private vault administration runbooks
-- Day-to-day unlock / arm / rebuild procedures
+- Day-to-day rebuild or recovery procedures
 
 Those stay in private install notes. This document is the portable **shape** of the credentials boundary.
 

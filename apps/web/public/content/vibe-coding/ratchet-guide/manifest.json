@@ -2,7 +2,7 @@
   "name": "ratchet-guide",
   "title": "Ratchet system guide",
   "version": "v1.2",
-  "description": "Shareable documentation pack for the Ratchet self-hosted AI build-and-verify control plane. Neutral illustrative RATCHET_ROOT paths only; no secrets, no real hostnames, no host operations runbooks or operator procedures.",
+  "description": "Shareable product-design documentation for a Ratchet-style AI build-and-verify control plane. Public-safe educational concepts only; no secrets, no real hostnames, no install trees, no host operations runbooks or operator procedures.",
   "basePath": "/content/vibe-coding/ratchet-guide/",
   "documents": [
     {
@@ -15,7 +15,7 @@
     },
     {
       "filename": "architecture.md",
-      "title": "System map, trust boundaries, end-to-end data flow"
+      "title": "System map, trust boundaries, end-to-end product flow"
     },
     {
       "filename": "principles.md",
@@ -23,15 +23,15 @@
     },
     {
       "filename": "layout.md",
-      "title": "Directory layout, environment files, project.json schema, and run workspace structure"
+      "title": "Logical product areas (control plane, harness, product shells) — not a host path map"
     },
     {
       "filename": "loop-and-missions.md",
-      "title": "The Ratchet loop contract, deploy strategies, mission YAML, exit codes, and verdict contract"
+      "title": "Loop contract, version signal, mission shape, and verdict ideas"
     },
     {
       "filename": "composer.md",
-      "title": "Composer control-plane UI: Build home, queue builder, models, and unified nav"
+      "title": "Composer product UX: goal capture, queue, product shells"
     },
     {
       "filename": "lazy-medic-sentinel.md",
@@ -39,11 +39,11 @@
     },
     {
       "filename": "vault.md",
-      "title": "Credentials boundary: consumer broker shape and optional infra rules"
+      "title": "Credentials boundary shape: broker secrets, never export to agents"
     },
     {
       "filename": "projects-and-deploy.md",
-      "title": "Project shells, product /version requirements, and multi-step work"
+      "title": "Product shells and version-signal requirements"
     },
     {
       "filename": "operations.md",
@@ -51,11 +51,11 @@
     },
     {
       "filename": "rebuild.md",
-      "title": "Greenfield rebuild checklist in phases A–E"
+      "title": "Greenfield product milestones in phases A–E"
     },
     {
       "filename": "ai-prompts.md",
-      "title": "Paste-ready prompts for rebuild, new product, and friend share"
+      "title": "Paste-ready educational prompts for rebuild, new product, and friend share"
     },
     {
       "filename": "footguns.md",
@@ -63,11 +63,11 @@
     },
     {
       "filename": "examples.md",
-      "title": "Mock loop, full local loop, mission YAML and project.json examples"
+      "title": "Mission and product-shell shapes (illustrative only)"
     },
     {
       "filename": "diagrams.md",
-      "title": "Mermaid gallery: happy path, trust boundaries, loop state, vault sequence, rebuild phases"
+      "title": "Mermaid gallery: happy path, trust boundaries, loop state, credentials sequence, rebuild phases"
     },
     {
       "filename": "one-pager.md",

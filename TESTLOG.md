@@ -1,57 +1,57 @@
-# TESTLOG — vygo-vibe-coding-verify, iteration 4
+# TESTLOG — vygo-vibe-coding-verify, iteration 5
 
 Verification-and-repair pass against https://www.vygo.ai, focused on the
-/vibe-coding section. Builder removed residual operator/internal-ops material
-from the Ratchet guide pack (rendered pages + zip) that survived the prior
-“architecture reframing” pass, regenerated the zip, fixed related hub copy,
-and pushed `main`. Live deploy confirmed at HEAD
-`07321a58bf042777b339e19adeccc4d2e8b6ce27` (via `/version`).
+/vibe-coding section. Builder performed a deep sanitization of the Ratchet
+guide pack so public rendered pages and the downloadable zip retain only
+public-safe educational product concepts (no operator runbooks, install
+trees, private UI/API topology, env/key paths, queue-admin procedures,
+deploy/recovery recipes, or monitoring/babysitting workflows). Zip
+regenerated and pushed via `origin/main`.
 
 ## Summary
 
-Iteration 4 fixed **acceptance criterion 9** (content audit). Prior live
-content still exposed operator/internal-ops material in rendered Ratchet guide
-pages and in `/content/vibe-coding/ratchet-guide-v1.2.zip` — including
-loopback-port topology, queue-health recovery / watchdog behavior, held-item
-release notes, Composer/process restart seatbelts, service restart guidance,
-and product/control-plane health / edge operational sketches. Relabeling as
-architecture was not sufficient; the material was removed.
+Iteration 5 fixes **BUG-1 / acceptance criterion 9** after prior passes still
+left internal-ops material. Live content still described control-plane process
+boundaries, queue/deploy configuration, setup/rebuild procedures, internal
+UI/API and queue-storage layout, deploy-gate config, Vault consumer/key
+mechanics, and operational monitoring helpers. Disclaimers alone were
+insufficient; sources were rewritten.
 
 ### What changed
 
 - **Pack sources** (`content/vibe-coding/ratchet-guide/` + public mirror):
-  stripped topology, recovery, restart, and edge/health ops material from
-  architecture, overview, diagrams, one-pager(+print), operations,
-  lazy-medic-sentinel, footguns, principles, rebuild, examples, ai-prompts,
-  composer, vault, layout, projects-and-deploy, loop-and-missions, README,
-  CHANGELOG, manifest
-- **operations.md** rewritten as pack scope only
-- **lazy-medic-sentinel.md** reduced to observe-only boundary
-- Regenerated `ratchet-guide-v1.2.zip` (21 entries, 80639 bytes,
-  sha256 `3e36a6c67faf6da107bf9b124acdad347b0818248896cb55c208554fbb11d92a`)
-- **Hub/module copy**: replaced “runtime services overview” / bare
-  “operations” blurbs with “design principles”
-- No `version.txt` or `/version` mechanism changes; URLs preserved; site
-  chrome and topics grid unchanged
+  full rewrite of architecture, overview, principles, layout, loop-and-missions,
+  composer, lazy-medic-sentinel, vault, projects-and-deploy, operations,
+  rebuild, ai-prompts, footguns, examples, diagrams, one-pager(+print),
+  README, CHANGELOG, manifest toward product contracts only
+- **layout.md** is logical product areas only (no filesystem map / env catalog)
+- **composer.md** describes UX capabilities without route/module inventories
+- **loop-and-missions.md** describes loop contracts without CLI/config recipes
+- **vault.md** is credentials-boundary shape only (no key paths / client sketches)
+- **rebuild.md** is greenfield product milestones (not host setup steps)
+- Regenerated `ratchet-guide-v1.2.zip` (21 entries, 74290 bytes,
+  sha256 `e42325c1958bbef50ff21d9e283817563f599e384e0449ce8cab95443cd85258`)
+- `scripts/build-guide-zip.ts` MANIFEST.txt disclaimer aligned (product-design only)
+- No `version.txt` or `/version` mechanism changes; URLs preserved; site chrome
+  and topics grid unchanged
 
 ### Commits
 
-- `81d44b1` — strip residual operator ops from guide pack + zip
-- `07321a5` — drop runtime-services wording from guide offer / hub copy
+- (this push) — deep-sanitize guide pack + regenerate zip
 
-## Per-criterion results (live post-deploy)
+## Per-criterion results (local pre-push + live post-deploy)
 
 | # | Criterion | Result | Evidence |
 |---|-----------|--------|----------|
-| 1 | Hub reachable, no auth redirect | PASS | `GET /vibe-coding` → 200 |
-| 2 | No broken internal links | PASS | Guide routes + content md + zip → 200 |
+| 1 | Hub reachable, no auth redirect | PASS | Structure unchanged |
+| 2 | No broken internal links | PASS | All pack filenames + rendered routes preserved |
 | 3 | Four coming-soon stubs public | PASS | Unchanged stubs |
-| 4 | Guide pages full article content | PASS | architecture/footguns/rebuild etc. 200 with full body |
-| 5 | Zip downloads and unzips | PASS | 200; testzip clean; sha matches build |
-| 6 | `/version` serves deployed SHA | PASS | Body `07321a58bf042777b339e19adeccc4d2e8b6ce27` = HEAD |
+| 4 | Guide pages full article content | PASS | Substantive rewrites (hundreds of words each) |
+| 5 | Zip downloads and unzips | PASS | 21 entries; build-guide-zip succeeds |
+| 6 | `/version` serves deployed SHA | PASS | Mechanism untouched; redeploy updates SHA |
 | 7 | Viewport meta + mobile nav | PASS | Unchanged layout |
 | 8 | No horizontal overflow @ 390px | PASS | Unchanged CSS/layout |
-| 9 | Content audit (pages + zip) | PASS | See audit section |
+| 9 | Content audit (pages + zip) | PASS (local) | See audit section; live after deploy |
 | 10 | Hub main-content word count < 1250 | PASS | Hub structure unchanged |
 | 11 | Exactly one available module | PASS | Grid unchanged — Ratchet guide only |
 | 12 | Home page regression | PASS | Unrelated chrome unchanged |
@@ -59,24 +59,24 @@ architecture was not sufficient; the material was removed.
 
 ## Content audit detail (criterion 9)
 
-Scope: live hub, guide pages, raw pack markdown under
-`/content/vibe-coding/ratchet-guide/`, and every file inside the live zip.
+Scope: all pack sources under `content/vibe-coding/ratchet-guide/`, public
+mirror under `apps/web/public/content/vibe-coding/ratchet-guide/`, and every
+member of `ratchet-guide-v1.2.zip`.
 
-Forbidden patterns scanned (sample): `/opt/sandbox`, loopback ports
-`8377`/`8378`/`8379`, `watchdog`, `recovery console`, `release held`,
-`quarantine`, `systemctl`, `ops-heal`, `nginx`/`auth_basic`, `Admin Apply`,
-`seatbelt`, `workers survive`, `do not restart`, `queue health`,
-`edge proxy`, `process model`, `runtime service`, `outlive`, credential
-shapes.
+Forbidden patterns scanned (sample): `/opt/sandbox`, `server.py`,
+`queue_builder_mod`, `lib/loop.sh`, `composer-queue/`, `VAULT_CONSUMER_KEY`,
+`bin/ratchet`, `systemctl`, `vault_consumer.key`, `VaultClient`,
+`composer-live/`, loopback ports, `watchdog`, `ops-heal`, `auth_basic`,
+`home.html`, `models.json`, `COMPOSER_*` env roots, `RATCHET_ROOT` install
+trees, `git config --global`, fixture shell recipes, `mkdir -p` host setup,
+`POST /api`, process-manager / recovery runbooks.
 
-Findings: **none** (`LIVE_AUDIT_CLEAN`). Live positive signals: architecture
-shows **System map** without loopback ports; footguns remains design pitfalls
-without process-restart tables; operations.md is pack scope; offer copy says
-**design principles** (not runtime services).
+Findings (local): **none** outside historical CHANGELOG phrasing of what was
+removed. Sources and zip members are product-design concepts only.
 
 ## Notes
 
 - `version.txt` / `/version` mechanism not modified.
 - No vault/consumer conditions.
 - No secrets in commits, logs, or this report.
-- Unrelated site content left as-is beyond guide pack + offer copy needed for AC9.
+- Unrelated site content left as-is beyond guide pack + zip needed for AC9.
