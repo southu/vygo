@@ -1,0 +1,81 @@
+{
+  "name": "ratchet-guide",
+  "title": "Ratchet system guide",
+  "version": "v1.2",
+  "description": "Shareable documentation pack for the Ratchet self-hosted AI build-and-verify control plane. Neutral illustrative /srv/ratchet paths only; no secrets, no real hostnames.",
+  "basePath": "/content/vibe-coding/ratchet-guide/",
+  "documents": [
+    {
+      "filename": "README.md",
+      "title": "Ratchet system guide (v1.2) — pack index, start paths, and read order"
+    },
+    {
+      "filename": "overview.md",
+      "title": "Elevator pitch, happy-path flow, and component cheat sheet"
+    },
+    {
+      "filename": "architecture.md",
+      "title": "System map, trust boundaries, end-to-end data flow, and process model"
+    },
+    {
+      "filename": "principles.md",
+      "title": "Load-bearing design rules: live is truth, proof of work, streaks, no secrets in builder env"
+    },
+    {
+      "filename": "layout.md",
+      "title": "Directory layout, environment files, project.json schema, and run workspace structure"
+    },
+    {
+      "filename": "loop-and-missions.md",
+      "title": "The Ratchet loop contract, deploy strategies, mission YAML, exit codes, and verdict contract"
+    },
+    {
+      "filename": "composer.md",
+      "title": "Composer control-plane UI: Build home, queue builder, models, and unified nav"
+    },
+    {
+      "filename": "lazy-medic-sentinel.md",
+      "title": "Overnight watchdogs: Lazy observe/ops modes, Medic recovery console, and Sentinel supervisor"
+    },
+    {
+      "filename": "vault.md",
+      "title": "Credentials vault: crypto, arm persistence, consumer broker, and provisioner integration"
+    },
+    {
+      "filename": "projects-and-deploy.md",
+      "title": "Project shells, product /version requirements, git identity, and host deploys"
+    },
+    {
+      "filename": "operations.md",
+      "title": "systemd units, nginx edge, health checks, heal timer, and the operator sidecar cadence"
+    },
+    {
+      "filename": "rebuild.md",
+      "title": "Greenfield rebuild checklist in phases A–E, from host setup to hardening"
+    },
+    {
+      "filename": "ai-prompts.md",
+      "title": "Paste-ready prompts for rebuild, ops, heal, deploy-timeout, new product, and sidecar agents"
+    },
+    {
+      "filename": "footguns.md",
+      "title": "Production failure modes: symptom, likely cause, and fix direction"
+    },
+    {
+      "filename": "examples.md",
+      "title": "Mock loop, full local loop, mission YAML and project.json examples, and ops snippets"
+    },
+    {
+      "filename": "diagrams.md",
+      "title": "Mermaid gallery: happy path, edge, trust boundaries, loop state, vault sequence, rebuild phases"
+    },
+    {
+      "filename": "one-pager.md",
+      "title": "Single-sheet printable summary of the whole system"
+    },
+    {
+      "filename": "CHANGELOG.md",
+      "title": "Documentation pack history and versioning notes"
+    }
+  ]
+}
