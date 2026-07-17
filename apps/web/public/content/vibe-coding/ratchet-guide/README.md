@@ -15,7 +15,7 @@
 - API keys, vault master passwords, consumer keys, or cloud tokens
 - Private host credentials or real server filesystem paths
 - Day-to-day host operations runbooks (process managers, SSH production ops, deploy/host diagnostics, recovery playbooks, vault unlock sequences)
-- Internal module maps, private UI/API topology, environment key catalogs, queue-storage layouts, or monitoring/babysitting workflows
+- Internal internal module inventorys, private UI/API topology, environment key catalogs, queue-storage layouts, or monitoring/babysitting workflows
 
 Illustrative examples use only placeholder domains such as `example.com`. Rename freely when rebuilding.
 

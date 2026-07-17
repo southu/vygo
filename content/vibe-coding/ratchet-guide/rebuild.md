@@ -16,7 +16,7 @@ This is a rebuild outline — not a host operations runbook.
 4. Three logical product areas: control plane, harness, product shells (place them wherever you like)
 5. Sources or stubs for: loop orchestration, goal-capture UI, credentials boundary
 
-No package lists, service unit files, or install trees live here.
+No package lists, service unit files, or host filesystem maps live here.
 
 ---
 

@@ -18,7 +18,7 @@ This pack is **product design documentation** for an AI build-and-verify control
 - Day-to-day host operations or process-manager recipes
 - Production recovery or admin playbooks for a running install
 - SSH, deploy-host diagnostics, cloud provisioning steps, or vault unlock procedures
-- Install-private topology, module maps, storage layouts, or environment key catalogs
+- Install-private topology, internal module inventorys, storage layouts, or environment key catalogs
 - Queue-admin procedures, monitoring workflows, or babysitting runbooks
 
 Private install notes belong outside this share pack.

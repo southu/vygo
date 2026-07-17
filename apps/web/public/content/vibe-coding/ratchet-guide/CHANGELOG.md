@@ -12,7 +12,7 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ### Removed
 
-- Internal file/module/storage layouts and install tree maps
+- Internal file/module/storage layouts and filesystem map maps
 - Private UI/API route tables, source-module inventories, and queue-storage paths
 - Environment variable catalogs, key-path details, and consumer-key sketches
 - Operational queue/admin actions, CLI run recipes, and process exit-code cookbooks

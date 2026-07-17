@@ -56,7 +56,7 @@ Optional ensure is powerful; leave it **off** unless you intentionally need stac
 ## What this pack does not include
 
 - Master passwords, consumer keys, or cloud tokens
-- Key-file paths, unlock sequences, or arm procedures
+- Secret-file paths, unlock sequences, or day-to-day vault administration
 - Host-private vault administration runbooks
 - Day-to-day rebuild or recovery procedures
 

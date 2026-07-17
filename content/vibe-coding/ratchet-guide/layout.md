@@ -14,7 +14,7 @@ This page describes **logical parts** of a Ratchet-style control plane — not a
 | **Harness** | The build → deploy gate → live test loop and its run workspaces |
 | **Products** | One shell per shipped app: repo + live URL + version signal |
 
-You may place these anywhere on disk when rebuilding. This pack deliberately does **not** publish a real install tree, module list, or storage layout.
+You may place these anywhere on disk when rebuilding. This pack deliberately does **not** publish a real filesystem map, module list, or storage layout.
 
 ---
 
@@ -71,6 +71,6 @@ Exact directory names and filenames are install-private.
 | Prefer team git identity the host accepts | Deploy gates depend on real deploys landing |
 | Document private install choices offline | This pack stays shareable |
 
-No environment variable names, key-file paths, or host topology appear here on purpose.
+No environment variable names, secret-file paths, or host topology appear here on purpose.
 
 Continue → [Loop & missions](./loop-and-missions.md)

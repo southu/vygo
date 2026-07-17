@@ -2,7 +2,7 @@
   "name": "ratchet-guide",
   "title": "Ratchet system guide",
   "version": "v1.2",
-  "description": "Shareable product-design documentation for a Ratchet-style AI build-and-verify control plane. Public-safe educational concepts only; no secrets, no real hostnames, no install trees, no host operations runbooks or operator procedures.",
+  "description": "Shareable product-design documentation for a Ratchet-style AI build-and-verify control plane. Public-safe educational concepts only; no secrets, no real hostnames, no filesystem maps, no host operations runbooks or operator procedures.",
   "basePath": "/content/vibe-coding/ratchet-guide/",
   "documents": [
     {

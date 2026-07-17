@@ -14,7 +14,7 @@ Composer is the human-facing factory for a Ratchet-style control plane:
 - Show run status at a glance
 - Point humans at credentials management (without putting secrets in chat)
 
-It is a **product surface**, not a published module map or private API catalog.
+It is a **product surface**, not a published internal module inventory or private API catalog.
 
 ---
 

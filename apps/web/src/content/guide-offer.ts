@@ -17,8 +17,8 @@ export const guideOffer = {
   assurances: [
     "The guide is free — the full v1.2 pack, no signup and no paywall.",
     "It contains no API keys, no vault passwords, and no host credentials.",
-    "Paths in the guide are illustrative — rename them to match your own install.",
-    "It is architecture and how-to documentation, not access to anyone's running VPC.",
+    "It teaches public-safe product concepts only — not install trees or host operations.",
+    "It is product-design documentation, not access to anyone's running VPC.",
   ],
   ctas: {
     startFree: {

@@ -27,7 +27,7 @@ export const vibeCodingModules: VibeCodingModule[] = [
   {
     title: "Rebuild checklist",
     blurb:
-      "Greenfield rebuild in phases A–E: host setup, control plane, deploy gate, first real mission, then hardening.",
+      "Greenfield product milestones in phases A–E: foundations, config rules, credentials boundary, first product, then hardening.",
     route: null,
     status: "coming-soon",
   },
@@ -62,14 +62,14 @@ export const vibeCodingModules: VibeCodingModule[] = [
   {
     title: "Composer walkthrough",
     blurb:
-      "A guided tour of the control-plane UI: Build home, the queue builder, models, and the unified nav.",
+      "A guided tour of the goal-capture surface: drafting multi-step missions, product shells, and queue status.",
     route: null,
     status: "coming-soon",
   },
   {
     title: "Vault deep-dive",
     blurb:
-      "How credentials are armed, brokered per task, and kept out of the builder environment entirely.",
+      "How credentials stay behind a brokered boundary and never enter the builder environment.",
     route: null,
     status: "coming-soon",
   },
