@@ -1039,18 +1039,93 @@ function stripRemediationLanguage(headline: string): string {
     .trim();
 }
 
+/** First sentence of free text (period/question/exclamation), or the whole string. */
+function firstSentenceOf(text: string): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  const match = cleaned.match(/^(.+?[.!?])(?:\s+|$)/);
+  return (match?.[1] ?? cleaned).trim();
+}
+
+/**
+ * True when the summary looks like a verb-first / subject-stripped fragment
+ * (common after sloppy paste recovery that matches `product[:\s]+(.+)`).
+ */
+function looksLikePredicateFragment(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  if (/^[a-z]/.test(t)) return true;
+  return /^(has|have|had|is|are|was|were|isn'?t|aren'?t|wasn'?t|weren'?t|does|doesn'?t|do|don'?t|did|didn'?t|can|can'?t|cannot|will|won'?t|should|shouldn'?t|needs?|need|lacks?|provides?|runs?|uses?|includes?|contains?|supports?|looks?|seems?|appears?|offers?|enables?|allows?|helps?|works?|serves?|delivers?)\b/i.test(
+    t,
+  );
+}
+
+/**
+ * Format a report summary for insertion after "describes" / "describing".
+ * - UNKNOWN → neutral "a product"
+ * - Predicate fragments → `a product that "<fragment>"` (quotes prospect wording)
+ * - Multi-sentence / full-sentence summaries → quote the first sentence only
+ * - Short noun phrases → embed as-is
+ */
+function formatSummaryAsDescribedObject(rawSummary: string): string {
+  const trimmed = rawSummary.replace(/\s+/g, " ").trim();
+  if (!trimmed || isUnknownField(trimmed)) return "a product";
+
+  const first = firstSentenceOf(trimmed);
+  const body = first.replace(/[.!?]+$/u, "").trim();
+  if (!body) return "a product";
+
+  if (looksLikePredicateFragment(body)) {
+    const predicate = body.charAt(0).toLowerCase() + body.slice(1);
+    return `a product that "${predicate}"`;
+  }
+
+  // Full sentence or multi-sentence report: quote first sentence so the
+  // surrounding template can stay a single grammatical clause.
+  if (first !== trimmed || /[.!?]$/.test(first)) {
+    return `a product that "${body}"`;
+  }
+
+  return body;
+}
+
+/**
+ * Join prose parts and re-capitalize any lowercase start that follows
+ * sentence-ending punctuation (guards against mid-string fragment appends).
+ */
+function joinReasoningProse(parts: string[]): string {
+  const joined = parts
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" ");
+  return joined.replace(/([.!?])\s+([a-z])/g, (_m, punct: string, ch: string) => {
+    return `${punct} ${ch.toUpperCase()}`;
+  });
+}
+
 export function buildEngagementReasoning(
   report: ReadinessReportV1Partial | Record<string, unknown>,
   signals: BucketSignals,
   bucket: EngagementBucket,
   dimensions: DimensionScores,
 ): string {
-  const summary =
+  const rawSummary =
     typeof report.summary === "string" && report.summary.trim()
       ? report.summary.trim()
       : signals.whoUses
         ? `a product used by ${signals.whoUses.toLowerCase()}`
         : "this product";
+
+  // Object phrase for "describes/describing …" templates (grammar-smoothed).
+  const described = formatSummaryAsDescribedObject(rawSummary);
+  // Standalone labeled context (Scale): keep prospect wording, first sentence only.
+  const contextSummary = (() => {
+    if (!rawSummary || isUnknownField(rawSummary)) return "not specified";
+    const first = firstSentenceOf(rawSummary).replace(/[.!?]+$/u, "").trim();
+    if (!first) return "not specified";
+    // Capitalize after a label like "Product context: …"
+    return first.charAt(0).toUpperCase() + first.slice(1);
+  })();
 
   const tenancy =
     typeof report.tenancy === "string" && report.tenancy.trim()
@@ -1072,43 +1147,43 @@ export function buildEngagementReasoning(
     dimensions.Reliability != null ? `Reliability ${dimensions.Reliability}` : "Reliability n/a";
 
   if (bucket === "Harden") {
-    return [
-      `Based on your submission describing ${summary}, with ${tenancy} and ${auth}, this looks like an internal tool with enough foundation to improve in a focused engagement.`,
+    return joinReasoningProse([
+      `Based on your submission describing ${described}, with ${tenancy} and ${auth}, this looks like an internal tool with enough foundation to improve in a focused engagement.`,
       `Scores (${s1}, ${s2}) and your user model (${signals.whoUses || "internal"}) support a Harden path rather than a full multi-tenant rebuild.`,
       `Tests were reported as: ${tests}.`,
-    ].join(" ");
+    ]);
   }
 
   if (bucket === "Enterprise") {
-    return [
-      `Your answers describe ${summary} with enterprise or multi-tenant pressure (${tenancy}; ${auth}).`,
+    return joinReasoningProse([
+      `Your answers describe ${described} with enterprise or multi-tenant pressure (${tenancy}; ${auth}).`,
       `Compliance or SSO signals, combined with ${s1} and ${s2}, point to an Enterprise-grade engagement rather than a lightweight fix.`,
       `We recommend locking scope with an audit before a fixed-price rebuild.`,
-    ].join(" ");
+    ]);
   }
 
   if (bucket === "Scale") {
-    return [
+    return joinReasoningProse([
       `You reported paying or growing usage alongside a security questionnaire path, while reliability/compliance scores remain soft (${s2}; Compliance ${dimensions["Compliance posture"] ?? "n/a"}).`,
-      `Product context: ${summary}. Tenancy: ${tenancy}.`,
+      `Product context: ${contextSummary}. Tenancy: ${tenancy}.`,
       `Scale is the fit when commercial pressure is real but foundations still need a serious rebuild plan.`,
-    ].join(" ");
+    ]);
   }
 
   if (bucket === "Not a fit") {
-    return [
+    return joinReasoningProse([
       `The submission does not yet describe a working product surface we can score confidently.`,
       `Come back when there is a runnable build and clearer stack answers so we can recommend an engagement.`,
       `No audit or build path is appropriate until basics are present.`,
-    ].join(" ");
+    ]);
   }
 
-  // Launch (including default)
-  return [
-    `Your report describes ${summary} used by ${signals.whoUses || "external or mixed users"}, with foundational gaps in scores (${s1}, ${s2}).`,
+  // Launch (including default) — comma before "used by" so multi-clause grammar stays valid.
+  return joinReasoningProse([
+    `Your report describes ${described}, used by ${signals.whoUses || "external or mixed users"}, with foundational gaps in scores (${s1}, ${s2}).`,
     `Stack signals include ${tenancy} and tests as: ${tests}.`,
     `Launch is the recommended engagement to put production foundations under a fixed scope before growth pressure compounds risk.`,
-  ].join(" ");
+  ]);
 }
 
 export function engagementMeta(bucket: EngagementBucket): {

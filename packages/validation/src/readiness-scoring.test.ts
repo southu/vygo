@@ -386,4 +386,71 @@ describe("readiness scoring", () => {
     assert.ok(payload.pricing.enterprise.includes("$275K"));
     assert.ok(/\$15K audit is credited/i.test(payload.pricing.auditNote));
   });
+
+  it("reasoning grammar-smoothes predicate-fragment summaries (ZephyrBill repro)", () => {
+    // recoverSloppyPaste strips "The product" via /product[:\s]+(.+)/ leaving a
+    // verb-first fragment; multi-sentence summaries used to yield
+    // "Your report describes has real revenue…. used by …".
+    const predicateSummary =
+      "has real revenue (320 paying customers) but is not production-ready. Top risks: IDOR authorization gap, committed Stripe secret, no tests, manual migrations.";
+    const payload = computeReadinessScore({
+      report: {
+        ...UNKNOWN_REPORT,
+        summary: predicateSummary,
+        tests: "none",
+        secrets_pattern: "committed Stripe secret",
+        authorization: "IDOR authorization gap",
+      },
+      source: "paste",
+      stage1: {
+        productDescription:
+          "ZephyrBill is a subscription billing dashboard for indie SaaS founders",
+        whoUses: "Solo SaaS founders churning invoices for about 320 paying customers",
+        builtWith: "Cursor",
+        blockers: ["security", "data_migration"],
+        deadline: "Yes within 90 days",
+        deadlineDetail: "Enterprise pilot with Northwind Labs kicks off in 8 weeks",
+      },
+    });
+
+    assert.equal(payload.bucket, "Launch");
+    assert.doesNotMatch(
+      payload.reasoning,
+      /describes has\b/i,
+      "must not glue 'describes' onto a bare predicate",
+    );
+    assert.doesNotMatch(
+      payload.reasoning,
+      /\.\s+used by\b/,
+      "must not append 'used by' after a period without a new sentence",
+    );
+    assert.match(
+      payload.reasoning,
+      /describes a product that "has real revenue \(320 paying customers\) but is not production-ready"/i,
+    );
+    assert.match(payload.reasoning, /320 paying customers/);
+    assert.match(payload.reasoning, /Solo SaaS founders/i);
+    // No mid-prose lowercase start after a sentence boundary.
+    assert.doesNotMatch(payload.reasoning, /[.!?]\s+[a-z]/);
+  });
+
+  it("sparse UNKNOWN summary keeps the Not a fit fallback verdict", () => {
+    const payload = computeReadinessScore({
+      report: UNKNOWN_REPORT,
+      source: "paste",
+      stage1: {
+        whoUses: "",
+        productDescription: "",
+        builtWith: "Cursor",
+        blockers: [],
+        deadline: "No hard deadline",
+        deadlineDetail: "",
+      },
+    });
+    assert.equal(payload.bucket, "Not a fit");
+    assert.match(
+      payload.reasoning,
+      /The submission does not yet describe a working product surface we can score confidently\./,
+    );
+  });
 });
