@@ -56,6 +56,7 @@ import { ScoreGateForm } from "@/components/readiness/ScoreGateForm";
 import { AssessmentProgress } from "@/components/readiness/AssessmentProgress";
 import { AnswerCallout } from "@/components/readiness/AnswerCallout";
 import { ConfirmStackCard, ConfirmSizeCard } from "@/components/readiness/StackSizeCards";
+import { FindingsList } from "@/components/readiness/FindingsList";
 import {
   calloutForBlockers,
   calloutForBuiltWith,
@@ -921,22 +922,11 @@ export function ReadinessFlow() {
           />
         </div>
 
-        <div className="readiness-step-panel mt-4" data-testid="readiness-confirm-findings">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-            {c.confirm.findingsLabel}
-          </p>
-          {confirm.findings.length > 0 ? (
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-ink-soft">
-              {confirm.findings.map((f) => (
-                <li key={f}>{f}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-muted">
-              Findings will appear once parsing completes. You can re-paste or continue.
-            </p>
-          )}
-        </div>
+        <FindingsList
+          label={c.confirm.findingsLabel}
+          findings={confirm.findings}
+          emptyText="Findings will appear once parsing completes. You can re-paste or continue."
+        />
 
         <AnswerCallout callout={confirmCallout} />
 
