@@ -137,6 +137,37 @@ describe("parseStructuredReadiness — realistic vygo paste", () => {
   });
 });
 
+describe("parseStructuredReadiness — verbatim text preservation", () => {
+  const result = parseStructuredReadiness(VYGO_PASTE);
+
+  it("keeps the raw STACK / SIZE / FINDINGS text retrievable unchanged", () => {
+    // Step 8 renders from these free-text fields; the structured layer must
+    // never mutate them (acceptance: pasted text reproduced verbatim).
+    assert.equal(result.raw, VYGO_PASTE);
+    assert.ok(result.stackText.includes("TypeScript"));
+    assert.ok(result.stackText.includes("Next.js 15"));
+    assert.ok(result.size.text.includes("518 git-tracked files"));
+    assert.ok(result.size.text.includes("63 SQL migrations"));
+    assert.ok(result.findingsText.some((f) => f.includes("session cookies + magic link")));
+  });
+
+  it("never invents finding text — every structured text traces to a bullet", () => {
+    // Nothing is dropped or altered: each structured finding's text must be a
+    // substring of one of today's plain bullet strings.
+    const bullets = result.findingsText.join("\n");
+    for (const f of result.findings) {
+      assert.ok(f.text.length > 0);
+      assert.ok(bullets.includes(f.text), `finding text not found in bullets: ${f.text}`);
+    }
+  });
+
+  it("does not mutate the caller's input string", () => {
+    const before = VYGO_PASTE;
+    parseStructuredReadiness(VYGO_PASTE);
+    assert.equal(VYGO_PASTE, before);
+  });
+});
+
 describe("parseStructuredReadiness — malformed / garbage input", () => {
   const GARBAGE = "asdf!!! 🍕 no colons here \n<<< random ;; ###\nqwerty 12345 zzz";
   const result = parseStructuredReadiness(GARBAGE);
