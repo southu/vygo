@@ -82,7 +82,6 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
 
   const e2eEmailDefault = useMemo(
     () => `e2e-test+gate-${Date.now().toString(36)}@vygo.ai`,
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable per mount
     [],
   );
 
