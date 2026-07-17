@@ -74,8 +74,8 @@
       "title": "Single-sheet printable summary of the whole system"
     },
     {
-      "filename": "one-pager.html",
-      "title": "Print/PDF-friendly self-contained HTML rendering of the one-pager (letter, inline SVG, no external assets)"
+      "filename": "one-pager-print",
+      "title": "Print/PDF-friendly self-contained HTML rendering of the one-pager (letter, inline SVG, no external assets) — served at the extensionless clean URL; backed by one-pager-print.html"
     },
     {
       "filename": "CHANGELOG.md",

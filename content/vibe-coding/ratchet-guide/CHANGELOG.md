@@ -8,11 +8,19 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ---
 
+## v1.2 / guide-2026-07-17d — one-pager clean-URL rename
+
+### Changed
+
+- Renamed the printable HTML one-pager: file `one-pager.html` → `one-pager-print.html`, published and linked as [`one-pager-print`](./one-pager-print). The pack host serves the site with Vercel `cleanUrls`, which 308-redirects every `.html` URL to its extensionless form — listing and linking the extensionless clean URL makes the printable sheet return 200 directly.
+
+---
+
 ## v1.2 / guide-2026-07-17c — web-publication sanitization
 
 ### Added
 
-- [`one-pager.html`](./one-pager.html) staged next to [`one-pager.md`](./one-pager.md): same single-sheet content, self-contained (inline SVG, `@media print`, letter) so the published link works with no external assets
+- [`one-pager-print`](./one-pager-print) staged next to [`one-pager.md`](./one-pager.md): same single-sheet content, self-contained (inline SVG, `@media print`, letter) so the published link works with no external assets
 
 ### Changed
 
@@ -67,7 +75,7 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 - [`operations.md`](./operations.md) — full sidecar section
 - [`lazy-medic-sentinel.md`](./lazy-medic-sentinel.md), [`overview.md`](./overview.md), [`principles.md`](./principles.md), [`architecture.md`](./architecture.md), [`diagrams.md`](./diagrams.md) — sidecar in ops model + cadence diagram
-- [`README.md`](./README.md), [`one-pager.md`](./one-pager.md), [`one-pager.html`](./one-pager.html) — mental model + links
+- [`README.md`](./README.md), [`one-pager.md`](./one-pager.md), [`one-pager-print`](./one-pager-print) — mental model + links
 
 ---
 
@@ -77,7 +85,7 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 - [`diagrams.md`](./diagrams.md) — Mermaid gallery (happy path, edge, trust, loop state, ops vs product, Vault sequence, rebuild phases)
 - [`one-pager.md`](./one-pager.md) — single-sheet Markdown summary
-- [`one-pager.html`](./one-pager.html) — print/PDF-friendly HTML (letter, @media print, self-contained inline SVG)
+- [`one-pager-print`](./one-pager-print) — print/PDF-friendly HTML (letter, @media print, self-contained inline SVG)
 - This file (`CHANGELOG.md`)
 
 ### Changed

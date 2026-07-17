@@ -2,7 +2,7 @@
 
 ← [Index](./README.md)
 
-All major diagrams in one place (Mermaid). They render on GitHub and in many Markdown previews. The [printable one-pager HTML](./one-pager.html) carries the happy-path diagram as inline SVG so it prints with no external assets.
+All major diagrams in one place (Mermaid). They render on GitHub and in many Markdown previews. The [printable one-pager HTML](./one-pager-print) carries the happy-path diagram as inline SVG so it prints with no external assets.
 
 ASCII versions remain in [architecture.md](./architecture.md) for terminals that don’t render Mermaid.
 
@@ -202,6 +202,6 @@ flowchart LR
 | Goal               | Use                                                         |
 | ------------------ | ----------------------------------------------------------- |
 | Share on GitHub    | This file + others with Mermaid fences                      |
-| One sheet of paper | Open [`one-pager.html`](./one-pager.html) → Print           |
+| One sheet of paper | Open [`one-pager-print`](./one-pager-print) → Print         |
 | Terminal-only      | ASCII maps in architecture / overview                       |
 | Slide paste        | Copy a single Mermaid block into Notion / Obsidian / slides |

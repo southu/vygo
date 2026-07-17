@@ -1,6 +1,6 @@
 # Ratchet — one-pager
 
-**Print tip:** For best results open [`one-pager.html`](./one-pager.html) and use **File → Print** (or Save as PDF). This Markdown page is the same content for editors that don’t open HTML.
+**Print tip:** For best results open [`one-pager-print`](./one-pager-print) and use **File → Print** (or Save as PDF). This Markdown page is the same content for editors that don’t open HTML.
 
 ---
 

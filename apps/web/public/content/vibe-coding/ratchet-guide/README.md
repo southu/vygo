@@ -20,36 +20,36 @@ Reference layout in this pack uses neutral paths under `/srv/ratchet/{control,ha
 
 ## Start paths
 
-| Goal                         | Open                                                                                      |
-| ---------------------------- | ----------------------------------------------------------------------------------------- |
-| **Print one sheet / PDF**    | [`one-pager.html`](./one-pager.html) (File → Print) · or [`one-pager.md`](./one-pager.md) |
-| **All diagrams**             | [`diagrams.md`](./diagrams.md)                                                            |
-| **What changed in the docs** | [`CHANGELOG.md`](./CHANGELOG.md)                                                          |
-| **Point an AI at rebuild**   | [`ai-prompts.md`](./ai-prompts.md) section A                                              |
+| Goal                         | Open                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------- |
+| **Print one sheet / PDF**    | [`one-pager-print`](./one-pager-print) (File → Print) · or [`one-pager.md`](./one-pager.md) |
+| **All diagrams**             | [`diagrams.md`](./diagrams.md)                                                              |
+| **What changed in the docs** | [`CHANGELOG.md`](./CHANGELOG.md)                                                            |
+| **Point an AI at rebuild**   | [`ai-prompts.md`](./ai-prompts.md) section A                                                |
 
 ---
 
 ## Read order
 
-| #   | File                                                                | Contents                                           |
-| --- | ------------------------------------------------------------------- | -------------------------------------------------- |
-| 1   | [overview.md](./overview.md)                                        | Elevator pitch, flow diagram, component table      |
-| 2   | [architecture.md](./architecture.md)                                | System map, trust boundaries, data flow            |
-| 3   | [principles.md](./principles.md)                                    | Design rules (live is truth, proof-of-work, …)     |
-| 4   | [layout.md](./layout.md)                                            | Directory trees, env files, `project.json`         |
-| 5   | [loop-and-missions.md](./loop-and-missions.md)                      | Ratchet loop, mission YAML, exit codes, `/version` |
-| 6   | [composer.md](./composer.md)                                        | Build UI, queue, assist, admin, header nav         |
-| 7   | [lazy-medic-sentinel.md](./lazy-medic-sentinel.md)                  | Overnight watchdogs and recovery                   |
-| 8   | [vault.md](./vault.md)                                              | Credentials, consumer broker, Railway actions      |
-| 9   | [projects-and-deploy.md](./projects-and-deploy.md)                  | Product shells, git identity, host deploys         |
-| 10  | [operations.md](./operations.md)                                    | systemd, nginx, heal timer, **operator sidecar**   |
-| 11  | [rebuild.md](./rebuild.md)                                          | Greenfield checklist (phases A–E)                  |
-| 12  | [ai-prompts.md](./ai-prompts.md)                                    | Coding / ops / **sidecar babysit** prompts         |
-| 13  | [footguns.md](./footguns.md)                                        | Production failure modes and fixes                 |
-| 14  | [examples.md](./examples.md)                                        | Mock loop, full loop, sample product campaign      |
-| —   | [diagrams.md](./diagrams.md)                                        | Mermaid gallery                                    |
-| —   | [one-pager.html](./one-pager.html) / [one-pager.md](./one-pager.md) | Printable sheet                                    |
-| —   | [CHANGELOG.md](./CHANGELOG.md)                                      | Guide pack history                                 |
+| #   | File                                                                  | Contents                                           |
+| --- | --------------------------------------------------------------------- | -------------------------------------------------- |
+| 1   | [overview.md](./overview.md)                                          | Elevator pitch, flow diagram, component table      |
+| 2   | [architecture.md](./architecture.md)                                  | System map, trust boundaries, data flow            |
+| 3   | [principles.md](./principles.md)                                      | Design rules (live is truth, proof-of-work, …)     |
+| 4   | [layout.md](./layout.md)                                              | Directory trees, env files, `project.json`         |
+| 5   | [loop-and-missions.md](./loop-and-missions.md)                        | Ratchet loop, mission YAML, exit codes, `/version` |
+| 6   | [composer.md](./composer.md)                                          | Build UI, queue, assist, admin, header nav         |
+| 7   | [lazy-medic-sentinel.md](./lazy-medic-sentinel.md)                    | Overnight watchdogs and recovery                   |
+| 8   | [vault.md](./vault.md)                                                | Credentials, consumer broker, Railway actions      |
+| 9   | [projects-and-deploy.md](./projects-and-deploy.md)                    | Product shells, git identity, host deploys         |
+| 10  | [operations.md](./operations.md)                                      | systemd, nginx, heal timer, **operator sidecar**   |
+| 11  | [rebuild.md](./rebuild.md)                                            | Greenfield checklist (phases A–E)                  |
+| 12  | [ai-prompts.md](./ai-prompts.md)                                      | Coding / ops / **sidecar babysit** prompts         |
+| 13  | [footguns.md](./footguns.md)                                          | Production failure modes and fixes                 |
+| 14  | [examples.md](./examples.md)                                          | Mock loop, full loop, sample product campaign      |
+| —   | [diagrams.md](./diagrams.md)                                          | Mermaid gallery                                    |
+| —   | [one-pager-print](./one-pager-print) / [one-pager.md](./one-pager.md) | Printable sheet                                    |
+| —   | [CHANGELOG.md](./CHANGELOG.md)                                        | Guide pack history                                 |
 
 ---
 

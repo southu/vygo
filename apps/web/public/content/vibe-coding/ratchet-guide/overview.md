@@ -34,7 +34,7 @@ Human goal → Composer → Queue → Build → Deploy gate → Test
 
 The name is the contract: like a mechanical ratchet, the loop only moves forward. Bugs stay on the books in `TESTLOG.md` until fixed. The run ends only after N consecutive clean passes against the deployed app.
 
-More diagrams: [diagrams.md](./diagrams.md) · Printable: [one-pager.html](./one-pager.html)
+More diagrams: [diagrams.md](./diagrams.md) · Printable: [one-pager-print](./one-pager-print)
 
 ---
 
