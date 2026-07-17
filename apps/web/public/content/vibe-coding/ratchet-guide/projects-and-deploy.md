@@ -80,7 +80,7 @@ Production short-circuit: after first version mismatch, check GitHub deployment 
 ### Prefer reuse over create
 
 1. Create one project in Railway UI
-2. Copy UUID from URL `railway.app/project/<uuid>`
+2. Copy the project UUID from the dashboard URL (e.g. `https://cloud.example.com/project/<uuid>`)
 3. Set `deploy.railway_project` in `project.json`
 4. Provisioner: `allow_create=false` when set
 

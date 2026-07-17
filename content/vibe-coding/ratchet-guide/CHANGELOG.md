@@ -8,6 +8,19 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ---
 
+## v1.2 / guide-2026-07-17c — web-publication sanitization
+
+### Added
+
+- [`one-pager.html`](./one-pager.html) staged next to [`one-pager.md`](./one-pager.md): same single-sheet content, self-contained (inline SVG, `@media print`, letter) so the published link works with no external assets
+
+### Changed
+
+- Replaced third-party service domains in examples with unmistakable placeholders (`git.example.com`, `cloud.example.com`)
+- Removed host-specific scratch paths (null-device output sinks, relative rsync sources) from command examples — every remaining filesystem path is illustrative under `/srv/ratchet/`
+
+---
+
 ## v1.2 / guide-2026-07-17b — public path names
 
 ### Changed
@@ -64,7 +77,7 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 - [`diagrams.md`](./diagrams.md) — Mermaid gallery (happy path, edge, trust, loop state, ops vs product, Vault sequence, rebuild phases)
 - [`one-pager.md`](./one-pager.md) — single-sheet Markdown summary
-- [`one-pager.html`](./one-pager.html) — print/PDF-friendly HTML (letter, @media print, Mermaid CDN)
+- [`one-pager.html`](./one-pager.html) — print/PDF-friendly HTML (letter, @media print, self-contained inline SVG)
 - This file (`CHANGELOG.md`)
 
 ### Changed

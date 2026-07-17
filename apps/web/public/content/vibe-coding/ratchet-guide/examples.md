@@ -43,7 +43,7 @@ Only external dependency: the two AI CLIs.
 
 ```yaml
 name: fix-homepage-cta
-repo: https://github.com/you/app.git
+repo: https://git.example.com/you/app.git
 live_url: https://www.example.com
 version_endpoint: /version
 
@@ -81,7 +81,7 @@ adapters:
   "slug": "acme",
   "name": "Acme",
   "repo": {
-    "url": "https://github.com/you/acme.git",
+    "url": "https://git.example.com/you/acme.git",
     "default_branch": "main",
     "local_path": "/srv/ratchet/projects/acme"
   },
@@ -158,9 +158,9 @@ Adapt upstream per host (dash vs product site).
 
 ```bash
 systemctl is-active ratchet-composer ratchet-lazy ratchet-vault ratchet-sentinel nginx
-curl -sS -o /dev/null -w "composer %{http_code}\n" http://127.0.0.1:8377/health
-curl -sS -o /dev/null -w "lazy %{http_code}\n" http://127.0.0.1:8378/health
-curl -sS -o /dev/null -w "vault %{http_code}\n" http://127.0.0.1:8379/health
+curl -sS -w "\ncomposer %{http_code}\n" http://127.0.0.1:8377/health
+curl -sS -w "\nlazy %{http_code}\n" http://127.0.0.1:8378/health
+curl -sS -w "\nvault %{http_code}\n" http://127.0.0.1:8379/health
 curl -sS https://www.example.com/version; echo
 ```
 

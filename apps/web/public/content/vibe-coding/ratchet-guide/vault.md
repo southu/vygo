@@ -45,7 +45,7 @@ Local, master-password **credentials vault** for Ratchet/Composer — outside Bu
 
 ```bash
 # conceptual — never print key material
-./scripts/harness_smoke.sh acme
+/srv/ratchet/harness/bin/harness_smoke.sh acme
 ```
 
 Smoke-style exit codes (reference):

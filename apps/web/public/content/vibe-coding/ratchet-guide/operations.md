@@ -50,9 +50,9 @@ systemctl show ratchet-composer -p KillMode --value   # expect: process
 ```bash
 systemctl start ratchet-composer ratchet-lazy ratchet-vault ratchet-sentinel ratchet-console nginx
 systemctl is-active ratchet-composer ratchet-lazy ratchet-vault ratchet-sentinel nginx
-curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8377/health
-curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8378/health
-curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8379/health
+curl -sS -w "\n%{http_code}\n" http://127.0.0.1:8377/health
+curl -sS -w "\n%{http_code}\n" http://127.0.0.1:8378/health
+curl -sS -w "\n%{http_code}\n" http://127.0.0.1:8379/health
 ```
 
 Vault may need human **unlock** after reboot (master password) when the DEK is not loaded. **Arm** duration is persisted across consumer restarts and restored if the arm window is still valid — you should not need to re-arm only because the vault process bounced.
@@ -85,9 +85,9 @@ If Composer treats loopback as trusted for Admin writes, do **not** naively pass
 ## Health checks (loopback, no auth)
 
 ```bash
-curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8377/health
-curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8378/health
-curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8379/health
+curl -sS -w "\n%{http_code}\n" http://127.0.0.1:8377/health
+curl -sS -w "\n%{http_code}\n" http://127.0.0.1:8378/health
+curl -sS -w "\n%{http_code}\n" http://127.0.0.1:8379/health
 curl -sS http://127.0.0.1:8377/api/sentinel/status
 curl -sS http://127.0.0.1:8379/api/status   # armed? dek loaded? (no secrets)
 ```
@@ -155,10 +155,11 @@ Paste-ready prompt: [ai-prompts.md § G](./ai-prompts.md#g-operator-sidecar-baby
 ## Deploying code from a laptop
 
 ```bash
+# from your laptop checkout of the control tree
 rsync -az --delete \
   --exclude .git --exclude __pycache__ --exclude '*.pyc' \
   --exclude .env --exclude run.log --exclude data \
-  ./composer-live/ host:/srv/ratchet/control/composer-live/
+  /srv/ratchet/control/composer-live/ host:/srv/ratchet/control/composer-live/
 
 # similarly lazy-mode, vault-mode, docs, bin
 ssh host 'systemctl restart ratchet-composer ratchet-lazy ratchet-vault'

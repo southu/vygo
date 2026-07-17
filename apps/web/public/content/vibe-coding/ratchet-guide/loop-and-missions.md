@@ -103,7 +103,7 @@ Production hardening also short-circuits when GitHub deployment status says **â€
 
 ```yaml
 name: fix-homepage-cta
-repo: https://github.com/you/app.git
+repo: https://git.example.com/you/app.git
 live_url: https://www.example.com
 version_endpoint: /version
 

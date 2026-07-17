@@ -74,6 +74,10 @@
       "title": "Single-sheet printable summary of the whole system"
     },
     {
+      "filename": "one-pager.html",
+      "title": "Print/PDF-friendly self-contained HTML rendering of the one-pager (letter, inline SVG, no external assets)"
+    },
+    {
       "filename": "CHANGELOG.md",
       "title": "Documentation pack history and versioning notes"
     }

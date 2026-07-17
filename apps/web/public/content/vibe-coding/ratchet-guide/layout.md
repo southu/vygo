@@ -86,7 +86,7 @@ Typical keys (names only — values are site-specific):
   "name": "Acme",
   "vision": "Short product description for humans and assist.",
   "repo": {
-    "url": "https://github.com/you/acme.git",
+    "url": "https://git.example.com/you/acme.git",
     "default_branch": "main",
     "local_path": "/srv/ratchet/projects/acme"
   },
