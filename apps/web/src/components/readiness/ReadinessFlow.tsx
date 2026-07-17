@@ -22,10 +22,14 @@ import {
   isNotBuiltYet,
   parseReadinessPastePartial,
   scanPasteForSecrets,
+  structuredReadinessFromReport,
   type BlockerOption,
   type BuiltWithOption,
   type DeadlineOption,
   type ReadinessStage1Answers,
+  type SizeClassification,
+  type SizeMetric,
+  type StackEntry,
   type WhoUsesOption,
 } from "@vygo/validation";
 import { readinessContent } from "@/content/readiness";
@@ -51,6 +55,7 @@ import { readinessAnalyticsEventCatalog, trackAnalytics } from "@/lib/analytics"
 import { ScoreGateForm } from "@/components/readiness/ScoreGateForm";
 import { AssessmentProgress } from "@/components/readiness/AssessmentProgress";
 import { AnswerCallout } from "@/components/readiness/AnswerCallout";
+import { ConfirmStackCard, ConfirmSizeCard } from "@/components/readiness/StackSizeCards";
 import {
   calloutForBlockers,
   calloutForBuiltWith,
@@ -118,7 +123,33 @@ type ConfirmState = {
   findings: string[];
   parseStatus: string;
   pending: boolean;
+  /** Structured stack technologies (grouped into badge chips on confirm). */
+  stackEntries: StackEntry[];
+  /** Today's free-text stack paragraph, kept to surface any unparsed remainder. */
+  stackText: string;
+  /** Structured size metrics rendered as stat tiles. */
+  sizeMetrics: SizeMetric[];
+  /** Coarse size classification for the one-line summary sentence. */
+  sizeClassification: SizeClassification | null;
 };
+
+/**
+ * Derive the structured stack/size fields for the confirm screen from an
+ * already-parsed report. Pure display shaping — reuses the validation layer's
+ * structured view rather than re-parsing the raw paste.
+ */
+function structuredConfirmFields(
+  report: Parameters<typeof structuredReadinessFromReport>[0],
+  raw = "",
+): Pick<ConfirmState, "stackEntries" | "stackText" | "sizeMetrics" | "sizeClassification"> {
+  const structured = structuredReadinessFromReport(report, raw);
+  return {
+    stackEntries: structured.stack,
+    stackText: structured.stackText,
+    sizeMetrics: structured.size.metrics,
+    sizeClassification: structured.size.classification,
+  };
+}
 
 export function ReadinessFlow() {
   const c = readinessContent;
@@ -281,6 +312,7 @@ export function ReadinessFlow() {
                   findings,
                   parseStatus: String(remote.draft?.parseStatus || "partial"),
                   pending: remote.draft?.parseStatus === "pending" || findings.length === 0,
+                  ...structuredConfirmFields(report, restoredPaste),
                 });
                 setView("confirm");
                 return;
@@ -626,6 +658,7 @@ export function ReadinessFlow() {
       findings: clientFindings,
       parseStatus: clientFindings.length > 0 ? "partial" : "pending",
       pending: true,
+      ...structuredConfirmFields(clientPartial, pasteText),
     };
 
     // Persist draft (paste text) without waiting for parse — still no secrets.
@@ -666,12 +699,17 @@ export function ReadinessFlow() {
         trackAnalytics("parse_failed", { parseStatus: result.parseStatus });
       }
       trackAnalytics("stage_completed", { stage: "stage3" });
+      const structuredReport =
+        result.report && typeof result.report === "object" && !Array.isArray(result.report)
+          ? (result.report as Parameters<typeof structuredReadinessFromReport>[0])
+          : clientPartial;
       setConfirm({
         stack: result.stack || clientConfirm.stack,
         size: result.size || clientConfirm.size,
         findings: merged.slice(0, 6),
         parseStatus: result.parseStatus,
         pending: result.parseStatus === "pending" || merged.length === 0,
+        ...structuredConfirmFields(structuredReport, pasteText),
       });
       trackAnalytics("stage_started", { stage: "confirm" });
       setView("confirm");
@@ -870,19 +908,17 @@ export function ReadinessFlow() {
           </p>
         ) : null}
 
-        <div className="readiness-step-panel mt-6 grid gap-4 sm:grid-cols-2">
-          <div data-testid="readiness-confirm-stack">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {c.confirm.stackLabel}
-            </p>
-            <p className="mt-1 text-base font-semibold text-ink">{confirm.stack}</p>
-          </div>
-          <div data-testid="readiness-confirm-size">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {c.confirm.sizeLabel}
-            </p>
-            <p className="mt-1 text-base font-semibold text-ink">{confirm.size}</p>
-          </div>
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <ConfirmStackCard
+            label={c.confirm.stackLabel}
+            entries={confirm.stackEntries}
+            stackText={confirm.stackText || confirm.stack}
+          />
+          <ConfirmSizeCard
+            label={c.confirm.sizeLabel}
+            metrics={confirm.sizeMetrics}
+            classification={confirm.sizeClassification}
+          />
         </div>
 
         <div className="readiness-step-panel mt-4" data-testid="readiness-confirm-findings">
