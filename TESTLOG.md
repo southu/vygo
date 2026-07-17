@@ -1,84 +1,46 @@
-# TESTLOG — vygo-vibe-coding-verify, iteration 5
+# TESTLOG — vygo-guide-acceptance-audit, iteration 1
 
-Verification-and-repair pass against https://www.vygo.ai, focused on the
-/vibe-coding section. Builder performed a deep sanitization of the Ratchet
-guide pack so public rendered pages and the downloadable zip retain only
-public-safe educational product concepts (no operator runbooks, install
-trees, private UI/API topology, env/key paths, queue-admin procedures,
-deploy/recovery recipes, or monitoring/babysitting workflows). Zip
-regenerated and pushed via `origin/main`. Live deploy confirmed at HEAD
-`c099f7cbaedc19b6bac1bdfb29089388699da241` (via `/version`).
+End-to-end acceptance verification against live https://www.vygo.ai for the
+guide notify opt-in flow, guide access without signup, mobile/a11y, `/version`,
+client-bundle secret hygiene, and apply/home regressions.
 
-## Summary
+**Deploy SHA at verification:** `b8d33f6fc270115e4d4f2b398753bf12ed10dc96`
+(matches `GET /version` and `origin/main` HEAD at check time).
 
-Iteration 5 fixes **BUG-1 / acceptance criterion 9** after prior passes still
-left internal-ops material. Live content still described control-plane process
-boundaries, queue/deploy configuration, setup/rebuild procedures, internal
-UI/API and queue-storage layout, deploy-gate config, Vault consumer/key
-mechanics, and operational monitoring helpers. Disclaimers alone were
-insufficient; sources were rewritten as product contracts only.
+**Scope of product change this iteration:** none required. Live site already
+satisfies every acceptance criterion below; this commit records the evidence
+for the tester. No `version.txt` edits. No new PII endpoints. No secrets in
+commits or this log.
 
-### What changed
-
-- **Pack sources** (`content/vibe-coding/ratchet-guide/` + public mirror):
-  full rewrite of architecture, overview, principles, layout, loop-and-missions,
-  composer, lazy-medic-sentinel, vault, projects-and-deploy, operations,
-  rebuild, ai-prompts, footguns, examples, diagrams, one-pager(+print),
-  README, CHANGELOG, manifest toward product contracts only
-- **layout.md** is logical product areas only (no filesystem map / env catalog)
-- **composer.md** describes UX capabilities without route/module inventories
-- **loop-and-missions.md** describes loop contracts without CLI/config recipes
-- **vault.md** is credentials-boundary shape only (no key paths / client sketches)
-- **rebuild.md** is greenfield product milestones (not host setup steps)
-- Regenerated `ratchet-guide-v1.2.zip` (21 entries, 74371 bytes,
-  sha256 `d99222faef02cd4fcbfc10c968feb5535a885e3a2ecfa6dc09c3d55a44ed1135`)
-- Hub topic blurbs + guide-offer copy softened (no “host setup” / “armed” /
-  install-path assurances)
-- `scripts/build-guide-zip.ts` MANIFEST.txt disclaimer aligned
-- No `version.txt` or `/version` mechanism changes; URLs preserved; site chrome
-  and topics grid structure unchanged
-
-### Commits
-
-- `187b8b8` — deep-sanitize guide pack + regenerate zip
-- `c099f7c` — soften hub blurbs and residual pack phrasing
-
-## Per-criterion results (live post-deploy)
+## Per-criterion results (live)
 
 | # | Criterion | Result | Evidence |
 |---|-----------|--------|----------|
-| 1 | Hub reachable, no auth redirect | PASS | `GET /vibe-coding` → 200 |
-| 2 | No broken internal links | PASS | Guide routes + stubs + content md + zip → 200 |
-| 3 | Four coming-soon stubs public | PASS | writing-missions, live-verify-testing, models-and-costs, case-studies → 200 |
-| 4 | Guide pages full article content | PASS | overview/architecture/one-pager/rebuild/ai-prompts/footguns 200 with full body |
-| 5 | Zip downloads and unzips | PASS | 200 `application/zip`; 21 entries; sha matches build |
-| 6 | `/version` serves deployed SHA | PASS | Body `c099f7cbaedc19b6bac1bdfb29089388699da241` = HEAD |
-| 7 | Viewport meta + mobile nav | PASS | viewport device-width; `mobile-nav-toggle` present |
-| 8 | No horizontal overflow @ 390px | PASS | Unchanged CSS/layout |
-| 9 | Content audit (pages + zip) | PASS | See audit section — `LIVE_AUDIT_CLEAN` |
-| 10 | Hub main-content word count < 1250 | PASS | ~740 words in `<main>` |
-| 11 | Exactly one available module | PASS | Topics grid: Ratchet guide available; rest coming-soon |
-| 12 | Home page regression | PASS | `/` → 200 |
-| 13 | Top-level pages regression | PASS | audit/method/security/why-vygo/pricing/waitlist → 200 |
+| 1 | `GET /version` → 200, body = deployed main SHA | **PASS** | Body `b8d33f6fc270115e4d4f2b398753bf12ed10dc96` |
+| 2 | Guide page 200 with notify CTA (email + submit) | **PASS** | `GET /guide` 200; HTML has `data-guide-notify`, `#guide-notify-email` (`type=email`), submit “Notify me”. Same block on `/vibe-coding` and `/vibe-coding/ratchet-guide` via `GuideOffer` |
+| 3 | Valid unique email → success + `source=guide_updates` row | **PASS** | `POST /api/apply` `{"source":"guide_updates","email":"ratchet-test+1784322806@example.com",...}` → **201**; id `9e0b477e-9891-42a7-94c2-89f504656b4c`. Vault SQL + `GET /api/apply/<id>` confirm `source=guide_updates`, email stored, message `guide updates opt-in` |
+| 4 | Invalid email → visible error, no success, no row | **PASS** | Client UI: `data-testid=guide-notify-validation-error` “Enter a valid email…”, form remains, no success. API: `POST` with `not-an-email` → **400**. SQL `count(*)` for `work_email` matching `not-an-email` = **0** |
+| 5 | Success body/UI contain no submitted email | **PASS** | 201 body has `work_email: null`; submitted address not present. Success UI text: “You're on the list.” (no email) |
+| 6 | Non-opted-in visitor can read + download guide | **PASS** | Guide docs/list render without signup. `GET /content/vibe-coding/ratchet-guide-v1.2.zip` → **200** `content-type: application/zip` (74371 bytes). Read routes e.g. `/vibe-coding/ratchet-guide` → 200 |
+| 7 | Viewport meta, labeled inputs, no overflow @ 375px | **PASS** | `meta name=viewport content="width=device-width, initial-scale=1"`. Inputs `guide-notify-name` / `guide-notify-email` have `label[for]`. Playwright @ 375×812: `scrollWidth === clientWidth === 375`, no overflowing elements |
+| 8 | Client JS bundles free of secrets | **PASS** | Scanned JS chunks referenced from `/`, `/guide`, `/apply` for Railway tokens, `postgres(ql)://`, Bearer tokens, `sk_live_`/`sk_test_`, JWT-like strings, `DATABASE_URL`/`RAILWAY_TOKEN` assignments — **no hits** |
+| 9 | Home HTTPS 200 + nav/content | **PASS** | `GET https://www.vygo.ai/` → **200**, primary nav + non-empty body |
+| 10 | Apply page + form still submit | **PASS** | `GET /apply` → **200** with form. `POST /api/apply` ordinary apply → **201** with `source=apply` |
 
-## Content audit detail (criterion 9)
+## Data-integrity notes
 
-Scope: live hub, guide index + six rendered docs, raw pack markdown under
-`/content/vibe-coding/ratchet-guide/`, and every file inside the live zip.
+- Validation failures never call insert (unit coverage + live 400 + SQL zero rows for garbage email).
+- guide_updates success redacts `work_email` in the POST response; durability confirmed via Railway Postgres (`applications`) and existing `GET /api/apply/<id>` read-back (not a new PII endpoint).
+- Vault consumer for folder `vygo` was armed/unlocked for SQL verification only; credentials never written to repo, TESTLOG, or client bundle.
 
-Forbidden patterns scanned (sample): `/opt/sandbox`, `server.py`,
-`queue_builder`, `lib/loop.sh`, `composer-queue`, `VAULT_CONSUMER`,
-`bin/ratchet`, `systemctl`, `vault_consumer`, `VaultClient`, `composer-live`,
-loopback ports, `watchdog`, `ops-heal`, `auth_basic`, `home.html`,
-`models.json`, `COMPOSER_PROJECTS`, `RATCHET_ROOT`, host setup recipes,
-`POST /api`, process-manager / recovery runbooks, consumer key paths.
+## Product paths exercised
 
-Findings: **none** (`LIVE_AUDIT_CLEAN`). Zip residual scan: **NONE**.
+- Notify: `GuideNotifyBlock` → `POST /api/apply` with `source=guide_updates`
+- Download: `/content/vibe-coding/ratchet-guide-v1.2.zip`
+- Version: `/version` (build-time SHA; `version.txt` not modified by this mission)
 
 ## Notes
 
-- `version.txt` / `/version` mechanism not modified.
-- No vault/consumer conditions.
-- No secrets in commits, logs, or this report.
-- Unrelated site content left as-is beyond guide pack + minimal hub/offer
-  copy needed for AC9.
+- No refactor of unrelated code.
+- Provisioner non-secret summary reused existing Railway project `vygo` (Postgres/Redis).
+- Ready for independent tester confirmation of the same ten items.
