@@ -81,6 +81,24 @@ export {
 } from "./paste-normalize.js";
 
 export {
+  stackSourceFromReport,
+  parseStackEntries,
+  parseSizeMetrics,
+  classifyReadinessSize,
+  classifyFindingSeverity,
+  parseStructuredFindings,
+  parseStructuredReadiness,
+  type StackCategory,
+  type StackEntry,
+  type SizeClassification,
+  type SizeMetric,
+  type StructuredSize,
+  type FindingSeverity,
+  type StructuredFinding,
+  type StructuredReadiness,
+} from "./paste-structured.js";
+
+export {
   fillUnknownFields,
   recoverSloppyPaste,
   runDeterministicParse,
