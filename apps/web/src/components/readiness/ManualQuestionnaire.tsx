@@ -27,6 +27,9 @@ import {
 } from "@/lib/readiness/storage";
 import { trackAnalytics } from "@/lib/analytics";
 import { ScoreGateForm } from "@/components/readiness/ScoreGateForm";
+import { AssessmentProgress } from "@/components/readiness/AssessmentProgress";
+import { AnswerCallout } from "@/components/readiness/AnswerCallout";
+import { calloutForManualField } from "@/lib/readiness/answer-callouts";
 
 function resumeTokenFromUrl(): string | null {
   if (typeof window === "undefined") return null;
@@ -39,12 +42,16 @@ function resumeTokenFromUrl(): string | null {
   }
 }
 
+/** Questionnaire questions + final submit step for progress. */
+const MANUAL_TOTAL_STEPS = MANUAL_QUESTIONNAIRE.length + 1;
+
 export function ManualQuestionnaire() {
   const c = readinessContent.fallback;
   const [token, setToken] = useState<string | null>(null);
   const [answers, setAnswers] = useState<ManualAnswers>(() => emptyManualAnswers());
   const [stage1, setStage1] = useState<Record<string, unknown>>({});
   const stage1Ref = useRef<Record<string, unknown>>({});
+  const [stepIndex, setStepIndex] = useState(0);
   const [status, setStatus] = useState<
     "loading" | "form" | "submitting" | "gate" | "done" | "error"
   >("loading");
@@ -106,6 +113,14 @@ export function ManualQuestionnaire() {
         if (cancelled) return;
         setToken(sessionToken);
         setAnswers(restored);
+        // Resume at first incomplete required question when possible.
+        const resumeAt = MANUAL_QUESTIONNAIRE.findIndex((q) => {
+          if (!q.required) return false;
+          const v = restored[q.id];
+          if (Array.isArray(v)) return v.length === 0;
+          return !String(v ?? "").trim();
+        });
+        setStepIndex(resumeAt >= 0 ? resumeAt : 0);
         persistLocal(restored, sessionToken, "manual");
         trackAnalytics("fallback_taken", { from: "manual_questionnaire" });
         trackAnalytics("stage_started", { stage: "fallback" });
@@ -122,6 +137,20 @@ export function ManualQuestionnaire() {
   }, [persistLocal]);
 
   const complete = useMemo(() => isManualQuestionnaireComplete(answers), [answers]);
+  const currentQ = MANUAL_QUESTIONNAIRE[stepIndex] ?? MANUAL_QUESTIONNAIRE[0]!;
+  const currentValue =
+    typeof answers[currentQ.id] === "string" ? (answers[currentQ.id] as string) : "";
+  const currentCallout = useMemo(
+    () => calloutForManualField(currentQ.id, currentValue),
+    [currentQ.id, currentValue],
+  );
+
+  const canAdvanceCurrent = useMemo(() => {
+    if (!currentQ.required) return true;
+    const v = answers[currentQ.id];
+    if (Array.isArray(v)) return v.length > 0;
+    return Boolean(String(v ?? "").trim());
+  }, [currentQ, answers]);
 
   const setAnswer = (id: string, value: string) => {
     setAnswers((prev) => {
@@ -146,6 +175,21 @@ export function ManualQuestionnaire() {
     } catch {
       // local still holds draft
     }
+  };
+
+  const goNext = () => {
+    if (!canAdvanceCurrent) return;
+    if (stepIndex < MANUAL_QUESTIONNAIRE.length - 1) {
+      setStepIndex((i) => i + 1);
+      void onBlurPersist();
+      return;
+    }
+    // Last question — submit when complete
+    void onSubmit();
+  };
+
+  const goBack = () => {
+    if (stepIndex > 0) setStepIndex((i) => i - 1);
   };
 
   const onSubmit = async () => {
@@ -189,7 +233,11 @@ export function ManualQuestionnaire() {
 
   if (status === "loading") {
     return (
-      <div className="card mt-8" aria-busy="true" data-testid="manual-questionnaire-loading">
+      <div
+        className="readiness-step-panel mt-8"
+        aria-busy="true"
+        data-testid="manual-questionnaire-loading"
+      >
         <p className="text-sm text-muted">Loading questionnaire…</p>
       </div>
     );
@@ -197,7 +245,7 @@ export function ManualQuestionnaire() {
 
   if (status === "error") {
     return (
-      <div className="card mt-8 border-red/30" role="alert">
+      <div className="readiness-step-panel mt-8 border-red/30" role="alert">
         <p className="font-semibold text-ink">Could not load the questionnaire.</p>
         <p className="mt-2 text-sm text-muted">{errorMessage}</p>
         <button type="button" className="btn-primary mt-4" onClick={() => window.location.reload()}>
@@ -213,7 +261,13 @@ export function ManualQuestionnaire() {
         <p className="sr-only" data-testid="manual-source">
           {savedMeta?.source ?? MANUAL_SOURCE}
         </p>
-        <ScoreGateForm token={token} source={MANUAL_SOURCE} onScored={onScored} />
+        <ScoreGateForm
+          token={token}
+          source={MANUAL_SOURCE}
+          onScored={onScored}
+          progressCurrent={MANUAL_TOTAL_STEPS}
+          progressTotal={MANUAL_TOTAL_STEPS}
+        />
       </div>
     );
   }
@@ -221,7 +275,7 @@ export function ManualQuestionnaire() {
   if (status === "done") {
     const resumeHref = token ? `/readiness?token=${encodeURIComponent(token)}` : "/readiness";
     return (
-      <div className="card mt-8" data-testid="manual-questionnaire-done">
+      <div className="readiness-step-panel mt-8" data-testid="manual-questionnaire-done">
         <h2 className="font-display text-2xl font-bold text-ink">{c.successTitle}</h2>
         <p className="mt-3 text-ink-soft">{c.successBody}</p>
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -250,87 +304,147 @@ export function ManualQuestionnaire() {
     );
   }
 
-  return (
-    <div className="mt-8" data-testid="manual-questionnaire">
-      <div className="space-y-6">
-        {MANUAL_QUESTIONNAIRE.map((q, index) => (
-          <fieldset key={q.id} className="card" data-testid={`manual-q-${q.id}`}>
-            <legend className="font-display text-lg font-semibold text-ink">
-              <span className="mr-2 text-sm font-medium text-muted">{index + 1}.</span>
-              {q.label}
-              {q.required ? (
-                <span className="sr-only"> (required)</span>
-              ) : (
-                <span className="ml-2 text-xs font-normal text-muted">optional</span>
-              )}
-            </legend>
-            {q.helper ? <p className="mt-1 text-sm text-muted">{q.helper}</p> : null}
+  const isLast = stepIndex >= MANUAL_QUESTIONNAIRE.length - 1;
+  const optionBase =
+    "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm transition-colors";
+  const optionSelected = "border-purple bg-purple-soft/40";
+  const optionIdle = "border-border bg-canvas hover:border-purple/40";
 
-            {q.type === "single" && q.options ? (
-              <div className="mt-3 flex flex-col gap-2" role="radiogroup" aria-label={q.label}>
-                {q.options.map((opt) => (
-                  <label
-                    key={opt}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm ${
-                      answers[q.id] === opt
-                        ? "border-purple bg-purple-soft/40"
-                        : "border-border bg-surface hover:border-purple/40"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={q.id}
-                      value={opt}
-                      checked={answers[q.id] === opt}
-                      onChange={() => {
-                        setAnswer(q.id, opt);
-                        void onBlurPersist();
-                      }}
-                      className="mt-0.5"
-                    />
-                    <span>{opt}</span>
-                  </label>
-                ))}
-              </div>
+  return (
+    <div className="readiness-assessment mt-8" data-testid="manual-questionnaire">
+      <AssessmentProgress
+        current={stepIndex + 1}
+        total={MANUAL_TOTAL_STEPS}
+        label="Fallback questionnaire"
+      />
+
+      <div
+        className="readiness-step-panel mt-4"
+        data-testid={`manual-q-${currentQ.id}`}
+        data-step={stepIndex + 1}
+      >
+        <fieldset>
+          <legend className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
+            <span className="mr-2 text-sm font-medium text-muted">{stepIndex + 1}.</span>
+            {currentQ.label}
+            {currentQ.required ? (
+              <span className="sr-only"> (required)</span>
             ) : (
-              <textarea
-                name={q.id}
-                rows={q.id === "summary" || q.id === "concerns" ? 3 : 2}
-                value={typeof answers[q.id] === "string" ? (answers[q.id] as string) : ""}
-                onChange={(ev) => setAnswer(q.id, ev.target.value.slice(0, 2000))}
-                onBlur={() => void onBlurPersist()}
-                placeholder={q.placeholder}
-                className="mt-3 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink"
-                data-testid={`manual-input-${q.id}`}
-              />
+              <span className="ml-2 text-xs font-normal text-muted">optional</span>
             )}
-          </fieldset>
-        ))}
+          </legend>
+          {currentQ.helper ? <p className="mt-2 text-sm text-muted">{currentQ.helper}</p> : null}
+
+          {currentQ.type === "single" && currentQ.options ? (
+            <div
+              className="mt-4 flex flex-col gap-2"
+              role="radiogroup"
+              aria-label={currentQ.label}
+            >
+              {currentQ.options.map((opt) => (
+                <label
+                  key={opt}
+                  className={`${optionBase} ${
+                    answers[currentQ.id] === opt ? optionSelected : optionIdle
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={currentQ.id}
+                    value={opt}
+                    checked={answers[currentQ.id] === opt}
+                    onChange={() => {
+                      setAnswer(currentQ.id, opt);
+                      void onBlurPersist();
+                    }}
+                    className="mt-0.5"
+                  />
+                  <span>{opt}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <textarea
+              name={currentQ.id}
+              rows={
+                currentQ.id === "summary" || currentQ.id === "concerns" || currentQ.id === "languages"
+                  ? 3
+                  : 2
+              }
+              value={currentValue}
+              onChange={(ev) => setAnswer(currentQ.id, ev.target.value.slice(0, 2000))}
+              onBlur={() => void onBlurPersist()}
+              placeholder={currentQ.placeholder}
+              className="mt-4 w-full rounded-xl border border-border bg-canvas px-3 py-2 text-sm text-ink"
+              data-testid={`manual-input-${currentQ.id}`}
+            />
+          )}
+        </fieldset>
+
+        <AnswerCallout callout={currentCallout} />
+
+        {errorMessage ? (
+          <p className="mt-4 text-sm text-red" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          {stepIndex > 0 ? (
+            <button type="button" className="btn-secondary" onClick={goBack}>
+              {c.back}
+            </button>
+          ) : null}
+          {isLast ? (
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!complete || status === "submitting"}
+              onClick={() => void onSubmit()}
+              data-testid="manual-submit"
+            >
+              {status === "submitting" ? c.submitting : c.submit}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!canAdvanceCurrent}
+              onClick={goNext}
+              data-testid="manual-continue"
+            >
+              Continue
+            </button>
+          )}
+          <Link
+            href={token ? `/readiness?token=${encodeURIComponent(token)}` : "/readiness"}
+            className="text-sm font-semibold text-purple hover:text-purple-dark"
+            data-testid="readiness-fallback-back"
+          >
+            ← {c.back}
+          </Link>
+        </div>
       </div>
 
-      {errorMessage ? (
-        <p className="mt-4 text-sm text-red" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
-
-      <div className="mt-8 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={!complete || status === "submitting"}
-          onClick={() => void onSubmit()}
-          data-testid="manual-submit"
-        >
-          {status === "submitting" ? c.submitting : c.submit}
-        </button>
-        <Link
-          href={token ? `/readiness?token=${encodeURIComponent(token)}` : "/readiness"}
-          className="text-sm font-semibold text-purple hover:text-purple-dark"
-          data-testid="readiness-fallback-back"
-        >
-          ← {c.back}
-        </Link>
+      {/* Keep all fields in DOM (hidden) so tests / restore can still find inputs by testid */}
+      <div className="sr-only" aria-hidden="true">
+        {MANUAL_QUESTIONNAIRE.map((q) =>
+          q.type === "single" && q.options ? (
+            <div key={q.id} data-testid={`manual-q-${q.id}-shell`}>
+              {q.options.map((opt) => (
+                <span key={opt}>{opt}</span>
+              ))}
+            </div>
+          ) : (
+            <textarea
+              key={q.id}
+              readOnly
+              tabIndex={-1}
+              value={typeof answers[q.id] === "string" ? (answers[q.id] as string) : ""}
+              data-testid={`manual-input-${q.id}-shell`}
+            />
+          ),
+        )}
       </div>
     </div>
   );

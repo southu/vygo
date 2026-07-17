@@ -12,11 +12,13 @@ export const metadata: Metadata = {
 export default function ReadinessFallbackPage() {
   const c = readinessContent.fallback;
   return (
-    <main id="main-content">
+    <main id="main-content" className="readiness-assessment-page">
       <section className="section-pad">
         <div className="container-page max-w-2xl">
           <p className="eyebrow">{c.eyebrow}</p>
-          <h1 className="mt-4 font-display text-3xl font-bold sm:text-4xl">{c.title}</h1>
+          <h1 className="mt-4 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+            {c.title}
+          </h1>
           <p className="mt-5 text-lg text-muted">{c.body}</p>
           <ManualQuestionnaire />
         </div>

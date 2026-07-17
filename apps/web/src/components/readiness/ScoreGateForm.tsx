@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { readinessContent } from "@/content/readiness";
 import { trackAnalytics } from "@/lib/analytics";
 import { scoreReadiness, type ScoreResponse } from "@/lib/readiness/api";
+import { AssessmentProgress } from "@/components/readiness/AssessmentProgress";
+import { AnswerCallout } from "@/components/readiness/AnswerCallout";
 
 /** Cloudflare always-pass test sitekey when env unset (same as waitlist). */
 const TURNSTILE_TEST_SITE_KEY = "1x00000000000000000000AA";
@@ -64,6 +66,9 @@ type ScoreGateFormProps = {
   initialEmail?: string;
   source?: string;
   onScored: (result: ScoreResponse) => void;
+  /** Optional flow progress (main paste path or manual path). */
+  progressCurrent?: number;
+  progressTotal?: number;
 };
 
 /**
@@ -75,7 +80,14 @@ type ScoreGateFormProps = {
  * without a human solving production Turnstile. Server still requires
  * e2e-test+*@vygo.ai email — real users are unaffected.
  */
-export function ScoreGateForm({ token, initialEmail = "", source, onScored }: ScoreGateFormProps) {
+export function ScoreGateForm({
+  token,
+  initialEmail = "",
+  source,
+  onScored,
+  progressCurrent,
+  progressTotal,
+}: ScoreGateFormProps) {
   const c = readinessContent.gate;
   // Client-only: query string is available after mount (static export safe).
   const [readinessE2E, setReadinessE2E] = useState(false);
@@ -237,15 +249,52 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
   };
 
   const fieldClass =
-    "mt-1.5 w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink shadow-sm focus-visible:border-purple";
+    "mt-1.5 w-full rounded-xl border border-border bg-canvas px-3 py-2.5 text-sm text-ink shadow-sm focus-visible:border-purple";
+
+  const gateBits = [
+    name.trim() ? `Name: ${name.trim()}` : null,
+    email.trim() ? `Email: ${email.trim()}` : null,
+    company.trim() ? `Company: ${company.trim()}` : null,
+  ].filter(Boolean) as string[];
+  const gateCallout =
+    gateBits.length > 0
+      ? {
+          id: "gate-contact",
+          text: `Got it — ${gateBits.join(" · ")}.`,
+        }
+      : null;
+
+  const showProgress =
+    typeof progressCurrent === "number" &&
+    typeof progressTotal === "number" &&
+    progressTotal > 0;
 
   return (
-    <div className="mt-8" data-testid="readiness-score-gate" data-readiness-e2e={readinessE2E ? "1" : "0"}>
-      <p className="eyebrow">{c.progressLabel}</p>
-      <h2 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">{c.title}</h2>
+    <div
+      className="readiness-assessment mt-8"
+      data-testid="readiness-score-gate"
+      data-readiness-e2e={readinessE2E ? "1" : "0"}
+    >
+      {showProgress ? (
+        <AssessmentProgress
+          current={progressCurrent!}
+          total={progressTotal!}
+          label="Results gate"
+        />
+      ) : (
+        <AssessmentProgress current={1} total={1} label="Results gate" />
+      )}
+      <p className="eyebrow mt-4">{c.progressLabel}</p>
+      <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+        {c.title}
+      </h2>
       <p className="mt-3 text-sm text-muted sm:text-base">{c.body}</p>
 
-      <form className="card mt-6 space-y-4" onSubmit={(e) => void onSubmit(e)} noValidate>
+      <form
+        className="readiness-step-panel mt-6 space-y-4"
+        onSubmit={(e) => void onSubmit(e)}
+        noValidate
+      >
         <div>
           <label htmlFor="gate-name" className="text-sm font-medium text-ink">
             {c.nameLabel} <span className="text-red">*</span>
@@ -382,6 +431,8 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
             </>
           )}
         </div>
+
+        <AnswerCallout callout={gateCallout} />
 
         {feedback ? (
           <p className="text-sm text-red" role="alert" data-testid="gate-error">

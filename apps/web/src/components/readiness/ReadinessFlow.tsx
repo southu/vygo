@@ -49,6 +49,16 @@ import {
 } from "@/lib/readiness/storage";
 import { readinessAnalyticsEventCatalog, trackAnalytics } from "@/lib/analytics";
 import { ScoreGateForm } from "@/components/readiness/ScoreGateForm";
+import { AssessmentProgress } from "@/components/readiness/AssessmentProgress";
+import { AnswerCallout } from "@/components/readiness/AnswerCallout";
+import {
+  calloutForBlockers,
+  calloutForBuiltWith,
+  calloutForDeadline,
+  calloutForProductDescription,
+  calloutForWhoUses,
+  type AnswerCalloutPayload,
+} from "@/lib/readiness/answer-callouts";
 
 // Retain event-name literals in the client bundle for live JS checks.
 void readinessAnalyticsEventCatalog();
@@ -72,6 +82,13 @@ const STAGE1_STEPS = [
   "deadline",
 ] as const;
 type Stage1Step = (typeof STAGE1_STEPS)[number];
+
+/** Full main-path step count: 5 intake + prompt + paste + confirm + gate. */
+const FLOW_TOTAL_STEPS = STAGE1_STEPS.length + 4;
+const FLOW_STEP_STAGE2 = STAGE1_STEPS.length + 1;
+const FLOW_STEP_STAGE3 = STAGE1_STEPS.length + 2;
+const FLOW_STEP_CONFIRM = STAGE1_STEPS.length + 3;
+const FLOW_STEP_GATE = STAGE1_STEPS.length + 4;
 
 function mergeStage1(partial: Partial<ReadinessStage1Answers>): ReadinessStage1Answers {
   return {
@@ -374,6 +391,28 @@ export function ReadinessFlow() {
         return Boolean(stage1.deadline);
       default:
         return false;
+    }
+  }, [step, stage1]);
+
+  /** Answer-specific callout for the active stage-1 step (honest echo only). */
+  const stage1Callout: AnswerCalloutPayload | null = useMemo(() => {
+    switch (step) {
+      case "productDescription":
+        return calloutForProductDescription(stage1.productDescription);
+      case "whoUses":
+        return stage1.whoUses ? calloutForWhoUses(stage1.whoUses) : null;
+      case "builtWith":
+        return stage1.builtWith && !isNotBuiltYet(stage1.builtWith)
+          ? calloutForBuiltWith(stage1.builtWith)
+          : null;
+      case "blockers":
+        return calloutForBlockers(stage1.blockers);
+      case "deadline":
+        return stage1.deadline
+          ? calloutForDeadline(stage1.deadline, stage1.deadlineDetail)
+          : null;
+      default:
+        return null;
     }
   }, [step, stage1]);
 
@@ -706,7 +745,11 @@ export function ReadinessFlow() {
 
   if (view === "loading") {
     return (
-      <div className="card mt-8" aria-busy="true" data-testid="readiness-loading">
+      <div
+        className="readiness-step-panel mt-8"
+        aria-busy="true"
+        data-testid="readiness-loading"
+      >
         <p className="text-sm text-muted">Loading your readiness check…</p>
       </div>
     );
@@ -714,7 +757,11 @@ export function ReadinessFlow() {
 
   if (view === "error") {
     return (
-      <div className="card mt-8 border-red/30" role="alert" data-testid="readiness-error">
+      <div
+        className="readiness-step-panel mt-8 border-red/30"
+        role="alert"
+        data-testid="readiness-error"
+      >
         <p className="font-semibold text-ink">We could not start the check.</p>
         <p className="mt-2 text-sm text-muted">{errorMessage}</p>
         <button type="button" className="btn-primary mt-4" onClick={() => window.location.reload()}>
@@ -726,36 +773,46 @@ export function ReadinessFlow() {
 
   if (view === "off_ramp_not_built") {
     return (
-      <div className="card mt-8" data-testid="readiness-off-ramp-not-built">
-        <h2 className="font-display text-2xl font-bold text-ink">{c.offRampNotBuilt.title}</h2>
-        <p className="mt-4 text-ink-soft">{c.offRampNotBuilt.body}</p>
-        <Link href="/" className="btn-primary mt-6 inline-flex">
-          {c.offRampNotBuilt.cta}
-        </Link>
+      <div
+        className="readiness-assessment mt-8"
+        data-testid="readiness-off-ramp-not-built"
+      >
+        <div className="readiness-step-panel">
+          <h2 className="font-display text-2xl font-bold text-ink">{c.offRampNotBuilt.title}</h2>
+          <p className="mt-4 text-ink-soft">{c.offRampNotBuilt.body}</p>
+          <Link href="/" className="btn-primary mt-6 inline-flex">
+            {c.offRampNotBuilt.cta}
+          </Link>
+        </div>
       </div>
     );
   }
 
   if (view === "off_ramp_features") {
     return (
-      <div className="card mt-8" data-testid="readiness-off-ramp-features">
-        <h2 className="font-display text-2xl font-bold text-ink">{c.offRampFeatures.title}</h2>
-        <p className="mt-4 text-ink-soft">{c.offRampFeatures.body}</p>
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <button
-            type="button"
-            className="btn-primary"
-            data-testid="readiness-features-continue"
-            onClick={() => {
-              setStepIndex(STAGE1_STEPS.indexOf("blockers"));
-              setView("stage1");
-            }}
-          >
-            {c.offRampFeatures.continueAnyway}
-          </button>
-          <Link href="/" className="btn-secondary">
-            {c.offRampFeatures.stop}
-          </Link>
+      <div
+        className="readiness-assessment mt-8"
+        data-testid="readiness-off-ramp-features"
+      >
+        <div className="readiness-step-panel">
+          <h2 className="font-display text-2xl font-bold text-ink">{c.offRampFeatures.title}</h2>
+          <p className="mt-4 text-ink-soft">{c.offRampFeatures.body}</p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              className="btn-primary"
+              data-testid="readiness-features-continue"
+              onClick={() => {
+                setStepIndex(STAGE1_STEPS.indexOf("blockers"));
+                setView("stage1");
+              }}
+            >
+              {c.offRampFeatures.continueAnyway}
+            </button>
+            <Link href="/" className="btn-secondary">
+              {c.offRampFeatures.stop}
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -763,15 +820,33 @@ export function ReadinessFlow() {
 
   if (view === "gate") {
     return (
-      <ScoreGateForm token={token || ""} initialEmail={email} source="paste" onScored={onScored} />
+      <ScoreGateForm
+        token={token || ""}
+        initialEmail={email}
+        source="paste"
+        onScored={onScored}
+        progressCurrent={FLOW_STEP_GATE}
+        progressTotal={FLOW_TOTAL_STEPS}
+      />
     );
   }
 
   if (view === "confirm" && confirm) {
+    const confirmCallout: AnswerCalloutPayload | null = confirm.stack
+      ? {
+          id: "confirm-stack",
+          text: `Got it — stack noted as ${confirm.stack}${confirm.size ? `; size: ${confirm.size}` : ""}.`,
+        }
+      : null;
     return (
-      <div className="mt-8" data-testid="readiness-confirm">
-        <p className="eyebrow">{c.stage3.progressLabel}</p>
-        <h2 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">
+      <div className="readiness-assessment mt-8" data-testid="readiness-confirm">
+        <AssessmentProgress
+          current={FLOW_STEP_CONFIRM}
+          total={FLOW_TOTAL_STEPS}
+          label="Confirm findings"
+        />
+        <p className="eyebrow mt-4">{c.stage3.progressLabel}</p>
+        <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
           {confirm.pending ? c.confirm.pendingTitle : c.confirm.title}
         </h2>
         {confirm.pending ? (
@@ -780,7 +855,7 @@ export function ReadinessFlow() {
           </p>
         ) : null}
 
-        <div className="card mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="readiness-step-panel mt-6 grid gap-4 sm:grid-cols-2">
           <div data-testid="readiness-confirm-stack">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
               {c.confirm.stackLabel}
@@ -795,7 +870,7 @@ export function ReadinessFlow() {
           </div>
         </div>
 
-        <div className="card mt-4" data-testid="readiness-confirm-findings">
+        <div className="readiness-step-panel mt-4" data-testid="readiness-confirm-findings">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">
             {c.confirm.findingsLabel}
           </p>
@@ -811,6 +886,8 @@ export function ReadinessFlow() {
             </p>
           )}
         </div>
+
+        <AnswerCallout callout={confirmCallout} />
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <button
@@ -835,20 +912,35 @@ export function ReadinessFlow() {
     );
   }
 
+  const stage3PasteCallout: AnswerCalloutPayload | null =
+    pasteText.trim().length >= 8
+      ? {
+          id: "paste-received",
+          text: `Got it — received your diagnostic paste (${pasteText.trim().length.toLocaleString()} characters). Submit when ready; nothing is scored yet.`,
+        }
+      : null;
+
   /** Stage 3 paste-back panel — always mounted so the page/DOM always contains the large textarea. */
   const stage3Panel = (
     <div
-      className={view === "stage3" ? "mt-8" : "sr-only"}
+      className={view === "stage3" ? "readiness-assessment mt-8" : "sr-only"}
       data-testid="readiness-stage3"
       aria-hidden={view === "stage3" ? undefined : true}
     >
-      <p className="eyebrow">{c.stage3.progressLabel}</p>
-      <h2 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">
+      {view === "stage3" ? (
+        <AssessmentProgress
+          current={FLOW_STEP_STAGE3}
+          total={FLOW_TOTAL_STEPS}
+          label="Paste results"
+        />
+      ) : null}
+      <p className={`eyebrow ${view === "stage3" ? "mt-4" : ""}`}>{c.stage3.progressLabel}</p>
+      <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
         {c.stage3.title}
       </h2>
       <p className="mt-3 text-base text-muted">{c.stage3.body}</p>
 
-      <div className="mt-6">
+      <div className="readiness-step-panel mt-6">
         <label htmlFor="readiness-paste" className="text-sm font-medium text-ink-soft">
           {c.stage3.textareaLabel}
         </label>
@@ -860,12 +952,13 @@ export function ReadinessFlow() {
           value={pasteText}
           onChange={(ev) => onPasteChange(ev.target.value)}
           placeholder={c.stage3.textareaPlaceholder}
-          className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-3 font-mono text-xs leading-relaxed text-ink sm:text-sm"
+          className="mt-2 w-full rounded-xl border border-border bg-canvas px-3 py-3 font-mono text-xs leading-relaxed text-ink sm:text-sm"
           data-testid="readiness-paste-textarea"
           spellCheck={false}
           autoComplete="off"
           tabIndex={view === "stage3" ? 0 : -1}
         />
+        {view === "stage3" ? <AnswerCallout callout={stage3PasteCallout} /> : null}
       </div>
 
       {secretLines.length > 0 && view === "stage3" ? (
@@ -933,14 +1026,29 @@ export function ReadinessFlow() {
   }
 
   if (view === "stage2" && promptBundle && howTo) {
+    const stage2Callout: AnswerCalloutPayload = {
+      id: "stage2-tool",
+      text: `Got it — diagnostic prompt tailored for ${howTo.toolName}${stage1.productDescription.trim() ? ` and “${stage1.productDescription.trim().slice(0, 80)}${stage1.productDescription.trim().length > 80 ? "…" : ""}”` : ""}.`,
+    };
     return (
-      <div className="mt-8" data-testid="readiness-stage2" data-variant={promptBundle.variant}>
-        <p className="eyebrow">{c.stage2.progressLabel}</p>
-        <h2 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">
+      <div
+        className="readiness-assessment mt-8"
+        data-testid="readiness-stage2"
+        data-variant={promptBundle.variant}
+      >
+        <AssessmentProgress
+          current={FLOW_STEP_STAGE2}
+          total={FLOW_TOTAL_STEPS}
+          label="Diagnostic prompt"
+        />
+        <p className="eyebrow mt-4">{c.stage2.progressLabel}</p>
+        <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
           {c.stage2.title}
         </h2>
 
-        <div className="card mt-6">
+        <AnswerCallout callout={stage2Callout} />
+
+        <div className="readiness-step-panel mt-6">
           <h3 className="font-display text-lg font-semibold text-ink">{c.stage2.howToTitle}</h3>
           <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-soft">
             {howTo.steps.map((s) => (
@@ -981,7 +1089,7 @@ export function ReadinessFlow() {
           </pre>
         </div>
 
-        <div className="card mt-6" data-testid="readiness-email-panel">
+        <div className="readiness-step-panel mt-6" data-testid="readiness-email-panel">
           <h3 className="font-display text-lg font-semibold text-ink">{c.stage2.emailMe}</h3>
           <p className="mt-1 text-sm text-muted">{c.stage2.resumeHint}</p>
           <form className="mt-4 flex flex-col gap-3 sm:flex-row" onSubmit={onEmailSubmit}>
@@ -997,7 +1105,7 @@ export function ReadinessFlow() {
               placeholder={c.stage2.emailPlaceholder}
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
-              className="min-h-11 w-full flex-1 rounded-xl border border-border bg-surface px-3 text-sm text-ink"
+              className="min-h-11 w-full flex-1 rounded-xl border border-border bg-canvas px-3 text-sm text-ink"
               data-testid="readiness-email-input"
             />
             <button
@@ -1053,16 +1161,31 @@ export function ReadinessFlow() {
 
   // Stage 1
   const q = c.stage1.questions;
+  const optionBase =
+    "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm transition-colors";
+  const optionSelected = "border-purple bg-purple-soft/40";
+  const optionIdle = "border-border bg-canvas hover:border-purple/40";
+  const optionDisabled = "cursor-not-allowed border-border bg-canvas opacity-50";
+
   return (
-    <div className="mt-8" data-testid="readiness-stage1" data-step={step}>
-      <p className="eyebrow">
+    <div
+      className="readiness-assessment mt-8"
+      data-testid="readiness-stage1"
+      data-step={step}
+    >
+      <AssessmentProgress
+        current={stepIndex + 1}
+        total={FLOW_TOTAL_STEPS}
+        label="Intake"
+      />
+      <p className="eyebrow mt-4">
         {c.stage1.progressLabel} · {stepIndex + 1}/{STAGE1_STEPS.length}
       </p>
 
-      <div className="card mt-4">
+      <div className="readiness-step-panel mt-4">
         {step === "productDescription" ? (
           <fieldset>
-            <legend className="font-display text-xl font-bold text-ink sm:text-2xl">
+            <legend className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
               {q.productDescription.label}
             </legend>
             <p className="mt-2 text-sm text-muted">{q.productDescription.helper}</p>
@@ -1077,7 +1200,7 @@ export function ReadinessFlow() {
               }}
               onBlur={() => void persist(stage1, "intake")}
               placeholder={q.productDescription.placeholder}
-              className="mt-4 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink"
+              className="mt-4 w-full rounded-xl border border-border bg-canvas px-3 py-2 text-sm text-ink"
               data-testid="readiness-q1"
             />
             <p className="mt-1 text-right text-xs text-muted" aria-live="polite">
@@ -1088,7 +1211,7 @@ export function ReadinessFlow() {
 
         {step === "whoUses" ? (
           <fieldset>
-            <legend className="font-display text-xl font-bold text-ink sm:text-2xl">
+            <legend className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
               {q.whoUses.label}
             </legend>
             <div
@@ -1099,10 +1222,8 @@ export function ReadinessFlow() {
               {WHO_USES_OPTIONS.map((opt) => (
                 <label
                   key={opt}
-                  className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm ${
-                    stage1.whoUses === opt
-                      ? "border-purple bg-purple-soft/40"
-                      : "border-border bg-surface hover:border-purple/40"
+                  className={`${optionBase} ${
+                    stage1.whoUses === opt ? optionSelected : optionIdle
                   }`}
                 >
                   <input
@@ -1126,7 +1247,7 @@ export function ReadinessFlow() {
 
         {step === "builtWith" ? (
           <fieldset>
-            <legend className="font-display text-xl font-bold text-ink sm:text-2xl">
+            <legend className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
               {q.builtWith.label}
             </legend>
             <div
@@ -1138,10 +1259,8 @@ export function ReadinessFlow() {
               {BUILT_WITH_OPTIONS.map((opt) => (
                 <label
                   key={opt}
-                  className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm ${
-                    stage1.builtWith === opt
-                      ? "border-purple bg-purple-soft/40"
-                      : "border-border bg-surface hover:border-purple/40"
+                  className={`${optionBase} ${
+                    stage1.builtWith === opt ? optionSelected : optionIdle
                   }`}
                 >
                   <input
@@ -1161,7 +1280,7 @@ export function ReadinessFlow() {
 
         {step === "blockers" ? (
           <fieldset>
-            <legend className="font-display text-xl font-bold text-ink sm:text-2xl">
+            <legend className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
               {q.blockers.label}
             </legend>
             <p className="mt-2 text-sm text-muted">{q.blockers.helper}</p>
@@ -1172,12 +1291,8 @@ export function ReadinessFlow() {
                 return (
                   <label
                     key={opt}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm ${
-                      checked
-                        ? "border-purple bg-purple-soft/40"
-                        : disabled
-                          ? "cursor-not-allowed border-border bg-surface opacity-50"
-                          : "border-border bg-surface hover:border-purple/40"
+                    className={`${optionBase} ${
+                      checked ? optionSelected : disabled ? optionDisabled : optionIdle
                     }`}
                   >
                     <input
@@ -1202,7 +1317,7 @@ export function ReadinessFlow() {
 
         {step === "deadline" ? (
           <fieldset>
-            <legend className="font-display text-xl font-bold text-ink sm:text-2xl">
+            <legend className="font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
               {q.deadline.label}
             </legend>
             <div
@@ -1214,10 +1329,8 @@ export function ReadinessFlow() {
               {DEADLINE_OPTIONS.map((opt) => (
                 <label
                   key={opt}
-                  className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm ${
-                    stage1.deadline === opt
-                      ? "border-purple bg-purple-soft/40"
-                      : "border-border bg-surface hover:border-purple/40"
+                  className={`${optionBase} ${
+                    stage1.deadline === opt ? optionSelected : optionIdle
                   }`}
                 >
                   <input
@@ -1255,12 +1368,14 @@ export function ReadinessFlow() {
                   }
                   onBlur={() => void persist(stage1, "intake")}
                   placeholder={q.deadline.detailPlaceholder}
-                  className="mt-2 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink"
+                  className="mt-2 w-full rounded-xl border border-border bg-canvas px-3 py-2 text-sm text-ink"
                 />
               </div>
             ) : null}
           </fieldset>
         ) : null}
+
+        <AnswerCallout callout={stage1Callout} />
 
         <div className="mt-6 flex flex-wrap gap-3">
           {stepIndex > 0 ? (

@@ -41,10 +41,10 @@ export const MANUAL_QUESTIONNAIRE: readonly ManualQuestion[] = [
   {
     id: "languages",
     reportField: "languages",
-    label: "Main languages or frameworks?",
-    helper: "Whatever you actually ship with.",
+    label: "Main languages, frameworks, or tools/platforms?",
+    helper: "Whatever you actually ship with — names and counts are fine.",
     type: "text",
-    placeholder: "e.g. TypeScript, Python, React",
+    placeholder: "e.g. HubSpot, Salesforce, Slack — or TypeScript, Python, React",
     required: true,
   },
   {

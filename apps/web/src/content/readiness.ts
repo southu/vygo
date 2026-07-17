@@ -12,8 +12,9 @@ export const readinessContent = {
       productDescription: {
         id: "productDescription",
         label: "What does your product do?",
-        helper: "One short sentence. Max 200 characters.",
-        placeholder: "e.g. Scheduling tool for multi-location clinics",
+        helper:
+          "One short sentence, or name the tools/platforms it relies on. Max 200 characters.",
+        placeholder: "e.g. Scheduling for clinics — HubSpot, Salesforce, Slack",
       },
       whoUses: {
         id: "whoUses",
