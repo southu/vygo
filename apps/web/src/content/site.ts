@@ -34,6 +34,9 @@ export const site = {
     insightsTitle: "Insights",
     insightsDescription:
       "Prototype teardowns and field notes on production engineering for AI-built software from VYGO.",
+    vibeCodingTitle: "Vibe Coding Hub — the Ratchet Build-and-Verify Loop",
+    vibeCodingDescription:
+      "What vibe coding is and is not, the Ratchet loop from goal to a streak of live-verified passes, the non-negotiables, and topics including the system guide and rebuild checklist.",
     privacyTitle: "Privacy Policy",
     privacyDescription:
       "Privacy Policy for VYGO LLC explaining how vygo.ai collects, uses, and protects personal information from the marketing site and waitlist. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
