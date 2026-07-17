@@ -162,15 +162,31 @@ export const INSIGHT_DETAIL_MAX_CHARS = 480;
 export const INSIGHT_HEADLINE_MAX_CHARS = 160;
 
 /**
+ * Truncate by Unicode code points (not UTF-16 code units) so surrogate pairs
+ * (emoji / non-BMP) are never split mid-character. Unpaired surrogates break
+ * JSON→Postgres UTF-8 encoding and can 500 the score path.
+ *
+ * `max` is a code-point budget. When truncated, the final code point is an
+ * ellipsis (…), so at most `max - 1` source code points are kept.
+ */
+export function clipByCodePoints(value: string, max: number): string {
+  if (max <= 0) return "";
+  if (!value) return value;
+  // Array.from iterates code points; String.prototype.slice uses UTF-16 units.
+  const points = Array.from(value);
+  if (points.length <= max) return value;
+  if (max === 1) return "…";
+  return `${points.slice(0, max - 1).join("")}…`;
+}
+
+/**
  * Collapse whitespace and truncate with a clean ellipsis for UI surfaces.
- * Never returns pure whitespace.
+ * Never returns pure whitespace. Safe for dense emoji / non-BMP input.
  */
 export function clipDisplayText(value: string, max = INSIGHT_SOURCE_MAX_CHARS): string {
   const t = value.replace(/\s+/g, " ").trim();
   if (!t) return "";
-  if (t.length <= max) return t;
-  if (max <= 1) return "…";
-  return `${t.slice(0, max - 1)}…`;
+  return clipByCodePoints(t, max);
 }
 
 /** Preserve original wording of a submitted answer as source_answer. */
@@ -386,7 +402,7 @@ export function buildEvidenceInsights(
       pushDraft(drafts, {
         type: "strength",
         headline: `You already operate with ${tool}`,
-        detail: `Your answer references ${tool} specifically ("${integrationRaw.slice(0, 160)}"), which is a concrete platform signal we can score against.`,
+        detail: `Your answer references ${tool} specifically ("${clipDisplayText(integrationRaw, 160)}"), which is a concrete platform signal we can score against.`,
         source_answer: integrationRaw.includes(tool)
           ? integrationRaw
           : rawAnswerText(
@@ -483,7 +499,7 @@ export function buildEvidenceInsights(
       });
     } else if (hasStrengthLanguage(raw) || extractNamedTools(raw).length > 0) {
       const tools = extractNamedTools(raw);
-      const focus = tools[0] ? tools[0] : raw.slice(0, 80);
+      const focus = tools[0] ? tools[0] : clipDisplayText(raw, 80);
       pushDraft(drafts, {
         type: "strength",
         headline: `Your ${field.replace(/_/g, " ")} practice is production-leaning`,
@@ -684,7 +700,7 @@ export function buildEvidenceInsights(
       pushDraft(drafts, {
         type: "opportunity",
         headline: `Your product summary names ${quoteList(summaryTools.slice(0, 3))}`,
-        detail: `You described the product as "${summaryRaw.slice(0, 200)}", grounding the engagement in your own wording.`,
+        detail: `You described the product as "${clipDisplayText(summaryRaw, 200)}", grounding the engagement in your own wording.`,
         source_answer: summaryRaw,
         dimension: "Maintainability",
         rank: 58,
@@ -693,7 +709,7 @@ export function buildEvidenceInsights(
       pushDraft(drafts, {
         type: "opportunity",
         headline: `Your own product description sets the scope`,
-        detail: `You wrote "${summaryRaw.slice(0, 200)}", which we echo back so findings stay tied to what you actually build.`,
+        detail: `You wrote "${clipDisplayText(summaryRaw, 200)}", which we echo back so findings stay tied to what you actually build.`,
         source_answer: summaryRaw,
         dimension: "Maintainability",
         rank: 35,

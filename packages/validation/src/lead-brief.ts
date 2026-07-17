@@ -69,18 +69,26 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return null;
 }
 
+/** Truncate by Unicode code points so emoji / non-BMP is never split mid-surrogate. */
+function clipCodePoints(value: string, max: number): string {
+  if (max <= 0) return "";
+  const points = Array.from(value);
+  if (points.length <= max) return value;
+  return points.slice(0, max).join("");
+}
+
 function asString(value: unknown, max = 500): string | null {
   if (typeof value !== "string") return null;
   const t = value.trim();
   if (!t) return null;
-  return t.slice(0, max);
+  return clipCodePoints(t, max);
 }
 
 function asStringArray(value: unknown, maxItems = 12): string[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
-    .map((v) => v.trim().slice(0, 200))
+    .map((v) => clipCodePoints(v.trim(), 200))
     .slice(0, maxItems);
 }
 
@@ -133,7 +141,7 @@ function extractScoreSummary(
   const findings = Array.isArray(s.findings)
     ? (s.findings as unknown[])
         .filter((f): f is string => typeof f === "string")
-        .map((f) => f.slice(0, 280))
+        .map((f) => clipCodePoints(f, 280))
         .slice(0, 5)
     : [];
   return {
@@ -175,11 +183,11 @@ function summarizeTechReport(
     if (report[key] == null) continue;
     const v = report[key];
     if (typeof v === "string") {
-      out[key] = v.slice(0, 400);
+      out[key] = clipCodePoints(v, 400);
     } else if (Array.isArray(v)) {
       out[key] = v
         .slice(0, 12)
-        .map((item) => (typeof item === "string" ? item.slice(0, 120) : item));
+        .map((item) => (typeof item === "string" ? clipCodePoints(item, 120) : item));
     } else if (typeof v === "number" || typeof v === "boolean") {
       out[key] = v;
     }
@@ -254,7 +262,7 @@ export function buildTalkingPoints(input: {
     );
   } else if (input.productOneLiner) {
     points.push(
-      `Restate the product in their words ("${input.productOneLiner.slice(0, 120)}") and confirm primary users and commercial pressure.`,
+      `Restate the product in their words ("${clipCodePoints(input.productOneLiner, 120)}") and confirm primary users and commercial pressure.`,
     );
   } else {
     points.push(
@@ -265,7 +273,7 @@ export function buildTalkingPoints(input: {
   while (points.length < 3) {
     points.push("Confirm next step preference: audit opening vs. deeper scoping call.");
   }
-  return [points[0]!, points[1]!, points[2]!].map((p) => p.slice(0, 400)) as [
+  return [points[0]!, points[1]!, points[2]!].map((p) => clipCodePoints(p, 400)) as [
     string,
     string,
     string,

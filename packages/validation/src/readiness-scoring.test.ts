@@ -495,6 +495,60 @@ describe("readiness scoring", () => {
       );
     }
   });
+
+  it("dense emoji free-text scores without unpaired surrogates in payload", () => {
+    function hasUnpairedSurrogate(s: string): boolean {
+      for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        if (c >= 0xd800 && c <= 0xdbff) {
+          const n = s.charCodeAt(i + 1);
+          if (!(n >= 0xdc00 && n <= 0xdfff)) return true;
+          i++;
+        } else if (c >= 0xdc00 && c <= 0xdfff) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function walk(obj: unknown): string[] {
+      if (typeof obj === "string") return hasUnpairedSurrogate(obj) ? [obj.slice(0, 20)] : [];
+      if (Array.isArray(obj)) return obj.flatMap(walk);
+      if (obj && typeof obj === "object") return Object.values(obj).flatMap(walk);
+      return [];
+    }
+
+    for (const n of [50, 100, 800] as const) {
+      const emoji = ("🚀🔒").repeat(n);
+      const payload = computeReadinessScore({
+        report: {
+          ...UNKNOWN_REPORT,
+          summary: emoji,
+          tests: "unit + integration",
+          secrets_pattern: "env vars",
+          authorization: "RBAC",
+          auth: "OAuth / SSO",
+        },
+        source: "manual",
+        stage1: {
+          productDescription: emoji,
+          whoUses: "External customers or end users",
+          builtWith: "Cursor",
+          blockers: ["security"],
+          deadline: "No hard deadline",
+          deadlineDetail: "",
+        },
+      });
+      assert.ok(Number.isFinite(payload.overall), `overall finite for n=${n}`);
+      const bad = walk(payload);
+      assert.equal(
+        bad.length,
+        0,
+        `unpaired surrogates in score payload for n=${n}: ${bad[0] ?? ""}`,
+      );
+      // JSON must serialize cleanly for Postgres jsonb.
+      assert.doesNotThrow(() => JSON.stringify(payload));
+    }
+  });
 });
 
 describe("hasScorableReportAnswers", () => {

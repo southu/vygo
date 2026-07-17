@@ -455,13 +455,17 @@ function redactReportDeep(report: Record<string, unknown>): Record<string, unkno
   return out;
 }
 
-/** Collapse whitespace + truncate free-text for client-safe surfaces. */
+/** Collapse whitespace + truncate free-text for client-safe surfaces (code-point safe). */
 function clipPublicText(value: unknown, max: number): string {
   if (value == null) return "";
   const t = String(value).replace(/\s+/g, " ").trim();
   if (!t) return "";
-  if (t.length <= max) return t;
-  return `${t.slice(0, max - 1)}…`;
+  // Truncate by Unicode code points so emoji / non-BMP never split mid-surrogate
+  // (unpaired surrogates break JSON→Postgres UTF-8 and can 500 the score path).
+  const points = Array.from(t);
+  if (points.length <= max) return t;
+  if (max <= 1) return "…";
+  return `${points.slice(0, max - 1).join("")}…`;
 }
 
 function finiteScore(value: unknown): number | null {

@@ -124,6 +124,27 @@ describe("sparse and long free-text insights", () => {
     assert.ok(clipped.endsWith("…"));
   });
 
+  it("clipDisplayText never splits dense emoji mid-surrogate", () => {
+    const dense = ("🚀🔒").repeat(100);
+    const clipped = clipDisplayText(dense, 50);
+    assert.ok(clipped.endsWith("…"));
+    assert.equal(Array.from(clipped).length, 50);
+    // No unpaired surrogates (would break JSON→Postgres UTF-8).
+    for (let i = 0; i < clipped.length; i++) {
+      const c = clipped.charCodeAt(i);
+      if (c >= 0xd800 && c <= 0xdbff) {
+        const n = clipped.charCodeAt(i + 1);
+        assert.ok(
+          n >= 0xdc00 && n <= 0xdfff,
+          `unpaired high surrogate at ${i}`,
+        );
+        i++;
+      } else {
+        assert.ok(!(c >= 0xdc00 && c <= 0xdfff), `unpaired low surrogate at ${i}`);
+      }
+    }
+  });
+
   it("sparse report yields fewer insights and no empty source quotes", () => {
     const sparse = buildEvidenceInsights({ summary: "x", tests: "none" });
     const rich = buildEvidenceInsights(RICH_REPORT);

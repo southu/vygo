@@ -8,6 +8,7 @@
  */
 
 import {
+  clipDisplayText,
   extractNamedTools,
   extractIntegrationCount,
   rawAnswerText,
@@ -81,9 +82,8 @@ function statusPhrase(status: SubMetricScore["status"], score: number): string {
 function quoteAnswer(value: unknown, max = 120): string {
   const raw = rawAnswerText(value);
   if (!raw) return "not provided";
-  const t = raw.replace(/\s+/g, " ").trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max - 1)}…`;
+  const clipped = clipDisplayText(raw, max);
+  return clipped || "not provided";
 }
 
 function bandLabel(score: number): string {

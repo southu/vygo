@@ -23,6 +23,8 @@ import type { ReadinessReportV1Partial } from "./report-schema.js";
 import type { ReadinessStage1Answers } from "./readiness-intake.js";
 import {
   buildEvidenceInsights,
+  clipByCodePoints,
+  clipDisplayText,
   type EvidenceInsight,
 } from "./evidence-insights.js";
 import {
@@ -543,7 +545,7 @@ function answerSnippet(value: unknown, maxLen = 120): string {
   if (typeof value === "string") {
     const t = value.trim().replace(/\s+/g, " ");
     if (!t) return "unanswered";
-    return t.length > maxLen ? `${t.slice(0, maxLen - 1)}…` : t;
+    return clipByCodePoints(t, maxLen);
   }
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   if (Array.isArray(value)) {
@@ -552,11 +554,11 @@ function answerSnippet(value: unknown, maxLen = 120): string {
       .filter(Boolean)
       .join(", ");
     if (!joined) return "unanswered";
-    return joined.length > maxLen ? `${joined.slice(0, maxLen - 1)}…` : joined;
+    return clipByCodePoints(joined, maxLen);
   }
   try {
     const s = JSON.stringify(value);
-    return s.length > maxLen ? `${s.slice(0, maxLen - 1)}…` : s;
+    return clipByCodePoints(s, maxLen);
   } catch {
     return "provided answer";
   }
@@ -1047,13 +1049,9 @@ export const REASONING_FREE_TEXT_MAX_CHARS = 160;
 /** Hard cap on the full multi-sentence reasoning string. */
 export const REASONING_BODY_MAX_CHARS = 900;
 
-/** Collapse whitespace and truncate with a clean ellipsis. */
+/** Collapse whitespace and truncate with a clean ellipsis (code-point safe). */
 function clipReasoningText(value: string, max = REASONING_FREE_TEXT_MAX_CHARS): string {
-  const t = value.replace(/\s+/g, " ").trim();
-  if (!t) return "";
-  if (t.length <= max) return t;
-  if (max <= 1) return "…";
-  return `${t.slice(0, max - 1)}…`;
+  return clipDisplayText(value, max);
 }
 
 /** First sentence of free text (period/question/exclamation), or the whole string. */
@@ -1094,7 +1092,9 @@ function formatSummaryAsDescribedObject(rawSummary: string): string {
   if (!body) return "a product";
 
   if (looksLikePredicateFragment(body)) {
-    const predicate = body.charAt(0).toLowerCase() + body.slice(1);
+    // Code-point safe: do not split a leading surrogate pair (emoji).
+    const points = Array.from(body);
+    const predicate = `${(points[0] ?? "").toLowerCase()}${points.slice(1).join("")}`;
     return `a product that "${predicate}"`;
   }
 
@@ -1147,7 +1147,9 @@ export function buildEngagementReasoning(
     // Capitalize after a label like "Product context: …"
     const clipped = clipReasoningText(first);
     if (!clipped) return "not specified";
-    return clipped.charAt(0).toUpperCase() + clipped.slice(1);
+    // Code-point safe capitalization (leading emoji must not be split).
+    const points = Array.from(clipped);
+    return `${(points[0] ?? "").toUpperCase()}${points.slice(1).join("")}`;
   })();
 
   const tenancy = clipReasoningText(

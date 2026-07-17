@@ -192,6 +192,7 @@ export {
 
 export {
   buildEvidenceInsights,
+  clipByCodePoints,
   clipDisplayText,
   extractNamedTools,
   extractIntegrationCount,

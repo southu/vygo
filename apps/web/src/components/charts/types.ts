@@ -54,13 +54,15 @@ export function hasChartEvidence(
 /** Bound free-text answers in tooltips / callouts so layout never overflows. */
 export const EVIDENCE_ANSWER_MAX_CHARS = 220;
 
-/** Collapse whitespace and truncate with a clean ellipsis. */
+/** Collapse whitespace and truncate with a clean ellipsis (code-point safe). */
 export function clipEvidenceText(value: string, max = EVIDENCE_ANSWER_MAX_CHARS): string {
   const t = value.replace(/\s+/g, " ").trim();
   if (!t) return "";
-  if (t.length <= max) return t;
+  // Array.from iterates code points so surrogate pairs (emoji) are never split.
+  const points = Array.from(t);
+  if (points.length <= max) return t;
   if (max <= 1) return "…";
-  return `${t.slice(0, max - 1)}…`;
+  return `${points.slice(0, max - 1).join("")}…`;
 }
 
 /** Format a prospect answer value for tooltip display (never placeholder filler). */
