@@ -6,17 +6,21 @@
  * Railway API (which always has the project Postgres). Clients never talk to the
  * database — only this endpoint.
  *
- * Also accepts guide-update email signups on the same path (no heavier anti-bot
- * gate than standard apply — Turnstile is not required on this intake today).
+ * Also accepts guide-update email signups on the same path. Turnstile is not
+ * required here — missing/invalid turnstileToken is ignored the same way as for
+ * ordinary apply (no TURNSTILE_FAILED gate on this route).
  * Request shape (documented near parseApplyBody in ../_lib/apply.ts):
  *   { "source": "guide_updates", "email": "user@example.com" }
  * Duplicate policy: repeat guide_updates emails insert a NEW row and return
  * friendly success (never "already signed up"). source is set to 'guide_updates'
  * explicitly on insert — never the applications column default of 'apply'.
+ * Success is HTTP 201 with a record-shaped body (parity with ordinary apply);
+ * work_email is always redacted so the submitted address is never echoed.
  */
 import postgres from "postgres";
 import type { Sql } from "postgres";
 import {
+  GUIDE_UPDATES_FULL_NAME,
   GUIDE_UPDATES_SOURCE,
   guideUpdatesSuccessBody,
   handleApplyIntake,
@@ -63,15 +67,33 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null): void {
 }
 
 /**
- * Finalize a guide_updates response: success template on 2xx, scrubbed body otherwise.
- * Never echoes the submitted email.
+ * Finalize a guide_updates response: keep 201 record-shaped success (no email),
+ * scrub error/upstream bodies. Never echoes the submitted email.
  */
 function finalizeGuideUpdates(
   result: ApplyHandlerResult,
   email: string,
 ): ApplyHandlerResult {
   if (result.status >= 200 && result.status < 300) {
-    return { status: 200, body: guideUpdatesSuccessBody(), logError: result.logError };
+    // Prefer an upstream/local record body already shaped by handleApplyIntake /
+    // guideUpdatesSuccessBody; re-apply redaction if a full row leaked through.
+    const body = scrubGuideUpdatesResponse(
+      result.body.id != null || result.body.source != null
+        ? {
+            id: result.body.id ?? null,
+            full_name: result.body.full_name ?? GUIDE_UPDATES_FULL_NAME,
+            work_email: null,
+            product_url: result.body.product_url ?? null,
+            message: result.body.message ?? null,
+            source: result.body.source ?? GUIDE_UPDATES_SOURCE,
+            created_at: result.body.created_at ?? null,
+          }
+        : guideUpdatesSuccessBody(),
+      email,
+    );
+    // Force work_email null even if scrub left a placeholder.
+    body.work_email = null;
+    return { status: 201, body, logError: result.logError };
   }
   return {
     status: result.status,
@@ -127,7 +149,11 @@ async function handlePost(req: EdgeRequest): Promise<ApplyHandlerResult> {
           upstream.status >= 400 &&
           /unique|duplicate/i.test(JSON.stringify(upstream.body))
         ) {
-          return { status: 200, body: guideUpdatesSuccessBody(), logError: upstream.logError };
+          return {
+            status: 201,
+            body: guideUpdatesSuccessBody(),
+            logError: upstream.logError,
+          };
         }
         return finalizeGuideUpdates(upstream, precheck.value.workEmail);
       }

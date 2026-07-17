@@ -293,17 +293,18 @@ describe("handleApplyIntake — guide_updates negative paths (validation before 
       { source: "guide_updates", email },
       store,
     );
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     assert.equal(store.calls, 1);
     assert.ok(store.lastValue);
     assert.equal(store.lastValue.source, GUIDE_UPDATES_SOURCE);
     assert.equal(store.lastValue.isGuideUpdates, true);
     assert.equal(store.lastValue.workEmail, email);
-    // Friendly success — no email echo, no row dump.
-    assert.deepEqual(res.body, guideUpdatesSuccessBody());
+    // Record-shaped success (parity with ordinary apply) — no email echo.
+    assert.equal(res.body.work_email, null);
+    assert.equal(res.body.source, GUIDE_UPDATES_SOURCE);
+    assert.equal(typeof res.body.id, "string");
+    assert.deepEqual(res.body, guideUpdatesSuccessBody(store.rows[0]!));
     assertNoSecrets(res.body, email);
-    assert.equal("id" in res.body, false);
-    assert.equal("work_email" in res.body, false);
   });
 
   it("duplicate email insert-again returns friendly 2xx both times", async () => {
@@ -312,15 +313,17 @@ describe("handleApplyIntake — guide_updates negative paths (validation before 
     const payload = { source: "guide_updates", email };
     const first = await handleApplyIntake(payload, store);
     const second = await handleApplyIntake(payload, store);
-    assert.equal(first.status, 200);
-    assert.equal(second.status, 200);
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
     assert.equal(store.calls, 2);
     assert.equal(store.rows.length, 2);
     assert.notEqual(store.rows[0]!.id, store.rows[1]!.id);
     assert.equal(store.rows[0]!.source, GUIDE_UPDATES_SOURCE);
     assert.equal(store.rows[1]!.source, GUIDE_UPDATES_SOURCE);
     for (const res of [first, second]) {
-      assert.deepEqual(res.body, guideUpdatesSuccessBody());
+      assert.equal(res.status, 201);
+      assert.equal(res.body.work_email, null);
+      assert.equal(res.body.source, GUIDE_UPDATES_SOURCE);
       assertNoSecrets(res.body, email);
       const raw = JSON.stringify(res.body).toLowerCase();
       assert.equal(/unique|constraint|duplicate key|already signed/.test(raw), false);
@@ -334,9 +337,10 @@ describe("handleApplyIntake — guide_updates negative paths (validation before 
       { source: "guide_updates", email },
       store,
     );
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     assert.equal(store.calls, 1);
     assert.deepEqual(res.body, guideUpdatesSuccessBody());
+    assert.equal(res.body.work_email, null);
     assertNoSecrets(res.body, email);
     const raw = JSON.stringify(res.body).toLowerCase();
     assert.equal(raw.includes("unique"), false);
@@ -368,11 +372,19 @@ describe("handleApplyIntake — guide_updates negative paths (validation before 
 });
 
 describe("guide_updates response helpers", () => {
-  it("guideUpdatesSuccessBody is PII-free", () => {
-    const body = guideUpdatesSuccessBody();
-    assert.equal(body.ok, true);
-    assert.equal(body.accepted, true);
-    assertNoSecrets(body, "anyone@example.com");
+  it("guideUpdatesSuccessBody is record-shaped and PII-free", () => {
+    const fromRow = guideUpdatesSuccessBody(SAMPLE_ROW);
+    assert.equal(fromRow.id, SAMPLE_ROW.id);
+    assert.equal(fromRow.work_email, null);
+    assert.equal(fromRow.source, GUIDE_UPDATES_SOURCE);
+    assertNoSecrets(fromRow, SAMPLE_ROW.work_email);
+
+    const soft = guideUpdatesSuccessBody();
+    assert.equal(soft.work_email, null);
+    assert.equal(soft.source, GUIDE_UPDATES_SOURCE);
+    assert.equal(soft.ok, true);
+    assert.equal(soft.accepted, true);
+    assertNoSecrets(soft, "anyone@example.com");
   });
 
   it("scrubGuideUpdatesResponse removes email and secret markers", () => {
@@ -396,6 +408,131 @@ describe("guide_updates response helpers", () => {
     );
     assert.equal(isUniqueConstraintError(new Error("23505")), true);
     assert.equal(isUniqueConstraintError(new Error("connection refused")), false);
+  });
+});
+
+describe("Turnstile parity — missing/invalid tokens (guide_updates vs apply)", () => {
+  /**
+   * POST /api/apply does not enforce Turnstile for either branch. Missing and
+   * invalid turnstileToken must be ignored identically: validation+insert only,
+   * same success status family (201) once a row is written.
+   */
+  it("missing turnstileToken succeeds for both sources with HTTP 201 record shape", async () => {
+    const guideStore = new CountingPersist();
+    const applyStore = new CountingPersist();
+    const guideEmail = "ratchet-qa+ts-missing-guide@example.com";
+    const applyEmail = "ratchet-qa+ts-missing-apply@example.com";
+
+    const guide = await handleApplyIntake(
+      {
+        source: "guide_updates",
+        email: guideEmail,
+        full_name: "Guide updates",
+        message: "guide updates opt-in",
+        // deliberately omit turnstileToken
+      },
+      guideStore,
+    );
+    const apply = await handleApplyIntake(
+      {
+        source: "apply",
+        full_name: "Ratchet QA",
+        work_email: applyEmail,
+        message: "test",
+        // deliberately omit turnstileToken
+      },
+      applyStore,
+    );
+
+    assert.equal(guide.status, 201);
+    assert.equal(apply.status, 201);
+    assert.equal(guideStore.calls, 1);
+    assert.equal(applyStore.calls, 1);
+
+    // Same success status family + record-shaped keys.
+    for (const key of ["id", "full_name", "work_email", "product_url", "message", "source", "created_at"]) {
+      assert.equal(key in guide.body, true, `guide missing key ${key}`);
+      assert.equal(key in apply.body, true, `apply missing key ${key}`);
+    }
+    // Guide never echoes email; apply returns the stored address (existing apply shape).
+    assert.equal(guide.body.work_email, null);
+    assert.equal(apply.body.work_email, applyEmail);
+    assert.equal(guide.body.source, GUIDE_UPDATES_SOURCE);
+    assert.equal(apply.body.source, "apply");
+    assertNoSecrets(guide.body, guideEmail);
+    // Neither path returns a Turnstile failure envelope.
+    assert.equal((guide.body as { error?: { code?: string } }).error?.code, undefined);
+    assert.equal((apply.body as { error?: { code?: string } }).error?.code, undefined);
+  });
+
+  it("invalid turnstileToken is ignored for both sources (same as missing)", async () => {
+    const guideStore = new CountingPersist();
+    const applyStore = new CountingPersist();
+    const invalidToken = "invalid-ratchet-token";
+    const guideEmail = "ratchet-qa+ts-invalid-guide@example.com";
+    const applyEmail = "ratchet-qa+ts-invalid-apply@example.com";
+
+    const guide = await handleApplyIntake(
+      {
+        source: "guide_updates",
+        email: guideEmail,
+        full_name: "Guide updates",
+        message: "guide updates opt-in",
+        turnstileToken: invalidToken,
+      },
+      guideStore,
+    );
+    const apply = await handleApplyIntake(
+      {
+        source: "apply",
+        full_name: "Ratchet QA",
+        work_email: applyEmail,
+        message: "test",
+        turnstileToken: invalidToken,
+      },
+      applyStore,
+    );
+
+    assert.equal(guide.status, 201);
+    assert.equal(apply.status, 201);
+    assert.equal(guideStore.calls, 1);
+    assert.equal(applyStore.calls, 1);
+
+    // Same status; both record-shaped; no TURNSTILE_FAILED; no token echo.
+    assert.equal(guide.body.work_email, null);
+    assert.equal(apply.body.work_email, applyEmail);
+    for (const res of [guide, apply]) {
+      const raw = JSON.stringify(res.body);
+      assert.equal(raw.includes(invalidToken), false);
+      assert.equal(/TURNSTILE/i.test(raw), false);
+      assert.equal((res.body as { error?: { code?: string } }).error?.code, undefined);
+    }
+    assertNoSecrets(guide.body, guideEmail);
+  });
+
+  it("empty-string turnstileToken does not block guide_updates or apply", async () => {
+    const guideStore = new CountingPersist();
+    const applyStore = new CountingPersist();
+    const guide = await handleApplyIntake(
+      {
+        source: "guide_updates",
+        email: "ratchet-qa+ts-empty-guide@example.com",
+        turnstileToken: "",
+      },
+      guideStore,
+    );
+    const apply = await handleApplyIntake(
+      {
+        full_name: "Ratchet QA",
+        work_email: "ratchet-qa+ts-empty-apply@example.com",
+        turnstileToken: "",
+      },
+      applyStore,
+    );
+    assert.equal(guide.status, 201);
+    assert.equal(apply.status, 201);
+    assert.equal(guideStore.calls, 1);
+    assert.equal(applyStore.calls, 1);
   });
 });
 

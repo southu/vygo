@@ -16,9 +16,11 @@
  * row (source explicitly 'guide_updates') and still returns a friendly success —
  * never an "already signed up" error.
  *
- * Anti-bot: mirrors standard apply (no Turnstile on this route today).
- * Success for guide_updates is returned only after the row commits and never
- * echoes email or other PII.
+ * Anti-bot: mirrors standard apply (Turnstile is not enforced on this route;
+ * missing/invalid turnstileToken is ignored for both guide_updates and apply).
+ * Success for guide_updates is HTTP 201 with a record-shaped body (parity with
+ * ordinary apply) after the row commits; work_email is redacted so email is
+ * never echoed.
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { findApplicationById, insertApplication, type DatabaseHandle } from "@vygo/db";
@@ -77,12 +79,39 @@ function extractFullNameRaw(record: Record<string, unknown>): string {
   return "";
 }
 
-/** PII-free success body for guide_updates (no email, name, or secrets). */
-export function guideUpdatesSuccessBody(): Record<string, unknown> {
+/**
+ * Record-shaped success body for guide_updates — same status/shape family as
+ * ordinary apply, with work_email always null (never echo submitted email).
+ */
+export function guideUpdatesSuccessBody(row?: {
+  id: string;
+  full_name: string;
+  product_url?: string | null;
+  message?: string | null;
+  source?: string;
+  created_at?: string;
+} | null): Record<string, unknown> {
+  if (row) {
+    return {
+      id: row.id,
+      full_name: row.full_name || GUIDE_UPDATES_FULL_NAME,
+      work_email: null,
+      product_url: row.product_url ?? null,
+      message: row.message ?? GUIDE_UPDATES_DEFAULT_MESSAGE,
+      source: row.source || GUIDE_UPDATES_SOURCE,
+      created_at: row.created_at ?? null,
+    };
+  }
   return {
+    id: null,
+    full_name: GUIDE_UPDATES_FULL_NAME,
+    work_email: null,
+    product_url: null,
+    message: GUIDE_UPDATES_DEFAULT_MESSAGE,
+    source: GUIDE_UPDATES_SOURCE,
+    created_at: null,
     ok: true,
     accepted: true,
-    message: "You're signed up for guide updates.",
   };
 }
 
@@ -243,8 +272,8 @@ export function registerApplyRoutes(app: FastifyInstance, deps: ApplyRouteDeps):
         source: parsed.value.source,
       });
       if (parsed.value.isGuideUpdates) {
-        // Success only after commit; never echo email / PII for guide opt-ins.
-        return reply.status(200).send(guideUpdatesSuccessBody());
+        // Match ordinary apply: 201 + record shape; redact work_email (no echo).
+        return reply.status(201).send(guideUpdatesSuccessBody(row));
       }
       return reply.status(201).send(row);
     } catch (error) {
@@ -254,7 +283,7 @@ export function registerApplyRoutes(app: FastifyInstance, deps: ApplyRouteDeps):
         parsed.value.isGuideUpdates &&
         /23505|unique(?:\s+constraint)?|duplicate key|already exists/i.test(errMsg)
       ) {
-        return reply.status(200).send(guideUpdatesSuccessBody());
+        return reply.status(201).send(guideUpdatesSuccessBody());
       }
       request.log.error(
         { event: "apply_insert_failed" },

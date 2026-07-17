@@ -14,7 +14,10 @@
  * never an "already signed up" error. No unique constraint is enforced here.
  *
  * Success for guide_updates is returned only after the applications row commits,
- * and the response never echoes email or other PII (unlike apply read-back).
+ * and the response never echoes email (work_email is redacted). Status and
+ * record shape match ordinary apply (HTTP 201) so Turnstile-optional paths share
+ * the same success family; Turnstile is not enforced on this intake for either
+ * source (missing/invalid tokens are ignored identically).
  */
 import type { Sql } from "postgres";
 import { resolveDatabaseUrl, resolveUpstreamApiOrigin } from "./store.js";
@@ -73,7 +76,8 @@ export function isUniqueConstraintError(error: unknown): boolean {
 
 /**
  * Scrub accidental PII echo from a response body for guide_updates responses.
- * Never used to build success bodies (those are fixed templates); defense in depth.
+ * Defense in depth for error/upstream paths — success bodies are built via
+ * guideUpdatesSuccessBody which never includes the submitted email.
  */
 export function scrubGuideUpdatesResponse(
   body: Record<string, unknown>,
@@ -114,6 +118,10 @@ export function scrubGuideUpdatesResponse(
  * - guide_updates always inserts with source='guide_updates' (via value.source).
  * - Duplicate policy: insert-again; unique-constraint errors soft-succeed for guide_updates.
  * - Success/error bodies for guide_updates never echo email or secrets.
+ * - Turnstile is not enforced on this intake (matches ordinary apply); missing or
+ *   invalid turnstileToken fields are ignored the same way for both branches.
+ * - On success, guide_updates returns HTTP 201 with a record-shaped body (same
+ *   status/shape family as ordinary apply) with work_email redacted.
  */
 export async function handleApplyIntake(
   body: unknown,
@@ -142,15 +150,15 @@ export async function handleApplyIntake(
     // source is on parsed.value (guide_updates set explicitly in parseApplyBody).
     const row = await persist.insert(parsed.value);
     if (parsed.value.isGuideUpdates) {
-      // Success only after commit; PII-free template (no email echo).
-      return { status: 200, body: guideUpdatesSuccessBody() };
+      // Match ordinary apply: HTTP 201 + record-shaped body; never echo email.
+      return { status: 201, body: guideUpdatesSuccessBody(row) };
     }
     return { status: 201, body: row as unknown as Record<string, unknown> };
   } catch (error) {
     // Documented insert-again policy: if a UNIQUE constraint is present or added
     // later, guide_updates still looks like success from the client's perspective.
     if (parsed.value.isGuideUpdates && isUniqueConstraintError(error)) {
-      return { status: 200, body: guideUpdatesSuccessBody() };
+      return { status: 201, body: guideUpdatesSuccessBody() };
     }
     return {
       status: 500,
@@ -197,14 +205,37 @@ function extractFullNameRaw(record: Record<string, unknown>): string {
 }
 
 /**
- * PII-free success body for guide_updates. Never includes email, name, or secrets.
- * Call only after the applications row has been committed.
+ * Record-shaped success body for guide_updates — same status/shape family as
+ * ordinary apply (HTTP 201 + applications row keys), but never echoes the
+ * submitted email (work_email is always null in the response).
+ *
+ * Prefer the committed row when available; fall back to a friendly record-shaped
+ * envelope when soft-succeeding on a unique-constraint (insert-again policy).
  */
-export function guideUpdatesSuccessBody(): Record<string, unknown> {
+export function guideUpdatesSuccessBody(row?: ApplyPublicRow | null): Record<string, unknown> {
+  if (row) {
+    return {
+      id: row.id,
+      full_name: row.full_name,
+      work_email: null,
+      product_url: row.product_url ?? null,
+      message: row.message ?? GUIDE_UPDATES_DEFAULT_MESSAGE,
+      source: row.source || GUIDE_UPDATES_SOURCE,
+      created_at: row.created_at,
+    };
+  }
+  // Soft-success path (unique constraint / defensive): still record-shaped,
+  // still no email, still looks like success to the client.
   return {
+    id: null,
+    full_name: GUIDE_UPDATES_FULL_NAME,
+    work_email: null,
+    product_url: null,
+    message: GUIDE_UPDATES_DEFAULT_MESSAGE,
+    source: GUIDE_UPDATES_SOURCE,
+    created_at: null,
     ok: true,
     accepted: true,
-    message: "You're signed up for guide updates.",
   };
 }
 

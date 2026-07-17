@@ -219,6 +219,81 @@ describe("apply routes without database", () => {
     assert.equal(/traceback|postgres:\/\//i.test(res.body), false);
   });
 
+  it("Turnstile: missing token is not rejected for guide_updates or apply (same status family)", async () => {
+    // Without DB both get 503 after validation — proves turnstile is not a gate.
+    const guide = await ctx.app.inject({
+      method: "POST",
+      url: "/api/apply",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://www.vygo.ai",
+      },
+      payload: {
+        source: "guide_updates",
+        email: "ratchet-qa+ts-miss-guide@example.com",
+        full_name: "Guide updates",
+        message: "guide updates opt-in",
+      },
+    });
+    const apply = await ctx.app.inject({
+      method: "POST",
+      url: "/api/apply",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://www.vygo.ai",
+      },
+      payload: {
+        full_name: "Ratchet QA",
+        work_email: "ratchet-qa+ts-miss-apply@example.com",
+        message: "test",
+      },
+    });
+    assert.equal(guide.statusCode, apply.statusCode);
+    assert.equal(guide.statusCode, 503);
+    assert.equal(/TURNSTILE/i.test(guide.body), false);
+    assert.equal(/TURNSTILE/i.test(apply.body), false);
+    assert.equal(guide.json().error?.code, apply.json().error?.code);
+  });
+
+  it("Turnstile: invalid token is not rejected for guide_updates or apply (same status/shape)", async () => {
+    const invalidToken = "invalid-ratchet-token";
+    const guide = await ctx.app.inject({
+      method: "POST",
+      url: "/api/apply",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://www.vygo.ai",
+      },
+      payload: {
+        source: "guide_updates",
+        email: "ratchet-qa+ts-bad-guide@example.com",
+        full_name: "Guide updates",
+        message: "guide updates opt-in",
+        turnstileToken: invalidToken,
+      },
+    });
+    const apply = await ctx.app.inject({
+      method: "POST",
+      url: "/api/apply",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://www.vygo.ai",
+      },
+      payload: {
+        full_name: "Ratchet QA",
+        work_email: "ratchet-qa+ts-bad-apply@example.com",
+        message: "test",
+        turnstileToken: invalidToken,
+      },
+    });
+    assert.equal(guide.statusCode, apply.statusCode);
+    assert.equal(guide.statusCode, 503);
+    // Identical error shape when DB is unavailable — Turnstile did not diverge the path.
+    assert.deepEqual(guide.json(), apply.json());
+    assert.equal(guide.body.includes(invalidToken), false);
+    assert.equal(apply.body.includes(invalidToken), false);
+  });
+
   it("non-POST methods on /api/apply are rejected (no stack)", async () => {
     for (const method of ["GET", "PUT", "DELETE", "PATCH"] as const) {
       const res = await ctx.app.inject({
