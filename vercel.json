@@ -59,6 +59,10 @@
       "destination": "/api/readiness/score-preview"
     },
     {
+      "source": "/v1/readiness/score-e2e",
+      "destination": "/api/readiness/score-e2e"
+    },
+    {
       "source": "/v1/readiness/snapshot/:id/email",
       "destination": "/api/readiness/snapshot-email?id=:id"
     },

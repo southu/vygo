@@ -12,7 +12,8 @@
  * GET    /v1/readiness/submission       — token-scoped read-back of stored submission
  * POST   /v1/readiness/score            — email gate + score + persist snapshot
  * POST   /v1/readiness/score-preview    — dry-run score (no Turnstile, no lead, no PII)
- * GET    /v1/readiness/snapshot/:id     — public snapshot read-back
+ * POST   /v1/readiness/score-e2e        — TEST-ONLY score (no Turnstile; real evidence pipeline)
+ * GET    /v1/readiness/snapshot/:id     — public snapshot read-back (incl. known e2e fixture ids)
  * POST   /v1/readiness/snapshot/:id/email — enqueue snapshot email copy
  *
  * All Postgres writes go through these server endpoints. Rate-limited by IP.
@@ -66,7 +67,7 @@ import {
   type ReadinessStage1Answers,
 } from "@vygo/validation";
 import { renderReadinessOpsBrief, type ReadinessOpsBriefPayload } from "@vygo/email";
-import type { ApiEnv } from "@vygo/config";
+import { CLOUDFLARE_TURNSTILE_TEST_TOKENS, type ApiEnv } from "@vygo/config";
 import { safeError } from "../errors.js";
 import { resolveClientIp } from "../services/client-ip.js";
 import { hashIpAddress } from "../services/ip-hash.js";
@@ -175,12 +176,141 @@ const SCORE_PREVIEW_PROFILE_STRONG: Record<string, unknown> = {
   confidence: 0.85,
 };
 
+/** Mixed-posture report for chart E2E (spans critical / warning / good bands). */
+const SCORE_PREVIEW_PROFILE_MIXED: Record<string, unknown> = {
+  summary: "Staging charts mixed-posture AI agent platform",
+  languages: "TypeScript",
+  size: "medium",
+  structure: "modular monorepo packages",
+  frontend: "Next.js",
+  backend: "Fastify",
+  database: "Postgres",
+  tenancy: "multi-tenant org_id",
+  auth: "session cookies + magic link",
+  authorization: "RBAC roles owner admin member",
+  row_level_security: "none",
+  environments: "local staging production",
+  deploys: "manual ssh",
+  tests: "none",
+  background_jobs: "email outbox worker with retry",
+  integrations: "Slack",
+  secrets_pattern: "hardcoded in git",
+  logging: "structured JSON logs request ids",
+  error_handling: "unhandled stack traces",
+  pii_categories: "email, name; no payment card or health records in prod",
+  api_surface: "HTTPS /v1 versioned API with auth",
+  fragility_flags: ["single region", "no backup"],
+  confidence: 0.7,
+};
+
 const SCORE_PREVIEW_PROFILES: Record<string, Record<string, unknown>> = {
   weak: SCORE_PREVIEW_PROFILE_WEAK,
   strong: SCORE_PREVIEW_PROFILE_STRONG,
+  mixed: SCORE_PREVIEW_PROFILE_MIXED,
   low: SCORE_PREVIEW_PROFILE_WEAK,
   high: SCORE_PREVIEW_PROFILE_STRONG,
 };
+
+/**
+ * Stable UUIDs for seeded readiness E2E snapshots (real scored evidence, no DB).
+ * Load via GET /v1/readiness/snapshot/{id} or /readiness/snapshot?id=...
+ * Never placeholder/lorem — answers come from SCORE_PREVIEW_PROFILES.
+ */
+export const READINESS_E2E_SNAPSHOT_IDS = {
+  weak: "00000000-0000-4000-a000-0000000000e1",
+  strong: "00000000-0000-4000-a000-0000000000e2",
+  mixed: "00000000-0000-4000-a000-0000000000e3",
+} as const;
+
+const READINESS_E2E_SNAPSHOT_BY_ID: Record<string, keyof typeof READINESS_E2E_SNAPSHOT_IDS> = {
+  [READINESS_E2E_SNAPSHOT_IDS.weak]: "weak",
+  [READINESS_E2E_SNAPSHOT_IDS.strong]: "strong",
+  [READINESS_E2E_SNAPSHOT_IDS.mixed]: "mixed",
+};
+
+/** Self-flagging emails allowed for readiness E2E Turnstile bypass only. */
+const READINESS_E2E_EMAIL_RE = /^e2e-test\+[a-z0-9._+-]+@vygo\.ai$/i;
+
+/**
+ * TEST-ONLY Turnstile bypass for automated readiness scoring.
+ * Requires ALL of: readinessE2E body/header flag, Cloudflare always-pass dummy
+ * token, and e2e-test+*@vygo.ai email. Does not apply to waitlist/apply.
+ * Real users (normal emails / real tokens) still hit full Turnstile verification.
+ */
+function isReadinessE2ETurnstileBypass(
+  request: FastifyRequest,
+  body: Record<string, unknown>,
+  email: string,
+  turnstileToken: string | undefined,
+): boolean {
+  const headerRaw = request.headers["x-vygo-readiness-e2e"];
+  const headerVal = Array.isArray(headerRaw) ? headerRaw[0] : headerRaw;
+  const headerOn =
+    typeof headerVal === "string" &&
+    (headerVal.trim() === "1" || headerVal.trim().toLowerCase() === "true");
+  const bodyOn = body.readinessE2E === true || body.e2eMode === true;
+  if (!headerOn && !bodyOn) return false;
+  if (turnstileToken !== CLOUDFLARE_TURNSTILE_TEST_TOKENS.alwaysPasses) return false;
+  if (!READINESS_E2E_EMAIL_RE.test(email)) return false;
+  return true;
+}
+
+function buildE2EFixtureSnapshot(
+  profileKey: keyof typeof READINESS_E2E_SNAPSHOT_IDS,
+  id: string,
+  scoringConfig: ReturnType<typeof scoringConfigFromDbRow> | null,
+): Record<string, unknown> {
+  const report = { ...SCORE_PREVIEW_PROFILES[profileKey] };
+  const payload = computeReadinessScore({
+    report,
+    source: "paste",
+    stage1: null,
+    followups: null,
+    config: scoringConfig,
+  });
+  const createdAt = "2026-01-01T00:00:00.000Z";
+  const body = publicSnapshotBody({
+    id,
+    scores: {
+      ...payload,
+      dimensions: payload.dimensions,
+      reasoning: payload.reasoning,
+      findings: payload.findings,
+      bucket: payload.bucket,
+      dimensionResults: payload.dimensionResults,
+      dimensionDetails: payload.dimensionDetails,
+      dimensionAnalyses: payload.dimensionAnalyses,
+      insights: payload.insights,
+      recommendation: payload.recommendation,
+      ranges: payload.ranges,
+      displayMode: payload.displayMode,
+      overall: payload.overall,
+      recommendedEngagement: payload.recommendedEngagement,
+      offerKey: payload.offerKey,
+      ctaLabel: payload.ctaLabel,
+      pricing: payload.pricing,
+      source: payload.source,
+      caveat: payload.caveat,
+    },
+    bucket: payload.bucket,
+    contact: {
+      source: "readiness_e2e_fixture",
+      name: "Ratchet E2E Test",
+      fullName: "Ratchet E2E Test",
+      email: `e2e-test+${profileKey}@vygo.ai`,
+      privacyAccepted: true,
+    },
+    parsedReport: report,
+    createdAt,
+  });
+  return {
+    ...body,
+    e2eFixture: true,
+    e2eProfile: profileKey,
+    persisted: false,
+    turnstileRequired: false,
+  };
+}
 
 function stripPreviewContactKeys(report: Record<string, unknown>): Record<string, unknown> {
   const blocked = new Set([
@@ -1647,7 +1777,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       return reply.status(400).send(
         safeError(
           "VALIDATION_ERROR",
-          'Provide assessment answers as `report` or `answers`, or a built-in `profile` of "weak" or "strong".',
+          'Provide assessment answers as `report` or `answers`, or a built-in `profile` of "weak", "strong", or "mixed".',
         ),
       );
     }
@@ -1777,15 +1907,23 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
     }
 
     const rawIp = resolveClientIp(request);
-    const turnstileResult = await deps.turnstile.verify(turnstileToken, rawIp);
-    if (!turnstileResult.success) {
+    const e2eBypass = isReadinessE2ETurnstileBypass(request, body, email, turnstileToken);
+    if (!e2eBypass) {
+      const turnstileResult = await deps.turnstile.verify(turnstileToken, rawIp);
+      if (!turnstileResult.success) {
+        request.log.info(
+          { event: "readiness_score_turnstile_failed", reason: turnstileResult.reason },
+          "turnstile failed",
+        );
+        return reply
+          .status(400)
+          .send(safeError("TURNSTILE_FAILED", "Verification failed. Please try again."));
+      }
+    } else {
       request.log.info(
-        { event: "readiness_score_turnstile_failed", reason: turnstileResult.reason },
-        "turnstile failed",
+        { event: "readiness_score_e2e_turnstile_bypassed" },
+        "readiness e2e turnstile bypass",
       );
-      return reply
-        .status(400)
-        .send(safeError("TURNSTILE_FAILED", "Verification failed. Please try again."));
     }
 
     const dbHandle = deps.getDb();
@@ -1878,12 +2016,13 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       };
 
       const contact: Record<string, unknown> = {
-        source: "readiness_score_gate",
+        source: e2eBypass ? "readiness_score_gate_e2e" : "readiness_score_gate",
         name,
         fullName: name,
         email,
         privacyAccepted: true,
         gatedAt: new Date().toISOString(),
+        ...(e2eBypass ? { e2e: true } : {}),
       };
       if (company) {
         contact.company = company;
@@ -1902,41 +2041,45 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
 
       // Template brief + dual email enqueue (applicant snapshot + ops brief).
       // Fail closed on missing LLM; never block the scored response.
+      // E2E path skips email side-effects so automation does not spam Resend.
       const origin =
         (deps.env as { PUBLIC_WEB_ORIGIN?: string }).PUBLIC_WEB_ORIGIN?.trim() ||
         "https://www.vygo.ai";
-      const side = await finalizeSubmissionSideEffects(dbHandle.db, {
-        submissionId: saved.id,
-        token,
-        email,
-        name,
-        company,
-        bucket: payload.bucket,
-        scores: scoresJson,
-        contact,
-        report,
-        draft,
-        discrepancyFlags: Array.isArray(saved.discrepancyFlags)
-          ? saved.discrepancyFlags
-          : Array.isArray(draft.discrepancyFlags)
-            ? draft.discrepancyFlags
-            : [],
-        leadNotificationEmail: deps.env.LEAD_NOTIFICATION_EMAIL || "hello@vygo.ai",
-        publicOrigin: origin,
-        log: request.log,
-      });
+      const side = e2eBypass
+        ? { briefId: null as string | null, snapshotQueued: false, opsBriefQueued: false }
+        : await finalizeSubmissionSideEffects(dbHandle.db, {
+            submissionId: saved.id,
+            token,
+            email,
+            name,
+            company,
+            bucket: payload.bucket,
+            scores: scoresJson,
+            contact,
+            report,
+            draft,
+            discrepancyFlags: Array.isArray(saved.discrepancyFlags)
+              ? saved.discrepancyFlags
+              : Array.isArray(draft.discrepancyFlags)
+                ? draft.discrepancyFlags
+                : [],
+            leadNotificationEmail: deps.env.LEAD_NOTIFICATION_EMAIL || "hello@vygo.ai",
+            publicOrigin: origin,
+            log: request.log,
+          });
 
       request.log.info(
         {
-          event: "readiness_scored",
+          event: e2eBypass ? "readiness_scored_e2e" : "readiness_scored",
           bucket: payload.bucket,
           source,
           snapshotId: saved.id,
           briefId: side.briefId,
           snapshotQueued: side.snapshotQueued,
           opsBriefQueued: side.opsBriefQueued,
+          e2e: e2eBypass,
         },
-        "readiness scored",
+        e2eBypass ? "readiness scored (e2e)" : "readiness scored",
       );
 
       return reply.status(200).send({
@@ -1967,6 +2110,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           snapshotQueued: side.snapshotQueued,
           opsBriefQueued: side.opsBriefQueued,
         },
+        ...(e2eBypass ? { e2e: true, turnstileBypassed: true } : {}),
       });
     } catch (error) {
       request.log.error(
@@ -1979,6 +2123,299 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
     }
   });
 
+  /**
+   * TEST-ONLY: score a built-in profile or arbitrary report without Turnstile
+   * and return a real evidence-bearing snapshot payload. Does not create a lead
+   * or send email. Prefer known fixture ids for zero-DB reads; optional
+   * session-token path persists when DB is available (for fresh snapshot ids).
+   */
+  app.post("/v1/readiness/score-e2e", async (request, reply) => {
+    if (!(await enforceScorePreviewRateLimit(request, reply, deps))) return;
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    if (!isJsonContentType(request.headers["content-type"])) {
+      return reply
+        .status(415)
+        .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const profileRaw =
+      typeof body.profile === "string" ? body.profile.trim().toLowerCase() : "";
+    const profileKey =
+      profileRaw === "low"
+        ? "weak"
+        : profileRaw === "high"
+          ? "strong"
+          : profileRaw === "weak" || profileRaw === "strong" || profileRaw === "mixed"
+            ? profileRaw
+            : "";
+
+    let scoringConfig = null as ReturnType<typeof scoringConfigFromDbRow> | null;
+    const dbHandle = deps.getDb();
+    if (dbHandle) {
+      try {
+        await ensureReadinessTables(dbHandle);
+        const configRow = await getActiveReadinessScoringConfig(dbHandle.db, "default");
+        scoringConfig = scoringConfigFromDbRow(configRow);
+      } catch {
+        scoringConfig = null;
+      }
+    }
+
+    // Built-in fixture path — deterministic id, no DB write.
+    if (profileKey && SCORE_PREVIEW_PROFILES[profileKey]) {
+      const id = READINESS_E2E_SNAPSHOT_IDS[profileKey as keyof typeof READINESS_E2E_SNAPSHOT_IDS];
+      try {
+        const fixture = buildE2EFixtureSnapshot(
+          profileKey as keyof typeof READINESS_E2E_SNAPSHOT_IDS,
+          id,
+          scoringConfig,
+        );
+        request.log.info(
+          { event: "readiness_score_e2e_fixture", profile: profileKey, snapshotId: id },
+          "readiness e2e fixture scored",
+        );
+        return reply.status(200).send({
+          ...fixture,
+          scores: fixture.dimensions ?? fixture.scores,
+          snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(id)}`,
+          email: { snapshotQueued: false, opsBriefQueued: false },
+        });
+      } catch (error) {
+        request.log.error(
+          { event: "readiness_score_e2e_failed" },
+          error instanceof Error ? error.message : "score-e2e failed",
+        );
+        return reply
+          .status(500)
+          .send(
+            safeError(
+              "SCORING_UNAVAILABLE",
+              "Scoring engine failed closed. Please try again later.",
+            ),
+          );
+      }
+    }
+
+    // Session-token path: full pipeline without Turnstile, self-flagging contact.
+    const token = typeof body.token === "string" ? body.token.trim().slice(0, 128) : "";
+    if (token && TOKEN_RE.test(token)) {
+      const name =
+        typeof body.name === "string" && body.name.trim()
+          ? body.name.trim().slice(0, 120)
+          : "Ratchet E2E Test";
+      const emailRaw =
+        typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 254) : "";
+      const email = READINESS_E2E_EMAIL_RE.test(emailRaw)
+        ? emailRaw
+        : `e2e-test+score-${Date.now().toString(36)}@vygo.ai`;
+
+      if (!dbHandle) {
+        return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+      }
+
+      try {
+        const session = await findReadinessSessionByToken(dbHandle.db, token);
+        if (!session) {
+          return reply.status(404).send(safeError("NOT_FOUND", "Session not found."));
+        }
+        const draft = session.draft;
+        const sourceRaw =
+          typeof draft.source === "string"
+            ? draft.source
+            : typeof body.source === "string"
+              ? body.source
+              : "paste";
+        const source = sourceRaw === "manual" ? "manual" : "paste";
+
+        let report: Record<string, unknown> = {};
+        if (draft.report && typeof draft.report === "object" && !Array.isArray(draft.report)) {
+          report = { ...(draft.report as Record<string, unknown>) };
+        } else if (
+          draft.manualAnswers &&
+          typeof draft.manualAnswers === "object" &&
+          !Array.isArray(draft.manualAnswers)
+        ) {
+          report = manualAnswersToReport(draft.manualAnswers as never) as Record<string, unknown>;
+        } else if (body.report && typeof body.report === "object" && !Array.isArray(body.report)) {
+          report = { ...(body.report as Record<string, unknown>) };
+        }
+        report = redactReportDeep(report);
+
+        const stage1 =
+          draft.stage1 && typeof draft.stage1 === "object" && !Array.isArray(draft.stage1)
+            ? (draft.stage1 as Partial<ReadinessStage1Answers>)
+            : null;
+        const followups =
+          draft.followupAnswers &&
+          typeof draft.followupAnswers === "object" &&
+          !Array.isArray(draft.followupAnswers)
+            ? (draft.followupAnswers as Record<string, unknown>)
+            : null;
+
+        const payload = computeReadinessScore({
+          report,
+          source,
+          stage1,
+          followups,
+          config: scoringConfig,
+        });
+        const scoresJson: Record<string, unknown> = {
+          ...payload,
+          dimensions: payload.dimensions,
+          reasoning: payload.reasoning,
+          findings: payload.findings,
+          bucket: payload.bucket,
+        };
+        const contact: Record<string, unknown> = {
+          source: "readiness_score_e2e",
+          name,
+          fullName: name,
+          email,
+          privacyAccepted: true,
+          e2e: true,
+          gatedAt: new Date().toISOString(),
+        };
+        const saved = await persistReadinessScore(dbHandle.db, {
+          token,
+          scores: scoresJson,
+          bucket: payload.bucket,
+          contact,
+          parsedReport: report,
+          rawPasteRedacted: null,
+          discrepancyFlags: Array.isArray(draft.discrepancyFlags) ? draft.discrepancyFlags : [],
+        });
+
+        request.log.info(
+          {
+            event: "readiness_score_e2e_persisted",
+            snapshotId: saved.id,
+            bucket: payload.bucket,
+          },
+          "readiness e2e scored and persisted",
+        );
+
+        return reply.status(200).send({
+          snapshotId: saved.id,
+          id: saved.id,
+          scores: payload.dimensions,
+          dimensions: payload.dimensions,
+          dimensionDetails: payload.dimensionDetails,
+          dimensionResults: payload.dimensionResults,
+          insights: payload.insights,
+          dimensionAnalyses: payload.dimensionAnalyses,
+          recommendation: payload.recommendation,
+          ranges: payload.ranges ?? null,
+          displayMode: payload.displayMode,
+          overall: payload.overall,
+          bucket: payload.bucket,
+          reasoning: payload.reasoning,
+          caveat: payload.caveat ?? null,
+          findings: payload.findings,
+          recommendedEngagement: payload.recommendedEngagement,
+          offerKey: payload.offerKey,
+          ctaLabel: payload.ctaLabel,
+          pricing: payload.pricing,
+          source: payload.source,
+          snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(saved.id)}`,
+          e2e: true,
+          turnstileRequired: false,
+          persisted: true,
+          email: { snapshotQueued: false, opsBriefQueued: false },
+        });
+      } catch (error) {
+        request.log.error(
+          { event: "readiness_score_e2e_failed" },
+          error instanceof Error ? error.message : "score-e2e failed",
+        );
+        return reply
+          .status(500)
+          .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+      }
+    }
+
+    // Arbitrary report (no session): pure compute shaped as a snapshot, no DB.
+    const resolved = resolveScorePreviewReport(body);
+    if (!resolved) {
+      return reply.status(400).send(
+        safeError(
+          "VALIDATION_ERROR",
+          'Provide `profile` ("weak"|"strong"|"mixed"), a session `token`, or assessment `report`/`answers`.',
+        ),
+      );
+    }
+    try {
+      const report = stripPreviewContactKeys(resolved.report);
+      const payload = computeReadinessScore({
+        report,
+        source: resolved.source,
+        stage1: null,
+        followups: null,
+        config: scoringConfig,
+      });
+      // Ephemeral pseudo-id: always the mixed fixture id when custom (clients
+      // should prefer profile=mixed / known ids for stable links).
+      const id = READINESS_E2E_SNAPSHOT_IDS.mixed;
+      const snap = publicSnapshotBody({
+        id,
+        scores: {
+          ...payload,
+          dimensions: payload.dimensions,
+          reasoning: payload.reasoning,
+          findings: payload.findings,
+          bucket: payload.bucket,
+          dimensionResults: payload.dimensionResults,
+          dimensionDetails: payload.dimensionDetails,
+          dimensionAnalyses: payload.dimensionAnalyses,
+          insights: payload.insights,
+          recommendation: payload.recommendation,
+          ranges: payload.ranges,
+          displayMode: payload.displayMode,
+          overall: payload.overall,
+          recommendedEngagement: payload.recommendedEngagement,
+          offerKey: payload.offerKey,
+          ctaLabel: payload.ctaLabel,
+          pricing: payload.pricing,
+          source: payload.source,
+          caveat: payload.caveat,
+        },
+        bucket: payload.bucket,
+        contact: {
+          source: "readiness_score_e2e",
+          name: "Ratchet E2E Test",
+          email: "e2e-test+custom@vygo.ai",
+          privacyAccepted: true,
+          e2e: true,
+        },
+        parsedReport: report,
+        createdAt: new Date().toISOString(),
+      });
+      return reply.status(200).send({
+        ...snap,
+        e2e: true,
+        e2eFixture: false,
+        persisted: false,
+        turnstileRequired: false,
+        snapshotPath: `/readiness/snapshot?id=${encodeURIComponent(id)}`,
+        email: { snapshotQueued: false, opsBriefQueued: false },
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_score_e2e_failed" },
+        error instanceof Error ? error.message : "score-e2e failed",
+      );
+      return reply
+        .status(500)
+        .send(
+          safeError(
+            "SCORING_UNAVAILABLE",
+            "Scoring engine failed closed. Please try again later.",
+          ),
+        );
+    }
+  });
+
   /** Public snapshot read-back by id — score, bucket, reasoning only (no secrets). */
   app.get("/v1/readiness/snapshot/:id", async (request, reply) => {
     if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
@@ -1987,6 +2424,34 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
     const id = typeof params.id === "string" ? params.id.trim() : "";
     if (!id || !UUID_RE.test(id)) {
       return reply.status(400).send(safeError("BAD_REQUEST", "Invalid snapshot id."));
+    }
+
+    // Seeded E2E fixtures: real scoring evidence without requiring a prior submission.
+    const fixtureProfile = READINESS_E2E_SNAPSHOT_BY_ID[id];
+    if (fixtureProfile) {
+      try {
+        let scoringConfig = null as ReturnType<typeof scoringConfigFromDbRow> | null;
+        const dbHandle = deps.getDb();
+        if (dbHandle) {
+          try {
+            await ensureReadinessTables(dbHandle);
+            const configRow = await getActiveReadinessScoringConfig(dbHandle.db, "default");
+            scoringConfig = scoringConfigFromDbRow(configRow);
+          } catch {
+            scoringConfig = null;
+          }
+        }
+        const fixture = buildE2EFixtureSnapshot(fixtureProfile, id, scoringConfig);
+        return reply.status(200).send(fixture);
+      } catch (error) {
+        request.log.error(
+          { event: "readiness_e2e_fixture_failed" },
+          error instanceof Error ? error.message : "e2e fixture failed",
+        );
+        return reply
+          .status(500)
+          .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+      }
     }
 
     const dbHandle = deps.getDb();

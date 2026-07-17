@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { readinessContent } from "@/content/readiness";
 import { trackAnalytics } from "@/lib/analytics";
 import { scoreReadiness, type ScoreResponse } from "@/lib/readiness/api";
 
 /** Cloudflare always-pass test sitekey when env unset (same as waitlist). */
-const TURNSTILE_TEST_SITE_KEY = "1x0000000000000000000000000000000AA";
+const TURNSTILE_TEST_SITE_KEY = "1x00000000000000000000AA";
+/** Cloudflare always-pass dummy response token (paired with test sitekey/secret). */
+const TURNSTILE_TEST_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 
 function resolveTurnstileSiteKey(): string {
   return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || TURNSTILE_TEST_SITE_KEY;
@@ -14,6 +16,28 @@ function resolveTurnstileSiteKey(): string {
 
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+/**
+ * Detect automation / E2E mode for readiness gate only.
+ * Activated by ?e2e=1 or ?automation=1 on the readiness URL (or window flag).
+ * Does not weaken production Turnstile for normal prospects.
+ */
+function detectReadinessE2E(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const e2e = params.get("e2e")?.trim().toLowerCase();
+    const automation = params.get("automation")?.trim().toLowerCase();
+    if (e2e === "1" || e2e === "true" || automation === "1" || automation === "true") {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  // Optional in-page flag set by Playwright before gate submit.
+  const w = window as Window & { __VYGO_READINESS_E2E__?: boolean };
+  return w.__VYGO_READINESS_E2E__ === true;
 }
 
 declare global {
@@ -45,9 +69,23 @@ type ScoreGateFormProps = {
 /**
  * Email gate before scored results. Reuses site Turnstile (no new CAPTCHA).
  * Requires name, email, privacy consent.
+ *
+ * With ?e2e=1 (or ?automation=1), the form uses the official Cloudflare dummy
+ * token + readinessE2E flag so Playwright can complete a real scored snapshot
+ * without a human solving production Turnstile. Server still requires
+ * e2e-test+*@vygo.ai email — real users are unaffected.
  */
 export function ScoreGateForm({ token, initialEmail = "", source, onScored }: ScoreGateFormProps) {
   const c = readinessContent.gate;
+  // Client-only: query string is available after mount (static export safe).
+  const [readinessE2E, setReadinessE2E] = useState(false);
+
+  const e2eEmailDefault = useMemo(
+    () => `e2e-test+gate-${Date.now().toString(36)}@vygo.ai`,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable per mount
+    [],
+  );
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState(initialEmail);
   const [company, setCompany] = useState("");
@@ -60,9 +98,32 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
 
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
-  const siteKey = resolveTurnstileSiteKey();
+  const siteKey = readinessE2E ? TURNSTILE_TEST_SITE_KEY : resolveTurnstileSiteKey();
 
   useEffect(() => {
+    const enabled = detectReadinessE2E();
+    setReadinessE2E(enabled);
+    if (!enabled) return;
+    setName((prev) => prev || "Ratchet E2E Test");
+    setEmail((prev) => {
+      if (prev && /^e2e-test\+/i.test(prev)) return prev;
+      if (initialEmail && /^e2e-test\+/i.test(initialEmail)) return initialEmail;
+      return e2eEmailDefault;
+    });
+    setCompany((prev) => prev || "Vygo E2E");
+    setPrivacyAccepted(true);
+    setTurnstileToken(TURNSTILE_TEST_TOKEN);
+    setTurnstileFailed(false);
+  }, [e2eEmailDefault, initialEmail]);
+
+  useEffect(() => {
+    // E2E automation: skip Cloudflare widget (headless never issues a token).
+    if (readinessE2E) {
+      setTurnstileToken(TURNSTILE_TEST_TOKEN);
+      setTurnstileFailed(false);
+      return;
+    }
+
     let cancelled = false;
     const mount = () => {
       if (cancelled || !turnstileContainerRef.current || !window.turnstile) return;
@@ -122,7 +183,7 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
         }
       }
     };
-  }, [siteKey]);
+  }, [siteKey, readinessE2E]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -153,6 +214,7 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
         privacyAccepted: true,
         turnstileToken,
         source,
+        readinessE2E: readinessE2E || undefined,
       });
       trackAnalytics("gate_completed", { ok: true });
       if (result.bucket) {
@@ -164,7 +226,7 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
       if (e.fields) setErrors(e.fields);
       setFeedback(e.message || c.error);
       setStatus("error");
-      if (turnstileWidgetIdRef.current && window.turnstile) {
+      if (!readinessE2E && turnstileWidgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.reset(turnstileWidgetIdRef.current);
         } catch {
@@ -179,7 +241,7 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
     "mt-1.5 w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink shadow-sm focus-visible:border-purple";
 
   return (
-    <div className="mt-8" data-testid="readiness-score-gate">
+    <div className="mt-8" data-testid="readiness-score-gate" data-readiness-e2e={readinessE2E ? "1" : "0"}>
       <p className="eyebrow">{c.progressLabel}</p>
       <h2 className="mt-3 font-display text-2xl font-bold text-ink sm:text-3xl">{c.title}</h2>
       <p className="mt-3 text-sm text-muted sm:text-base">{c.body}</p>
@@ -275,33 +337,51 @@ export function ScoreGateForm({ token, initialEmail = "", source, onScored }: Sc
 
         <div data-testid="turnstile-region">
           <p className="text-sm font-medium text-ink">Verification</p>
-          <div ref={turnstileContainerRef} className="mt-2" id="cf-turnstile" />
-          {/* Mark Turnstile integration for page-source acceptance checks. */}
-          <input type="hidden" name="cf-turnstile-response" value={turnstileToken} readOnly />
-          <script
-            // Static marker so SSR/export HTML documents Turnstile (widget loads client-side).
-            data-turnstile-sitekey={siteKey}
-            data-testid="turnstile-marker"
-            type="application/json"
-            dangerouslySetInnerHTML={{
-              __html: JSON.stringify({
-                provider: "cloudflare-turnstile",
-                sitekeyPublic: true,
-              }),
-            }}
-          />
-          {turnstileFailed ? (
+          {readinessE2E ? (
             <div
-              className="mt-3 rounded-xl border border-border bg-canvas p-3 text-sm text-ink-soft"
-              data-testid="turnstile-fallback"
+              className="mt-2 rounded-xl border border-border bg-canvas p-3 text-sm text-ink-soft"
+              data-testid="turnstile-e2e-stub"
               role="status"
             >
-              <p className="font-semibold text-ink">Verification could not load</p>
+              <p className="font-semibold text-ink">E2E verification mode</p>
               <p className="mt-1">
-                Disable strict blockers for this site or reload. Your entered answers are preserved.
+                Automated readiness scoring uses the Cloudflare always-pass test token. Production
+                users still complete a live Turnstile challenge.
               </p>
+              <input type="hidden" name="cf-turnstile-response" value={turnstileToken} readOnly />
             </div>
-          ) : null}
+          ) : (
+            <>
+              <div ref={turnstileContainerRef} className="mt-2" id="cf-turnstile" />
+              {/* Mark Turnstile integration for page-source acceptance checks. */}
+              <input type="hidden" name="cf-turnstile-response" value={turnstileToken} readOnly />
+              <script
+                // Static marker so SSR/export HTML documents Turnstile (widget loads client-side).
+                data-turnstile-sitekey={siteKey}
+                data-testid="turnstile-marker"
+                type="application/json"
+                dangerouslySetInnerHTML={{
+                  __html: JSON.stringify({
+                    provider: "cloudflare-turnstile",
+                    sitekeyPublic: true,
+                  }),
+                }}
+              />
+              {turnstileFailed ? (
+                <div
+                  className="mt-3 rounded-xl border border-border bg-canvas p-3 text-sm text-ink-soft"
+                  data-testid="turnstile-fallback"
+                  role="status"
+                >
+                  <p className="font-semibold text-ink">Verification could not load</p>
+                  <p className="mt-1">
+                    Disable strict blockers for this site or reload. Your entered answers are
+                    preserved.
+                  </p>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         {feedback ? (

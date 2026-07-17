@@ -289,6 +289,14 @@ async function proxyJson(
       headers["x-forwarded-for"] = clientIp;
       headers["x-real-ip"] = clientIp;
     }
+    // Forward readiness E2E automation flag (test-only Turnstile path).
+    if (inboundHeaders) {
+      const e2eRaw = inboundHeaders["x-vygo-readiness-e2e"];
+      const e2eVal = Array.isArray(e2eRaw) ? e2eRaw[0] : e2eRaw;
+      if (typeof e2eVal === "string" && e2eVal.trim()) {
+        headers["x-vygo-readiness-e2e"] = e2eVal.trim();
+      }
+    }
 
     const upstream = await fetch(`${origin}${path}`, {
       method,
@@ -451,6 +459,14 @@ export async function proxyScorePreview(
   inboundHeaders?: Record<string, string | string[] | undefined>,
 ): Promise<ReadinessHandlerResult> {
   return proxyJson("POST", "/v1/readiness/score-preview", body ?? {}, env, inboundHeaders);
+}
+
+export async function proxyScoreE2E(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/score-e2e", body ?? {}, env, inboundHeaders);
 }
 
 export async function proxyGetSnapshot(

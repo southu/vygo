@@ -31,6 +31,7 @@ import {
   proxyPatchSession,
   proxyScore,
   proxyScorePreview,
+  proxyScoreE2E,
   proxySnapshotEmail,
   resolveDatabaseUrl,
   resolveEdgeClientIp,
@@ -63,6 +64,7 @@ const ALLOWED_OPS = new Set([
   "brief",
   "score",
   "score-preview",
+  "score-e2e",
   "snapshot",
   "snapshot-email",
 ]);
@@ -1138,6 +1140,32 @@ async function handleScore(req: EdgeRequest): Promise<ReadinessHandlerResult> {
  * bundlable in this Hobby function and would crash the whole [op] handler.
  * Built-in dual profiles also remain on GET /api/readiness sampleAssessments.
  */
+async function handleScoreE2E(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const contentType = contentTypeBase(req.headers);
+  if (contentType && contentType !== "application/json") {
+    return {
+      status: 415,
+      body: {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "Content-Type must be application/json.",
+        },
+      },
+    };
+  }
+  const parsedBody = readJsonBody(req);
+  if (!parsedBody.ok) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+    };
+  }
+  return proxyScoreE2E(parsedBody.value ?? {}, process.env, req.headers);
+}
+
 async function handleScorePreview(req: EdgeRequest): Promise<ReadinessHandlerResult> {
   const rl = checkEdgeRateLimit(req);
   if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
@@ -1315,6 +1343,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleScore(req);
     } else if (op === "score-preview") {
       result = await handleScorePreview(req);
+    } else if (op === "score-e2e") {
+      result = await handleScoreE2E(req);
     } else if (op === "snapshot") {
       result = await handleSnapshotGet(req);
     } else if (op === "snapshot-email") {

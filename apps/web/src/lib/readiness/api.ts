@@ -359,10 +359,23 @@ export async function scoreReadiness(input: {
   privacyAccepted: boolean;
   turnstileToken: string;
   source?: string;
+  /**
+   * TEST-ONLY: enable readiness E2E Turnstile bypass. Server still requires the
+   * Cloudflare always-pass dummy token and an e2e-test+*@vygo.ai email.
+   * Never used for real prospect submissions.
+   */
+  readinessE2E?: boolean;
 }): Promise<ScoreResponse> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    accept: "application/json",
+  };
+  if (input.readinessE2E) {
+    headers["x-vygo-readiness-e2e"] = "1";
+  }
   const res = await fetch(apiUrl("/v1/readiness/score"), {
     method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
+    headers,
     body: JSON.stringify({
       token: input.token,
       name: input.name,
@@ -372,6 +385,7 @@ export async function scoreReadiness(input: {
       privacyConsent: input.privacyAccepted,
       turnstileToken: input.turnstileToken,
       source: input.source,
+      ...(input.readinessE2E ? { readinessE2E: true, e2eMode: true } : {}),
     }),
     credentials: "same-origin",
     cache: "no-store",

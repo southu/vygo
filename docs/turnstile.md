@@ -22,6 +22,29 @@ Typed env: `@vygo/config` (`packages/config`).
 
 Never put the secret key in the web app, client bundles, or git.
 
+## Readiness automated E2E (production-safe)
+
+Playwright cannot complete production Turnstile widgets (no token is issued in
+headless/automation). For the **readiness score gate only**, a narrow bypass
+exists so automation can reach a real scored snapshot without weakening
+protection for real prospects:
+
+1. **Client:** open `/readiness?e2e=1` (or set `window.__VYGO_READINESS_E2E__ = true`).
+2. **Request:** `POST /v1/readiness/score` with:
+   - `readinessE2E: true` (or header `X-Vygo-Readiness-E2E: 1`)
+   - `turnstileToken: "XXXX.DUMMY.TOKEN.XXXX"` (Cloudflare always-pass dummy)
+   - `email` matching `e2e-test+…@vygo.ai`
+3. **Server:** skips Cloudflare `siteverify` only when all three conditions hold;
+   still runs the full scoring/evidence pipeline and persists a snapshot.
+   Email side-effects are skipped for this path.
+
+Alternatively, load a seeded fixture (no gate):
+
+- Mixed chart evidence: `/readiness/snapshot?id=00000000-0000-4000-a000-0000000000e3`
+- Or `POST /v1/readiness/score-e2e` with `{ "profile": "mixed" }`
+
+**Waitlist and apply forms do not implement this bypass.**
+
 ## Local development
 
 Use Cloudflare’s **official always-pass test keys** (safe for local/CI only):

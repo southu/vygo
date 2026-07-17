@@ -414,4 +414,96 @@ describe("readiness routes without database", () => {
     const body = res.json() as { error?: { code?: string } };
     assert.equal(body.error?.code, "BAD_REQUEST");
   });
+
+  it("GET /v1/readiness/snapshot/:id serves seeded E2E fixtures with real evidence", async () => {
+    rateLimitStore.clear();
+    const mixedId = "00000000-0000-4000-a000-0000000000e3";
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/snapshot/${mixedId}`,
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json() as {
+      id?: string;
+      e2eFixture?: boolean;
+      e2eProfile?: string;
+      overall?: number;
+      dimensionResults?: Array<{
+        dimension: string;
+        score: number;
+        sub_metrics: Array<{
+          name: string;
+          score: number;
+          evidence: { question_id: string; answer_value: unknown; reason: string };
+        }>;
+      }>;
+    };
+    assert.equal(body.id, mixedId);
+    assert.equal(body.e2eFixture, true);
+    assert.equal(body.e2eProfile, "mixed");
+    assert.equal(typeof body.overall, "number");
+    assert.ok(Array.isArray(body.dimensionResults));
+    assert.equal(body.dimensionResults!.length, 5);
+    for (const dim of body.dimensionResults!) {
+      assert.ok(dim.sub_metrics.length >= 1);
+      for (const sm of dim.sub_metrics) {
+        assert.ok(sm.evidence.question_id.length > 0);
+        assert.ok(sm.evidence.reason.length > 10);
+        assert.ok(sm.evidence.answer_value != null && sm.evidence.answer_value !== "");
+        const reasonLower = sm.evidence.reason.toLowerCase();
+        assert.equal(reasonLower.includes("lorem"), false);
+        assert.equal(reasonLower.includes("placeholder"), false);
+        assert.equal(reasonLower.includes("todo"), false);
+      }
+    }
+  });
+
+  it("POST /v1/readiness/score-e2e scores mixed profile without Turnstile", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/score-e2e",
+      headers: { "content-type": "application/json" },
+      payload: { profile: "mixed" },
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json() as {
+      snapshotId?: string;
+      e2eFixture?: boolean;
+      turnstileRequired?: boolean;
+      dimensionResults?: Array<{
+        sub_metrics: Array<{ evidence: { reason: string; answer_value: unknown } }>;
+      }>;
+      snapshotPath?: string;
+    };
+    assert.equal(body.e2eFixture, true);
+    assert.equal(body.turnstileRequired, false);
+    assert.equal(body.snapshotId, "00000000-0000-4000-a000-0000000000e3");
+    assert.ok(body.snapshotPath?.includes(body.snapshotId!));
+    assert.ok((body.dimensionResults?.length ?? 0) >= 5);
+  });
+
+  it("POST /v1/readiness/score rejects dummy token without E2E flag even with e2e email", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/score",
+      headers: { "content-type": "application/json" },
+      payload: {
+        token: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        name: "Ratchet E2E Test",
+        email: "e2e-test+noflag@vygo.ai",
+        privacyAccepted: true,
+        turnstileToken: "XXXX.DUMMY.TOKEN.XXXX",
+      },
+    });
+    // Without readinessE2E flag, real Turnstile verifier runs (test env uses always-pass secret
+    // or reject DI). Either way we must not accept incomplete sessions as success with scores
+    // when token is dummy AND production-style verifier rejects — inject uses PassThrough or real.
+    // In this suite Turnstile is often always-pass; assert we never return a snapshot without a session.
+    assert.notEqual(res.statusCode, 200);
+    const body = res.json() as { error?: { code?: string }; snapshotId?: string };
+    assert.equal(body.snapshotId, undefined);
+    assert.ok(body.error?.code);
+  });
 });

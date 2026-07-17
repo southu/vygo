@@ -374,6 +374,27 @@ Deterministic weights (never returned on public success responses):
 - Budget 75k+ +2
 - Security / security_compliance blocker +2
 
+### Readiness E2E / automation (Turnstile-safe)
+
+Production Turnstile remains required for real prospect scoring
+(`POST /v1/readiness/score` without the E2E flag). Automated Playwright (and
+similar) runs can use one of these **clearly scoped** paths — none of them
+accept arbitrary bot traffic as a normal user:
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET`  | `/v1/readiness/snapshot/00000000-0000-4000-a000-0000000000e1` | Seeded **weak** fixture (real score + evidence) |
+| `GET`  | `/v1/readiness/snapshot/00000000-0000-4000-a000-0000000000e2` | Seeded **strong** fixture |
+| `GET`  | `/v1/readiness/snapshot/00000000-0000-4000-a000-0000000000e3` | Seeded **mixed** fixture (chart tooltip E2E) |
+| `POST` | `/v1/readiness/score-e2e` | Score a `profile` / `report` / session `token` without Turnstile; returns real `dimensionResults` evidence |
+| `POST` | `/v1/readiness/score` + E2E flag | Full gate path: body `readinessE2E: true` (or header `X-Vygo-Readiness-E2E: 1`) **and** Cloudflare dummy token `XXXX.DUMMY.TOKEN.XXXX` **and** email matching `e2e-test+*@vygo.ai` |
+
+Web UI: open `/readiness?e2e=1` (or `?automation=1`) so the score gate pre-fills
+an E2E email, injects the dummy token, and sends the E2E flag. Real users who
+never set those query params still complete live Turnstile.
+
+Waitlist / apply intakes are **unchanged** — no request-level Turnstile bypass.
+
 ### Non-production test surface
 
 When `ENABLE_TEST_SURFACE=true`, non-production `NODE_ENV`, or Cloudflare test
