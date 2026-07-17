@@ -243,14 +243,18 @@ export function parseSizeMetrics(sizeText: string): SizeMetric[] {
   for (const segment of segments) {
     const seg = segment.trim();
     if (!seg) continue;
-    const m = seg.match(/(\d[\d,]*(?:\.\d+)?)\s*(k|m|thousand|million)?\+?\s*(.*)$/i);
+    // A compact scale suffix (k/m) must attach directly to the number (e.g.
+    // "40k", "2m"); the spelled-out forms may be spaced. This deliberately
+    // avoids eating the first letter of a unit word — "12 modules" must not be
+    // read as 12 million "odules".
+    const m = seg.match(/(\d[\d,]*(?:\.\d+)?)([km])?\+?\s*(thousand|million)?\s*(.*)$/i);
     if (!m) continue;
     let value = Number.parseFloat((m[1] ?? "").replace(/,/g, ""));
     if (!Number.isFinite(value)) continue;
-    const scale = (m[2] ?? "").toLowerCase();
+    const scale = `${m[2] ?? ""}${m[3] ?? ""}`.toLowerCase();
     if (scale === "k" || scale === "thousand") value *= 1000;
     if (scale === "m" || scale === "million") value *= 1_000_000;
-    let label = (m[3] ?? "").trim();
+    let label = (m[4] ?? "").trim();
     // Trim stray brackets/punctuation left by prose like "(~40k LOC)".
     label = label
       .replace(/^[^\w]+/, "")

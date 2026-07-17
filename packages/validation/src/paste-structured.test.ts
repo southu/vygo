@@ -205,6 +205,29 @@ describe("unit helpers", () => {
     assert.equal(loc?.value, 40000);
   });
 
+  it("parseSizeMetrics expands spelled-out million/thousand scales", () => {
+    const metrics = parseSizeMetrics("5 million rows; 12 thousand events");
+    const rows = metrics.find((m) => /rows/i.test(m.label));
+    const events = metrics.find((m) => /events/i.test(m.label));
+    assert.equal(rows?.value, 5_000_000);
+    assert.equal(events?.value, 12_000);
+  });
+
+  it("parseSizeMetrics does not read a unit's leading m/k as a scale suffix", () => {
+    // "12 modules" must be 12 modules, not 12 million "odules"; likewise "5 members".
+    const metrics = parseSizeMetrics("12 modules, 5 members, 3 kernels");
+    const byLabel = new Map(metrics.map((m) => [m.label, m]));
+    assert.equal(byLabel.get("modules")?.value, 12);
+    assert.equal(byLabel.get("modules")?.unit, "modules");
+    assert.equal(byLabel.get("members")?.value, 5);
+    assert.equal(byLabel.get("kernels")?.value, 3);
+  });
+
+  it("classifyReadinessSize stays correct when module counts sit next to a unit word", () => {
+    const metrics = parseSizeMetrics("2000 modules, 4 apps");
+    assert.equal(classifyReadinessSize("", metrics), "large");
+  });
+
   it("classifyReadinessSize prefers explicit keywords", () => {
     assert.equal(classifyReadinessSize("large enterprise monorepo", []), "large");
     assert.equal(classifyReadinessSize("small side project", []), "small");
