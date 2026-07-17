@@ -13,7 +13,7 @@ export const guideOffer = {
   heading: "Get the guide",
   title: "Ratchet system guide v1.2",
   intro:
-    "The complete Ratchet system guide, v1.2, as one free zip: overview, architecture, the loop contract, Composer, Vault, runtime services overview, and the phase A–E rebuild checklist.",
+    "The complete Ratchet system guide, v1.2, as one free zip: overview, architecture, the loop contract, Composer, Vault, design principles, and the phase A–E rebuild checklist.",
   assurances: [
     "The guide is free — the full v1.2 pack, no signup and no paywall.",
     "It contains no API keys, no vault passwords, and no host credentials.",

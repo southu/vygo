@@ -20,7 +20,7 @@ export const vibeCodingModules: VibeCodingModule[] = [
   {
     title: "Ratchet system guide",
     blurb:
-      "The full documentation pack: overview, architecture, the loop contract, Composer, Vault, operations, and the Mermaid diagram gallery.",
+      "The full documentation pack: overview, architecture, the loop contract, Composer, Vault, design principles, and the Mermaid diagram gallery.",
     route: "/vibe-coding/ratchet-guide",
     status: "available",
   },

@@ -27,7 +27,7 @@ export const vibeCodingModulePages: VibeCodingModulePage[] = [
     href: "/vibe-coding/ratchet-guide",
     status: "available",
     description:
-      "The complete Ratchet system documentation: overview, architecture, the loop contract, Composer, Vault, operations, principles, and the Mermaid diagram gallery, plus the phase A–E rebuild checklist for standing the system up from scratch. The pack ships as versioned markdown alongside this site; this page is the canonical module entry point that orients you before you dive into the files.",
+      "The complete Ratchet system documentation: overview, architecture, the loop contract, Composer, Vault, design principles, and the Mermaid diagram gallery, plus the phase A–E rebuild checklist for standing the system up from scratch. The pack ships as versioned markdown alongside this site; this page is the canonical module entry point that orients you before you dive into the files.",
   },
   {
     slug: "writing-missions",
