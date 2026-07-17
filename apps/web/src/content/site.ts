@@ -88,6 +88,7 @@ export function getFooterNav(): NavItem[] {
     { href: "/method", label: "Method" },
     { href: "/security", label: "Security" },
     { href: "/why-vygo", label: "Why vygo.ai" },
+    { href: "/vibe-coding", label: "Vibe coding" },
   ];
 
   if (commercialFlags.showPublicPricing) {
