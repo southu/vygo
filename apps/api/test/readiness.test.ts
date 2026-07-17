@@ -13,7 +13,8 @@ import {
   parseReadinessReportV1,
   type ReadinessReportV1,
 } from "@vygo/validation";
-import { redactSensitivePaste, generateReadinessSessionToken } from "@vygo/db";
+import { redactSensitivePaste, redactSessionDraft, generateReadinessSessionToken } from "@vygo/db";
+import { stripNullBytes, stripNullBytesDeep } from "@vygo/validation";
 import { buildApp, type AppContext, MemoryRateLimitStore } from "../src/app.js";
 
 describe("readiness report schema contract", () => {
@@ -107,6 +108,43 @@ describe("readiness redaction helpers", () => {
     assert.ok(a.length >= 16);
     assert.ok(b.length >= 16);
     assert.notEqual(a, b);
+  });
+
+  it("strips U+0000 from free-text so Postgres never 500s on draft ingest", () => {
+    assert.equal(stripNullBytes("Inventory\u0000SaaS for retail"), "InventorySaaS for retail");
+    assert.equal(stripNullBytes("clean"), "clean");
+
+    const nested = stripNullBytesDeep({
+      productDescription: "Inventory\u0000SaaS",
+      manualAnswers: {
+        summary: "A\u0000B",
+        concerns: "fragility\u0000here",
+      },
+      report: { summary: "report\u0000sum" },
+      // Non-NUL C0 must survive (BUG-5 isolation / prior green checks).
+      note: "keep\u0001\u0002\u0007bell",
+    });
+    assert.deepEqual(nested, {
+      productDescription: "InventorySaaS",
+      manualAnswers: {
+        summary: "AB",
+        concerns: "fragilityhere",
+      },
+      report: { summary: "reportsum" },
+      note: "keep\u0001\u0002\u0007bell",
+    });
+
+    const draft = redactSessionDraft({
+      productDescription: "Inventory\u0000SaaS for retail",
+      manualAnswers: { summary: "sum\u0000mary", concerns: "c\u0000oncerns" },
+      report: { summary: "r\u0000eport" },
+      stage: "confirm",
+    });
+    assert.equal(draft.productDescription, "InventorySaaS for retail");
+    assert.equal((draft.manualAnswers as Record<string, string>).summary, "summary");
+    assert.equal((draft.manualAnswers as Record<string, string>).concerns, "concerns");
+    assert.equal((draft.report as Record<string, string>).summary, "report");
+    assert.equal(JSON.stringify(draft).includes("\u0000"), false);
   });
 });
 

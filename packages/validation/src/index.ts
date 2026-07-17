@@ -346,6 +346,37 @@ export function hasDisallowedControlChars(
   return /[\u0000-\u001F\u007F-\u009F]/.test(value);
 }
 
+/**
+ * Strip U+0000 (NUL) from free-text. Postgres text/jsonb cannot store null
+ * bytes; other C0 controls are allowed so real-world pastes with bells/ANSI
+ * still work. Prefer stripping over 500 INTERNAL_ERROR on ingest.
+ */
+export function stripNullBytes(value: string): string {
+  if (!value.includes("\u0000")) return value;
+  return value.replace(/\u0000/g, "");
+}
+
+/**
+ * Deep-walk JSON-like values and strip U+0000 from every string leaf so
+ * readiness drafts, reports, and score payloads remain Postgres-safe.
+ */
+export function stripNullBytesDeep<T>(value: T): T {
+  if (typeof value === "string") {
+    return stripNullBytes(value) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => stripNullBytesDeep(item)) as T;
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = stripNullBytesDeep(child);
+    }
+    return out as T;
+  }
+  return value;
+}
+
 /** Trimmed free-text string with max length and control-character rejection. */
 const freeTextString = (max: number, options?: { allowMultilineWhitespace?: boolean }) =>
   z

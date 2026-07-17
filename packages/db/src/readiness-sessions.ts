@@ -6,7 +6,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
-import { redactPasteSecrets } from "@vygo/validation";
+import { redactPasteSecrets, stripNullBytes, stripNullBytesDeep } from "@vygo/validation";
 import type { Db } from "./client.js";
 import {
   OUTBOX_KINDS,
@@ -129,9 +129,13 @@ function normalizeDraft(value: Record<string, unknown> | undefined): Record<stri
 /**
  * Redact credential-shaped paste fields before any draft is persisted.
  * Defense in depth: client also blocks secrets before submit.
+ * Also strips U+0000 from all free-text leaves — Postgres text/jsonb rejects
+ * null bytes, which otherwise surfaces as HTTP 500 INTERNAL_ERROR on PATCH.
  */
 export function redactSessionDraft(draft: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...draft };
+  // Strip NULs first so nested free-text (summary, concerns, productDescription,
+  // report.*, manualAnswers.*, stage1.*) never reaches the driver.
+  const out = stripNullBytesDeep({ ...draft }) as Record<string, unknown>;
   for (const key of ["pasteText", "rawPasteRedacted"] as const) {
     const value = out[key];
     if (typeof value === "string" && value) {
@@ -650,18 +654,32 @@ export async function persistReadinessScore(
     throw new Error("readiness session not found");
   }
 
+  // Postgres-safe: strip U+0000 from free-text in scores/report/contact/draft.
+  const safeScores = stripNullBytesDeep(input.scores) as Record<string, unknown>;
+  const safeContact = stripNullBytesDeep(input.contact) as Record<string, unknown>;
+  const safeReport = input.parsedReport
+    ? (stripNullBytesDeep(input.parsedReport) as Record<string, unknown>)
+    : null;
+  const safePaste =
+    typeof input.rawPasteRedacted === "string"
+      ? stripNullBytes(input.rawPasteRedacted)
+      : input.rawPasteRedacted;
+
   const draft =
     session.draft && typeof session.draft === "object" && !Array.isArray(session.draft)
-      ? { ...(session.draft as Record<string, unknown>) }
+      ? (stripNullBytesDeep({ ...(session.draft as Record<string, unknown>) }) as Record<
+          string,
+          unknown
+        >)
       : {};
-  draft.scores = input.scores;
+  draft.scores = safeScores;
   draft.bucket = input.bucket;
-  draft.contact = input.contact;
+  draft.contact = safeContact;
   draft.scoredAt = new Date().toISOString();
-  if (input.parsedReport) draft.report = input.parsedReport;
-  if (input.rawPasteRedacted) {
-    draft.rawPasteRedacted = input.rawPasteRedacted;
-    draft.pasteText = input.rawPasteRedacted;
+  if (safeReport) draft.report = safeReport;
+  if (safePaste) {
+    draft.rawPasteRedacted = safePaste;
+    draft.pasteText = safePaste;
   }
 
   await db
@@ -674,11 +692,11 @@ export async function persistReadinessScore(
     await db
       .update(readinessSubmissions)
       .set({
-        scores: input.scores,
+        scores: safeScores,
         bucket: input.bucket,
-        contact: input.contact,
-        parsedReport: input.parsedReport ?? existing.parsedReport,
-        rawPasteRedacted: input.rawPasteRedacted ?? existing.rawPasteRedacted,
+        contact: safeContact,
+        parsedReport: safeReport ?? existing.parsedReport,
+        rawPasteRedacted: safePaste ?? existing.rawPasteRedacted,
         discrepancyFlags: input.discrepancyFlags ?? existing.discrepancyFlags,
       })
       .where(eq(readinessSubmissions.id, existing.id));
@@ -696,21 +714,21 @@ export async function persistReadinessScore(
   const inserted = await insertReadinessSubmission(db, {
     sessionId: session.id,
     parsedReport:
-      input.parsedReport ??
+      safeReport ??
       (draft.report && typeof draft.report === "object"
         ? (draft.report as Record<string, unknown>)
         : null),
     rawPasteRedacted:
-      input.rawPasteRedacted ??
+      safePaste ??
       (typeof draft.rawPasteRedacted === "string"
         ? draft.rawPasteRedacted
         : typeof draft.pasteText === "string"
           ? draft.pasteText
           : null),
-    scores: input.scores,
+    scores: safeScores,
     bucket: input.bucket,
     discrepancyFlags: input.discrepancyFlags ?? [],
-    contact: input.contact,
+    contact: safeContact,
   });
 
   draft.submissionId = inserted.id;

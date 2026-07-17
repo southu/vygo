@@ -80,11 +80,33 @@ function rowToPublic(row: {
 }
 
 /**
+ * Strip U+0000 from strings. Postgres text/jsonb rejects null bytes
+ * (HTTP 500 if left in free-text). Other C0 controls are left intact.
+ */
+function stripNullBytesDeep(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.includes("\u0000") ? value.replace(/\u0000/g, "") : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => stripNullBytesDeep(item));
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = stripNullBytesDeep(child);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
  * Edge-local draft redaction for paste fields (mirrors Railway/db path).
  * High-confidence credential shapes only; never store unredacted pasteText.
+ * Also strips U+0000 so free-text drafts never 500 on jsonb write.
  */
 export function redactEdgeDraft(draft: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...draft };
+  const out = stripNullBytesDeep({ ...draft }) as Record<string, unknown>;
   for (const key of ["pasteText", "rawPasteRedacted"] as const) {
     const value = out[key];
     if (typeof value !== "string" || !value) continue;

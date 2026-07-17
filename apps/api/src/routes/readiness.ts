@@ -58,6 +58,7 @@ import {
   runDeterministicParse,
   scoringConfigFromDbRow,
   selectFollowupQuestions,
+  stripNullBytesDeep,
   toDimensionResults,
   toPublicLeadBrief,
   tryLlmNormalizeReport,
@@ -439,8 +440,10 @@ function isEmailLike(value: string): boolean {
 }
 
 function redactReportDeep(report: Record<string, unknown>): Record<string, unknown> {
+  // Strip U+0000 before secret redaction so free-text never breaks Postgres jsonb.
+  const cleaned = stripNullBytesDeep(report) as Record<string, unknown>;
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(report)) {
+  for (const [k, v] of Object.entries(cleaned)) {
     if (typeof v === "string") {
       const r = redactPasteSecrets(v);
       out[k] = redactSensitivePaste(r.redacted);
