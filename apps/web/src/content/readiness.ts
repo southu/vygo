@@ -12,8 +12,7 @@ export const readinessContent = {
       productDescription: {
         id: "productDescription",
         label: "What does your product do?",
-        helper:
-          "One short sentence, or name the tools/platforms it relies on. Max 200 characters.",
+        helper: "One short sentence, or name the tools/platforms it relies on. Max 200 characters.",
         placeholder: "e.g. Scheduling for clinics — HubSpot, Salesforce, Slack",
       },
       whoUses: {
@@ -90,6 +89,7 @@ export const readinessContent = {
     findingsLabel: "Findings",
     looksRight: "Looks right → continue",
     somethingOff: "Something's off",
+    looksWrong: "Looks wrong? Re-paste results",
     repaste: "Re-paste report",
     editHint: "You can re-paste or tweak key fields below.",
   },

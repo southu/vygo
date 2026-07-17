@@ -202,7 +202,7 @@ export function ConfirmStackCard({
   const remainder = stackRemainder(stackText, entries);
   return (
     <div className="readiness-step-panel" data-testid="readiness-confirm-stack">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+      <p className="eyebrow">{label}</p>
       <div className="mt-3 space-y-3">
         {STACK_GROUPS.map((group) => {
           const items = entries.filter((e) => group.categories.includes(e.category));
@@ -255,7 +255,7 @@ export function ConfirmSizeCard({
   const tiles = metrics.slice(0, 5);
   return (
     <div className="readiness-step-panel" data-testid="readiness-confirm-size">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+      <p className="eyebrow">{label}</p>
       {tiles.length > 0 ? (
         <ul className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3" data-testid="size-stat-tiles">
           {tiles.map((metric) => (

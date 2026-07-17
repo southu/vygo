@@ -930,10 +930,10 @@ export function ReadinessFlow() {
 
         <AnswerCallout callout={confirmCallout} />
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-8 flex flex-col items-start gap-4">
           <button
             type="button"
-            className="btn-primary"
+            className="btn-primary w-full sm:w-auto"
             onClick={() => void onLooksRight()}
             data-testid="readiness-confirm-looks-right"
           >
@@ -941,14 +941,13 @@ export function ReadinessFlow() {
           </button>
           <button
             type="button"
-            className="btn-secondary"
+            className="text-sm font-semibold text-purple underline underline-offset-2 hover:text-purple-dark"
             onClick={onSomethingOff}
             data-testid="readiness-confirm-something-off"
           >
-            {c.confirm.somethingOff}
+            {c.confirm.looksWrong}
           </button>
         </div>
-        <p className="mt-3 text-xs text-muted">{c.confirm.editHint}</p>
       </div>
     );
   }

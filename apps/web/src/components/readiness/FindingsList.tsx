@@ -212,7 +212,7 @@ export function FindingsList({
   return (
     <div className="readiness-step-panel mt-4" data-testid="readiness-confirm-findings">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+        <p className="eyebrow">{label}</p>
         {parsed.length > 0 && countSummary ? (
           <p data-testid="findings-count-summary" className="text-xs font-medium text-muted">
             {countSummary}
