@@ -95,21 +95,25 @@ const ENTERPRISE_REPORT: ReadinessReportV1Partial = {
 };
 
 describe("readiness scoring", () => {
-  it("scores unknown fields near the configured risk percentile (~25), not midpoint", () => {
+  it("scores unknown fields near the configured risk percentile band, not midpoint", () => {
     const scores = scoreAllDimensions(UNKNOWN_REPORT, DEFAULT_SCORING_CONFIG);
     for (const [label, value] of Object.entries(scores)) {
       assert.ok(
         value >= 15 && value <= 35,
-        `${label} should be ~25th percentile risk, got ${value}`,
+        `${label} should be ~risk-quartile percentile, got ${value}`,
       );
       assert.ok(value < 45, `${label} must not be neutral/midpoint, got ${value}`);
+      assert.notEqual(value, 25, `${label} must not equal the old flat default of 25`);
     }
   });
 
-  it("uses config unknownPercentile for empty fields", () => {
+  it("uses config unknownPercentile for empty fields (never exactly 25)", () => {
     const rule = DEFAULT_SCORING_CONFIG.dimensions[0]!.fields[0]!;
     const s = scoreFieldValue("unknown", rule, 0.25);
-    assert.equal(s, 25);
+    // 0.25 * 100 would be 25; engine remaps the historical sentinel to 24.
+    assert.equal(s, 24);
+    const s24 = scoreFieldValue("unknown", rule, 0.24);
+    assert.equal(s24, 24);
   });
 
   it("buckets Harden for internal-only solid tool", () => {
@@ -360,7 +364,7 @@ describe("readiness scoring", () => {
       for (const check of details[label].checks) {
         assert.equal(check.answered, false, `${label}/${check.key} should be unanswered`);
         assert.equal(check.status, "unknown");
-        assert.equal(check.score, 25, "unknown checks score at the risk percentile");
+        assert.equal(check.score, 24, "unknown checks score at the risk percentile (not flat 25)");
         assert.equal(check.evidence.question_id, check.key);
         assert.ok(check.evidence.reason.length > 0);
         assert.match(check.evidence.reason, /did not answer/i);

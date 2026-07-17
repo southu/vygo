@@ -802,7 +802,20 @@ export async function ensureReadinessTables(dbHandle: DatabaseHandle): Promise<v
     // seed races are non-fatal
   }
 
-  // Seed Stage 5 scoring config v2 (dimension weights as data).
+  // Seed Stage 5 scoring config (dimension weights as data).
+  // Version tracks DEFAULT_SCORING_CONFIG.version so percentile / rule updates
+  // activate on deploy (highest active version wins).
+  try {
+    await seedReadinessScoringConfig(dbHandle.db, {
+      configKey: "default",
+      version: 3,
+      rules: defaultScoringRulesJson(),
+      weights: defaultScoringWeightsJson(),
+    });
+  } catch {
+    // seed races are non-fatal
+  }
+  // Keep v2 row updated as well for older deploy paths that only seed v2.
   try {
     await seedReadinessScoringConfig(dbHandle.db, {
       configKey: "default",

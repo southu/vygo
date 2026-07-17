@@ -150,6 +150,7 @@ export {
   scoreAllDimensions,
   scoreAllDimensionDetails,
   scoreFieldValue,
+  unknownRiskScore,
   scoreDimension,
   scoreDimensionDetail,
   overallFromDimensions,

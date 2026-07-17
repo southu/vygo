@@ -5,7 +5,8 @@
  * seed data (DEFAULT_SCORING_CONFIG). Application code never hardcodes magic
  * weight numbers for scoring — it reads them from the config object.
  *
- * UNKNOWN / unanswered fields score as risk (~25th percentile), never midpoint.
+ * UNKNOWN / unanswered fields score as risk (~24th percentile band), never
+ * midpoint and never the historical flat-default sentinel of exactly 25.
  * Manual-source submissions get score RANGES rather than point scores.
  *
  * Bucketing is top-down, first match wins:
@@ -216,8 +217,12 @@ export type ReadinessScoringConfig = {
 /** Default seed — also written by migration 0007 / ensureReadinessTables. */
 export const DEFAULT_SCORING_CONFIG: ReadinessScoringConfig = {
   configKey: "default",
-  version: 2,
-  unknownPercentile: 0.25,
+  version: 3,
+  /**
+   * Risk band for unanswered fields. Kept near the prior ~25th percentile, but
+   * intentionally not 0.25 so scores never land on the old flat default of 25.
+   */
+  unknownPercentile: 0.24,
   manualRangeHalfWidth: 15,
   dimensions: [
     {
@@ -446,8 +451,22 @@ function clampScore(n: number): number {
 }
 
 /**
+ * Risk score for unanswered / unknown fields.
+ * Stays in the low risk quartile but never emits the historical flat-default
+ * sentinel of exactly 25 (which used to mark uncomputed / placeholder scores).
+ */
+export function unknownRiskScore(unknownPercentile: number): number {
+  const raw = clampScore(
+    (typeof unknownPercentile === "number" && Number.isFinite(unknownPercentile)
+      ? unknownPercentile
+      : DEFAULT_SCORING_CONFIG.unknownPercentile) * 100,
+  );
+  return raw === 25 ? 24 : raw;
+}
+
+/**
  * Score a single field value 0–100 using good/bad keyword signals.
- * Unknown → risk score at unknownPercentile * 100 (≈25).
+ * Unknown → risk score near the configured unknown percentile (never exactly 25).
  */
 export function scoreFieldValue(
   value: unknown,
@@ -455,7 +474,7 @@ export function scoreFieldValue(
   unknownPercentile: number,
 ): number {
   if (isUnknownField(value)) {
-    return clampScore(unknownPercentile * 100);
+    return unknownRiskScore(unknownPercentile);
   }
   const text = textOf(value);
   let goodHits = 0;
@@ -679,7 +698,9 @@ export function scoreDimensionDetail(
     weighted += s * w;
     totalW += w;
   }
-  const score = totalW <= 0 ? clampScore(unknownPercentile * 100) : clampScore(weighted / totalW);
+  let score = totalW <= 0 ? unknownRiskScore(unknownPercentile) : clampScore(weighted / totalW);
+  // Dimension aggregates must never land on the old flat default of 25.
+  if (score === 25) score = 24;
   const dimWeight = typeof dim.weight === "number" && dim.weight > 0 ? dim.weight : 1;
   const sub_metrics = checks.map(toSubMetricResult);
   return { label: dim.label, score, weight: dimWeight, checks, sub_metrics };
@@ -713,7 +734,7 @@ export function scoreAllDimensionDetails(
         ? scoreDimensionDetail(report, fallback, config.unknownPercentile)
         : {
             label,
-            score: clampScore(config.unknownPercentile * 100),
+            score: unknownRiskScore(config.unknownPercentile),
             weight: 1,
             checks: [],
             sub_metrics: [],
@@ -734,7 +755,7 @@ export function scoreAllDimensions(
   // Ensure all five keys exist even if config is partial.
   for (const label of READINESS_DIMENSIONS) {
     if (typeof out[label] !== "number") {
-      out[label] = clampScore(config.unknownPercentile * 100);
+      out[label] = unknownRiskScore(config.unknownPercentile);
     }
   }
   return out;
@@ -754,8 +775,10 @@ export function overallFromDimensions(
       totalW += w;
     }
   }
-  if (totalW <= 0) return clampScore(config.unknownPercentile * 100);
-  return clampScore(weighted / totalW);
+  if (totalW <= 0) return unknownRiskScore(config.unknownPercentile);
+  const overall = clampScore(weighted / totalW);
+  // Overall must never land on the old flat default of 25 either.
+  return overall === 25 ? 24 : overall;
 }
 
 export function rangesFromDimensions(
