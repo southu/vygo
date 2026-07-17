@@ -28,8 +28,8 @@ export const vibeCodingModules: VibeCodingModule[] = [
     title: "Rebuild checklist",
     blurb:
       "Greenfield rebuild in phases A–E: host setup, control plane, deploy gate, first real mission, then hardening.",
-    route: "/content/vibe-coding/ratchet-guide/rebuild.md",
-    status: "available",
+    route: null,
+    status: "coming-soon",
   },
   {
     title: "Writing missions",
@@ -150,7 +150,7 @@ export const vibeCodingContent = {
   topics: {
     heading: "Topics",
     intro:
-      "Every card below renders from a single module list — adding a topic means appending one entry. Start with the guide, then the rebuild checklist.",
+      "Every card below renders from a single module list — adding a topic means appending one entry. Start with the guide; the remaining topics publish here as they ship.",
   },
   finalCta: {
     heading: "Build with a ratchet, not a leap of faith",
