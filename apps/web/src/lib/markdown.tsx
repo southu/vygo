@@ -341,6 +341,9 @@ function parseBlocks(lines: string[], ctx: Ctx, keyPrefix: string): ReactNode[] 
         <pre
           key={key()}
           data-language={lang || undefined}
+          tabIndex={0}
+          role="region"
+          aria-label={lang ? `${lang} code` : "code"}
           className="mt-4 overflow-x-auto rounded-card border border-border bg-surface p-4 text-sm leading-relaxed"
         >
           <code className="font-mono text-ink-soft">{buf.join("\n")}</code>
