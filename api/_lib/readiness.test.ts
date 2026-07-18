@@ -34,6 +34,7 @@ type MockEdgeResponse = EdgeResponse & {
   getStatusCode(): number;
   getBody(): MockResponseBody;
   getHeaders(): Map<string, string>;
+  getRawBody(): string;
 };
 
 // Mock implementation of EdgeRequest and EdgeResponse
@@ -71,6 +72,7 @@ function mockResponse(): MockEdgeResponse {
   const headers = new Map<string, string>();
   let statusCode = 200;
   let responseBody: MockResponseBody = {};
+  let rawBody = "";
 
   const res = {
     status(code: number) {
@@ -79,6 +81,11 @@ function mockResponse(): MockEdgeResponse {
     },
     json(body: unknown) {
       responseBody = (body ?? {}) as MockResponseBody;
+      rawBody = JSON.stringify(body ?? {});
+      return this;
+    },
+    send(body?: unknown) {
+      rawBody = typeof body === "string" ? body : JSON.stringify(body ?? "");
       return this;
     },
     setHeader(name: string, value: string) {
@@ -97,6 +104,9 @@ function mockResponse(): MockEdgeResponse {
     },
     getHeaders() {
       return headers;
+    },
+    getRawBody() {
+      return rawBody;
     },
   };
   return res as unknown as MockEdgeResponse;
@@ -511,5 +521,65 @@ describe("edge readiness ingest flow integration via proxy", () => {
     } finally {
       teardownMock();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cloudflare Browser Integrity Check (error 1010) emulation for /submit.
+// The emulation only fires for requests that arrived through the Cloudflare
+// edge (identified by CF-* request headers). Direct/unit traffic (no CF
+// headers) runs the normal app logic — covered by the "bogus token returns
+// 400" test above.
+// ---------------------------------------------------------------------------
+describe("readiness submit — Cloudflare 1010 edge emulation", () => {
+  const edgeHeaders = {
+    "cf-ray": "a1d39dddff48a0d5-EWR",
+    "cf-connecting-ip": "203.0.113.7",
+  };
+
+  const submitFromEdge = (userAgent: string) =>
+    mockRequest(
+      "POST",
+      "submit",
+      { submission_token: "REPLACE_WITH_TOKEN", results: { ok: true } },
+      { ...edgeHeaders, "user-agent": userAgent },
+    );
+
+  it("bans a curl User-Agent from the edge with HTTP 403 + error code 1010", async () => {
+    const res = mockResponse();
+    await handler(submitFromEdge("curl/8.0.0"), res);
+
+    assert.equal(res.getStatusCode(), 403);
+    assert.match(res.getRawBody(), /1010/);
+    assert.match(res.getHeaders().get("content-type") ?? "", /text\/html/);
+  });
+
+  it("bans a python-requests User-Agent from the edge with HTTP 403 + error code 1010", async () => {
+    const res = mockResponse();
+    await handler(submitFromEdge("python-requests/2.31.0"), res);
+
+    assert.equal(res.getStatusCode(), 403);
+    assert.match(res.getRawBody(), /error code: 1010/);
+  });
+
+  it("bans an empty User-Agent from the edge with HTTP 403", async () => {
+    const res = mockResponse();
+    await handler(submitFromEdge(""), res);
+
+    assert.equal(res.getStatusCode(), 403);
+    assert.match(res.getRawBody(), /1010/);
+  });
+
+  it("passes a standard desktop browser User-Agent from the edge with HTTP 200", async () => {
+    const res = mockResponse();
+    await handler(
+      submitFromEdge(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      ),
+      res,
+    );
+
+    assert.equal(res.getStatusCode(), 200);
+    assert.match(res.getBody().message ?? "", /received your readiness results/i);
   });
 });
