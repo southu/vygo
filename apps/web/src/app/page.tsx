@@ -67,10 +67,13 @@ export default function HomePage() {
       <section className="section-pad border-t border-border bg-surface" data-section="setup-first">
         <div className="container-page max-w-3xl">
           <p className="eyebrow">Step 1</p>
-          <h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Get set up first</h2>
+          <h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">
+            Get set up for vibe coding first
+          </h2>
           <p className="mt-4 text-lg text-muted">
-            Do this once, before reading anything else: download the free guide pack, open it in
-            your AI coding tool, and paste one setup prompt.
+            Have you started vibe coding yet? What are you waiting for? Get started now with our
+            kick-start Ratchet system and leapfrog everyone still using CLIs and applications that
+            miss out on real-world learning from real-world power users.
           </p>
           <StepList steps={setupSteps} />
           <div className="mt-8">
