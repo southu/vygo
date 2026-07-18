@@ -3,6 +3,10 @@ import { ModulePage } from "@/components/vibe-coding/ModulePage";
 import { GuideToc, type GuideTocEntry } from "@/components/vibe-coding/GuideToc";
 import { HeadingAnchor } from "@/components/vibe-coding/HeadingAnchor";
 import { BackToTop } from "@/components/vibe-coding/BackToTop";
+import { StepList, type Step } from "@/components/vibe-coding/StepCard";
+import { Callout } from "@/components/vibe-coding/Callout";
+import { CodeBlock } from "@/components/vibe-coding/CodeBlock";
+import { ScreenshotPlaceholder } from "@/components/vibe-coding/ScreenshotPlaceholder";
 import { getVibeModulePage } from "@/content/vibe-coding-modules";
 import { guideDocs, guidePackEntryHref, isRenderedGuideDoc } from "@/content/ratchet-guide";
 import { readGuidePackManifest } from "@/lib/guide-source";
@@ -56,6 +60,116 @@ const guideToc: GuideTocEntry[] = [
 ];
 
 /**
+ * Step-card content for "Run your first mission" — the guide's first
+ * end-to-end procedure. Every card is exactly one action; UI element names
+ * (buttons, menus, fields) are bolded per the guide's step-card convention.
+ */
+const quickStartSteps: Step[] = [
+  {
+    title: "Create a product shell",
+    body: (
+      <>
+        <p>
+          In Composer, click <strong>New product shell</strong> and bind it to your{" "}
+          <strong>Git remote</strong> field, your <strong>Live URL</strong> field, and a{" "}
+          <strong>Version endpoint</strong> field (e.g. <code>GET /version</code>) that returns the
+          deployed git SHA.
+        </p>
+        <ScreenshotPlaceholder caption="Composer's product shell setup screen, showing the Git remote, Live URL, and Version endpoint fields." />
+      </>
+    ),
+  },
+  {
+    title: "Confirm your deploy and version endpoint",
+    body: (
+      <>
+        <p>
+          Make sure your host deploys automatically on push to your deploy branch, and that the{" "}
+          <strong>Version endpoint</strong> is publicly reachable without a control-plane login
+          &mdash; the deploy gate polls it directly. Confirm it responds before you start:
+        </p>
+        <CodeBlock code="curl -s https://your-app.example.com/version" language="shell" />
+      </>
+    ),
+  },
+  {
+    title: "Describe your goal",
+    body: (
+      <>
+        <p>
+          Open Composer&apos;s <strong>Goal capture</strong> screen and type the change into the{" "}
+          <strong>Goal</strong> field in plain language, e.g. &ldquo;Change the homepage CTA label
+          to &lsquo;Get started&rsquo;.&rdquo; Note anything the change must not touch in the{" "}
+          <strong>Constraints</strong> field.
+        </p>
+        <ScreenshotPlaceholder caption="The goal capture screen, with the Goal and Constraints fields." />
+      </>
+    ),
+  },
+  {
+    title: "Accept the draft queue",
+    body: (
+      <>
+        <p>
+          For anything beyond a one-line goal, Composer splits it into a small queue of focused
+          steps instead of one mega-mission. Click <strong>Accept draft</strong> to take the queue
+          as-is for a first run.
+        </p>
+        <Callout type="tip">
+          You can edit any step&apos;s title or body before accepting &mdash; Composer treats your
+          edits as the source of truth for that step.
+        </Callout>
+      </>
+    ),
+  },
+  {
+    title: "Set your limits",
+    body: (
+      <>
+        <p>
+          Choose a <strong>Max iterations</strong> field, a <strong>Pass streak</strong> field
+          &mdash; the run of consecutive live passes required to finish (2 is a reasonable first
+          value) &mdash; and an optional <strong>Spend cap</strong> field.
+        </p>
+        <ScreenshotPlaceholder caption="The run limits screen, with Max iterations, Pass streak, and Spend cap fields." />
+      </>
+    ),
+  },
+  {
+    title: "Start the run",
+    body: (
+      <p>
+        Click <strong>Start run</strong>. Each iteration is automatic: the builder pushes real
+        commits, the deploy gate waits until your version endpoint matches the new SHA, and a tester
+        checks only the live app and returns PASS or FAIL.
+      </p>
+    ),
+  },
+  {
+    title: "Watch it iterate",
+    body: (
+      <>
+        <p>
+          Track progress on the <strong>Mission timeline</strong> panel. A FAIL carries the
+          tester&apos;s feedback into the next build automatically. A PASS advances the streak. You
+          do not need to intervene between iterations.
+        </p>
+        <ScreenshotPlaceholder caption="The mission timeline panel, showing build, deploy gate, and test status per iteration." />
+      </>
+    ),
+  },
+  {
+    title: "Confirm your first pass",
+    body: (
+      <p>
+        The mission finishes on its own once the required streak is reached. Open your live URL to
+        confirm the change actually shipped.
+      </p>
+    ),
+  },
+];
+
+/**
  * How-to guide: task-based sections in the order a new user actually works
  * (what Ratchet does → first mission → the build/deploy/test loop → advanced
  * usage), rather than the pack's feature/file order. The six rendered docs and
@@ -66,7 +180,9 @@ const guideToc: GuideTocEntry[] = [
  * Below the module header, the guide body is a two-column layout: the GuideToc
  * (sticky sidebar at lg+, top dropdown below it) and the content column. Every
  * h2/h3 in the content column carries a stable id from guideToc above plus a
- * hover-revealed HeadingAnchor for copyable deep links.
+ * hover-revealed HeadingAnchor for copyable deep links. Multi-step procedures
+ * render through StepList/StepCard; tips, warnings, and notes render through
+ * Callout; commands and code snippets render through CodeBlock.
  */
 export default function RatchetGuidePage() {
   return (
@@ -102,55 +218,7 @@ export default function RatchetGuidePage() {
               Five minutes, start to finish. These steps are everything a first-time user needs
               &mdash; no other reading required before you start.
             </p>
-            <ol className="mt-8 space-y-4">
-              {[
-                {
-                  title: "Create a product shell",
-                  body: "In Composer, bind a product shell to your git remote, your live URL, and a version endpoint (e.g. GET /version) that returns the deployed git SHA.",
-                },
-                {
-                  title: "Confirm your deploy and version endpoint",
-                  body: "Make sure your host deploys automatically on push to your deploy branch, and that the version endpoint is publicly reachable without a control-plane login — the deploy gate polls it directly.",
-                },
-                {
-                  title: "Describe your goal",
-                  body: "Open Composer's goal capture screen and state the change in plain language, e.g. “Change the homepage CTA label to ‘Get started’.” Note anything the change must not touch.",
-                },
-                {
-                  title: "Accept the draft queue",
-                  body: "For anything beyond a one-line goal, Composer splits it into a small queue of focused steps instead of one mega-mission. Accept the draft as-is for a first run.",
-                },
-                {
-                  title: "Set your limits",
-                  body: "Choose a max iteration count, the streak of consecutive live passes required to finish (2 is a reasonable first value), and an optional spend cap.",
-                },
-                {
-                  title: "Start the run",
-                  body: "Each iteration is automatic: the builder pushes real commits, the deploy gate waits until your version endpoint matches the new SHA, and a tester checks only the live app and returns PASS or FAIL.",
-                },
-                {
-                  title: "Watch it iterate",
-                  body: "A FAIL carries the tester's feedback into the next build automatically. A PASS advances the streak. You do not need to intervene between iterations.",
-                },
-                {
-                  title: "Confirm your first pass",
-                  body: "The mission finishes on its own once the required streak is reached. Open your live URL to confirm the change actually shipped.",
-                },
-              ].map((step, index) => (
-                <li key={step.title} className="card flex gap-4">
-                  <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-soft font-display text-sm font-bold text-purple"
-                    aria-hidden="true"
-                  >
-                    {index + 1}
-                  </span>
-                  <div>
-                    <p className="font-display text-base font-semibold">{step.title}</p>
-                    <p className="mt-1 text-sm text-muted">{step.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            <StepList steps={quickStartSteps} />
           </section>
 
           <section className="mt-14" data-section="core-workflow">
@@ -162,12 +230,13 @@ export default function RatchetGuidePage() {
               Every mission, first run or hundredth, repeats the same three-stage loop against the
               live product:
             </p>
-            <pre className="mt-6 overflow-x-auto rounded-card border border-border bg-surface p-4 text-sm leading-relaxed">
-              <code className="font-mono text-ink-soft">{`Build → Deploy gate → Test
+            <CodeBlock
+              code={`Build → Deploy gate → Test
    ↑                    │
    └──── FAIL ────┘
-        PASS streak → done`}</code>
-            </pre>
+        PASS streak → done`}
+              language="flow"
+            />
 
             <h3
               id="build-real-provable-changes"
@@ -191,12 +260,18 @@ export default function RatchetGuidePage() {
               <HeadingAnchor id="wait-for-the-deploy-gate-to-confirm-your-push" />
             </h3>
             <p className="mt-3 text-muted">
-              After a push, the deploy gate polls your product's version endpoint until it returns
-              the SHA that was just pushed (matching is case-insensitive; the full SHA or a
-              long-enough prefix counts). If the version endpoint is behind auth, wrong, or bound to
-              a different product than the live URL under test, the gate times out and the run looks
-              stuck even though the build succeeded.
+              After a push, the deploy gate polls your product&apos;s version endpoint until it
+              returns the SHA that was just pushed.
             </p>
+            <Callout type="note">
+              SHA matching is case-insensitive, and a long-enough prefix of the full SHA counts as a
+              match &mdash; you don&apos;t need to return the entire hash.
+            </Callout>
+            <Callout type="warning">
+              If the version endpoint is behind auth, wrong, or bound to a different product than
+              the live URL under test, the gate times out and the run looks stuck even though the
+              build succeeded.
+            </Callout>
 
             <h3
               id="test-only-the-live-deployed-app"
@@ -303,19 +378,17 @@ export default function RatchetGuidePage() {
               Avoid the common design pitfalls
               <HeadingAnchor id="avoid-the-common-design-pitfalls" />
             </h3>
-            <ul className="mt-3 space-y-2 pl-6 text-sm text-ink-soft marker:text-muted list-disc">
-              <li>
-                Keep the version signal public and reachable by the deploy gate &mdash; auth
-                blocking it makes loops look stuck even when the build is fine.
-              </li>
-              <li>
-                Never trust agent claims over git reality; require a real, content-changing,
-                fast-forward commit.
-              </li>
-              <li>
-                Keep cloud tokens and credentials out of builder and tester environments entirely.
-              </li>
-            </ul>
+            <Callout type="warning">
+              Keep the version signal public and reachable by the deploy gate &mdash; auth blocking
+              it makes loops look stuck even when the build is fine.
+            </Callout>
+            <Callout type="warning">
+              Never trust agent claims over git reality; require a real, content-changing,
+              fast-forward commit.
+            </Callout>
+            <Callout type="warning">
+              Keep cloud tokens and credentials out of builder and tester environments entirely.
+            </Callout>
 
             <h3
               id="know-the-core-components"
