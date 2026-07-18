@@ -417,7 +417,7 @@ describe("readiness scoring", () => {
         blockers: ["security", "data_migration"],
         deadline: "Yes within 90 days",
         deadlineDetail: "Enterprise pilot with Northwind Labs kicks off in 8 weeks",
-      },
+      } as any,
     });
 
     assert.equal(payload.bucket, "Launch");
@@ -479,7 +479,7 @@ describe("readiness scoring", () => {
         blockers: ["security"],
         deadline: "No hard deadline",
         deadlineDetail: "",
-      },
+      } as any,
     });
 
     assert.ok(payload.reasoning);
@@ -540,7 +540,7 @@ describe("readiness scoring", () => {
           blockers: ["security"],
           deadline: "No hard deadline",
           deadlineDetail: "",
-        },
+        } as any,
       });
       assert.ok(Number.isFinite(payload.overall), `overall finite for n=${n}`);
       const bad = walk(payload);
