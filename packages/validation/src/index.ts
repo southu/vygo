@@ -47,6 +47,7 @@ export {
 
 export {
   READINESS_PROMPT_REASSURANCE,
+  READINESS_SUBMIT_URL,
   buildPromptHowTo,
   buildDiagnosticPrompt,
   isRepoAccessTool,

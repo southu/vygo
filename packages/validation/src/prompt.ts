@@ -18,6 +18,9 @@ import {
 export const READINESS_PROMPT_REASSURANCE =
   "This prompt is read-only. It never asks the AI to change code, and it excludes secrets, keys, and customer data." as const;
 
+/** Endpoint the customer's AI POSTs analysis results back to (see api/readiness/[op].ts "submit"). */
+export const READINESS_SUBMIT_URL = "https://www.vygo.ai/api/readiness/submit" as const;
+
 const FIXED_RULES_LINES = [
   "RULES (fixed — do not relax):",
   "1. Read-only: inspect and report only. Do not modify files, run destructive commands, or propose code changes.",
@@ -81,7 +84,40 @@ export type BuildDiagnosticPromptInput = {
   answers: ReadinessStage1Answers;
   /** Override tool display name; defaults to answers.builtWith. */
   toolName?: string;
+  /**
+   * Per-session submission token minted via /api/readiness/token. When present,
+   * it is embedded in the prompt and a submit-back instruction block is appended.
+   */
+  submissionToken?: string;
 };
+
+/**
+ * Instruction block appended after the analysis instructions, addressed to the
+ * customer's AI: submit the results back to Vygo only if it has web/tool access.
+ * Field names mirror the /api/readiness/submit contract (submission_token required,
+ * results/results_text optional payload).
+ */
+function submissionInstructionBlock(token: string): string[] {
+  return [
+    "SUBMIT RESULTS BACK TO VYGO (instructions for the AI running this prompt):",
+    "AFTER you have produced the report block above, IF you have web/tool access (an HTTP client, a web request tool, or code execution), submit the analysis results back to Vygo as JSON:",
+    "1. Method: POST",
+    `2. URL: ${READINESS_SUBMIT_URL}`,
+    "3. Headers: Content-Type: application/json",
+    "4. Body: a single JSON object with these exact fields:",
+    "   {",
+    `     "submission_token": "${token}",`,
+    '     "results": { "<report field name>": "<value or UNKNOWN>" },',
+    '     "results_text": "<the full report block as plain text, including delimiters>"',
+    "   }",
+    '   - "submission_token" (string, required): the submission token embedded above — include it in the body exactly as shown.',
+    '   - "results" (object, optional): the completed report fields as structured JSON.',
+    '   - "results_text" (string, optional): the raw report block text.',
+    '   Always include "submission_token"; include "results" and/or "results_text".',
+    "5. If you do NOT have web/tool access, do not attempt the request — tell the user to paste the report block back into the Vygo readiness page instead.",
+    "6. Once the POST succeeds (HTTP 200), confirm to the user that the analysis results were successfully submitted to Vygo.",
+  ];
+}
 
 /**
  * Full diagnostic prompt text shown in the monospace block (copyable).
@@ -138,7 +174,24 @@ export function buildDiagnosticPrompt(input: BuildDiagnosticPromptInput): {
     "Remember: read-only, no secrets/values, UNKNOWN if unverifiable, production standards, output ONLY the report block.",
   ];
 
-  return { variant, prompt: lines.join("\n") };
+  const submissionToken = input.submissionToken?.trim() || "";
+  if (!submissionToken) {
+    return { variant, prompt: lines.join("\n") };
+  }
+
+  // Token line goes before the analysis instructions, the submission block after
+  // them — the analysis instructions themselves stay byte-identical.
+  const withSubmission = [
+    lines[0],
+    lines[1],
+    "",
+    `SUBMISSION TOKEN (unique to this readiness session): ${submissionToken}`,
+    ...lines.slice(2),
+    "",
+    ...submissionInstructionBlock(submissionToken),
+  ];
+
+  return { variant, prompt: withSubmission.join("\n") };
 }
 
 export function isRepoAccessTool(builtWith: BuiltWithOption | string): boolean {

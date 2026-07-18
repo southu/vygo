@@ -119,6 +119,24 @@ function resumeTokenFromUrl(): string | null {
   }
 }
 
+/**
+ * Mint a per-session submission token (embedded in the diagnostic prompt so the
+ * customer's AI can POST results back to /api/readiness/submit). Best-effort:
+ * returns null when the edge is unreachable and the prompt renders without it.
+ */
+async function mintSubmissionToken(): Promise<string | null> {
+  try {
+    const res = await fetch("/api/readiness/token", { method: "POST" });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { token?: unknown };
+    const t = typeof data.token === "string" ? data.token.trim() : "";
+    return t || null;
+  } catch (e) {
+    console.error("Could not fetch readiness submission token", e);
+    return null;
+  }
+}
+
 type ConfirmState = {
   stack: string;
   size: string;
@@ -159,6 +177,7 @@ export function ReadinessFlow() {
   const c = readinessContent;
   const [view, setView] = useState<View>("loading");
   const [token, setToken] = useState<string | null>(null);
+  const [submissionToken, setSubmissionToken] = useState<string | null>(null);
   const [stage1, setStage1] = useState<ReadinessStage1Answers>(EMPTY_STAGE1);
   const [stepIndex, setStepIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
@@ -225,6 +244,11 @@ export function ReadinessFlow() {
   // Bootstrap: resume from ?token= or localStorage, else create session.
   useEffect(() => {
     let cancelled = false;
+    // Mint the per-session submission token up front (fresh and resumed sessions
+    // alike) so it is embedded in the diagnostic prompt once stage 2 renders.
+    void mintSubmissionToken().then((t) => {
+      if (!cancelled && t) setSubmissionToken(t);
+    });
     (async () => {
       try {
         const fromUrl = resumeTokenFromUrl();
@@ -332,11 +356,6 @@ export function ReadinessFlow() {
         }
 
         if (!sessionToken) {
-          try {
-            await fetch("/api/readiness/token", { method: "POST" });
-          } catch (e) {
-            console.error("Could not fetch readiness submission token", e);
-          }
           const created = await createReadinessSession({
             stage: "intake",
             draft: draftFromStage1(restoredStage1, {
@@ -411,8 +430,11 @@ export function ReadinessFlow() {
 
   const promptBundle = useMemo(() => {
     if (!stage1.builtWith || isNotBuiltYet(stage1.builtWith)) return null;
-    return buildDiagnosticPrompt({ answers: stage1 });
-  }, [stage1]);
+    return buildDiagnosticPrompt({
+      answers: stage1,
+      submissionToken: submissionToken ?? undefined,
+    });
+  }, [stage1, submissionToken]);
 
   const howTo = useMemo(() => {
     if (!stage1.builtWith) return null;
