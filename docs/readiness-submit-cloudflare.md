@@ -30,10 +30,11 @@ submitter. This document reproduces and records that behavior.
 > `southu/vygo` repository is **private**, so the unauthenticated
 > `raw.githubusercontent.com/.../main/docs/readiness-submit-cloudflare.md`
 > URL returns **404** — that is "no anonymous access", not "file missing".
-> Making that public URL serve 200 would require flipping the repo to public,
-> which is **deliberately declined**: sibling docs such as
-> `docs/credentials-and-decisions.md` contain real operational secrets that
-> must not be exposed to the public internet. Use the **authenticated** check in
+> Making that public URL serve 200 would require flipping the whole repo to
+> public, which is **deliberately declined**: `southu/vygo` is a live production
+> codebase, and changing its visibility is an irreversible, owner-level decision
+> that exposes the full source and git history permanently. That is out of scope
+> for a document-and-reproduce mission. Use the **authenticated** check in
 > [Verifying this doc is published on `main`](#verifying-this-doc-is-published-on-main)
 > instead.
 
@@ -216,24 +217,28 @@ curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
 
 Both return the committed content (HTTP 200) when the doc is present on `main`.
 
-### Why publication stays private (verified 2026-07-18)
+### Why publication stays private
 
-The decline to flip the repo to public is not cautionary hand-waving — a secret
-scan of the tracked tree confirms the repository holds **live credentials** that
-must never reach the public internet, for example a Resend API key
-(`re_…`) in `docs/credentials-and-decisions.md` and Postgres connection strings
-(`postgres://…:…@…`) elsewhere in the tree and in history. Making
-`raw.githubusercontent.com/southu/vygo/...` serve `200` anonymously requires
-repository visibility = public, which would expose those secrets and the full
-git history at once and cannot be undone. That trade is **declined**; the
-authenticated checks above are the supported way to confirm this doc is on
-`main`.
+Making `raw.githubusercontent.com/southu/vygo/...` serve `200` anonymously
+requires repository visibility = **public**. `southu/vygo` is a live production
+codebase; flipping it to public exposes the entire source tree and full git
+history to the internet at once, is cached/indexed by third parties even if
+later reverted, and cannot be undone. Whether that trade is acceptable is an
+**owner-level decision** (the repo belongs to the vygo/ReadySignal team), not a
+side effect a documentation mission should trigger automatically. A quick secret
+scan of the tracked tree and history did not surface live credentials in the
+current state (only `localhost` / test-fixture DSNs and placeholder examples),
+but a scan cannot _prove_ the absence of secrets, and the irreversibility alone
+is sufficient reason to leave visibility unchanged. The trade is therefore
+**declined**; the authenticated checks above are the supported way to confirm
+this doc is on `main`.
 
-Re-verified against production on **2026-07-18** (iteration 6): `curl/8.0.0`
+Re-verified against production on **2026-07-18** (iteration 7): `curl/8.0.0`
 and `python-requests/2.31.0` → `HTTP 403` + `error code: 1010`; browser UA →
 `HTTP 200 {"message":"Vygo has successfully received your readiness results."}`;
-`GET /version` and `GET /` → `HTTP 200`. The differentiator remains the
-`User-Agent` header exactly as documented above.
+`GET /version` (SHA matches pushed `HEAD`) and `GET /` (home renders, non-empty)
+→ `HTTP 200`. The differentiator remains the `User-Agent` header exactly as
+documented above.
 
 ---
 
