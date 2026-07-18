@@ -14,6 +14,7 @@ import {
   scoreAllDimensions,
   scoreFieldValue,
 } from "./readiness-scoring.js";
+import type { ReadinessStage1Answers } from "./readiness-intake.js";
 import type { ReadinessReportV1Partial } from "./report-schema.js";
 
 const UNKNOWN_REPORT: ReadinessReportV1Partial = {
@@ -417,7 +418,7 @@ describe("readiness scoring", () => {
         blockers: ["security", "data_migration"],
         deadline: "Yes within 90 days",
         deadlineDetail: "Enterprise pilot with Northwind Labs kicks off in 8 weeks",
-      } as any,
+      } as unknown as Partial<ReadinessStage1Answers>,
     });
 
     assert.equal(payload.bucket, "Launch");
@@ -479,7 +480,7 @@ describe("readiness scoring", () => {
         blockers: ["security"],
         deadline: "No hard deadline",
         deadlineDetail: "",
-      } as any,
+      } as unknown as Partial<ReadinessStage1Answers>,
     });
 
     assert.ok(payload.reasoning);
@@ -546,7 +547,7 @@ describe("readiness scoring", () => {
           blockers: ["security"],
           deadline: "No hard deadline",
           deadlineDetail: "",
-        } as any,
+        } as unknown as Partial<ReadinessStage1Answers>,
       });
       assert.ok(Number.isFinite(payload.overall), `overall finite for n=${n}`);
       const bad = walk(payload);
