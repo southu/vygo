@@ -11,6 +11,7 @@ import { AdvancedExpander } from "@/components/vibe-coding/AdvancedExpander";
 import { GuideModeToggle } from "@/components/vibe-coding/GuideModeToggle";
 import { getVibeModulePage } from "@/content/vibe-coding-modules";
 import { guideDocs, guidePackEntryHref, isRenderedGuideDoc } from "@/content/ratchet-guide";
+import { guideOffer } from "@/content/guide-offer";
 import { readGuidePackManifest } from "@/lib/guide-source";
 import { GUIDE_MODE_STORAGE_KEY } from "@/lib/guide-mode";
 
@@ -30,6 +31,7 @@ export const metadata: Metadata = {
  * the page.
  */
 const guideToc: GuideTocEntry[] = [
+  { id: "get-set-up", title: "Step 1: Get set up", level: 2 },
   { id: "overview", title: "Understand what Ratchet does", level: 2 },
   { id: "quick-start", title: "Run your first mission", level: 2 },
   { id: "core-workflow", title: "Run the build, deploy, and test loop", level: 2 },
@@ -102,6 +104,71 @@ function NextSectionLink({ href, title }: { href: string; title: string }) {
     </p>
   );
 }
+
+/**
+ * Setup prompt pasted into an AI coding tool after unzipping the guide pack.
+ * Mirrors "AI prompt pack" prompt A (content/vibe-coding/ratchet-guide/ai-prompts.md)
+ * with an added unzip instruction, so the two stay in sync in spirit.
+ */
+const guideZipFilename = guideOffer.ctas.startFree.href.split("/").pop();
+const setupPrompt = `Unzip ${guideZipFilename} in this folder, then read the pack in order: README.md, then overview → architecture → principles → layout → loop-and-missions.
+
+Follow the product contracts strictly:
+- Live deploy gate via an honest public version signal (tester judges the live URL only)
+- Builder proof-of-work from git state only (ignore agent claims)
+- Secrets only via a credentials boundary — never in builder env
+- Multi-step goals → multiple queue items
+- Optional infra ensure is fail-closed; prefer bound cloud project identities
+- Overnight helpers may observe only; they never implement product features
+
+Start with: loop + mock roles + mission shape validation.
+Then: goal capture + queue.
+Then: real builder/tester roles and a credentials boundary stub.
+Do not invent machine-specific install paths or operator runbooks.`;
+
+/**
+ * Step-card content for "Get set up" — the very first thing a visitor does,
+ * before any other guide content. One card per action: download the zip into
+ * the working folder, open the AI coding tool there, then run the prompt.
+ */
+const setupSteps: Step[] = [
+  {
+    title: "Download the system zip into your project folder",
+    body: (
+      <p>
+        Pick (or create) the folder where you want to work with your AI coding tool, and download{" "}
+        <a
+          href={guideOffer.ctas.startFree.href}
+          className="font-semibold text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
+        >
+          {guideOffer.title}
+        </a>{" "}
+        directly into it &mdash; no login, no form.
+      </p>
+    ),
+  },
+  {
+    title: "Open your AI coding tool in that same folder",
+    body: (
+      <p>
+        Launch your AI coding tool (Claude Code, Cursor, or similar) with that folder as its{" "}
+        <strong>working directory</strong> &mdash; the same one the zip just landed in.
+      </p>
+    ),
+  },
+  {
+    title: "Run the setup prompt",
+    body: (
+      <>
+        <p>
+          Paste this into your AI coding tool. It unzips the pack and finishes initial setup for
+          you:
+        </p>
+        <CodeBlock code={setupPrompt} language="prompt" />
+      </>
+    ),
+  },
+];
 
 /**
  * Step-card content for "Run your first mission" — the guide's first
@@ -248,7 +315,25 @@ export default function RatchetGuidePage() {
         <GuideToc sections={guideToc} />
 
         <div className="min-w-0 guide-prose">
-          <section data-section="overview">
+          <section className="card border-2 border-purple/30 bg-purple/5" data-section="get-set-up">
+            <span
+              className="chip border-purple/40 bg-white font-semibold text-purple"
+              data-step-badge
+            >
+              Step 1
+            </span>
+            <h2 id="get-set-up" className="group scroll-mt-24 mt-3 font-display text-2xl font-bold">
+              Get set up
+              <HeadingAnchor id="get-set-up" />
+            </h2>
+            <p className="mt-4 text-lg text-muted">
+              Do this once, before anything else on this page.
+            </p>
+            <StepList steps={setupSteps} />
+            <NextSectionLink href="#overview" title="Understand what Ratchet does" />
+          </section>
+
+          <section className="mt-14" data-section="overview">
             <h2 id="overview" className="group scroll-mt-24 font-display text-2xl font-bold">
               Understand what Ratchet does
               <HeadingAnchor id="overview" />
@@ -635,7 +720,10 @@ export default function RatchetGuidePage() {
             </p>
             <p className="mt-2 text-muted">
               <strong>Fix:</strong> go back to{" "}
-              <a href="#quick-start" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
+              <a
+                href="#quick-start"
+                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
+              >
                 Run your first mission
               </a>{" "}
               and set all three product shell fields before queuing another run.
@@ -680,7 +768,10 @@ export default function RatchetGuidePage() {
             <p className="mt-2 text-muted">
               <strong>Fix:</strong> confirm auto-deploy is wired to your deploy branch and that a
               fresh <code>curl</code> of the endpoint changes after every push &mdash; see{" "}
-              <a href="#quick-start" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
+              <a
+                href="#quick-start"
+                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
+              >
                 Confirm your deploy and version endpoint
               </a>
               .
@@ -701,11 +792,17 @@ export default function RatchetGuidePage() {
             <p className="mt-2 text-muted">
               <strong>Fix:</strong> check git history for an actual advancing commit per iteration
               (see{" "}
-              <a href="#build-real-provable-changes" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
+              <a
+                href="#build-real-provable-changes"
+                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
+              >
                 Build real, provable changes
               </a>
               ) and confirm the tester targets the same live app the deploy gate just confirmed (see{" "}
-              <a href="#test-only-the-live-deployed-app" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
+              <a
+                href="#test-only-the-live-deployed-app"
+                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
+              >
                 Test only the live, deployed app
               </a>
               ).
@@ -726,7 +823,10 @@ export default function RatchetGuidePage() {
             <p className="mt-2 text-muted">
               <strong>Fix:</strong> raise the iteration or spend limit, lower the{" "}
               <strong>Pass streak</strong> field (see{" "}
-              <a href="#quick-start" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
+              <a
+                href="#quick-start"
+                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
+              >
                 Set your limits
               </a>
               ), or split the goal into a multi-step campaign so each piece can finish on its own
