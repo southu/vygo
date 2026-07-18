@@ -744,16 +744,19 @@ export default function RatchetGuidePage() {
       </div>
 
       {/*
-       * Re-applies a stored Expert preference to every Advanced expander
-       * before hydration, so a returning Expert reader never sees a flash
-       * of collapsed content on reload. Runs during initial HTML parsing,
-       * after every [data-advanced-expander] element above it in the DOM.
+       * Re-applies a stored Expert preference, and each expander's own
+       * individually-persisted open/close choice, before hydration — so a
+       * returning reader never sees a flash of the wrong state on reload.
+       * An explicit per-expander choice (set on click) wins over the
+       * Expert-mode default, since it's the reader's most recent action on
+       * that specific element. Runs during initial HTML parsing, after
+       * every [data-advanced-expander] element above it in the DOM.
        */}
       <script
         dangerouslySetInnerHTML={{
-          __html: `(function(){try{if(window.localStorage.getItem(${JSON.stringify(
+          __html: `(function(){try{var expert=window.localStorage.getItem(${JSON.stringify(
             GUIDE_MODE_STORAGE_KEY,
-          )})==="expert"){document.querySelectorAll('[data-advanced-expander]').forEach(function(w){var b=w.querySelector('.advanced-expander-summary');var c=w.querySelector('.advanced-expander-body');if(b)b.setAttribute('aria-expanded','true');if(c)c.hidden=false;});}}catch(e){}})();`,
+          )})==="expert";document.querySelectorAll('[data-advanced-expander]').forEach(function(w){var key=w.getAttribute('data-expander-key');var stored=key?window.localStorage.getItem('ratchet-guide-expander:'+key):null;var open=stored===null?expert:stored==="1";var b=w.querySelector('.advanced-expander-summary');var c=w.querySelector('.advanced-expander-body');if(b)b.setAttribute('aria-expanded',open?'true':'false');if(c)c.hidden=!open;});}catch(e){}})();`,
         }}
       />
 
