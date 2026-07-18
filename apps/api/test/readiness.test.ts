@@ -13,9 +13,17 @@ import {
   parseReadinessReportV1,
   type ReadinessReportV1,
 } from "@vygo/validation";
-import { redactSensitivePaste, redactSessionDraft, generateReadinessSessionToken } from "@vygo/db";
+import {
+  createDatabase,
+  redactSensitivePaste,
+  redactSessionDraft,
+  generateReadinessSessionToken,
+  runMigrations,
+  type DatabaseHandle,
+} from "@vygo/db";
 import { stripNullBytes, stripNullBytesDeep } from "@vygo/validation";
 import { buildApp, type AppContext, MemoryRateLimitStore } from "../src/app.js";
+import { ensureReadinessTables } from "../src/routes/readiness.js";
 
 describe("readiness report schema contract", () => {
   it("exposes the fixed v1 field set", () => {
@@ -582,5 +590,133 @@ describe("readiness routes without database", () => {
     });
     assert.notEqual(res.statusCode, 404);
     assert.equal(res.statusCode, 503);
+  });
+});
+
+/**
+ * DB-backed regression tests for the readiness ingest flow (token + submit).
+ * Exercises the real drizzle-wrapped handle end to end: drizzle's postgres-js
+ * driver swaps this handle's options.serializers[3802] for a transparent
+ * identity fn, so the submit insert must not rely on sql.json() — this suite
+ * fails if the insert path regresses back to it. Uses the same local test
+ * Postgres gate as the waitlist integration suite (not part of CI).
+ */
+describe("readiness ingest flow with database", () => {
+  const TEST_DATABASE_URL =
+    process.env.DATABASE_URL_TEST ||
+    process.env.DATABASE_URL ||
+    "postgresql://vygo:vygo@localhost:5432/vygo_test";
+
+  let handle: DatabaseHandle;
+  let ctx: AppContext;
+  let rateLimitStore: MemoryRateLimitStore;
+
+  before(async () => {
+    await runMigrations(TEST_DATABASE_URL);
+    handle = createDatabase(TEST_DATABASE_URL);
+    await ensureReadinessTables(handle);
+    // Isolate ingest rows from earlier runs sharing the test database.
+    await handle.sql`DELETE FROM readiness_ingest_submissions`;
+    await handle.sql`DELETE FROM readiness_ingest_tokens`;
+    rateLimitStore = new MemoryRateLimitStore();
+    ctx = await buildApp({
+      env: loadApiEnv({
+        ...process.env,
+        DATABASE_URL: TEST_DATABASE_URL,
+        NODE_ENV: "test",
+        LOG_LEVEL: "silent",
+        CORS_ORIGINS: "https://www.vygo.ai",
+        RATE_LIMIT_IP_MAX: "100",
+        IP_HASH_SALT: "test-salt-for-readiness",
+      }),
+      database: handle,
+      rateLimitStore,
+    });
+    await ctx.app.ready();
+  });
+
+  after(async () => {
+    await ctx.close();
+    await handle.close();
+  });
+
+  it("issues distinct short-lived tokens and accepts structured + text submissions", async () => {
+    rateLimitStore.clear();
+
+    const issueToken = async () => {
+      const res = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+      assert.equal(res.statusCode, 200);
+      return res.json() as { token?: string; expires_at?: string; ttl?: number };
+    };
+
+    const first = await issueToken();
+    const second = await issueToken();
+    assert.ok(first.token);
+    assert.ok(second.token);
+    assert.notEqual(first.token, second.token);
+    assert.equal(first.ttl, 1800);
+    assert.ok(first.expires_at);
+    // Short-lived: expiry lands ~30 minutes out, never more than 31.
+    const expiresInMs = new Date(first.expires_at as string).getTime() - Date.now();
+    assert.ok(expiresInMs > 0 && expiresInMs <= 31 * 60 * 1000);
+
+    // Shape (a): structured JSON results object.
+    const structured = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: first.token, results: { overall: 82, bucket: "Launch" } },
+    });
+    assert.equal(structured.statusCode, 200);
+    const structuredBody = structured.json() as { message?: string };
+    assert.ok(structuredBody.message?.includes("Vygo"));
+
+    // Shape (b): plain-text results blob.
+    const text = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: {
+        submission_token: second.token,
+        results_text: "No backups; high replication lag.",
+      },
+    });
+    assert.equal(text.statusCode, 200);
+    const textBody = text.json() as { message?: string };
+    assert.ok(textBody.message?.includes("received"));
+
+    // Both raw payloads are persisted keyed by their submission token.
+    const rows = await handle.sql<{ token: string; payload: unknown; received_at: unknown }[]>`
+      SELECT token, payload, received_at FROM readiness_ingest_submissions ORDER BY received_at
+    `;
+    assert.equal(rows.length, 2);
+    const byToken = new Map(rows.map((row) => [row.token, row]));
+    const structuredRow = byToken.get(first.token as string);
+    const textRow = byToken.get(second.token as string);
+    assert.ok(structuredRow);
+    assert.ok(textRow);
+    assert.ok(!Number.isNaN(new Date(structuredRow.received_at as string).getTime()));
+    assert.deepEqual((structuredRow.payload as Record<string, unknown>).results, {
+      overall: 82,
+      bucket: "Launch",
+    });
+    assert.equal(
+      (textRow.payload as Record<string, unknown>).results_text,
+      "No backups; high replication lag.",
+    );
+  });
+
+  it("rejects an unknown submission token with a 4xx JSON error", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: "not-a-real-token", results: { score: 1 } },
+    });
+    assert.equal(res.statusCode, 400);
+    const body = res.json() as { error?: { code?: string; message?: string } };
+    assert.equal(body.error?.code, "INVALID_TOKEN");
+    assert.ok(/unknown or expired/i.test(body.error?.message ?? ""));
   });
 });

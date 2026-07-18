@@ -3174,10 +3174,13 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           .send(safeError("EXPIRED_TOKEN", "The submission token is unknown or expired."));
       }
 
-      // Persist submission
+      // Persist submission. Pass jsonb as a pre-stringified parameter with an
+      // explicit cast: drizzle's postgres-js driver replaces this handle's
+      // options.serializers[114/3802] with a transparent identity fn, so
+      // sql.json() parameters reach the wire unserialized and throw.
       await dbHandle.sql`
         INSERT INTO readiness_ingest_submissions (token, payload)
-        VALUES (${submissionToken}, ${dbHandle.sql.json(body as never)})
+        VALUES (${submissionToken}, ${JSON.stringify(body)}::jsonb)
       `;
 
       return reply.status(200).send({
