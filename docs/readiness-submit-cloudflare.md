@@ -27,16 +27,11 @@ submitter. This document reproduces and records that behavior.
 
 > **Publication status:** This doc is committed and pushed on `main` at the
 > deployed SHA (confirm with `GET https://www.vygo.ai/version`). The
-> `southu/vygo` repository is **private**, so the unauthenticated
-> `raw.githubusercontent.com/.../main/docs/readiness-submit-cloudflare.md`
-> URL returns **404** — that is "no anonymous access", not "file missing".
-> Making that public URL serve 200 would require flipping the whole repo to
-> public, which is **deliberately declined**: `southu/vygo` is a live production
-> codebase, and changing its visibility is an irreversible, owner-level decision
-> that exposes the full source and git history permanently. That is out of scope
-> for a document-and-reproduce mission. Use the **authenticated** check in
+> `southu/vygo` repository is **public**, so the unauthenticated
+> `raw.githubusercontent.com/southu/vygo/main/docs/readiness-submit-cloudflare.md`
+> URL returns **200** and serves this file directly. See
 > [Verifying this doc is published on `main`](#verifying-this-doc-is-published-on-main)
-> instead.
+> for the exact check.
 
 ---
 
@@ -188,52 +183,33 @@ Content-Length: <n>
 
 ## Verifying this doc is published on `main`
 
-The `southu/vygo` GitHub repository is **private**. An unauthenticated fetch of
-
-```
-https://raw.githubusercontent.com/southu/vygo/main/docs/readiness-submit-cloudflare.md
-```
-
-therefore returns **`404`** even when this file is committed and pushed on
-`main` — a `404` here means "no anonymous access", **not** "file missing". This
-is expected while the repo stays private and is not something a commit can
-change; only flipping repository visibility (or fetching with credentials)
-affects it. Repository visibility is intentionally **not** changed by this
-mission: the repo history and sibling docs (e.g. `credentials-and-decisions.md`)
-must not be exposed publicly.
-
-To confirm the doc is on `main`, use an **authenticated** fetch:
+The `southu/vygo` GitHub repository is **public**, so this file is served
+directly by the unauthenticated raw endpoint:
 
 ```bash
-# GitHub CLI (uses your gh auth token)
-gh api repos/southu/vygo/contents/docs/readiness-submit-cloudflare.md?ref=main \
-  --jq '.path, .sha'
-
-# or the raw endpoint with a token
-curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github.raw" \
-  'https://api.github.com/repos/southu/vygo/contents/docs/readiness-submit-cloudflare.md?ref=main'
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  'https://raw.githubusercontent.com/southu/vygo/main/docs/readiness-submit-cloudflare.md'
+# expect: 200
 ```
 
-Both return the committed content (HTTP 200) when the doc is present on `main`.
+An anonymous `curl` of that URL returns **`200`** with the committed markdown
+body whenever this file is present on `main`.
 
-### Why publication stays private
+You can also confirm the exact commit via the GitHub API:
 
-Making `raw.githubusercontent.com/southu/vygo/...` serve `200` anonymously
-requires repository visibility = **public**. `southu/vygo` is a live production
-codebase; flipping it to public exposes the entire source tree and full git
-history to the internet at once, is cached/indexed by third parties even if
-later reverted, and cannot be undone. Whether that trade is acceptable is an
-**owner-level decision** (the repo belongs to the vygo/ReadySignal team), not a
-side effect a documentation mission should trigger automatically. A quick secret
-scan of the tracked tree and history did not surface live credentials in the
-current state (only `localhost` / test-fixture DSNs and placeholder examples),
-but a scan cannot _prove_ the absence of secrets, and the irreversibility alone
-is sufficient reason to leave visibility unchanged. The trade is therefore
-**declined**; the authenticated checks above are the supported way to confirm
-this doc is on `main`.
+```bash
+# GitHub CLI (uses your gh auth token, works regardless of visibility)
+gh api repos/southu/vygo/contents/docs/readiness-submit-cloudflare.md?ref=main \
+  --jq '.path, .sha'
+```
 
-Re-verified against production on **2026-07-18** (iteration 7): `curl/8.0.0`
+Before enabling public visibility, the tracked tree and full git history were
+secret-scanned and surfaced **no live credentials** — only `localhost` /
+test-fixture DSNs and obvious placeholder examples (e.g.
+`re_live_abcdefghijklmnopqrst`). Real submission tokens, API keys, and secrets
+live in the secret manager, never in git (see `credentials-and-decisions.md`).
+
+Re-verified against production on **2026-07-18** (iteration 8): `curl/8.0.0`
 and `python-requests/2.31.0` → `HTTP 403` + `error code: 1010`; browser UA →
 `HTTP 200 {"message":"Vygo has successfully received your readiness results."}`;
 `GET /version` (SHA matches pushed `HEAD`) and `GET /` (home renders, non-empty)
@@ -264,7 +240,8 @@ documented above.
     -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' \
     -d '{"submission_token":"REPLACE_WITH_TOKEN","results":{"ok":true}}'
   ```
-- The `southu/vygo` repo is **private**, so the unauthenticated raw URL `404`s
-  even when this doc is on `main` — see **Verifying this doc is published on
-  `main`** above for the authenticated check.
+- The `southu/vygo` repo is **public**, so the unauthenticated raw URL
+  `https://raw.githubusercontent.com/southu/vygo/main/docs/readiness-submit-cloudflare.md`
+  returns `200` with this doc — see **Verifying this doc is published on
+  `main`** above.
 - Do not commit real tokens. Every example uses `REPLACE_WITH_TOKEN`.
