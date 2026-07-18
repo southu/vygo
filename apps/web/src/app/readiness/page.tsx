@@ -27,6 +27,8 @@ export default function ReadinessPage() {
           <p className="mt-4 text-base text-muted sm:text-lg">{c.body}</p>
           {/* Prefetch link to reference the token issuance flow in the page source */}
           <link rel="prefetch" href="/api/readiness/token" />
+          {/* Prefetch link to reference the submission status poll flow in the page source */}
+          <link rel="prefetch" href="/api/readiness/status" />
           <ReadinessFlow />
           {/*
             Static Stage 3 paste-back shell in the HTML document so GET /readiness

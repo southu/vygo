@@ -6,6 +6,7 @@
  *   POST /api/readiness/followups
  *   POST /api/readiness/followups/answer  (op: followups-answer)
  *   GET  /api/readiness/submission
+ *   GET  /api/readiness/status            (submission-token poll: pending/ready/expired)
  *
  * One Vercel serverless function covers these paths so we stay under the
  * 12-function Hobby limit. Rewrites from /v1/readiness/* still apply.
@@ -35,6 +36,7 @@ import {
   proxySnapshotEmail,
   proxyToken,
   proxySubmit,
+  proxyGetStatus,
   resolveDatabaseUrl,
   resolveEdgeClientIp,
   type ReadinessHandlerResult,
@@ -71,12 +73,22 @@ const ALLOWED_OPS = new Set([
   "snapshot-email",
   "token",
   "submit",
+  "status",
 ]);
 
 /** Shared readiness edge rate-limit budget (aligns with Railway ~20/60s). */
 const rlBuckets = new Map<string, { count: number; expiresAt: number }>();
 const RL_LIMIT = 20;
 const RL_WINDOW_MS = 60 * 1000;
+
+/**
+ * Dedicated status-poll budget. The waiting readiness page polls on a short
+ * interval, so status gets its own generous bucket — sharing the 20/60s ops
+ * budget would let plain polling starve parse/session calls.
+ */
+const statusRlBuckets = new Map<string, { count: number; expiresAt: number }>();
+const STATUS_RL_LIMIT = 90;
+const STATUS_RL_WINDOW_MS = 60 * 1000;
 
 let cachedSql: Sql | null = null;
 let cachedUrl: string | null = null;
@@ -131,6 +143,32 @@ function rateLimitedResult(retryAfterSeconds: number): ReadinessHandlerResult {
     },
     retryAfterSeconds,
   };
+}
+
+function checkStatusRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterSeconds: number } {
+  const raw = resolveEdgeClientIp(req.headers) || "unknown";
+  const ipPart = createHash("sha256").update(String(raw)).digest("hex").slice(0, 32);
+  const shard = raw === "unknown" ? Math.floor(Date.now() / STATUS_RL_WINDOW_MS) : 0;
+  const key = `readiness:status:${ipPart}:t${shard}`;
+  const now = Date.now();
+  const existing = statusRlBuckets.get(key);
+  if (!existing || existing.expiresAt <= now) {
+    statusRlBuckets.set(key, { count: 1, expiresAt: now + STATUS_RL_WINDOW_MS });
+    if (statusRlBuckets.size > 500) {
+      for (const [k, v] of statusRlBuckets) {
+        if (v.expiresAt <= now) statusRlBuckets.delete(k);
+      }
+    }
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+  existing.count += 1;
+  if (existing.count > STATUS_RL_LIMIT) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((existing.expiresAt - now) / 1000)),
+    };
+  }
+  return { allowed: true, retryAfterSeconds: 0 };
 }
 
 async function ensureSubmissionTables(sql: Sql): Promise<void> {
@@ -1437,6 +1475,171 @@ async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
 }
 
 // ---------------------------------------------------------------------------
+// status — poll a submission token's ingest status (waiting page)
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/readiness/status?token=<submission_token>
+ *   - 200 { status: "pending" }                         — valid token, nothing landed yet
+ *   - 200 { status: "ready", results, results_text }    — results landed (re-redacted)
+ *   - 404 { status: "expired" }                         — unknown token
+ *   - 410 { status: "expired" }                         — expired token, nothing landed
+ * Results that landed before expiry stay readable after it.
+ */
+async function handleStatusGet(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkStatusRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const token = queryParam(req, "token").slice(0, 128);
+  if (!token) {
+    return {
+      status: 400,
+      body: {
+        error: { code: "VALIDATION_ERROR", message: "A submission token is required." },
+      },
+    };
+  }
+  // A token outside the minted format can never exist: answer exactly like an
+  // unknown token so the endpoint stays a simple pending/expired signal.
+  if (!TOKEN_RE.test(token)) {
+    return {
+      status: 404,
+      body: {
+        status: "expired",
+        error: {
+          code: "NOT_FOUND",
+          message: "The submission token is unknown or expired.",
+        },
+      },
+    };
+  }
+
+  const url = resolveDatabaseUrl();
+  if (!url) {
+    const upstream = await proxyGetStatus(token, process.env, req.headers);
+    // Pass through genuine expired signals; a 404/410 WITHOUT our expired
+    // marker means the upstream route is not deployed yet — report temporary
+    // unavailability instead so the waiting page keeps polling.
+    if (upstream.status === 404 || upstream.status === 410) {
+      const marker = typeof upstream.body.status === "string" ? upstream.body.status : "";
+      const code = (upstream.body.error as { code?: string } | undefined)?.code ?? "";
+      if (marker === "expired" || code === "NOT_FOUND" || code === "EXPIRED_TOKEN") {
+        return upstream;
+      }
+      return {
+        status: 503,
+        body: {
+          error: {
+            code: "UNAVAILABLE",
+            message: "Service temporarily unavailable. Please try again later.",
+          },
+        },
+      };
+    }
+    return upstream;
+  }
+
+  try {
+    const sql = getSql(url);
+    await ensureSubmissionTables(sql);
+
+    const tokenRows = await sql<{ token: string; expires_at: Date | string }[]>`
+      SELECT token, expires_at
+      FROM readiness_ingest_tokens
+      WHERE token = ${token}
+      LIMIT 1
+    `;
+    const tokenRow = tokenRows[0];
+    if (!tokenRow) {
+      return {
+        status: 404,
+        body: {
+          status: "expired",
+          error: {
+            code: "NOT_FOUND",
+            message: "The submission token is unknown or expired.",
+          },
+        },
+      };
+    }
+
+    const expiresAtIso = new Date(tokenRow.expires_at).toISOString();
+
+    const submissionRows = await sql<{ payload: unknown; received_at: Date | string }[]>`
+      SELECT payload, received_at
+      FROM readiness_ingest_submissions
+      WHERE token = ${token}
+      ORDER BY received_at DESC
+      LIMIT 1
+    `;
+    const submission = submissionRows[0];
+
+    if (!submission) {
+      if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+        return {
+          status: 410,
+          body: {
+            status: "expired",
+            error: {
+              code: "EXPIRED_TOKEN",
+              message: "The submission token is unknown or expired.",
+            },
+          },
+        };
+      }
+      return {
+        status: 200,
+        body: { token, status: "pending", expires_at: expiresAtIso },
+      };
+    }
+
+    const payload =
+      submission.payload &&
+      typeof submission.payload === "object" &&
+      !Array.isArray(submission.payload)
+        ? (submission.payload as Record<string, unknown>)
+        : {};
+    // Re-redact on read-back so a planted secret in the raw ingest payload
+    // never echoes back to the page.
+    const resultsText =
+      typeof payload.results_text === "string"
+        ? edgeRedactSecrets(payload.results_text).redacted
+        : null;
+    const results =
+      payload.results && typeof payload.results === "object" && !Array.isArray(payload.results)
+        ? (payload.results as Record<string, unknown>)
+        : null;
+    const receivedAt =
+      submission.received_at instanceof Date
+        ? submission.received_at.toISOString()
+        : String(submission.received_at);
+
+    return {
+      status: 200,
+      body: {
+        token,
+        status: "ready",
+        expires_at: expiresAtIso,
+        received_at: receivedAt,
+        results,
+        results_text: resultsText,
+      },
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Could not read submission status.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // HTTP entry
 // ---------------------------------------------------------------------------
 
@@ -1472,8 +1675,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     return;
   }
 
-  // submission / brief / snapshot are GET; score / snapshot-email / others are POST
-  const getOps = new Set(["submission", "brief", "snapshot"]);
+  // submission / brief / snapshot / status are GET; score / snapshot-email / others are POST
+  const getOps = new Set(["submission", "brief", "snapshot", "status"]);
   if (getOps.has(op)) {
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET, OPTIONS");
@@ -1516,6 +1719,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleToken(req);
     } else if (op === "submit") {
       result = await handleSubmit(req);
+    } else if (op === "status") {
+      result = await handleStatusGet(req);
     } else {
       result = await handleSubmissionGet(req);
     }

@@ -181,6 +181,68 @@ export async function submitReadinessResults(input: {
 }
 
 /**
+ * Poll the ingest status of a per-session submission token while the prompt
+ * screen waits for the customer's AI to POST results back. Plain GET polling —
+ * the serverless stack has no SSE. Distinguishes pending / ready / expired so
+ * the page can auto-render landed results or offer a start-over on expiry.
+ */
+export type SubmissionStatusResult =
+  | { kind: "pending" }
+  | {
+      kind: "ready";
+      resultsText: string;
+      results: Record<string, unknown> | null;
+      receivedAt: string | null;
+    }
+  | { kind: "expired" }
+  | { kind: "rate_limited"; retryAfterSeconds: number }
+  | { kind: "unavailable" };
+
+export async function getReadinessSubmissionStatus(
+  submissionToken: string,
+): Promise<SubmissionStatusResult> {
+  let res: Response;
+  try {
+    res = await fetch(
+      apiUrl(`/api/readiness/status?token=${encodeURIComponent(submissionToken)}`),
+      {
+        method: "GET",
+        headers: { accept: "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
+      },
+    );
+  } catch {
+    return { kind: "unavailable" };
+  }
+  const body = await parseJson(res);
+  const status = typeof body.status === "string" ? body.status : "";
+  if (res.status === 404 || res.status === 410 || status === "expired") {
+    return { kind: "expired" };
+  }
+  if (res.status === 429) {
+    const retryAfter = Number(res.headers.get("retry-after") || "");
+    return {
+      kind: "rate_limited",
+      retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 15,
+    };
+  }
+  if (!res.ok) return { kind: "unavailable" };
+  if (status === "ready") {
+    return {
+      kind: "ready",
+      resultsText: typeof body.results_text === "string" ? body.results_text : "",
+      results:
+        body.results && typeof body.results === "object" && !Array.isArray(body.results)
+          ? (body.results as Record<string, unknown>)
+          : null,
+      receivedAt: typeof body.received_at === "string" ? body.received_at : null,
+    };
+  }
+  return { kind: "pending" };
+}
+
+/**
  * Submit paste for server-side parse. On network/endpoint failure the caller
  * should show a graceful pending confirmation from the client-side partial parse.
  * Never call this with text that failed the client secret scan.

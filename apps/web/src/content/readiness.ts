@@ -66,6 +66,16 @@ export const readinessContent = {
     pasteResults: "I've run it — paste results",
     resumeHint: "Your progress is saved. Use the resume link in email or keep this tab.",
   },
+  waiting: {
+    // Exact status line shown while polling for the AI's POSTed results.
+    status: "waiting for your AI to send results…",
+    helper:
+      "Keep this tab open — your analysis appears here automatically when it arrives. No AI send access? Paste the report yourself instead.",
+    expiredTitle: "This results link expired",
+    expiredBody:
+      "Submission links stay valid for 30 minutes. Start over to generate a fresh prompt with a fresh link.",
+    startOver: "Start over",
+  },
   stage3: {
     progressLabel: "Stage 3 of 3 — paste results",
     title: "Paste your diagnostic report",

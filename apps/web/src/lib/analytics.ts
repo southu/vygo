@@ -21,6 +21,9 @@ export const READINESS_ANALYTICS_EVENTS = [
   "bucket_assigned",
   "cta_clicked",
   "off_ramp_hit",
+  "ingest_landed",
+  "ingest_expired",
+  "start_over",
 ] as const;
 
 export type ReadinessAnalyticsEventName = (typeof READINESS_ANALYTICS_EVENTS)[number];

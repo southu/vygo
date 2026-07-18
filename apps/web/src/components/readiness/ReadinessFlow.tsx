@@ -39,6 +39,7 @@ import {
   draftFromStage1,
   emailReadinessPrompt,
   getReadinessSession,
+  getReadinessSubmissionStatus,
   logReadinessLead,
   parseReadinessPaste,
   patchReadinessSession,
@@ -97,6 +98,12 @@ const FLOW_STEP_STAGE2 = STAGE1_STEPS.length + 1;
 const FLOW_STEP_STAGE3 = STAGE1_STEPS.length + 2;
 const FLOW_STEP_CONFIRM = STAGE1_STEPS.length + 3;
 const FLOW_STEP_GATE = STAGE1_STEPS.length + 4;
+
+/**
+ * Interval for polling the ingest status endpoint while the prompt screen
+ * waits on the customer's AI (plain polling — this stack has no SSE).
+ */
+const INGEST_POLL_INTERVAL_MS = 4000;
 
 function mergeStage1(partial: Partial<ReadinessStage1Answers>): ReadinessStage1Answers {
   return {
@@ -195,6 +202,11 @@ export function ReadinessFlow() {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const pasteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Ingest watch: waiting on the customer's AI to POST results back.
+  const [submissionExpired, setSubmissionExpired] = useState(false);
+  /** received_at of the ingest record already rendered (consume-once). */
+  const ingestedRef = useRef<string | null>(null);
 
   const step: Stage1Step = STAGE1_STEPS[stepIndex] ?? "productDescription";
 
@@ -643,6 +655,179 @@ export function ReadinessFlow() {
   };
 
   /**
+   * Parse results text and render the confirm analysis. Shared by the manual
+   * paste path and the automatic ingest path so the SAME payload renders the
+   * SAME analysis either way. Never call with text that failed the secret scan.
+   */
+  const runParseAndConfirm = async (text: string) => {
+    // Client partial for graceful pending if endpoint is not live.
+    const clientPartial = parseReadinessPastePartial(text);
+    const clientFindings = buildConfirmationFindings(clientPartial, 6);
+    const clientConfirm: ConfirmState = {
+      stack: describeStack(clientPartial),
+      size: describeSize(clientPartial),
+      findings: clientFindings,
+      parseStatus: clientFindings.length > 0 ? "partial" : "pending",
+      pending: true,
+      raw: text,
+      ...structuredConfirmFields(clientPartial, text),
+    };
+
+    // Persist draft (paste text) without waiting for parse — still no secrets.
+    saveReadinessLocal(buildLocal(stage1, "paste", token, { pasteText: text }));
+
+    if (!token) {
+      setConfirm(clientConfirm);
+      setView("confirm");
+      return;
+    }
+
+    try {
+      const result: ParseResponse = await parseReadinessPaste({ token, paste: text });
+      const findings =
+        result.findings.length > 0
+          ? result.findings.slice(0, 6)
+          : clientFindings.length > 0
+            ? clientFindings
+            : [];
+      // Ensure 4–6 findings when we have data; pad from client if needed.
+      let merged = findings;
+      if (merged.length < 4 && clientFindings.length > merged.length) {
+        const seen = new Set(merged);
+        for (const f of clientFindings) {
+          if (merged.length >= 6) break;
+          if (!seen.has(f)) {
+            merged = [...merged, f];
+            seen.add(f);
+          }
+        }
+      }
+      if (result.parseStatus === "ok") {
+        trackAnalytics("parse_success", { parseStatus: result.parseStatus });
+      } else if (result.parseStatus === "partial" || result.parseStatus === "pending") {
+        trackAnalytics("parse_normalized", { parseStatus: result.parseStatus });
+      } else {
+        trackAnalytics("parse_failed", { parseStatus: result.parseStatus });
+      }
+      trackAnalytics("stage_completed", { stage: "stage3" });
+      const structuredReport =
+        result.report && typeof result.report === "object" && !Array.isArray(result.report)
+          ? (result.report as Parameters<typeof structuredReadinessFromReport>[0])
+          : clientPartial;
+      setConfirm({
+        stack: result.stack || clientConfirm.stack,
+        size: result.size || clientConfirm.size,
+        findings: merged.slice(0, 6),
+        parseStatus: result.parseStatus,
+        pending: result.parseStatus === "pending" || merged.length === 0,
+        raw: text,
+        ...structuredConfirmFields(structuredReport, text),
+      });
+      trackAnalytics("stage_started", { stage: "confirm" });
+      setView("confirm");
+    } catch (err) {
+      const e = err as Error & { code?: string; lines?: number[] };
+      if (e.code === "SECRETS_DETECTED") {
+        setSecretLines(Array.isArray(e.lines) ? e.lines : []);
+        setSecretMessage(PASTE_SECRETS_BLOCK_MESSAGE);
+        trackAnalytics("secret_scan_blocked", { hitCount: e.lines?.length ?? 0, source: "server" });
+        return;
+      }
+      trackAnalytics("parse_failed", { code: e.code || "network" });
+      // Graceful pending: show client-side confirmation.
+      setConfirm(clientConfirm);
+      trackAnalytics("stage_started", { stage: "confirm" });
+      setView("confirm");
+      // Still save draft on session without re-sending paste if possible
+      try {
+        await patchReadinessSession(token, {
+          stage: "confirm",
+          draft: draftFromStage1(stage1, {
+            email: email || undefined,
+            pasteText: text,
+            source: "paste",
+            parseStatus: "pending",
+            report: clientPartial as Record<string, unknown>,
+          }),
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+
+  // Live ref so the ingest poll loop below always calls the latest closure
+  // without restarting its interval on every render.
+  const runParseAndConfirmRef = useRef(runParseAndConfirm);
+  useEffect(() => {
+    runParseAndConfirmRef.current = runParseAndConfirm;
+  });
+
+  /**
+   * Watch for the customer's AI POSTing results back (ingest). While the prompt
+   * screen is up with a live submission token, poll the status endpoint on an
+   * interval; landed results render through the same analysis path as a manual
+   * paste (no reload), and an expired/unknown token stops the wait so the page
+   * can offer a start-over.
+   */
+  useEffect(() => {
+    if (view !== "stage2" || !submissionToken || submissionExpired) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const schedule = (ms: number) => {
+      if (!cancelled) timer = setTimeout(tick, ms);
+    };
+
+    const tick = async () => {
+      if (cancelled) return;
+      const status = await getReadinessSubmissionStatus(submissionToken);
+      if (cancelled) return;
+      switch (status.kind) {
+        case "pending":
+          schedule(INGEST_POLL_INTERVAL_MS);
+          return;
+        case "rate_limited":
+          schedule(Math.max(INGEST_POLL_INTERVAL_MS, status.retryAfterSeconds * 1000));
+          return;
+        case "unavailable":
+          // Transient network/5xx — keep waiting, back off a little.
+          schedule(INGEST_POLL_INTERVAL_MS * 2);
+          return;
+        case "expired":
+          trackAnalytics("ingest_expired", {});
+          setSubmissionExpired(true);
+          return;
+        case "ready": {
+          // Consume-once: never re-render the same landed record twice.
+          if (status.receivedAt && ingestedRef.current === status.receivedAt) {
+            schedule(INGEST_POLL_INTERVAL_MS);
+            return;
+          }
+          const text =
+            status.resultsText.trim() ||
+            (status.results ? JSON.stringify(status.results, null, 2) : "");
+          if (!text) {
+            schedule(INGEST_POLL_INTERVAL_MS);
+            return;
+          }
+          ingestedRef.current = status.receivedAt ?? `ready-${Date.now()}`;
+          trackAnalytics("ingest_landed", { source: "api" });
+          setPasteText(text);
+          await runParseAndConfirmRef.current(text);
+          return;
+        }
+      }
+    };
+
+    void tick();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [view, submissionToken, submissionExpired]);
+
+  /**
    * Client-side secret scan MUST run before any network send of paste contents.
    * On hit: block submit, highlight lines, show fixed message — no fetch.
    */
@@ -682,22 +867,6 @@ export function ReadinessFlow() {
     setSecretMessage("");
     setPasteSubmitting(true);
 
-    // Client partial for graceful pending if endpoint is not live.
-    const clientPartial = parseReadinessPastePartial(pasteText);
-    const clientFindings = buildConfirmationFindings(clientPartial, 6);
-    const clientConfirm: ConfirmState = {
-      stack: describeStack(clientPartial),
-      size: describeSize(clientPartial),
-      findings: clientFindings,
-      parseStatus: clientFindings.length > 0 ? "partial" : "pending",
-      pending: true,
-      raw: pasteText,
-      ...structuredConfirmFields(clientPartial, pasteText),
-    };
-
-    // Persist draft (paste text) without waiting for parse — still no secrets.
-    saveReadinessLocal(buildLocal(stage1, "paste", token, { pasteText }));
-
     // Paste fallback → the SAME ingest endpoint (POST /api/readiness/submit)
     // with the SAME per-session submission token as the direct API path (the
     // token embedded in the diagnostic prompt), so a pasted delimited report
@@ -714,85 +883,8 @@ export function ReadinessFlow() {
       }
     })();
 
-    if (!token) {
-      setConfirm(clientConfirm);
-      setView("confirm");
-      setPasteSubmitting(false);
-      return;
-    }
-
     try {
-      const result: ParseResponse = await parseReadinessPaste({ token, paste: pasteText });
-      const findings =
-        result.findings.length > 0
-          ? result.findings.slice(0, 6)
-          : clientFindings.length > 0
-            ? clientFindings
-            : [];
-      // Ensure 4–6 findings when we have data; pad from client if needed.
-      let merged = findings;
-      if (merged.length < 4 && clientFindings.length > merged.length) {
-        const seen = new Set(merged);
-        for (const f of clientFindings) {
-          if (merged.length >= 6) break;
-          if (!seen.has(f)) {
-            merged = [...merged, f];
-            seen.add(f);
-          }
-        }
-      }
-      if (result.parseStatus === "ok") {
-        trackAnalytics("parse_success", { parseStatus: result.parseStatus });
-      } else if (result.parseStatus === "partial" || result.parseStatus === "pending") {
-        trackAnalytics("parse_normalized", { parseStatus: result.parseStatus });
-      } else {
-        trackAnalytics("parse_failed", { parseStatus: result.parseStatus });
-      }
-      trackAnalytics("stage_completed", { stage: "stage3" });
-      const structuredReport =
-        result.report && typeof result.report === "object" && !Array.isArray(result.report)
-          ? (result.report as Parameters<typeof structuredReadinessFromReport>[0])
-          : clientPartial;
-      setConfirm({
-        stack: result.stack || clientConfirm.stack,
-        size: result.size || clientConfirm.size,
-        findings: merged.slice(0, 6),
-        parseStatus: result.parseStatus,
-        pending: result.parseStatus === "pending" || merged.length === 0,
-        raw: pasteText,
-        ...structuredConfirmFields(structuredReport, pasteText),
-      });
-      trackAnalytics("stage_started", { stage: "confirm" });
-      setView("confirm");
-    } catch (err) {
-      const e = err as Error & { code?: string; lines?: number[] };
-      if (e.code === "SECRETS_DETECTED") {
-        setSecretLines(Array.isArray(e.lines) ? e.lines : []);
-        setSecretMessage(PASTE_SECRETS_BLOCK_MESSAGE);
-        trackAnalytics("secret_scan_blocked", { hitCount: e.lines?.length ?? 0, source: "server" });
-        setPasteSubmitting(false);
-        return;
-      }
-      trackAnalytics("parse_failed", { code: e.code || "network" });
-      // Graceful pending: show client-side confirmation.
-      setConfirm(clientConfirm);
-      trackAnalytics("stage_started", { stage: "confirm" });
-      setView("confirm");
-      // Still save draft on session without re-sending paste if possible
-      try {
-        await patchReadinessSession(token, {
-          stage: "confirm",
-          draft: draftFromStage1(stage1, {
-            email: email || undefined,
-            pasteText,
-            source: "paste",
-            parseStatus: "pending",
-            report: clientPartial as Record<string, unknown>,
-          }),
-        });
-      } catch {
-        /* ignore */
-      }
+      await runParseAndConfirm(pasteText);
     } finally {
       setPasteSubmitting(false);
     }
@@ -842,6 +934,40 @@ export function ReadinessFlow() {
   const onSomethingOff = () => {
     setConfirm(null);
     setView("stage3");
+  };
+
+  /** Expired/unknown submission token: reset to the top of the readiness flow. */
+  const onStartOver = async () => {
+    trackAnalytics("start_over", { from: "ingest_expired" });
+    ingestedRef.current = null;
+    setSubmissionExpired(false);
+    setSubmissionToken(null);
+    setStage1(EMPTY_STAGE1);
+    setStepIndex(0);
+    setPasteText("");
+    setConfirm(null);
+    setSecretLines([]);
+    setSecretMessage("");
+    saveReadinessLocal({
+      token,
+      stage: "intake",
+      stage1: EMPTY_STAGE1,
+      email: email || undefined,
+      updatedAt: new Date().toISOString(),
+    });
+    if (token) {
+      void patchReadinessSession(token, {
+        stage: "intake",
+        draft: draftFromStage1(EMPTY_STAGE1),
+      }).catch(() => {
+        /* local reset still applies */
+      });
+    }
+    // Mint a fresh submission token so the next generated prompt has a live link.
+    void mintSubmissionToken().then((t) => {
+      if (t) setSubmissionToken(t);
+    });
+    setView("stage1");
   };
 
   // Highlight helper: line numbers for secret scan overlay
@@ -1211,6 +1337,42 @@ export function ReadinessFlow() {
             {promptBundle.prompt}
           </pre>
         </div>
+
+        {submissionToken ? (
+          <div
+            className="readiness-step-panel mt-6"
+            data-testid="readiness-waiting"
+            aria-live="polite"
+          >
+            {submissionExpired ? (
+              <div data-testid="readiness-waiting-expired">
+                <h3 className="font-display text-lg font-semibold text-ink">
+                  {c.waiting.expiredTitle}
+                </h3>
+                <p className="mt-1 text-sm text-muted">{c.waiting.expiredBody}</p>
+                <button
+                  type="button"
+                  className="btn-primary mt-4"
+                  onClick={() => void onStartOver()}
+                  data-testid="readiness-start-over"
+                >
+                  {c.waiting.startOver}
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p
+                  className="text-sm font-medium text-ink"
+                  data-testid="readiness-waiting-status"
+                  role="status"
+                >
+                  {c.waiting.status}
+                </p>
+                <p className="mt-1 text-sm text-muted">{c.waiting.helper}</p>
+              </div>
+            )}
+          </div>
+        ) : null}
 
         <div className="readiness-step-panel mt-6" data-testid="readiness-email-panel">
           <h3 className="font-display text-lg font-semibold text-ink">{c.stage2.emailMe}</h3>

@@ -15,6 +15,9 @@
  * POST   /v1/readiness/score-e2e        — TEST-ONLY score (no Turnstile; real evidence pipeline)
  * GET    /v1/readiness/snapshot/:id     — public snapshot read-back (incl. known e2e fixture ids)
  * POST   /v1/readiness/snapshot/:id/email — enqueue snapshot email copy
+ * POST   /v1/readiness/token            — mint a short-lived per-submission ingest token
+ * POST   /v1/readiness/submit           — AI ingest: store results for a submission token
+ * GET    /v1/readiness/status           — poll submission-token status (pending/ready/expired)
  *
  * All Postgres writes go through these server endpoints. Rate-limited by IP.
  * Never returns connection strings, DATABASE_URL, stack traces, or secrets.
@@ -118,6 +121,18 @@ const SCORE_RL_WINDOW_SECONDS = 60;
 /** Dry-run preview is cheaper (no DB/email) but still rate-limited against abuse. */
 const SCORE_PREVIEW_RL_LIMIT = 30;
 const SCORE_PREVIEW_RL_WINDOW_SECONDS = 60;
+
+/**
+ * Status polling is read-only and interval-driven (the waiting page polls every
+ * few seconds), so it gets its own generous bucket — never share the 20/60s
+ * interactive bucket or polling alone would starve parse/session ops.
+ */
+const STATUS_RL_LIMIT = 90;
+const STATUS_RL_WINDOW_SECONDS = 60;
+
+function readinessStatusIpRateLimitKey(ipHash: string): string {
+  return `rl:readiness:status:v1:ip:${ipHash}`;
+}
 
 function readinessScoreIpRateLimitKey(ipHash: string): string {
   return `rl:readiness:score:v1:ip:${ipHash}`;
@@ -1222,6 +1237,56 @@ async function enforceReadinessRateLimit(
     );
     request.log.info(
       { event: "readiness_rate_limited", retryAfterSeconds: retryAfter },
+      "rate limited",
+    );
+    await reply
+      .status(429)
+      .header("Retry-After", String(retryAfter))
+      .send(safeError("RATE_LIMITED", "Too many attempts. Please try again later."));
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Rate-limit the readiness status poll endpoint by client IP (own bucket).
+ * Read-only, called on an interval by the waiting readiness page, so the limit
+ * sits well above normal poll cadence while still bounding abuse.
+ */
+async function enforceStatusRateLimit(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: ReadinessRouteDeps,
+): Promise<boolean> {
+  const rawIp = resolveClientIp(request);
+  const ipHashResult = hashIpAddress(rawIp, deps.env);
+
+  let bucketKey: string;
+  if (ipHashResult) {
+    bucketKey = readinessStatusIpRateLimitKey(ipHashResult.hash);
+  } else {
+    const { createHmac } = await import("node:crypto");
+    const digest = createHmac("sha256", "vygo-readiness-status-rl")
+      .update(rawIp)
+      .digest("hex")
+      .slice(0, 32);
+    bucketKey = readinessStatusIpRateLimitKey(`rlfb:${digest}`);
+  }
+
+  const result = await checkRateLimit(
+    deps.rateLimitStore,
+    bucketKey,
+    STATUS_RL_LIMIT,
+    STATUS_RL_WINDOW_SECONDS,
+  );
+
+  if (!result.allowed) {
+    const retryAfter = Math.max(
+      1,
+      Math.min(result.retryAfterSeconds || STATUS_RL_WINDOW_SECONDS, STATUS_RL_WINDOW_SECONDS),
+    );
+    request.log.info(
+      { event: "readiness_status_rate_limited", retryAfterSeconds: retryAfter },
       "rate limited",
     );
     await reply
@@ -3190,6 +3255,121 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       request.log.error(
         { event: "readiness_submit_failed" },
         error instanceof Error ? error.message : "submit failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  /**
+   * Poll the status of a per-submission ingest token. The waiting readiness
+   * page polls this on an interval after the prompt is generated:
+   *   - 200 { status: "pending" }  — token valid, no results landed yet
+   *   - 200 { status: "ready", results, results_text } — results landed (redacted)
+   *   - 404 { status: "expired" }  — unknown token
+   *   - 410 { status: "expired" }  — token past expiry with no landed results
+   * Results that landed before expiry remain readable after it.
+   */
+  app.get("/v1/readiness/status", async (request, reply) => {
+    if (!(await enforceStatusRateLimit(request, reply, deps))) return;
+
+    const q = (request.query ?? {}) as Record<string, unknown>;
+    const token = typeof q.token === "string" ? q.token.trim().slice(0, 128) : "";
+    if (!token) {
+      return reply
+        .status(400)
+        .send(safeError("VALIDATION_ERROR", "A submission token is required."));
+    }
+    // A token outside the minted format can never exist: answer exactly like
+    // an unknown token so the endpoint stays a simple pending/expired signal.
+    if (!TOKEN_RE.test(token)) {
+      return reply.status(404).send({
+        status: "expired",
+        ...safeError("NOT_FOUND", "The submission token is unknown or expired."),
+      });
+    }
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+
+      const tokenRows = await dbHandle.sql<{ token: string; expires_at: Date | string }[]>`
+        SELECT token, expires_at
+        FROM readiness_ingest_tokens
+        WHERE token = ${token}
+        LIMIT 1
+      `;
+      const tokenRow = tokenRows[0];
+      if (!tokenRow) {
+        return reply.status(404).send({
+          status: "expired",
+          ...safeError("NOT_FOUND", "The submission token is unknown or expired."),
+        });
+      }
+
+      const expiresAtIso = new Date(tokenRow.expires_at).toISOString();
+
+      const submissionRows = await dbHandle.sql<{ payload: unknown; received_at: Date | string }[]>`
+        SELECT payload, received_at
+        FROM readiness_ingest_submissions
+        WHERE token = ${token}
+        ORDER BY received_at DESC
+        LIMIT 1
+      `;
+      const submission = submissionRows[0];
+
+      if (!submission) {
+        if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+          return reply.status(410).send({
+            status: "expired",
+            ...safeError("EXPIRED_TOKEN", "The submission token is unknown or expired."),
+          });
+        }
+        return reply.status(200).send({
+          token,
+          status: "pending",
+          expires_at: expiresAtIso,
+        });
+      }
+
+      const payload =
+        submission.payload &&
+        typeof submission.payload === "object" &&
+        !Array.isArray(submission.payload)
+          ? (submission.payload as Record<string, unknown>)
+          : {};
+      // Re-redact on read-back so a planted secret in the raw ingest payload
+      // never echoes back to the page.
+      const resultsText =
+        typeof payload.results_text === "string"
+          ? redactPasteSecrets(payload.results_text).redacted
+          : null;
+      const results =
+        payload.results && typeof payload.results === "object" && !Array.isArray(payload.results)
+          ? (payload.results as Record<string, unknown>)
+          : null;
+      const receivedAt =
+        submission.received_at instanceof Date
+          ? submission.received_at.toISOString()
+          : String(submission.received_at);
+
+      return reply.status(200).send({
+        token,
+        status: "ready",
+        expires_at: expiresAtIso,
+        received_at: receivedAt,
+        results,
+        results_text: resultsText,
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_status_failed" },
+        error instanceof Error ? error.message : "status failed",
       );
       return reply
         .status(500)

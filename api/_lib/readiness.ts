@@ -398,6 +398,20 @@ export async function proxySubmit(
   return proxyJson("POST", "/v1/readiness/submit", body ?? {}, env, inboundHeaders);
 }
 
+export async function proxyGetStatus(
+  token: string,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson(
+    "GET",
+    `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    undefined,
+    env,
+    inboundHeaders,
+  );
+}
+
 export async function proxyGetSession(
   token: string,
   env: NodeJS.ProcessEnv = process.env,

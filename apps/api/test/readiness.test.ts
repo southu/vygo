@@ -591,6 +591,40 @@ describe("readiness routes without database", () => {
     assert.notEqual(res.statusCode, 404);
     assert.equal(res.statusCode, 503);
   });
+
+  it("GET /v1/readiness/status requires a token", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/v1/readiness/status",
+    });
+    assert.notEqual(res.statusCode, 404);
+    assert.equal(res.statusCode, 400);
+    const body = res.json() as { error?: { code?: string } };
+    assert.equal(body.error?.code, "VALIDATION_ERROR");
+  });
+
+  it("GET /v1/readiness/status with a malformed token answers like an unknown token", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/v1/readiness/status?token=bogus",
+    });
+    assert.equal(res.statusCode, 404);
+    const body = res.json() as { status?: string; error?: { code?: string } };
+    assert.equal(body.status, "expired");
+    assert.equal(body.error?.code, "NOT_FOUND");
+  });
+
+  it("GET /v1/readiness/status returns 503 without database when token is present", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "GET",
+      url: "/v1/readiness/status?token=test-token-valid-length",
+    });
+    assert.notEqual(res.statusCode, 404);
+    assert.equal(res.statusCode, 503);
+  });
 });
 
 /**
@@ -718,5 +752,79 @@ describe("readiness ingest flow with database", () => {
     const body = res.json() as { error?: { code?: string; message?: string } };
     assert.equal(body.error?.code, "INVALID_TOKEN");
     assert.ok(/unknown or expired/i.test(body.error?.message ?? ""));
+  });
+
+  it("reports pending before ingest, ready after, and redacts secrets on read-back", async () => {
+    rateLimitStore.clear();
+    const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+    assert.equal(tokenRes.statusCode, 200);
+    const { token } = tokenRes.json() as { token: string };
+
+    const pending = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    assert.equal(pending.statusCode, 200);
+    const pendingBody = pending.json() as { status?: string; results_text?: unknown };
+    assert.equal(pendingBody.status, "pending");
+    assert.equal(pendingBody.results_text, undefined);
+
+    const secret = "sk-live-abcdefghijklmnopqrstuvwxyz";
+    const submit = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: {
+        submission_token: token,
+        results_text: `VYGO-READINESS-REPORT-V1 key: ${secret}`,
+        results: { overall: 82, bucket: "Launch" },
+      },
+    });
+    assert.equal(submit.statusCode, 200);
+
+    const ready = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    assert.equal(ready.statusCode, 200);
+    const readyBody = ready.json() as {
+      status?: string;
+      received_at?: string;
+      results?: Record<string, unknown> | null;
+      results_text?: string | null;
+    };
+    assert.equal(readyBody.status, "ready");
+    assert.ok(readyBody.received_at);
+    assert.deepEqual(readyBody.results, { overall: 82, bucket: "Launch" });
+    assert.ok(typeof readyBody.results_text === "string" && readyBody.results_text.length > 0);
+    // Planted secret must never echo back to the waiting page.
+    assert.ok(!readyBody.results_text!.includes(secret));
+  });
+
+  it("distinguishes unknown and expired tokens on the status endpoint", async () => {
+    rateLimitStore.clear();
+
+    const unknown = await ctx.app.inject({
+      method: "GET",
+      url: "/v1/readiness/status?token=unknown-token-1234567890",
+    });
+    assert.equal(unknown.statusCode, 404);
+    const unknownBody = unknown.json() as { status?: string; error?: { code?: string } };
+    assert.equal(unknownBody.status, "expired");
+    assert.equal(unknownBody.error?.code, "NOT_FOUND");
+
+    const expiredToken = `expired-${Date.now()}-abcdefgh`;
+    await handle.sql`
+      INSERT INTO readiness_ingest_tokens (token, expires_at)
+      VALUES (${expiredToken}, ${new Date(Date.now() - 60 * 1000).toISOString()})
+    `;
+    const expired = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(expiredToken)}`,
+    });
+    assert.equal(expired.statusCode, 410);
+    const expiredBody = expired.json() as { status?: string; error?: { code?: string } };
+    assert.equal(expiredBody.status, "expired");
+    assert.equal(expiredBody.error?.code, "EXPIRED_TOKEN");
   });
 });
