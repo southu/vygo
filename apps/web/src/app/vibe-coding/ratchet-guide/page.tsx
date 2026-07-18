@@ -304,6 +304,16 @@ const quickStartSteps: Step[] = [
 export default function RatchetGuidePage() {
   return (
     <ModulePage module={module}>
+      <div className="container-page -mt-4 pb-4">
+        <a
+          href="/content/vibe-coding/ratchet-guide/README.md"
+          download="README.md"
+          className="btn-secondary"
+          data-download-link="guide-index-markdown"
+        >
+          Download raw Markdown (.md)
+        </a>
+      </div>
       <div
         className="container-page section-pad border-t border-border lg:grid lg:grid-cols-[14rem_1fr] lg:items-start lg:gap-10 xl:grid-cols-[16rem_1fr] xl:gap-14"
         data-guide-body

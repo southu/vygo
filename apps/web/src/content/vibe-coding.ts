@@ -84,11 +84,11 @@ export const vibeCodingContent = {
     primaryCta: { label: "Start free", href: "/apply" },
     guideCta: {
       label: "Read the guide",
-      href: "/content/vibe-coding/ratchet-guide/README.md",
+      href: "/vibe-coding/ratchet-guide",
     },
     checklistCta: {
       label: "Rebuild checklist",
-      href: "/content/vibe-coding/ratchet-guide/rebuild.md",
+      href: "/vibe-coding/ratchet-guide/rebuild",
     },
   },
   definition: {

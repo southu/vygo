@@ -27,7 +27,7 @@ export default function VibeCodingPage() {
           <p className="mt-6 text-lg text-muted">{content.hero.intro}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <CtaLink href={content.hero.primaryCta.href}>{content.hero.primaryCta.label}</CtaLink>
-            {/* Static markdown pack: plain anchors, not client-side navigation. */}
+            {/* Rendered guide/checklist pages: plain anchors, not client-side navigation. */}
             <a className="btn-secondary" href={content.hero.guideCta.href}>
               {content.hero.guideCta.label}
             </a>
