@@ -44,3 +44,15 @@ commits or this log.
 - No refactor of unrelated code.
 - Provisioner non-secret summary reused existing Railway project `vygo` (Postgres/Redis).
 - Ready for independent tester confirmation of the same ten items.
+
+## Homepage copy deploy (2026-07-18)
+
+Mission `vygo-homepage-deploy`: ship the STEP 1 "Get set up first" homepage copy
+change (reframed around vibe coding, commit `5ce379f`) to production.
+
+- Product change: none beyond the copy already on `main`; the homepage copy and
+  all app code are untouched by this commit.
+- Deploy trigger: this commit is pushed to `main` so the Railway/Vercel pipeline
+  for project `vygo` redeploys and `GET /version` reports the new HEAD SHA.
+- Verify: `GET https://www.vygo.ai/` → 200 HTML; `GET /version` → pushed HEAD;
+  no server-error text; nav links < 500; valid HTTPS certificate.
