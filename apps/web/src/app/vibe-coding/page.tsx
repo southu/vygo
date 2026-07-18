@@ -6,6 +6,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { VibeLoopDiagram } from "@/components/VibeLoopDiagram";
 import { TopicCard } from "@/components/TopicCard";
 import { GuideOffer } from "@/components/vibe-coding/GuideOffer";
+import { guideOffer } from "@/content/guide-offer";
 import { StepList } from "@/components/vibe-coding/StepCard";
 import { setupSteps } from "@/content/guide-setup";
 
@@ -28,7 +29,12 @@ export default function VibeCodingPage() {
           </h1>
           <p className="mt-6 text-lg text-muted">{content.hero.intro}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <CtaLink href={content.hero.primaryCta.href}>{content.hero.primaryCta.label}</CtaLink>
+            {/* Plain anchor straight to the zip, same download behavior as the
+                lower-page "Start free" link in GuideOffer — no client-side
+                navigation for a static file download. */}
+            <a className="btn-primary" href={guideOffer.ctas.startFree.href}>
+              {content.hero.primaryCta.label}
+            </a>
             {/* Rendered guide/checklist pages: plain anchors, not client-side navigation. */}
             <a className="btn-secondary" href={content.hero.guideCta.href}>
               {content.hero.guideCta.label}
