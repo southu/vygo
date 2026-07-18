@@ -5,6 +5,7 @@ import { parseReadinessPastePartial } from "./paste-normalize.js";
 import {
   classifyFindingSeverity,
   classifyReadinessSize,
+  isMalformedStructuredPaste,
   parseSizeMetrics,
   parseStackEntries,
   parseStructuredFindings,
@@ -195,6 +196,37 @@ describe("parseStructuredReadiness — malformed / garbage input", () => {
     assert.deepEqual(empty.stack, []);
     assert.deepEqual(empty.size.metrics, []);
     assert.deepEqual(empty.findings, []);
+  });
+});
+
+describe("isMalformedStructuredPaste — raw fallback gate", () => {
+  it("flags truncated JSON so recognizable tech is not scraped into a partial stack", () => {
+    // Exact repro from the field: truncated mid-string, valid tech substrings.
+    const truncated =
+      '{"stack":{"languages":["TypeScript"],"frameworks":["React","Next.js"]},' +
+      '"findings":[{"severity":"high","detail":"Tenant isolation';
+    assert.equal(isMalformedStructuredPaste(truncated), true);
+  });
+
+  it("flags a JSON array that is cut off", () => {
+    assert.equal(isMalformedStructuredPaste('[{"severity":"high","detail":"Auth'), true);
+  });
+
+  it("does not flag complete, valid JSON", () => {
+    assert.equal(isMalformedStructuredPaste('{"stack":{"languages":["TypeScript"]}}'), false);
+    assert.equal(isMalformedStructuredPaste("[1, 2, 3]"), false);
+  });
+
+  it("does not flag the delimited v1 report (handled by its own parser)", () => {
+    assert.equal(isMalformedStructuredPaste(VYGO_PASTE), false);
+  });
+
+  it("does not flag arbitrary prose or empty input", () => {
+    assert.equal(isMalformedStructuredPaste("We built a clinic scheduling tool in TypeScript."), false);
+    assert.equal(isMalformedStructuredPaste(""), false);
+    assert.equal(isMalformedStructuredPaste("   "), false);
+    // @ts-expect-error — exercising a non-string call at runtime.
+    assert.equal(isMalformedStructuredPaste(null), false);
   });
 });
 

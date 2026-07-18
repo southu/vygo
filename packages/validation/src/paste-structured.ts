@@ -379,6 +379,34 @@ export function structuredReadinessFromReport(
 }
 
 /**
+ * Detect a paste that is *trying* to be structured JSON but is syntactically
+ * malformed or truncated (e.g. `{"stack":{...},"findings":[{"severity":"high"`).
+ *
+ * Such input must fall back to the verbatim raw view rather than have stray
+ * technology substrings (TypeScript, Next.js, …) scraped out of the broken JSON
+ * and presented as a partial, misleading structured result. Valid/complete JSON,
+ * the delimited v1 report format, and arbitrary prose all return `false`, so the
+ * existing successful confirm behavior for those inputs is preserved.
+ *
+ * Only JSON-shaped input (first non-space char is `{` or `[`) is considered
+ * "structured" here; the delimited v1 report has its own footer-tolerant parser
+ * and is intentionally not routed through this check.
+ */
+export function isMalformedStructuredPaste(raw: string): boolean {
+  if (typeof raw !== "string") return false;
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  const first = trimmed[0];
+  if (first !== "{" && first !== "[") return false;
+  try {
+    JSON.parse(trimmed);
+    return false; // parses cleanly — treat as valid JSON, not malformed
+  } catch {
+    return true; // JSON-shaped but broken/truncated → raw fallback
+  }
+}
+
+/**
  * Parse a raw Stage 3 diagnostic paste into structured display data. Pure and
  * total: on garbage input it returns empty structured collections while
  * preserving the raw text (and today's free-text/bullet renderings) so nothing

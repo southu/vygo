@@ -19,6 +19,7 @@ import {
   describeSize,
   describeStack,
   isFeaturesOnlySoftOffRamp,
+  isMalformedStructuredPaste,
   isNotBuiltYet,
   parseReadinessPastePartial,
   scanPasteForSecrets,
@@ -891,12 +892,24 @@ export function ReadinessFlow() {
   }
 
   if (view === "confirm" && confirm) {
-    const confirmCallout: AnswerCalloutPayload | null = confirm.stack
-      ? {
-          id: "confirm-stack",
-          text: `Got it — stack noted as ${confirm.stack}${confirm.size ? `; size: ${confirm.size}` : ""}.`,
-        }
-      : null;
+    // Force the verbatim raw fallback when the paste is syntactically malformed
+    // structured input (e.g. truncated JSON): never scrape stray tech substrings
+    // out of broken JSON into a misleading partial STACK. Also show it when
+    // nothing structured parsed at all but we still have raw text to display.
+    const rawText = confirm.raw.trim();
+    const showRawFallback =
+      rawText.length > 0 &&
+      (isMalformedStructuredPaste(confirm.raw) ||
+        (confirm.stackEntries.length === 0 &&
+          confirm.sizeMetrics.length === 0 &&
+          confirm.findings.length === 0));
+    const confirmCallout: AnswerCalloutPayload | null =
+      !showRawFallback && confirm.stack
+        ? {
+            id: "confirm-stack",
+            text: `Got it — stack noted as ${confirm.stack}${confirm.size ? `; size: ${confirm.size}` : ""}.`,
+          }
+        : null;
     return (
       <div className="readiness-assessment mt-8" data-testid="readiness-confirm">
         <AssessmentProgress
@@ -914,10 +927,7 @@ export function ReadinessFlow() {
           </p>
         ) : null}
 
-        {confirm.stackEntries.length === 0 &&
-        confirm.sizeMetrics.length === 0 &&
-        confirm.findings.length === 0 &&
-        confirm.raw.trim() ? (
+        {showRawFallback ? (
           <div className="readiness-step-panel mt-6" data-testid="readiness-confirm-raw-fallback">
             <p className="eyebrow">Pasted input</p>
             <p className="mt-2 text-sm text-muted">

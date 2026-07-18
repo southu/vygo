@@ -89,6 +89,7 @@ export {
   parseStructuredFindings,
   parseStructuredReadiness,
   structuredReadinessFromReport,
+  isMalformedStructuredPaste,
   type StackCategory,
   type StackEntry,
   type SizeClassification,
