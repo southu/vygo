@@ -39,23 +39,23 @@ More diagrams: [diagrams.md](./diagrams.md) · Printable: [one-pager-print](./on
 
 ## Component cheat sheet
 
-| Component | Role |
-| --------- | ---- |
-| **Composer** | Human-facing surface: capture goals, manage product shells, queue missions |
-| **Ratchet loop** | Orchestration: builder → deploy gate → live tester → streak |
-| **Credentials boundary** | Secrets stay brokered; agents never hold cloud tokens |
-| **Product shells** | One product = one repo + one live URL + one version signal |
-| **Optional helpers** | Observe and report only — never implement product features |
+| Component                | Role                                                                       |
+| ------------------------ | -------------------------------------------------------------------------- |
+| **Composer**             | Human-facing surface: capture goals, manage product shells, queue missions |
+| **Ratchet loop**         | Orchestration: builder → deploy gate → live tester → streak                |
+| **Credentials boundary** | Secrets stay brokered; agents never hold cloud tokens                      |
+| **Product shells**       | One product = one repo + one live URL + one version signal                 |
+| **Optional helpers**     | Observe and report only — never implement product features                 |
 
 ---
 
 ## What “done” means
 
-| Layer | Done when |
-| ----- | --------- |
-| Single mission | A streak of consecutive live passes |
-| Deploy gate | Live version signal matches what the builder just pushed |
-| Builder step | Real git work is proven — not agent claims alone |
+| Layer            | Done when                                                  |
+| ---------------- | ---------------------------------------------------------- |
+| Single mission   | A streak of consecutive live passes                        |
+| Deploy gate      | Live version signal matches what the builder just pushed   |
+| Builder step     | Real git work is proven — not agent claims alone           |
 | Product campaign | Each focused step succeeded (or was intentionally dropped) |
 
 ---
@@ -75,6 +75,6 @@ More diagrams: [diagrams.md](./diagrams.md) · Printable: [one-pager-print](./on
 1. Skim [principles.md](./principles.md)
 2. Read [loop-and-missions.md](./loop-and-missions.md) until the live-version contract is clear
 3. Skim [footguns.md](./footguns.md) for the common design mistakes
-4. Only then decide how *your* install would realize the same product ideas
+4. Only then decide how _your_ install would realize the same product ideas
 
 Continue → [Architecture](./architecture.md)

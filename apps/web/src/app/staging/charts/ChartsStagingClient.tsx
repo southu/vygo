@@ -73,7 +73,9 @@ export function ChartsStagingClient() {
         <span className="rounded-full border border-border bg-canvas px-2.5 py-0.5 font-semibold text-ink-soft">
           Verification surface (no Turnstile)
         </span>
-        {data.sourceLabel ? <span data-testid="charts-source-label">{data.sourceLabel}</span> : null}
+        {data.sourceLabel ? (
+          <span data-testid="charts-source-label">{data.sourceLabel}</span>
+        ) : null}
         {data.bucket ? (
           <span className="rounded-full bg-purple-soft px-2.5 py-0.5 font-semibold text-purple-dark">
             Bucket: {data.bucket}
@@ -81,10 +83,9 @@ export function ChartsStagingClient() {
         ) : null}
       </div>
       <p className="text-sm text-muted" data-testid="charts-verify-hint">
-        Live score-preview (or snapshot <code className="text-xs">?id=</code>) powers the same radar,
-        gauge, and sub-metric bars as{" "}
-        <code className="text-xs">/readiness/snapshot</code>. Hover, tap, or Tab to a segment for the
-        score, reason, and submitted answer.
+        Live score-preview (or snapshot <code className="text-xs">?id=</code>) powers the same
+        radar, gauge, and sub-metric bars as <code className="text-xs">/readiness/snapshot</code>.
+        Hover, tap, or Tab to a segment for the score, reason, and submitted answer.
       </p>
 
       <section

@@ -345,8 +345,7 @@ function resolveScorePreviewReport(body: Record<string, unknown>): {
 } | null {
   const profileRaw = typeof body.profile === "string" ? body.profile.trim().toLowerCase() : "";
   if (profileRaw && SCORE_PREVIEW_PROFILES[profileRaw]) {
-    const canonical =
-      profileRaw === "low" ? "weak" : profileRaw === "high" ? "strong" : profileRaw;
+    const canonical = profileRaw === "low" ? "weak" : profileRaw === "high" ? "strong" : profileRaw;
     return {
       report: { ...SCORE_PREVIEW_PROFILES[profileRaw] },
       source: "paste",
@@ -420,11 +419,8 @@ function publicScorePreviewBody(
     recommendation: sanitizePublicRecommendation(payload.recommendation),
     ranges: payload.ranges ?? null,
     reasoning:
-      typeof payload.reasoning === "string"
-        ? clipPublicText(payload.reasoning, 900) || null
-        : null,
-    caveat:
-      typeof payload.caveat === "string" ? clipPublicText(payload.caveat, 480) || null : null,
+      typeof payload.reasoning === "string" ? clipPublicText(payload.reasoning, 900) || null : null,
+    caveat: typeof payload.caveat === "string" ? clipPublicText(payload.caveat, 480) || null : null,
     findings: Array.isArray(payload.findings)
       ? payload.findings.map((f) => clipPublicText(f, 280)).filter(Boolean)
       : [],
@@ -497,10 +493,7 @@ function sanitizePublicInsights(raw: unknown): unknown[] {
     const type = typeof row.type === "string" ? row.type.trim() : "";
     const headline = clipPublicText(row.headline, 160);
     const detail = clipPublicText(row.detail, 480);
-    const source_answer = clipPublicText(
-      row.source_answer ?? row.sourceAnswer,
-      280,
-    );
+    const source_answer = clipPublicText(row.source_answer ?? row.sourceAnswer, 280);
     const dimension = typeof row.dimension === "string" ? row.dimension.trim() : "";
     // Sparse degrade: skip empty-quote insights rather than inventing content.
     if (!headline || !source_answer) continue;
@@ -517,8 +510,7 @@ function sanitizePublicDimensionAnalyses(raw: unknown): unknown[] {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const row = entry as Record<string, unknown>;
     const dimension = typeof row.dimension === "string" ? row.dimension : "";
-    const score =
-      typeof row.score === "number" && Number.isFinite(row.score) ? row.score : null;
+    const score = typeof row.score === "number" && Number.isFinite(row.score) ? row.score : null;
     const paragraphs = Array.isArray(row.paragraphs)
       ? row.paragraphs
           .filter((p): p is string => typeof p === "string")
@@ -541,7 +533,9 @@ function sanitizePublicRecommendation(raw: unknown): Record<string, unknown> | n
   const row = raw as Record<string, unknown>;
   return {
     patternKey: typeof row.patternKey === "string" ? row.patternKey : "",
-    engagement: clipPublicText(row.engagement, 160) || (typeof row.engagement === "string" ? row.engagement : ""),
+    engagement:
+      clipPublicText(row.engagement, 160) ||
+      (typeof row.engagement === "string" ? row.engagement : ""),
     rationale: clipPublicText(row.rationale, 800),
     citedFindings: Array.isArray(row.citedFindings)
       ? row.citedFindings
@@ -1986,19 +1980,26 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
     const body = (request.body ?? {}) as Record<string, unknown>;
     const resolved = resolveScorePreviewReport(body);
     if (!resolved) {
-      return reply.status(400).send(
-        safeError(
-          "VALIDATION_ERROR",
-          'Provide assessment answers as `report` or `answers`, or a built-in `profile` of "weak", "strong", or "mixed".',
-        ),
-      );
+      return reply
+        .status(400)
+        .send(
+          safeError(
+            "VALIDATION_ERROR",
+            'Provide assessment answers as `report` or `answers`, or a built-in `profile` of "weak", "strong", or "mixed".',
+          ),
+        );
     }
 
     const report = stripPreviewContactKeys(resolved.report);
     if (Object.keys(report).length === 0) {
       return reply
         .status(400)
-        .send(safeError("VALIDATION_ERROR", "Assessment answers must include at least one scored field."));
+        .send(
+          safeError(
+            "VALIDATION_ERROR",
+            "Assessment answers must include at least one scored field.",
+          ),
+        );
     }
 
     try {
@@ -2052,10 +2053,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       return reply
         .status(500)
         .send(
-          safeError(
-            "SCORING_UNAVAILABLE",
-            "Scoring engine failed closed. Please try again later.",
-          ),
+          safeError("SCORING_UNAVAILABLE", "Scoring engine failed closed. Please try again later."),
         );
     }
   });
@@ -2550,8 +2548,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
     }
 
     const body = (request.body ?? {}) as Record<string, unknown>;
-    const profileRaw =
-      typeof body.profile === "string" ? body.profile.trim().toLowerCase() : "";
+    const profileRaw = typeof body.profile === "string" ? body.profile.trim().toLowerCase() : "";
     const profileKey =
       profileRaw === "low"
         ? "weak"
@@ -2659,7 +2656,10 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
             "";
           if (pasteFallback.trim()) {
             try {
-              const recovered = parseReadinessPastePartial(pasteFallback) as Record<string, unknown>;
+              const recovered = parseReadinessPastePartial(pasteFallback) as Record<
+                string,
+                unknown
+              >;
               if (hasScorableReportAnswers(recovered, scoringConfig ?? undefined)) {
                 report = recovered;
               }
@@ -2793,9 +2793,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
               ? clipPublicText(payload.reasoning, 900) || null
               : null,
           caveat:
-            typeof payload.caveat === "string"
-              ? clipPublicText(payload.caveat, 480) || null
-              : null,
+            typeof payload.caveat === "string" ? clipPublicText(payload.caveat, 480) || null : null,
           findings: Array.isArray(payload.findings)
             ? payload.findings.map((f) => clipPublicText(f, 280)).filter(Boolean)
             : [],
@@ -2817,19 +2815,23 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         );
         return reply
           .status(500)
-          .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+          .send(
+            safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."),
+          );
       }
     }
 
     // Arbitrary report (no session): pure compute shaped as a snapshot, no DB.
     const resolved = resolveScorePreviewReport(body);
     if (!resolved) {
-      return reply.status(400).send(
-        safeError(
-          "VALIDATION_ERROR",
-          'Provide `profile` ("weak"|"strong"|"mixed"), a session `token`, or assessment `report`/`answers`.',
-        ),
-      );
+      return reply
+        .status(400)
+        .send(
+          safeError(
+            "VALIDATION_ERROR",
+            'Provide `profile` ("weak"|"strong"|"mixed"), a session `token`, or assessment `report`/`answers`.',
+          ),
+        );
     }
     try {
       const report = stripPreviewContactKeys(resolved.report);
@@ -2894,10 +2896,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       return reply
         .status(500)
         .send(
-          safeError(
-            "SCORING_UNAVAILABLE",
-            "Scoring engine failed closed. Please try again later.",
-          ),
+          safeError("SCORING_UNAVAILABLE", "Scoring engine failed closed. Please try again later."),
         );
     }
   });
@@ -2936,7 +2935,9 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         );
         return reply
           .status(500)
-          .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+          .send(
+            safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."),
+          );
       }
     }
 
@@ -3107,7 +3108,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
 
       await dbHandle.sql`
         INSERT INTO readiness_ingest_tokens (token, expires_at)
-        VALUES (${token}, ${expiresAt})
+        VALUES (${token}, ${expiresAt.toISOString()})
       `;
 
       return reply.status(200).send({

@@ -487,9 +487,15 @@ describe("readiness scoring", () => {
       payload.reasoning.length <= REASONING_BODY_MAX_CHARS,
       `reasoning length ${payload.reasoning.length} exceeds body max ${REASONING_BODY_MAX_CHARS}`,
     );
-    assert.doesNotMatch(payload.reasoning, new RegExp("Z".repeat(REASONING_FREE_TEXT_MAX_CHARS + 20)));
+    assert.doesNotMatch(
+      payload.reasoning,
+      new RegExp("Z".repeat(REASONING_FREE_TEXT_MAX_CHARS + 20)),
+    );
     assert.match(payload.reasoning, /…/);
-    assert.ok(!payload.reasoning.includes(longSummary), "full raw summary must not appear in reasoning");
+    assert.ok(
+      !payload.reasoning.includes(longSummary),
+      "full raw summary must not appear in reasoning",
+    );
     // Embedded free-text snippet itself is bounded.
     const describedMatch = payload.reasoning.match(/describes\s+([^,]+)/i);
     if (describedMatch) {
@@ -522,7 +528,7 @@ describe("readiness scoring", () => {
     }
 
     for (const n of [50, 100, 800] as const) {
-      const emoji = ("🚀🔒").repeat(n);
+      const emoji = "🚀🔒".repeat(n);
       const payload = computeReadinessScore({
         report: {
           ...UNKNOWN_REPORT,
@@ -564,10 +570,7 @@ describe("hasScorableReportAnswers", () => {
       false,
       "unrecognized keys must not count as scorable answers",
     );
-    assert.equal(
-      hasScorableReportAnswers({ confidence: "NaN", not: "valid" }),
-      false,
-    );
+    assert.equal(hasScorableReportAnswers({ confidence: "NaN", not: "valid" }), false);
     assert.equal(
       hasScorableReportAnswers({ auth: "unknown", tests: "Not sure" }),
       false,

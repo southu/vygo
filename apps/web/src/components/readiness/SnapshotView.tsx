@@ -165,7 +165,9 @@ function firstSentence(text: string): string {
 function buildPersonalizedVerdict(data: SnapshotResponse, overall: number | null): string {
   const reasoningLine = data.reasoning ? firstSentence(data.reasoning) : "";
   if (reasoningLine && reasoningLine.length >= 40) {
-    return quoteText(reasoningLine, VERDICT_MAX_CHARS) || quoteText(data.reasoning, VERDICT_MAX_CHARS);
+    return (
+      quoteText(reasoningLine, VERDICT_MAX_CHARS) || quoteText(data.reasoning, VERDICT_MAX_CHARS)
+    );
   }
 
   const summary = quoteText(data.reportSummary?.summary, 90);
@@ -204,7 +206,10 @@ function buildApplyHref(snapshot: SnapshotResponse): string {
 }
 
 function dimSlug(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
 /**
@@ -378,9 +383,7 @@ function DimensionSection({
               {rangeLow}–{rangeHigh}
             </span>
           ) : (
-            <span data-testid={`snapshot-dim-score-${dimension}`}>
-              {pointLabel ?? "—"}
-            </span>
+            <span data-testid={`snapshot-dim-score-${dimension}`}>{pointLabel ?? "—"}</span>
           )}
           <span className="ml-1 text-base font-semibold text-muted">/100</span>
         </p>
@@ -398,9 +401,7 @@ function DimensionSection({
           className={`h-full rounded-full ${meta.bar}`}
           style={{
             width:
-              headline == null
-                ? "0%"
-                : `${Math.max(headline > 0 ? 4 : 0, clampPct(headline))}%`,
+              headline == null ? "0%" : `${Math.max(headline > 0 ? 4 : 0, clampPct(headline))}%`,
           }}
           data-testid={`snapshot-dim-bar-${dimension}`}
         />
@@ -748,7 +749,10 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
               {verdict}
             </p>
             {data.bucket ? (
-              <p className="mt-4 min-w-0 break-words text-sm text-ink-soft" data-testid="snapshot-bucket">
+              <p
+                className="mt-4 min-w-0 break-words text-sm text-ink-soft"
+                data-testid="snapshot-bucket"
+              >
                 Recommended path:{" "}
                 <span className="font-display text-base font-bold text-purple">{data.bucket}</span>
               </p>
@@ -827,7 +831,9 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted">No structured insights were available for this snapshot.</p>
+          <p className="text-sm text-muted">
+            No structured insights were available for this snapshot.
+          </p>
         )}
       </section>
 
@@ -905,17 +911,17 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
                       const finding = quoteText(f, 280);
                       if (!finding) return null;
                       return (
-                      <li
-                        key={finding}
-                        className="flex min-w-0 items-start gap-3"
-                        data-testid="snapshot-recommendation-finding"
-                      >
-                        <span
-                          className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-green"
-                          aria-hidden
-                        />
-                        <span className="min-w-0 break-words leading-relaxed">{finding}</span>
-                      </li>
+                        <li
+                          key={finding}
+                          className="flex min-w-0 items-start gap-3"
+                          data-testid="snapshot-recommendation-finding"
+                        >
+                          <span
+                            className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-green"
+                            aria-hidden
+                          />
+                          <span className="min-w-0 break-words leading-relaxed">{finding}</span>
+                        </li>
                       );
                     })}
                   </ul>

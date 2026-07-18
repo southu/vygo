@@ -79,14 +79,14 @@ Bind repo + live URL + version URL together. Prefer a known cloud project identi
 
 ## 5. Reference product campaign (shape, not secrets)
 
-| Step | What happened |
-| ---- | ------------- |
-| 1 | Product shell for repo + live URL + version signal |
-| 2 | Mission: change homepage CTA + related copy on live site |
-| 3 | Builder several iterations; host deploy from git |
-| 4 | Deploy gate waited until version signal advanced |
-| 5 | Tester checked acceptance text on live URL |
-| 6 | Success after consecutive passes |
+| Step | What happened                                            |
+| ---- | -------------------------------------------------------- |
+| 1    | Product shell for repo + live URL + version signal       |
+| 2    | Mission: change homepage CTA + related copy on live site |
+| 3    | Builder several iterations; host deploy from git         |
+| 4    | Deploy gate waited until version signal advanced         |
+| 5    | Tester checked acceptance text on live URL               |
+| 6    | Success after consecutive passes                         |
 
 The product details are incidental — the **system** is the loop + control plane.
 
@@ -94,12 +94,12 @@ The product details are incidental — the **system** is the loop + control plan
 
 ## 6. What to open-source vs keep private
 
-| Share freely | Keep private |
-| ------------ | ------------ |
-| Loop design, mission shape, mock role ideas | Secret config, vault ciphertext, consumer credentials |
-| Composer UX patterns and queue-builder product rules | Passwords, API tokens, host topology |
-| This guide pack | Master passwords, cloud account tokens |
-| Architecture diagrams | Install-specific hostnames if you care |
+| Share freely                                         | Keep private                                          |
+| ---------------------------------------------------- | ----------------------------------------------------- |
+| Loop design, mission shape, mock role ideas          | Secret config, vault ciphertext, consumer credentials |
+| Composer UX patterns and queue-builder product rules | Passwords, API tokens, host topology                  |
+| This guide pack                                      | Master passwords, cloud account tokens                |
+| Architecture diagrams                                | Install-specific hostnames if you care                |
 
 ---
 

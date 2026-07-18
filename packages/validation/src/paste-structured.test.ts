@@ -222,7 +222,10 @@ describe("isMalformedStructuredPaste — raw fallback gate", () => {
   });
 
   it("does not flag arbitrary prose or empty input", () => {
-    assert.equal(isMalformedStructuredPaste("We built a clinic scheduling tool in TypeScript."), false);
+    assert.equal(
+      isMalformedStructuredPaste("We built a clinic scheduling tool in TypeScript."),
+      false,
+    );
     assert.equal(isMalformedStructuredPaste(""), false);
     assert.equal(isMalformedStructuredPaste("   "), false);
     // @ts-expect-error — exercising a non-string call at runtime.

@@ -83,14 +83,16 @@ function extractFullNameRaw(record: Record<string, unknown>): string {
  * Record-shaped success body for guide_updates — same status/shape family as
  * ordinary apply, with work_email always null (never echo submitted email).
  */
-export function guideUpdatesSuccessBody(row?: {
-  id: string;
-  full_name: string;
-  product_url?: string | null;
-  message?: string | null;
-  source?: string;
-  created_at?: string;
-} | null): Record<string, unknown> {
+export function guideUpdatesSuccessBody(
+  row?: {
+    id: string;
+    full_name: string;
+    product_url?: string | null;
+    message?: string | null;
+    source?: string;
+    created_at?: string;
+  } | null,
+): Record<string, unknown> {
   if (row) {
     return {
       id: row.id,

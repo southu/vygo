@@ -107,8 +107,7 @@ function resolveReport(input: ScorePreviewInput): {
   source: "paste" | "manual";
   profile: string | null;
 } | null {
-  const profileRaw =
-    typeof input.profile === "string" ? input.profile.trim().toLowerCase() : "";
+  const profileRaw = typeof input.profile === "string" ? input.profile.trim().toLowerCase() : "";
   if (profileRaw && profileRaw in SCORE_PREVIEW_PROFILES) {
     const key = profileRaw as ScorePreviewProfileName;
     return {
@@ -276,7 +275,7 @@ export function runScorePreview(input: ScorePreviewInput): ScorePreviewResult {
       status: 400,
       code: "VALIDATION_ERROR",
       message:
-        "Provide assessment answers as `report` or `answers`, or a built-in `profile` of \"weak\" or \"strong\".",
+        'Provide assessment answers as `report` or `answers`, or a built-in `profile` of "weak" or "strong".',
     };
   }
 

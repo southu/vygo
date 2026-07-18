@@ -20,13 +20,13 @@ A credentials boundary for a Ratchet-style control plane — outside Build/Queue
 
 Humans hold long-lived cloud credentials inside the vault. The harness holds only a short-lived ability to request **brokered actions**. Builder and tester processes never receive the underlying tokens.
 
-Illustrative action *families* (names are not a public API catalog):
+Illustrative action _families_ (names are not a public API catalog):
 
-| Family | Purpose |
-| ------ | ------- |
-| Identity | Confirm credentials are usable before optional infra steps |
-| List / resolve projects | Prefer reuse over create; honor bound project identities |
-| Configure host variables from vault | Set values without printing them into logs |
+| Family                              | Purpose                                                    |
+| ----------------------------------- | ---------------------------------------------------------- |
+| Identity                            | Confirm credentials are usable before optional infra steps |
+| List / resolve projects             | Prefer reuse over create; honor bound project identities   |
+| Configure host variables from vault | Set values without printing them into logs                 |
 
 The product rule is **broker, don’t export**. Exact action names, key formats, and storage layouts are install-private.
 

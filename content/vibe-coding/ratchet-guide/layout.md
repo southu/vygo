@@ -8,11 +8,11 @@ This page describes **logical parts** of a Ratchet-style control plane — not a
 
 ## Three product areas
 
-| Area | What it is for |
-| ---- | -------------- |
-| **Control plane** | Human UI for goals, product shells, and the mission queue |
-| **Harness** | The build → deploy gate → live test loop and its run workspaces |
-| **Products** | One shell per shipped app: repo + live URL + version signal |
+| Area              | What it is for                                                  |
+| ----------------- | --------------------------------------------------------------- |
+| **Control plane** | Human UI for goals, product shells, and the mission queue       |
+| **Harness**       | The build → deploy gate → live test loop and its run workspaces |
+| **Products**      | One shell per shipped app: repo + live URL + version signal     |
 
 You may place these anywhere on disk when rebuilding. This pack deliberately does **not** publish a real filesystem map, module list, or storage layout.
 
@@ -38,18 +38,18 @@ You may place these anywhere on disk when rebuilding. This pack deliberately doe
 
 Each product is a **binding**, not a bag of unrelated URLs:
 
-| Binding | Why it matters |
-| ------- | -------------- |
-| Git remote | Where the builder pushes |
-| Live URL | What the tester grades |
-| Version URL | What the deploy gate polls for honesty |
-| Optional cloud project identity | Prefer reuse over accidental create |
+| Binding                         | Why it matters                         |
+| ------------------------------- | -------------------------------------- |
+| Git remote                      | Where the builder pushes               |
+| Live URL                        | What the tester grades                 |
+| Version URL                     | What the deploy gate polls for honesty |
+| Optional cloud project identity | Prefer reuse over accidental create    |
 
 When those four disagree, the loop cannot tell truth from coincidence.
 
 ---
 
-## What a run workspace *means*
+## What a run workspace _means_
 
 Conceptually, every mission attempt needs:
 
@@ -64,12 +64,12 @@ Exact directory names and filenames are install-private.
 
 ## Configuration hygiene (product rules)
 
-| Rule | Why |
-| ---- | --- |
-| Separate secret material from non-secret service config | Reduces accidental commit and paste |
-| Load secrets only into services that need them | Never into builder/tester agent env |
-| Prefer team git identity the host accepts | Deploy gates depend on real deploys landing |
-| Document private install choices offline | This pack stays shareable |
+| Rule                                                    | Why                                         |
+| ------------------------------------------------------- | ------------------------------------------- |
+| Separate secret material from non-secret service config | Reduces accidental commit and paste         |
+| Load secrets only into services that need them          | Never into builder/tester agent env         |
+| Prefer team git identity the host accepts               | Deploy gates depend on real deploys landing |
+| Document private install choices offline                | This pack stays shareable                   |
 
 No environment variable names, secret-file paths, or host topology appear here on purpose.
 

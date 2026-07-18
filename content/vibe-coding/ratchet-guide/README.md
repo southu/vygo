@@ -6,7 +6,7 @@
 
 **Who it’s for**
 
-- Friends who want to understand or rebuild the *product idea*
+- Friends who want to understand or rebuild the _product idea_
 - Coding agents you point at this folder (“design me this”)
 - Humans returning to the design without chat history
 
@@ -34,25 +34,25 @@ Illustrative examples use only placeholder domains such as `example.com`. Rename
 
 ## Read order
 
-| #   | File                                                                  | Contents                                           |
-| --- | --------------------------------------------------------------------- | -------------------------------------------------- |
-| 1   | [overview.md](./overview.md)                                          | Elevator pitch, flow diagram, component table      |
-| 2   | [architecture.md](./architecture.md)                                  | System map, trust boundaries, data flow            |
-| 3   | [principles.md](./principles.md)                                      | Design rules (live is truth, proof-of-work, …)     |
-| 4   | [layout.md](./layout.md)                                              | Logical product areas (not a host path map)        |
-| 5   | [loop-and-missions.md](./loop-and-missions.md)                        | Loop contract, version signal, mission shape       |
-| 6   | [composer.md](./composer.md)                                          | Goal capture, queue, product shells (product UX)   |
-| 7   | [lazy-medic-sentinel.md](./lazy-medic-sentinel.md)                    | Optional overnight helpers (observe only)          |
-| 8   | [vault.md](./vault.md)                                                | Credentials boundary shape                         |
-| 9   | [projects-and-deploy.md](./projects-and-deploy.md)                    | Product shells and version-signal requirements     |
-| 10  | [operations.md](./operations.md)                                      | Pack scope: what is and is not included            |
-| 11  | [rebuild.md](./rebuild.md)                                            | Greenfield product milestones (phases A–E)         |
-| 12  | [ai-prompts.md](./ai-prompts.md)                                      | Coding / new-product / friend-share prompts        |
-| 13  | [footguns.md](./footguns.md)                                          | Design pitfalls and fix directions                 |
-| 14  | [examples.md](./examples.md)                                          | Mission and product-shell shapes                   |
-| —   | [diagrams.md](./diagrams.md)                                          | Mermaid gallery                                    |
-| —   | [one-pager-print](./one-pager-print) / [one-pager.md](./one-pager.md) | Printable sheet                                    |
-| —   | [CHANGELOG.md](./CHANGELOG.md)                                        | Guide pack history                                 |
+| #   | File                                                                  | Contents                                         |
+| --- | --------------------------------------------------------------------- | ------------------------------------------------ |
+| 1   | [overview.md](./overview.md)                                          | Elevator pitch, flow diagram, component table    |
+| 2   | [architecture.md](./architecture.md)                                  | System map, trust boundaries, data flow          |
+| 3   | [principles.md](./principles.md)                                      | Design rules (live is truth, proof-of-work, …)   |
+| 4   | [layout.md](./layout.md)                                              | Logical product areas (not a host path map)      |
+| 5   | [loop-and-missions.md](./loop-and-missions.md)                        | Loop contract, version signal, mission shape     |
+| 6   | [composer.md](./composer.md)                                          | Goal capture, queue, product shells (product UX) |
+| 7   | [lazy-medic-sentinel.md](./lazy-medic-sentinel.md)                    | Optional overnight helpers (observe only)        |
+| 8   | [vault.md](./vault.md)                                                | Credentials boundary shape                       |
+| 9   | [projects-and-deploy.md](./projects-and-deploy.md)                    | Product shells and version-signal requirements   |
+| 10  | [operations.md](./operations.md)                                      | Pack scope: what is and is not included          |
+| 11  | [rebuild.md](./rebuild.md)                                            | Greenfield product milestones (phases A–E)       |
+| 12  | [ai-prompts.md](./ai-prompts.md)                                      | Coding / new-product / friend-share prompts      |
+| 13  | [footguns.md](./footguns.md)                                          | Design pitfalls and fix directions               |
+| 14  | [examples.md](./examples.md)                                          | Mission and product-shell shapes                 |
+| —   | [diagrams.md](./diagrams.md)                                          | Mermaid gallery                                  |
+| —   | [one-pager-print](./one-pager-print) / [one-pager.md](./one-pager.md) | Printable sheet                                  |
+| —   | [CHANGELOG.md](./CHANGELOG.md)                                        | Guide pack history                               |
 
 ---
 

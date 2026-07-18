@@ -31,13 +31,7 @@ function polar(cx: number, cy: number, r: number, angleDeg: number) {
   };
 }
 
-function arcPath(
-  cx: number,
-  cy: number,
-  r: number,
-  startDeg: number,
-  endDeg: number,
-): string {
+function arcPath(cx: number, cy: number, r: number, startDeg: number, endDeg: number): string {
   const start = polar(cx, cy, r, startDeg);
   const end = polar(cx, cy, r, endDeg);
   const large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;

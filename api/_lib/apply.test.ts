@@ -246,19 +246,13 @@ describe("handleApplyIntake — guide_updates negative paths (validation before 
     const res = await handleApplyIntake({ source: "guide_updates" }, store);
     assert.equal(res.status, 400);
     assert.equal(store.calls, 0);
-    assert.equal(
-      (res.body.error as { code?: string } | undefined)?.code,
-      "VALIDATION_ERROR",
-    );
+    assert.equal((res.body.error as { code?: string } | undefined)?.code, "VALIDATION_ERROR");
     assertNoSecrets(res.body);
   });
 
   it("never calls insert for empty email", async () => {
     const store = new CountingPersist();
-    const res = await handleApplyIntake(
-      { source: "guide_updates", email: "" },
-      store,
-    );
+    const res = await handleApplyIntake({ source: "guide_updates", email: "" }, store);
     assert.equal(res.status, 400);
     assert.equal(store.calls, 0);
     assertNoSecrets(res.body);
@@ -267,10 +261,7 @@ describe("handleApplyIntake — guide_updates negative paths (validation before 
   it("never calls insert for garbage email and does not echo it", async () => {
     const store = new CountingPersist();
     const bad = "not-an-email";
-    const res = await handleApplyIntake(
-      { source: "guide_updates", email: bad },
-      store,
-    );
+    const res = await handleApplyIntake({ source: "guide_updates", email: bad }, store);
     assert.equal(res.status, 400);
     assert.equal(store.calls, 0);
     assertNoSecrets(res.body, bad);
@@ -289,10 +280,7 @@ describe("handleApplyIntake — guide_updates negative paths (validation before 
   it("inserts with source=guide_updates unconditionally on valid email", async () => {
     const store = new CountingPersist();
     const email = "ratchet-qa+ok@example.com";
-    const res = await handleApplyIntake(
-      { source: "guide_updates", email },
-      store,
-    );
+    const res = await handleApplyIntake({ source: "guide_updates", email }, store);
     assert.equal(res.status, 201);
     assert.equal(store.calls, 1);
     assert.ok(store.lastValue);
@@ -333,10 +321,7 @@ describe("handleApplyIntake — guide_updates negative paths (validation before 
   it("unique-constraint throw still returns friendly guide_updates success", async () => {
     const store = new UniqueThrowingPersist();
     const email = "ratchet-qa+unique@example.com";
-    const res = await handleApplyIntake(
-      { source: "guide_updates", email },
-      store,
-    );
+    const res = await handleApplyIntake({ source: "guide_updates", email }, store);
     assert.equal(res.status, 201);
     assert.equal(store.calls, 1);
     assert.deepEqual(res.body, guideUpdatesSuccessBody());
@@ -450,7 +435,15 @@ describe("Turnstile parity — missing/invalid tokens (guide_updates vs apply)",
     assert.equal(applyStore.calls, 1);
 
     // Same success status family + record-shaped keys.
-    for (const key of ["id", "full_name", "work_email", "product_url", "message", "source", "created_at"]) {
+    for (const key of [
+      "id",
+      "full_name",
+      "work_email",
+      "product_url",
+      "message",
+      "source",
+      "created_at",
+    ]) {
       assert.equal(key in guide.body, true, `guide missing key ${key}`);
       assert.equal(key in apply.body, true, `apply missing key ${key}`);
     }

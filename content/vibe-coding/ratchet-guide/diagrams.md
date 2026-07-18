@@ -143,9 +143,9 @@ flowchart LR
 
 ## Print / export tips
 
-| Goal | Use |
-| ---- | --- |
-| Share on GitHub | This file + others with Mermaid fences |
-| One sheet of paper | Open [`one-pager-print`](./one-pager-print) → Print |
-| Terminal-only | ASCII maps in architecture / overview |
-| Slide paste | Copy a single Mermaid block into Notion / Obsidian / slides |
+| Goal               | Use                                                         |
+| ------------------ | ----------------------------------------------------------- |
+| Share on GitHub    | This file + others with Mermaid fences                      |
+| One sheet of paper | Open [`one-pager-print`](./one-pager-print) → Print         |
+| Terminal-only      | ASCII maps in architecture / overview                       |
+| Slide paste        | Copy a single Mermaid block into Notion / Obsidian / slides |

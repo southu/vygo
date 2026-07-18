@@ -10,11 +10,11 @@ Each product is a **shell**: a named binding of git remote, live URL, and versio
 
 ### Folder vs product (design)
 
-| Shell kind | Typical use |
-| ---------- | ----------- |
-| Product app | The shipped app the tester grades |
-| Control plane | Optional self-improvement of the factory itself |
-| Sandbox / fixtures | Experiments and local fake deploys |
+| Shell kind         | Typical use                                     |
+| ------------------ | ----------------------------------------------- |
+| Product app        | The shipped app the tester grades               |
+| Control plane      | Optional self-improvement of the factory itself |
+| Sandbox / fixtures | Experiments and local fake deploys              |
 
 **Never** enqueue product acceptance against the control-plane repo while pointing the live URL at a different product domain. That mismatch is a classic deploy-gate poison pill.
 

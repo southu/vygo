@@ -105,9 +105,7 @@ function parseEvidence(raw: PreviewEvidence | null | undefined): ChartEvidence |
 function withDimensionEvidence(dims: ChartDimension[]): ChartDimension[] {
   return dims.map((d) => ({
     ...d,
-    evidence: hasChartEvidence(d.evidence)
-      ? d.evidence
-      : pickDimensionEvidence(d.sub_metrics),
+    evidence: hasChartEvidence(d.evidence) ? d.evidence : pickDimensionEvidence(d.sub_metrics),
   }));
 }
 
@@ -313,7 +311,9 @@ export async function fetchChartDataFromSnapshot(id: string): Promise<ReadinessC
  * Resolve live chart data: prefer real snapshot when id is set, else mixed
  * score-preview assessment (live engine, varied bands).
  */
-export async function loadStagingChartData(snapshotId?: string | null): Promise<ReadinessChartData> {
+export async function loadStagingChartData(
+  snapshotId?: string | null,
+): Promise<ReadinessChartData> {
   if (snapshotId && snapshotId.trim()) {
     try {
       return await fetchChartDataFromSnapshot(snapshotId.trim());

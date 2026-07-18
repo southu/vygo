@@ -88,7 +88,10 @@ export function scrubGuideUpdatesResponse(
   if (submittedEmail && submittedEmail.trim()) {
     const email = submittedEmail.trim();
     // Case-insensitive removal of the submitted address if it leaked into the payload.
-    next = next.replace(new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "[redacted]");
+    next = next.replace(
+      new RegExp(email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"),
+      "[redacted]",
+    );
   }
   // Drop common secret/stack markers if an upstream ever misbehaves.
   next = next
@@ -282,8 +285,7 @@ export function parseApplyBody(
     }
 
     const fullNameRaw = extractFullNameRaw(record).trim();
-    const messageRaw =
-      typeof record.message === "string" ? record.message.trim() : "";
+    const messageRaw = typeof record.message === "string" ? record.message.trim() : "";
 
     return {
       ok: true,
@@ -400,9 +402,7 @@ export async function insertApplicationRow(
 ): Promise<ApplyPublicRow> {
   // Prefer explicit override, then parsed value.source, then apply default.
   const insertSource =
-    (source && source.trim()) ||
-    (value.source && value.source.trim()) ||
-    APPLY_SOURCE;
+    (source && source.trim()) || (value.source && value.source.trim()) || APPLY_SOURCE;
   await ensureApplicationsTable(sql);
   const rows = await sql<
     {

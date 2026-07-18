@@ -9,11 +9,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import {
-  formatEvidenceAnswer,
-  hasChartEvidence,
-  type ChartEvidence,
-} from "./types";
+import { formatEvidenceAnswer, hasChartEvidence, type ChartEvidence } from "./types";
 
 export type EvidenceTooltipCardProps = {
   score: number;
@@ -56,10 +52,7 @@ export function EvidenceTooltipCard({
         Score {rounded}
         <span className="ml-1 text-xs font-semibold text-muted">/100</span>
       </p>
-      <p
-        className="mt-1.5 text-xs leading-snug text-ink-soft"
-        data-testid="chart-evidence-reason"
-      >
+      <p className="mt-1.5 text-xs leading-snug text-ink-soft" data-testid="chart-evidence-reason">
         {evidence.reason.trim()}
       </p>
       {answer ? (
@@ -275,12 +268,7 @@ export function InteractiveChartSegment({
       </div>
       {open ? (
         <div className={`chart-evidence-tooltip-anchor ${placementClass}`} aria-hidden={false}>
-          <EvidenceTooltipCard
-            id={tipId}
-            score={score}
-            evidence={evidence}
-            title={label}
-          />
+          <EvidenceTooltipCard id={tipId} score={score} evidence={evidence} title={label} />
         </div>
       ) : null}
     </div>

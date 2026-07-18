@@ -75,7 +75,6 @@ export const guideDocs: [GuideDoc, ...GuideDoc[]] = [
     sourceFile: "footguns.md",
     href: "/vibe-coding/ratchet-guide/footguns",
     blurb: "Design pitfalls: contracts, boundaries, and fix directions",
-
   },
 ];
 

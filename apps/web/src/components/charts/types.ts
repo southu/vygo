@@ -45,9 +45,7 @@ export function hasChartEvidence(
   evidence: ChartEvidence | null | undefined,
 ): evidence is ChartEvidence {
   return Boolean(
-    evidence &&
-      typeof evidence.reason === "string" &&
-      evidence.reason.trim().length > 0,
+    evidence && typeof evidence.reason === "string" && evidence.reason.trim().length > 0,
   );
 }
 
@@ -90,9 +88,7 @@ export function formatEvidenceAnswer(value: unknown, max = EVIDENCE_ANSWER_MAX_C
  * Pick representative evidence for a dimension: prefer the lowest-scored
  * sub-metric that has real evidence (highlights the binding constraint).
  */
-export function pickDimensionEvidence(
-  subMetrics: ChartSubMetric[],
-): ChartEvidence | null {
+export function pickDimensionEvidence(subMetrics: ChartSubMetric[]): ChartEvidence | null {
   const withEv = subMetrics
     .filter((sm) => hasChartEvidence(sm.evidence))
     .slice()

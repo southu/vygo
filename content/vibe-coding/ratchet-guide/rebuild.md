@@ -32,7 +32,7 @@ No package lists, service unit files, or host filesystem maps live here.
 
 ## Phase C — Credentials boundary (shape)
 
-1. Stand up *some* encrypted store for long-lived credentials (private master material — never in this pack)
+1. Stand up _some_ encrypted store for long-lived credentials (private master material — never in this pack)
 2. Scope cloud access to product shells, not global agent env
 3. Give the harness only brokered access — no tokens in builder env
 4. Confirm identity checks fail closed **before** any optional infra ensure

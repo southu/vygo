@@ -42,13 +42,13 @@ stateDiagram-v2
 
 ### Steps (ideas)
 
-| Step | What it means |
-| ---- | ------------- |
-| Setup | Load the mission; create an isolated run workspace |
-| Build | Coding agent changes the product; real commits and push |
-| Deploy gate | Wait until live version matches what was pushed |
-| Test | Exercise the **live** app; return structured pass/fail |
-| Decide | PASS advances the streak; FAIL resets it. Stop on streak or limits |
+| Step        | What it means                                                      |
+| ----------- | ------------------------------------------------------------------ |
+| Setup       | Load the mission; create an isolated run workspace                 |
+| Build       | Coding agent changes the product; real commits and push            |
+| Deploy gate | Wait until live version matches what was pushed                    |
+| Test        | Exercise the **live** app; return structured pass/fail             |
+| Decide      | PASS advances the streak; FAIL resets it. Stop on streak or limits |
 
 ### Outcomes (conceptual)
 
@@ -96,16 +96,16 @@ Other gate strategies (fixed wait, custom command) exist as ideas for throwaways
 
 A mission is a **scoped unit of product work**:
 
-| Field idea | Purpose |
-| ---------- | ------- |
-| Name | Human-readable label for the run |
-| Repo + branch | Where the builder pushes |
-| Live URL | What the tester grades |
-| Version signal | What the gate polls |
-| Mission text | What to change (and what not to touch) |
-| Acceptance | Observable checks on the live app |
-| Limits | Max iterations, required streak, optional spend cap |
-| Roles | Which builder / tester / gate implementations to use |
+| Field idea     | Purpose                                              |
+| -------------- | ---------------------------------------------------- |
+| Name           | Human-readable label for the run                     |
+| Repo + branch  | Where the builder pushes                             |
+| Live URL       | What the tester grades                               |
+| Version signal | What the gate polls                                  |
+| Mission text   | What to change (and what not to touch)               |
+| Acceptance     | Observable checks on the live app                    |
+| Limits         | Max iterations, required streak, optional spend cap  |
+| Roles          | Which builder / tester / gate implementations to use |
 
 A tiny illustrative shape (placeholders only):
 

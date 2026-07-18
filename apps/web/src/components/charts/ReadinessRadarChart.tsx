@@ -17,7 +17,15 @@ import type { ChartDimension } from "./types";
 import { hasChartEvidence } from "./types";
 import { InteractiveChartSegment } from "./EvidenceTooltip";
 
-Chart.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+Chart.register(
+  RadarController,
+  RadialLinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  Tooltip,
+  Legend,
+);
 
 type ReadinessRadarChartProps = {
   dimensions: ChartDimension[];
@@ -166,9 +174,7 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
 
     // Layout after mount and on resize.
     const ro =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(() => layoutHotspots())
-        : null;
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => layoutHotspots()) : null;
     if (wrapRef.current && ro) ro.observe(wrapRef.current);
     // Immediate attempt (animation may also call layoutHotspots).
     const t = window.setTimeout(layoutHotspots, 50);
@@ -188,11 +194,7 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
     .join(", ");
 
   return (
-    <div
-      className={className}
-      data-testid="readiness-radar-chart"
-      data-chart="radar"
-    >
+    <div className={className} data-testid="readiness-radar-chart" data-chart="radar">
       <div ref={wrapRef} className="relative w-full">
         {/* pointer-events-none: axis hotspots sit above and must receive hover/tap */}
         <canvas
@@ -203,10 +205,7 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
           aria-label={`Overall readiness radar across dimensions: ${ariaSummary}`}
         />
         {/* Focusable axis hotspots over each radar point (DOM for a11y + tooltips) */}
-        <div
-          className="pointer-events-none absolute inset-0 z-10"
-          data-testid="radar-hotspots"
-        >
+        <div className="pointer-events-none absolute inset-0 z-10" data-testid="radar-hotspots">
           {hotspots.map((h) => {
             const dim = h.dimension;
             const score = clampScore(dim.score);

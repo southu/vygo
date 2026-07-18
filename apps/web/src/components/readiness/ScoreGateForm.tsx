@@ -92,10 +92,7 @@ export function ScoreGateForm({
   // Client-only: query string is available after mount (static export safe).
   const [readinessE2E, setReadinessE2E] = useState(false);
 
-  const e2eEmailDefault = useMemo(
-    () => `e2e-test+gate-${Date.now().toString(36)}@vygo.ai`,
-    [],
-  );
+  const e2eEmailDefault = useMemo(() => `e2e-test+gate-${Date.now().toString(36)}@vygo.ai`, []);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState(initialEmail);
@@ -104,7 +101,9 @@ export function ScoreGateForm({
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileFailed, setTurnstileFailed] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
-  const [status, setStatus] = useState<"idle" | "submitting" | "error" | "already_submitted">("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "error" | "already_submitted">(
+    "idle",
+  );
   const [feedback, setFeedback] = useState("");
 
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
@@ -277,9 +276,7 @@ export function ScoreGateForm({
       : null;
 
   const showProgress =
-    typeof progressCurrent === "number" &&
-    typeof progressTotal === "number" &&
-    progressTotal > 0;
+    typeof progressCurrent === "number" && typeof progressTotal === "number" && progressTotal > 0;
 
   return (
     <div

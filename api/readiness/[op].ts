@@ -1312,7 +1312,7 @@ async function handleToken(req: EdgeRequest): Promise<ReadinessHandlerResult> {
 
     await sql`
       INSERT INTO readiness_ingest_tokens (token, expires_at)
-      VALUES (${token}, ${expiresAt})
+      VALUES (${token}, ${expiresAt.toISOString()})
     `;
 
     return {

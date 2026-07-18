@@ -170,10 +170,7 @@ describe("detailed recommendation — score pattern branching", () => {
       !/security-first|security remediation/i.test(payload.recommendation.engagement),
       "must not be the security-first engagement",
     );
-    assert.match(
-      payload.recommendation.engagement,
-      /Launch|operability|adoption|foundations/i,
-    );
+    assert.match(payload.recommendation.engagement, /Launch|operability|adoption|foundations/i);
     assert.ok(payload.recommendation.citedFindings.length >= 3);
     const citeBlob = [
       ...payload.recommendation.citedFindings,
@@ -227,7 +224,11 @@ describe("detailed recommendation — score pattern branching", () => {
       b.recommendation.engagement,
       c.recommendation.engagement,
     ];
-    assert.equal(new Set(engagements).size, 3, `expected 3 distinct engagements, got ${engagements.join(" | ")}`);
+    assert.equal(
+      new Set(engagements).size,
+      3,
+      `expected 3 distinct engagements, got ${engagements.join(" | ")}`,
+    );
 
     const bodies = [a.recommendation.body, b.recommendation.body, c.recommendation.body];
     assert.equal(new Set(bodies).size, 3, "recommendation bodies must differ substantively");

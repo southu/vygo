@@ -189,13 +189,9 @@ export function mergeReadinessDrafts(
   incoming: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> {
   const prev =
-    existing && typeof existing === "object" && !Array.isArray(existing)
-      ? { ...existing }
-      : {};
+    existing && typeof existing === "object" && !Array.isArray(existing) ? { ...existing } : {};
   const next =
-    incoming && typeof incoming === "object" && !Array.isArray(incoming)
-      ? { ...incoming }
-      : {};
+    incoming && typeof incoming === "object" && !Array.isArray(incoming) ? { ...incoming } : {};
 
   const mergeNested = (key: string) => {
     const a =

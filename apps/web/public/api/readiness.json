@@ -2,8 +2,8 @@
   "ready": false,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "b011674c7ea7341758d4a1b100451389a9753b71",
-  "generatedAt": "2026-07-17T15:53:43.340Z",
+  "gitSha": "c899dc1618e2f449bfb936a97d20c6d712ff1807",
+  "generatedAt": "2026-07-18T03:46:27.328Z",
   "railwayFoundation": {
     "statusUrl": "/api/railway-foundation",
     "project": "vygo",

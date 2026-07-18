@@ -27,12 +27,12 @@ Private install notes belong outside this share pack.
 
 ## Product pieces (roles only)
 
-| Piece | Product role |
-| ----- | ------------ |
-| **Composer** | Human UI: goals, product shells, mission queue |
-| **Ratchet loop** | Build → deploy gate → live test per mission |
-| **Vault** | Encrypted credentials; brokered access for harness actions |
-| **Optional helpers** | Observe and report only; never implement product features |
+| Piece                | Product role                                                             |
+| -------------------- | ------------------------------------------------------------------------ |
+| **Composer**         | Human UI: goals, product shells, mission queue                           |
+| **Ratchet loop**     | Build → deploy gate → live test per mission                              |
+| **Vault**            | Encrypted credentials; brokered access for harness actions               |
+| **Optional helpers** | Observe and report only; never implement product features                |
 | **Product live app** | The deployed app the tester grades; must expose an honest version signal |
 
 Names in this pack use only illustrative placeholders. Rename freely when rebuilding.

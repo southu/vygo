@@ -70,10 +70,7 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null): void {
  * Finalize a guide_updates response: keep 201 record-shaped success (no email),
  * scrub error/upstream bodies. Never echoes the submitted email.
  */
-function finalizeGuideUpdates(
-  result: ApplyHandlerResult,
-  email: string,
-): ApplyHandlerResult {
+function finalizeGuideUpdates(result: ApplyHandlerResult, email: string): ApplyHandlerResult {
   if (result.status >= 200 && result.status < 300) {
     // Prefer an upstream/local record body already shaped by handleApplyIntake /
     // guideUpdatesSuccessBody; re-apply redaction if a full row leaked through.
@@ -145,10 +142,7 @@ async function handlePost(req: EdgeRequest): Promise<ApplyHandlerResult> {
       });
       if (precheck.value.isGuideUpdates) {
         // Soft-succeed unique/duplicate wording from upstream for insert-again policy.
-        if (
-          upstream.status >= 400 &&
-          /unique|duplicate/i.test(JSON.stringify(upstream.body))
-        ) {
+        if (upstream.status >= 400 && /unique|duplicate/i.test(JSON.stringify(upstream.body))) {
           return {
             status: 201,
             body: guideUpdatesSuccessBody(),

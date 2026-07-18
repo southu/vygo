@@ -27,13 +27,13 @@ flowchart LR
 
 ## Stack (roles)
 
-| Piece | Place | Job |
-| ----- | ----- | --- |
-| Composer | control plane UI | Goals, queue, product shells |
-| Ratchet loop | harness | Build → gate → live test |
-| Vault | credentials boundary | Secrets + brokered access |
-| Products | product shells | Repo + live URL + version signal |
-| Overnight helpers | optional | Observe only; no product features |
+| Piece             | Place                | Job                               |
+| ----------------- | -------------------- | --------------------------------- |
+| Composer          | control plane UI     | Goals, queue, product shells      |
+| Ratchet loop      | harness              | Build → gate → live test          |
+| Vault             | credentials boundary | Secrets + brokered access         |
+| Products          | product shells       | Repo + live URL + version signal  |
+| Overnight helpers | optional             | Observe only; no product features |
 
 ---
 
@@ -52,14 +52,14 @@ flowchart LR
 
 ## Loop outcomes (concepts)
 
-| Outcome | Meaning |
-| ------- | ------- |
-| Success | Required streak of consecutive passes |
-| Max iterations | Budget of attempts exhausted |
-| Deploy timeout | Live version never caught up |
-| Tester contract | Missing or bad structured result |
-| Builder proof-of-work | No real git progress |
-| Budget | Spend limit exceeded |
+| Outcome               | Meaning                               |
+| --------------------- | ------------------------------------- |
+| Success               | Required streak of consecutive passes |
+| Max iterations        | Budget of attempts exhausted          |
+| Deploy timeout        | Live version never caught up          |
+| Tester contract       | Missing or bad structured result      |
+| Builder proof-of-work | No real git progress                  |
+| Budget                | Spend limit exceeded                  |
 
 ---
 
@@ -77,12 +77,12 @@ Model CLIs → control plane + harness + product shells → credentials boundary
 
 ## Share / go deeper
 
-| Need | Open |
-| ---- | ---- |
-| Full guide | [README.md](./README.md) |
-| All diagrams | [diagrams.md](./diagrams.md) |
+| Need          | Open                             |
+| ------------- | -------------------------------- |
+| Full guide    | [README.md](./README.md)         |
+| All diagrams  | [diagrams.md](./diagrams.md)     |
 | Agent prompts | [ai-prompts.md](./ai-prompts.md) |
-| Footguns | [footguns.md](./footguns.md) |
-| Guide history | [CHANGELOG.md](./CHANGELOG.md) |
+| Footguns      | [footguns.md](./footguns.md)     |
+| Guide history | [CHANGELOG.md](./CHANGELOG.md)   |
 
 _No secrets in this pack. Guide pack **v1.2** · product design reference only._

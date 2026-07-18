@@ -1125,7 +1125,11 @@ function formatSummaryAsDescribedObject(rawSummary: string): string {
   // surrounding template can stay a single grammatical clause.
   // Compare against the unclipped first sentence so grammar choice is stable.
   const unclippedBody = first.replace(/[.!?]+$/u, "").trim();
-  if (first !== trimmed || /[.!?]$/.test(first) || unclippedBody.length > REASONING_FREE_TEXT_MAX_CHARS) {
+  if (
+    first !== trimmed ||
+    /[.!?]$/.test(first) ||
+    unclippedBody.length > REASONING_FREE_TEXT_MAX_CHARS
+  ) {
     return `a product that "${body}"`;
   }
 
@@ -1165,7 +1169,9 @@ export function buildEngagementReasoning(
   // Standalone labeled context (Scale): keep prospect wording, first sentence only.
   const contextSummary = (() => {
     if (!rawSummary || isUnknownField(rawSummary)) return "not specified";
-    const first = firstSentenceOf(rawSummary).replace(/[.!?]+$/u, "").trim();
+    const first = firstSentenceOf(rawSummary)
+      .replace(/[.!?]+$/u, "")
+      .trim();
     if (!first) return "not specified";
     // Capitalize after a label like "Product context: …"
     const clipped = clipReasoningText(first);

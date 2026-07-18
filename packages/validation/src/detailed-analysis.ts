@@ -189,11 +189,7 @@ export function buildAllDimensionAnalyses(
 ): DimensionAnalysis[] {
   return ANALYSIS_DIMENSIONS.map((dim) => {
     const detail = dimensionDetails[dim];
-    return buildDimensionAnalysis(
-      dim,
-      detail ?? { score: 0, checks: [] },
-      insights,
-    );
+    return buildDimensionAnalysis(dim, detail ?? { score: 0, checks: [] }, insights);
   });
 }
 
@@ -399,7 +395,11 @@ export function selectRecommendationPattern(input: {
   // Also match when security is clearly the strongest dimension and integrations are thin.
   if (
     (sec >= 65 && adoption.lowAdoption) ||
-    (sec >= 65 && sec >= rel + 15 && sec >= ops + 10 && !adoption.highAdoption && adoption.lowAdoption)
+    (sec >= 65 &&
+      sec >= rel + 15 &&
+      sec >= ops + 10 &&
+      !adoption.highAdoption &&
+      adoption.lowAdoption)
   ) {
     return {
       patternKey: "high_security_low_adoption",
@@ -555,22 +555,16 @@ export function buildDetailedRecommendation(input: {
   const preferred: string[] = [];
   if (branch.patternKey === "security_first_high_adoption") {
     preferred.push(
-      ...allFindings.filter((f) =>
-        /security|auth|secret|tool|integration|credential/i.test(f),
-      ),
+      ...allFindings.filter((f) => /security|auth|secret|tool|integration|credential/i.test(f)),
     );
   } else if (branch.patternKey === "high_security_low_adoption") {
     preferred.push(
-      ...allFindings.filter((f) =>
-        /security|operab|maintain|deploy|environment|tool/i.test(f),
-      ),
+      ...allFindings.filter((f) => /security|operab|maintain|deploy|environment|tool/i.test(f)),
     );
   } else if (branch.patternKey === "uniform_mid_scores") {
     preferred.push(...allFindings.filter((f) => /score \d+\/100/i.test(f)));
   } else if (branch.patternKey === "reliability_first") {
-    preferred.push(
-      ...allFindings.filter((f) => /reliab|test|fragil|error|logging/i.test(f)),
-    );
+    preferred.push(...allFindings.filter((f) => /reliab|test|fragil|error|logging/i.test(f)));
   }
 
   const citedFindings: string[] = [];
@@ -625,10 +619,7 @@ export function buildDetailedAnalysis(input: {
   insights: EvidenceInsight[];
   bucket: EngagementBucket;
 }): DetailedAnalysisPayload {
-  const dimensionAnalyses = buildAllDimensionAnalyses(
-    input.dimensionDetails,
-    input.insights,
-  );
+  const dimensionAnalyses = buildAllDimensionAnalyses(input.dimensionDetails, input.insights);
   const recommendation = buildDetailedRecommendation(input);
   return { dimensionAnalyses, recommendation };
 }

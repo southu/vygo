@@ -88,7 +88,14 @@ describe("buildEvidenceInsights", () => {
     const secondPerson = insights.filter((i) => /you|your/i.test(`${i.headline} ${i.detail}`));
     assert.ok(secondPerson.length >= 6);
 
-    const tokens = ["Zapier", "Make", "LangChain", "12", "no centralized credential management", "team of 8"];
+    const tokens = [
+      "Zapier",
+      "Make",
+      "LangChain",
+      "12",
+      "no centralized credential management",
+      "team of 8",
+    ];
     let grounded = 0;
     for (const insight of insights) {
       const blob = `${insight.headline} ${insight.detail} ${insight.source_answer}`;
@@ -99,8 +106,14 @@ describe("buildEvidenceInsights", () => {
 
   it("includes at least one risk and one strength when gaps and goods are present", () => {
     const insights = buildEvidenceInsights(RICH_REPORT);
-    assert.ok(insights.some((i) => i.type === "risk"), "expected a risk insight");
-    assert.ok(insights.some((i) => i.type === "strength"), "expected a strength insight");
+    assert.ok(
+      insights.some((i) => i.type === "risk"),
+      "expected a risk insight",
+    );
+    assert.ok(
+      insights.some((i) => i.type === "strength"),
+      "expected a strength insight",
+    );
   });
 
   it("is ranked stably for the same payload", () => {
@@ -125,7 +138,7 @@ describe("sparse and long free-text insights", () => {
   });
 
   it("clipDisplayText never splits dense emoji mid-surrogate", () => {
-    const dense = ("🚀🔒").repeat(100);
+    const dense = "🚀🔒".repeat(100);
     const clipped = clipDisplayText(dense, 50);
     assert.ok(clipped.endsWith("…"));
     assert.equal(Array.from(clipped).length, 50);
@@ -134,10 +147,7 @@ describe("sparse and long free-text insights", () => {
       const c = clipped.charCodeAt(i);
       if (c >= 0xd800 && c <= 0xdbff) {
         const n = clipped.charCodeAt(i + 1);
-        assert.ok(
-          n >= 0xdc00 && n <= 0xdfff,
-          `unpaired high surrogate at ${i}`,
-        );
+        assert.ok(n >= 0xdc00 && n <= 0xdfff, `unpaired high surrogate at ${i}`);
         i++;
       } else {
         assert.ok(!(c >= 0xdc00 && c <= 0xdfff), `unpaired low surrogate at ${i}`);

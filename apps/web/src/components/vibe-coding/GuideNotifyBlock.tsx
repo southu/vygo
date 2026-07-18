@@ -117,10 +117,7 @@ export function GuideNotifyBlock() {
             aria-live="polite"
             data-testid="guide-notify-success"
           >
-            <h2
-              id="guide-notify-heading"
-              className="font-display text-xl font-bold sm:text-2xl"
-            >
+            <h2 id="guide-notify-heading" className="font-display text-xl font-bold sm:text-2xl">
               Want to be notified when there are updates?
             </h2>
             <p
@@ -147,15 +144,12 @@ export function GuideNotifyBlock() {
     >
       <div className="container-page max-w-3xl">
         <div className="card max-w-xl">
-          <h2
-            id="guide-notify-heading"
-            className="font-display text-xl font-bold sm:text-2xl"
-          >
+          <h2 id="guide-notify-heading" className="font-display text-xl font-bold sm:text-2xl">
             Want to be notified when there are updates?
           </h2>
           <p className="mt-2 text-sm text-muted">
-            Optional signup for Ratchet guide and product updates. Reading and
-            downloading the guide never requires this form.
+            Optional signup for Ratchet guide and product updates. Reading and downloading the guide
+            never requires this form.
           </p>
           <form
             className="mt-6 space-y-4"
@@ -165,12 +159,8 @@ export function GuideNotifyBlock() {
             noValidate
           >
             <div>
-              <label
-                htmlFor="guide-notify-name"
-                className="block text-sm font-medium text-ink"
-              >
-                Name{" "}
-                <span className="font-normal text-muted">(optional)</span>
+              <label htmlFor="guide-notify-name" className="block text-sm font-medium text-ink">
+                Name <span className="font-normal text-muted">(optional)</span>
               </label>
               <input
                 id="guide-notify-name"
@@ -186,10 +176,7 @@ export function GuideNotifyBlock() {
               />
             </div>
             <div>
-              <label
-                htmlFor="guide-notify-email"
-                className="block text-sm font-medium text-ink"
-              >
+              <label htmlFor="guide-notify-email" className="block text-sm font-medium text-ink">
                 Email
               </label>
               <input
@@ -208,9 +195,7 @@ export function GuideNotifyBlock() {
                 }}
                 disabled={isSubmitting}
                 aria-invalid={showValidation ? true : undefined}
-                aria-describedby={
-                  showValidation ? "guide-notify-email-error" : undefined
-                }
+                aria-describedby={showValidation ? "guide-notify-email-error" : undefined}
                 className="mt-2 w-full min-h-11 rounded-lg border border-border bg-canvas px-4 py-2.5 text-base text-ink sm:text-sm"
                 placeholder="you@example.com"
                 data-testid="guide-notify-email"

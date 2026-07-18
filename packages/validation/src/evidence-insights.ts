@@ -231,8 +231,7 @@ export function extractNamedTools(text: string): string[] {
       // Prefer word-ish boundaries so "Go" does not match "going".
       const before = idx === 0 ? " " : lower[idx - 1]!;
       const after = end >= lower.length ? " " : lower[end]!;
-      const boundaryOk =
-        !/[a-z0-9]/i.test(before) && !/[a-z0-9]/i.test(after);
+      const boundaryOk = !/[a-z0-9]/i.test(before) && !/[a-z0-9]/i.test(after);
       if (boundaryOk) {
         const overlaps = usedRanges.some(([a, b]) => !(end <= a || idx >= b));
         if (!overlaps) {
@@ -514,7 +513,10 @@ export function buildEvidenceInsights(
   // --- Tests -----------------------------------------------------------------
   const testsRaw = rawAnswerText(rec.tests);
   if (testsRaw && !isUnknownish(testsRaw)) {
-    if (hasRiskLanguage(testsRaw) || /\b(no automated|none|never run|not run|ad-hoc)\b/i.test(testsRaw)) {
+    if (
+      hasRiskLanguage(testsRaw) ||
+      /\b(no automated|none|never run|not run|ad-hoc)\b/i.test(testsRaw)
+    ) {
       pushDraft(drafts, {
         type: "risk",
         headline: `You lack durable automated test coverage`,
@@ -617,7 +619,10 @@ export function buildEvidenceInsights(
         dimension: "Maintainability",
         rank: 82,
       });
-    } else if (hasStrengthLanguage(structureRaw) || /\b(modular|monorepo|packages|services)\b/i.test(structureRaw)) {
+    } else if (
+      hasStrengthLanguage(structureRaw) ||
+      /\b(modular|monorepo|packages|services)\b/i.test(structureRaw)
+    ) {
       pushDraft(drafts, {
         type: "strength",
         headline: `Your codebase structure is intentionally modular`,
@@ -732,17 +737,19 @@ export function buildEvidenceInsights(
   });
 
   // Final pass: bounded strings only (defense in depth for long free-text).
-  return drafts.map(({ type, headline, detail, source_answer, dimension }) => ({
-    type,
-    headline: clipDisplayText(headline, INSIGHT_HEADLINE_MAX_CHARS),
-    detail: clipDisplayText(detail, INSIGHT_DETAIL_MAX_CHARS),
-    source_answer: clipDisplayText(source_answer, INSIGHT_SOURCE_MAX_CHARS),
-    dimension: dimension.trim(),
-  })).filter(
-    (i) =>
-      Boolean(i.headline) &&
-      Boolean(i.detail) &&
-      Boolean(i.source_answer) &&
-      Boolean(i.dimension),
-  );
+  return drafts
+    .map(({ type, headline, detail, source_answer, dimension }) => ({
+      type,
+      headline: clipDisplayText(headline, INSIGHT_HEADLINE_MAX_CHARS),
+      detail: clipDisplayText(detail, INSIGHT_DETAIL_MAX_CHARS),
+      source_answer: clipDisplayText(source_answer, INSIGHT_SOURCE_MAX_CHARS),
+      dimension: dimension.trim(),
+    }))
+    .filter(
+      (i) =>
+        Boolean(i.headline) &&
+        Boolean(i.detail) &&
+        Boolean(i.source_answer) &&
+        Boolean(i.dimension),
+    );
 }

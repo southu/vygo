@@ -605,8 +605,7 @@ function parseInsights(raw: unknown): SnapshotInsight[] | null {
     const row = entry as Record<string, unknown>;
     const typeRaw = typeof row.type === "string" ? row.type.trim().toLowerCase() : "";
     if (!INSIGHT_TYPES.has(typeRaw)) continue;
-    const headline =
-      typeof row.headline === "string" ? clipClientText(row.headline, 160) : "";
+    const headline = typeof row.headline === "string" ? clipClientText(row.headline, 160) : "";
     const detail = typeof row.detail === "string" ? clipClientText(row.detail, 480) : "";
     const source_answer = clipClientText(
       typeof row.source_answer === "string"
@@ -635,8 +634,7 @@ function parseRecommendation(raw: unknown): SnapshotRecommendation | null {
   const r = raw as Record<string, unknown>;
   const engagement = typeof r.engagement === "string" ? r.engagement.trim() : "";
   const rationale = typeof r.rationale === "string" ? r.rationale.trim() : "";
-  const expectedOutcomes =
-    typeof r.expectedOutcomes === "string" ? r.expectedOutcomes.trim() : "";
+  const expectedOutcomes = typeof r.expectedOutcomes === "string" ? r.expectedOutcomes.trim() : "";
   const firstStepScope = typeof r.firstStepScope === "string" ? r.firstStepScope.trim() : "";
   if (!engagement || !rationale) return null;
   const citedFindings = Array.isArray(r.citedFindings)
@@ -647,7 +645,11 @@ function parseRecommendation(raw: unknown): SnapshotRecommendation | null {
   const body =
     typeof r.body === "string" && r.body.trim()
       ? r.body.trim()
-      : [rationale, expectedOutcomes && `Expected outcomes: ${expectedOutcomes}`, firstStepScope && `Suggested first-step scope of work: ${firstStepScope}`]
+      : [
+          rationale,
+          expectedOutcomes && `Expected outcomes: ${expectedOutcomes}`,
+          firstStepScope && `Suggested first-step scope of work: ${firstStepScope}`,
+        ]
           .filter(Boolean)
           .join("\n\n");
   return {
@@ -752,8 +754,7 @@ export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse
           : null,
     ) ?? null;
   const overallRaw = body.overall;
-  const overall =
-    typeof overallRaw === "number" && Number.isFinite(overallRaw) ? overallRaw : null;
+  const overall = typeof overallRaw === "number" && Number.isFinite(overallRaw) ? overallRaw : null;
   // Explicit scoring failure flag from API (malformed / empty answer payload).
   if (body.scoringFailed === true || body.errorCode === "SCORING_FAILED") {
     return {
@@ -804,9 +805,7 @@ export async function getReadinessSnapshot(id: string): Promise<SnapshotResponse
     overall,
     bucket: typeof body.bucket === "string" ? body.bucket : null,
     reasoning:
-      typeof body.reasoning === "string"
-        ? clipClientText(body.reasoning, 900) || null
-        : null,
+      typeof body.reasoning === "string" ? clipClientText(body.reasoning, 900) || null : null,
     caveat: typeof body.caveat === "string" ? clipClientText(body.caveat, 480) || null : null,
     findings: Array.isArray(body.findings)
       ? (body.findings as unknown[])
@@ -842,9 +841,7 @@ function sanitizeClientReportSummary(raw: Record<string, unknown>): Record<strin
     if (typeof v === "string") {
       out[k] = clipClientText(v, 280) || null;
     } else if (Array.isArray(v)) {
-      out[k] = v.map((item) =>
-        typeof item === "string" ? clipClientText(item, 120) : item,
-      );
+      out[k] = v.map((item) => (typeof item === "string" ? clipClientText(item, 120) : item));
     } else {
       out[k] = v;
     }

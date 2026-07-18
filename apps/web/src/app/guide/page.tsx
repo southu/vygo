@@ -21,9 +21,7 @@ export default function GuidePage() {
       <section className="section-pad" data-section="guide-hero">
         <div className="container-page max-w-3xl">
           <p className="eyebrow">Free system guide</p>
-          <h1 className="mt-4 font-display text-4xl font-bold sm:text-5xl">
-            {guideOffer.title}
-          </h1>
+          <h1 className="mt-4 font-display text-4xl font-bold sm:text-5xl">{guideOffer.title}</h1>
           <p className="mt-6 text-lg text-muted">{guideOffer.intro}</p>
         </div>
       </section>

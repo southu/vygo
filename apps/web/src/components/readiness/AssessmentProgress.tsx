@@ -43,9 +43,7 @@ export function AssessmentProgress({
           data-testid="assessment-progress-label"
         >
           Step {safeCurrent} of {safeTotal}
-          {label ? (
-            <span className="ml-2 font-medium text-muted">· {label}</span>
-          ) : null}
+          {label ? <span className="ml-2 font-medium text-muted">· {label}</span> : null}
         </p>
         <p className="text-xs font-medium tabular-nums text-muted" aria-hidden>
           {pct}%

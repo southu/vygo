@@ -15,11 +15,7 @@ type SubMetricBarsProps = {
  */
 export function SubMetricBars({ dimensions, className }: SubMetricBarsProps) {
   return (
-    <div
-      className={className}
-      data-testid="sub-metric-bars"
-      data-chart="sub-metric-bars"
-    >
+    <div className={className} data-testid="sub-metric-bars" data-chart="sub-metric-bars">
       <div className="grid gap-5 lg:grid-cols-2">
         {dimensions.map((dim) => (
           <DimensionBars key={dim.dimension} dimension={dim} />

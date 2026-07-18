@@ -47,13 +47,13 @@ Gallery: [diagrams.md](./diagrams.md)
 
 ## Trust boundaries (product ideas)
 
-| Zone | Who | Product rule |
-| ---- | --- | ------------ |
-| **Human + Composer** | Operator | Captures goals, owns the queue of missions |
-| **Builder workspace** | Coding agent | May edit the product repo; never holds cloud secrets |
-| **Tester workspace** | Tester agent | Judges the **live** app only — not the builder’s local tree |
-| **Credentials boundary** | Harness-side broker | Short-lived, named actions — tokens never enter agent env |
-| **Product live** | Public users | Exposes an honest version signal the loop can wait on |
+| Zone                     | Who                 | Product rule                                                |
+| ------------------------ | ------------------- | ----------------------------------------------------------- |
+| **Human + Composer**     | Operator            | Captures goals, owns the queue of missions                  |
+| **Builder workspace**    | Coding agent        | May edit the product repo; never holds cloud secrets        |
+| **Tester workspace**     | Tester agent        | Judges the **live** app only — not the builder’s local tree |
+| **Credentials boundary** | Harness-side broker | Short-lived, named actions — tokens never enter agent env   |
+| **Product live**         | Public users        | Exposes an honest version signal the loop can wait on       |
 
 Secrets stay out of agent prompts and builder/tester environments. That boundary is the architecture; how any one install implements it is private.
 
@@ -100,25 +100,25 @@ The run ends only after a **streak** of consecutive passes. A single fail resets
 
 The loop has three replaceable roles:
 
-| Role | Purpose |
-| ---- | ------- |
-| **Builder** | Change product code and prove real git work happened |
-| **Deploy gate** | Wait until live version matches what was pushed |
-| **Tester** | Grade the live URL only; emit structured pass/fail |
+| Role            | Purpose                                              |
+| --------------- | ---------------------------------------------------- |
+| **Builder**     | Change product code and prove real git work happened |
+| **Deploy gate** | Wait until live version matches what was pushed      |
+| **Tester**      | Grade the live URL only; emit structured pass/fail   |
 
 Early development can simulate any role; production-minded installs use real agents against a real live URL. Mixing simulated and real roles is a rollout technique, not a host recipe.
 
 ---
 
-## Where product state *conceptually* lives
+## Where product state _conceptually_ lives
 
 No install paths here — only the ideas:
 
-| State | Product idea |
-| ----- | ------------ |
-| Queue | Ordered missions per product |
-| Run workspace | One isolated workspace per mission attempt |
-| Product shell | Repo + live URL + version URL bound together |
-| Credentials store | Encrypted secrets outside agent workspaces |
+| State             | Product idea                                 |
+| ----------------- | -------------------------------------------- |
+| Queue             | Ordered missions per product                 |
+| Run workspace     | One isolated workspace per mission attempt   |
+| Product shell     | Repo + live URL + version URL bound together |
+| Credentials store | Encrypted secrets outside agent workspaces   |
 
 Continue → [Principles](./principles.md)

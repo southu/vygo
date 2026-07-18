@@ -20,14 +20,14 @@ It is a **product surface**, not a published internal module inventory or privat
 
 ## Primary capabilities (product ideas)
 
-| Capability | Purpose |
-| ---------- | ------- |
-| **Build / goal home** | Natural language goal → multi-step queue draft |
-| **Classic compose** | Structured mission form when you already know the brief |
-| **Product shells** | Create and edit the binding of repo + live URL + version signal |
-| **Queue** | See and manage work scoped per product |
-| **Runs overview** | What is running, finished, or blocked |
-| **Settings** | Models and defaults for assist / builder / tester roles |
+| Capability            | Purpose                                                         |
+| --------------------- | --------------------------------------------------------------- |
+| **Build / goal home** | Natural language goal → multi-step queue draft                  |
+| **Classic compose**   | Structured mission form when you already know the brief         |
+| **Product shells**    | Create and edit the binding of repo + live URL + version signal |
+| **Queue**             | See and manage work scoped per product                          |
+| **Runs overview**     | What is running, finished, or blocked                           |
+| **Settings**          | Models and defaults for assist / builder / tester roles         |
 
 Exact routes, filenames, and internal APIs are install-private and intentionally omitted here.
 
