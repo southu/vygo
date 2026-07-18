@@ -7,6 +7,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { READINESS_SUBMIT_URL, buildDiagnosticPrompt } from "./prompt.js";
+import { READINESS_REPORT_V1_END, READINESS_REPORT_V1_START } from "./report-schema.js";
 import type { ReadinessStage1Answers } from "./readiness-intake.js";
 
 const ANSWERS: ReadinessStage1Answers = {
@@ -63,6 +64,26 @@ describe("buildDiagnosticPrompt", () => {
     assert.ok(prompt.includes("IF you have web/tool access"));
     assert.ok(prompt.includes("do NOT have web/tool access"));
     assert.ok(prompt.includes("confirm to the user"));
+  });
+
+  it("tells AIs without web access to output a delimited block the customer can paste back", () => {
+    const { prompt } = buildDiagnosticPrompt({ answers: ANSWERS, submissionToken: TOKEN })!;
+    assert.ok(prompt.includes("do NOT have web/tool access"));
+    assert.ok(prompt.includes("no web access"));
+    assert.ok(prompt.includes("clearly delimited block"));
+    assert.ok(prompt.includes("explicit begin and end markers"));
+    assert.ok(
+      prompt.includes(
+        `Begin marker — the first line of the block, exactly: ${READINESS_REPORT_V1_START}`,
+      ),
+    );
+    assert.ok(
+      prompt.includes(
+        `End marker — the last line of the block, exactly: ${READINESS_REPORT_V1_END}`,
+      ),
+    );
+    assert.ok(prompt.includes("paste it into the paste box"));
+    assert.ok(prompt.includes("couldn't send it"));
   });
 
   it("keeps the original analysis instructions unchanged around the additions", () => {

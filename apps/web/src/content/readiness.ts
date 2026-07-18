@@ -73,6 +73,8 @@ export const readinessContent = {
     textareaLabel: "Diagnostic report paste",
     textareaPlaceholder:
       "Paste the VYGO-READINESS-REPORT block here (markdown fences and line wrapping are OK)…",
+    noSendHelper:
+      "My AI couldn't send it — no problem. Paste the delimited results block (with the === begin/end marker lines) here and submit it yourself. It goes to the same endpoint your AI would use, so nothing is lost.",
     submit: "Submit report",
     submitting: "Checking…",
     secretsMessage: "Remove secrets before submitting.",

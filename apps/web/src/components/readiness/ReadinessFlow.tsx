@@ -44,6 +44,7 @@ import {
   patchReadinessSession,
   pasteTextFromDraft,
   stage1FromDraft,
+  submitReadinessResults,
   type ParseResponse,
   type ScoreResponse,
 } from "@/lib/readiness/api";
@@ -697,6 +698,22 @@ export function ReadinessFlow() {
     // Persist draft (paste text) without waiting for parse — still no secrets.
     saveReadinessLocal(buildLocal(stage1, "paste", token, { pasteText }));
 
+    // Paste fallback → the SAME ingest endpoint (POST /api/readiness/submit)
+    // with the SAME per-session submission token as the direct API path (the
+    // token embedded in the diagnostic prompt), so a pasted delimited report
+    // lands in the same stored submission record — no parallel store.
+    // Best-effort: the interactive parse/confirm flow below must not depend on it.
+    void (async () => {
+      const ingestToken = submissionToken ?? (await mintSubmissionToken());
+      if (!ingestToken) return;
+      if (!submissionToken) setSubmissionToken(ingestToken);
+      try {
+        await submitReadinessResults({ submissionToken: ingestToken, resultsText: pasteText });
+      } catch {
+        // Ingest submit is best-effort; the parse flow below still captures the paste.
+      }
+    })();
+
     if (!token) {
       setConfirm(clientConfirm);
       setView("confirm");
@@ -1061,6 +1078,9 @@ export function ReadinessFlow() {
           autoComplete="off"
           tabIndex={view === "stage3" ? 0 : -1}
         />
+        <p className="mt-3 text-sm text-muted" data-testid="readiness-paste-helper">
+          {c.stage3.noSendHelper}
+        </p>
         {view === "stage3" ? <AnswerCallout callout={stage3PasteCallout} /> : null}
       </div>
 

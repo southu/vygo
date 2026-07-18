@@ -33,6 +33,9 @@ export default function ReadinessPage() {
             always contains a large paste textarea in page source (acceptance).
             The interactive client flow owns the live Stage 3 UI with the same
             data-testid after hydration; this shell stays hidden and inert.
+            The paste path posts the delimited results block to the same ingest
+            endpoint the customer's AI uses directly (POST /api/readiness/submit)
+            with the same per-session submission token.
           */}
           <div
             className="sr-only"
@@ -42,17 +45,28 @@ export default function ReadinessPage() {
           >
             <h2>{s3.title}</h2>
             <p>{s3.body}</p>
-            <label htmlFor="readiness-paste-shell">{s3.textareaLabel}</label>
-            <textarea
-              id="readiness-paste-shell"
-              name="paste"
-              rows={16}
-              readOnly
-              tabIndex={-1}
-              placeholder={s3.textareaPlaceholder}
-              data-testid="readiness-paste-textarea"
-              defaultValue=""
-            />
+            <p>{s3.noSendHelper}</p>
+            <form
+              action="/api/readiness/submit"
+              method="post"
+              data-submit-url="/api/readiness/submit"
+              data-testid="readiness-paste-form"
+            >
+              <label htmlFor="readiness-paste-shell">{s3.textareaLabel}</label>
+              <textarea
+                id="readiness-paste-shell"
+                name="paste"
+                rows={16}
+                readOnly
+                tabIndex={-1}
+                placeholder={s3.textareaPlaceholder}
+                data-testid="readiness-paste-textarea"
+                defaultValue=""
+              />
+              <button type="submit" disabled tabIndex={-1} data-testid="readiness-paste-submit">
+                {s3.submit}
+              </button>
+            </form>
           </div>
         </div>
       </section>

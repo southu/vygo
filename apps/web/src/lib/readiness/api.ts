@@ -140,6 +140,47 @@ export async function emailReadinessPrompt(input: {
 }
 
 /**
+ * Submit pasted results through the SAME ingest endpoint the customer's AI uses
+ * (POST /api/readiness/submit) with the SAME per-session submission token that
+ * was embedded in the diagnostic prompt. A pasted delimited report therefore
+ * lands in the same stored submission record as a direct API submission —
+ * same storage, same token, same record shape.
+ * Never call this with text that failed the client secret scan.
+ */
+export async function submitReadinessResults(input: {
+  submissionToken: string;
+  resultsText: string;
+}): Promise<{ message: string }> {
+  const res = await fetch(apiUrl("/api/readiness/submit"), {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({
+      submission_token: input.submissionToken,
+      results_text: input.resultsText,
+    }),
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  const body = await parseJson(res);
+  if (!res.ok) {
+    const code = (body.error as { code?: string } | undefined)?.code;
+    const msg =
+      (body.error as { message?: string } | undefined)?.message ||
+      "Could not submit readiness results.";
+    const err = new Error(msg) as Error & { status?: number; code?: string };
+    err.status = res.status;
+    err.code = code;
+    throw err;
+  }
+  return {
+    message:
+      typeof body.message === "string"
+        ? body.message
+        : "Vygo has successfully received your readiness results.",
+  };
+}
+
+/**
  * Submit paste for server-side parse. On network/endpoint failure the caller
  * should show a graceful pending confirmation from the client-side partial parse.
  * Never call this with text that failed the client secret scan.

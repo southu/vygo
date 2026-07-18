@@ -95,7 +95,9 @@ export type BuildDiagnosticPromptInput = {
  * Instruction block appended after the analysis instructions, addressed to the
  * customer's AI: submit the results back to Vygo only if it has web/tool access.
  * Field names mirror the /api/readiness/submit contract (submission_token required,
- * results/results_text optional payload).
+ * results/results_text optional payload). AIs without web access are told to
+ * output the results inside the delimited report block (explicit begin/end
+ * markers) so the customer can paste it back into the readiness page.
  */
 function submissionInstructionBlock(token: string): string[] {
   return [
@@ -114,7 +116,10 @@ function submissionInstructionBlock(token: string): string[] {
     '   - "results" (object, optional): the completed report fields as structured JSON.',
     '   - "results_text" (string, optional): the raw report block text.',
     '   Always include "submission_token"; include "results" and/or "results_text".',
-    "5. If you do NOT have web/tool access, do not attempt the request — tell the user to paste the report block back into the Vygo readiness page instead.",
+    "5. If you do NOT have web/tool access (no web access — you cannot make HTTP requests), do not attempt the request. Instead, output the results to the user inside a clearly delimited block with explicit begin and end markers:",
+    `   - Begin marker — the first line of the block, exactly: ${READINESS_REPORT_V1_START}`,
+    `   - End marker — the last line of the block, exactly: ${READINESS_REPORT_V1_END}`,
+    '   Tell the user to copy the entire block (including both marker lines) and paste it into the paste box on the Vygo readiness page (the "my AI couldn\'t send it" path).',
     "6. Once the POST succeeds (HTTP 200), confirm to the user that the analysis results were successfully submitted to Vygo.",
   ];
 }
