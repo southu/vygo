@@ -240,6 +240,11 @@ export function ReadinessFlow() {
       const draft = draftFromStage1(nextStage1, {
         email: email || undefined,
         pasteText: (localExtra?.pasteText ?? pasteText) || undefined,
+        // Draft PATCHes replace the whole draft (see api/_lib/readiness.ts
+        // patchSessionRow), so the submission token must be re-included on
+        // every persist or a later write would silently drop it and break
+        // resume-after-reload while waiting on the AI's POST.
+        submissionToken: submissionToken || undefined,
         ...extraDraft,
       });
       const local = buildLocal(nextStage1, stage, t, localExtra);
@@ -251,17 +256,12 @@ export function ReadinessFlow() {
         // Local persist still works; server retry on next action.
       }
     },
-    [token, email, pasteText, buildLocal],
+    [token, email, pasteText, submissionToken, buildLocal],
   );
 
   // Bootstrap: resume from ?token= or localStorage, else create session.
   useEffect(() => {
     let cancelled = false;
-    // Mint the per-session submission token up front (fresh and resumed sessions
-    // alike) so it is embedded in the diagnostic prompt once stage 2 renders.
-    void mintSubmissionToken().then((t) => {
-      if (!cancelled && t) setSubmissionToken(t);
-    });
     (async () => {
       try {
         const fromUrl = resumeTokenFromUrl();
@@ -272,6 +272,13 @@ export function ReadinessFlow() {
         let restoredEmail = local?.email || "";
         let restoredPaste = local?.pasteText || "";
         const didResume = Boolean(fromUrl || local?.token);
+        // Tracks whether we had to mint a fresh submission token this load (vs.
+        // reusing one already embedded in a previously generated prompt) so a
+        // resumed stage2 view can backfill it into the draft before the user
+        // does anything else — otherwise a second reload would mint yet
+        // another token and orphan any results already posted under this one.
+        let submissionTokenPromise: Promise<string | null> = Promise.resolve(null);
+        let mintedFreshSubmissionToken = false;
 
         if (sessionToken) {
           try {
@@ -290,6 +297,26 @@ export function ReadinessFlow() {
             if (remotePaste) restoredPaste = remotePaste;
             if (didResume) {
               trackAnalytics("session_resumed", { stage: restoredStage });
+            }
+
+            // Reuse the submission token already embedded in a previously
+            // generated prompt (persisted to the draft) instead of minting a
+            // fresh one on every reload — a re-mint would silently orphan any
+            // results the customer's AI already posted under the old token,
+            // breaking auto-display on refresh.
+            const remoteSubmissionToken =
+              typeof remote.draft?.submissionToken === "string"
+                ? remote.draft.submissionToken.trim()
+                : "";
+            if (remoteSubmissionToken) {
+              setSubmissionToken(remoteSubmissionToken);
+              submissionTokenPromise = Promise.resolve(remoteSubmissionToken);
+            } else {
+              mintedFreshSubmissionToken = true;
+              submissionTokenPromise = mintSubmissionToken();
+              void submissionTokenPromise.then((t) => {
+                if (!cancelled && t) setSubmissionToken(t);
+              });
             }
 
             const off = remote.draft?.offRamp as { kind?: string } | undefined;
@@ -377,6 +404,14 @@ export function ReadinessFlow() {
           });
           if (cancelled) return;
           sessionToken = created.token;
+          // Brand-new (or previously-stale) session: no submission token could
+          // have been persisted yet, so mint one now. Once the user completes
+          // stage 1, goNext()'s persist() call embeds it in the draft.
+          mintedFreshSubmissionToken = true;
+          submissionTokenPromise = mintSubmissionToken();
+          void submissionTokenPromise.then((t) => {
+            if (!cancelled && t) setSubmissionToken(t);
+          });
         }
 
         if (cancelled) return;
@@ -424,6 +459,25 @@ export function ReadinessFlow() {
               return;
             }
             trackAnalytics("stage_started", { stage: "stage2" });
+            // Resumed straight into the waiting screen with a token minted
+            // this load (none was persisted yet) — backfill it into the
+            // draft now so a subsequent reload reuses it instead of minting
+            // another and orphaning any results already posted under this one.
+            if (mintedFreshSubmissionToken && sessionToken) {
+              const resolvedSubmissionToken = await submissionTokenPromise;
+              if (!cancelled && resolvedSubmissionToken) {
+                void patchReadinessSession(sessionToken, {
+                  stage: restoredStage || "prompt",
+                  draft: draftFromStage1(restoredStage1, {
+                    email: restoredEmail || undefined,
+                    pasteText: restoredPaste || undefined,
+                    submissionToken: resolvedSubmissionToken,
+                  }),
+                }).catch(() => {
+                  /* best-effort backfill; next persist() retries */
+                });
+              }
+            }
             setView("stage2");
             return;
           }
