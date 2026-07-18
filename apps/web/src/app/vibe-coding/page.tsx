@@ -6,6 +6,8 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { VibeLoopDiagram } from "@/components/VibeLoopDiagram";
 import { TopicCard } from "@/components/TopicCard";
 import { GuideOffer } from "@/components/vibe-coding/GuideOffer";
+import { StepList } from "@/components/vibe-coding/StepCard";
+import { setupSteps } from "@/content/guide-setup";
 
 export const metadata: Metadata = {
   title: site.metadata.vibeCodingTitle,
@@ -35,6 +37,19 @@ export default function VibeCodingPage() {
               {content.hero.checklistCta.label}
             </a>
           </div>
+        </div>
+      </section>
+
+      {/* Get set up first — the very first action, before any other content */}
+      <section className="section-pad border-t border-border bg-surface" data-section="setup-first">
+        <div className="container-page max-w-3xl">
+          <p className="eyebrow">Step 1</p>
+          <h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Get set up first</h2>
+          <p className="mt-4 text-lg text-muted">
+            Do this once, before reading anything else: download the free guide pack, open it in
+            your AI coding tool, and paste one setup prompt.
+          </p>
+          <StepList steps={setupSteps} />
         </div>
       </section>
 
