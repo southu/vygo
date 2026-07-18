@@ -209,12 +209,12 @@ test-fixture DSNs and obvious placeholder examples (e.g.
 `re_live_abcdefghijklmnopqrst`). Real submission tokens, API keys, and secrets
 live in the secret manager, never in git (see `credentials-and-decisions.md`).
 
-Re-verified against production on **2026-07-18** (iteration 8): `curl/8.0.0`
+Re-verified against production on **2026-07-18** (iteration 9): `curl/8.0.0`
 and `python-requests/2.31.0` → `HTTP 403` + `error code: 1010`; browser UA →
 `HTTP 200 {"message":"Vygo has successfully received your readiness results."}`;
-`GET /version` (SHA matches pushed `HEAD`) and `GET /` (home renders, non-empty)
-→ `HTTP 200`. The differentiator remains the `User-Agent` header exactly as
-documented above.
+`GET /version` (SHA matches pushed `HEAD`) and `GET /` (home renders, non-empty
+body ~123 KB) → `HTTP 200`. The differentiator remains the `User-Agent` header
+exactly as documented above.
 
 ---
 
