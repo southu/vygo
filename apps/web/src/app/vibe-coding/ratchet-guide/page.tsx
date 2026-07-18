@@ -635,7 +635,7 @@ export default function RatchetGuidePage() {
             </p>
             <p className="mt-2 text-muted">
               <strong>Fix:</strong> go back to{" "}
-              <a href="#quick-start" className="text-purple hover:underline">
+              <a href="#quick-start" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
                 Run your first mission
               </a>{" "}
               and set all three product shell fields before queuing another run.
@@ -658,7 +658,7 @@ export default function RatchetGuidePage() {
               to the same product shell as your live URL. See{" "}
               <a
                 href="#wait-for-the-deploy-gate-to-confirm-your-push"
-                className="text-purple hover:underline"
+                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
               >
                 Wait for the deploy gate to confirm your push
               </a>
@@ -680,7 +680,7 @@ export default function RatchetGuidePage() {
             <p className="mt-2 text-muted">
               <strong>Fix:</strong> confirm auto-deploy is wired to your deploy branch and that a
               fresh <code>curl</code> of the endpoint changes after every push &mdash; see{" "}
-              <a href="#quick-start" className="text-purple hover:underline">
+              <a href="#quick-start" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
                 Confirm your deploy and version endpoint
               </a>
               .
@@ -701,11 +701,11 @@ export default function RatchetGuidePage() {
             <p className="mt-2 text-muted">
               <strong>Fix:</strong> check git history for an actual advancing commit per iteration
               (see{" "}
-              <a href="#build-real-provable-changes" className="text-purple hover:underline">
+              <a href="#build-real-provable-changes" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
                 Build real, provable changes
               </a>
               ) and confirm the tester targets the same live app the deploy gate just confirmed (see{" "}
-              <a href="#test-only-the-live-deployed-app" className="text-purple hover:underline">
+              <a href="#test-only-the-live-deployed-app" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
                 Test only the live, deployed app
               </a>
               ).
@@ -726,14 +726,14 @@ export default function RatchetGuidePage() {
             <p className="mt-2 text-muted">
               <strong>Fix:</strong> raise the iteration or spend limit, lower the{" "}
               <strong>Pass streak</strong> field (see{" "}
-              <a href="#quick-start" className="text-purple hover:underline">
+              <a href="#quick-start" className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple">
                 Set your limits
               </a>
               ), or split the goal into a multi-step campaign so each piece can finish on its own
               (see{" "}
               <a
                 href="#plan-multi-step-campaigns-instead-of-one-mega-mission"
-                className="text-purple hover:underline"
+                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
               >
                 Plan multi-step campaigns instead of one mega-mission
               </a>
@@ -753,7 +753,7 @@ export default function RatchetGuidePage() {
         dangerouslySetInnerHTML={{
           __html: `(function(){try{if(window.localStorage.getItem(${JSON.stringify(
             GUIDE_MODE_STORAGE_KEY,
-          )})==="expert"){document.querySelectorAll('[data-advanced-expander]').forEach(function(d){d.open=true;});}}catch(e){}})();`,
+          )})==="expert"){document.querySelectorAll('[data-advanced-expander]').forEach(function(w){var b=w.querySelector('.advanced-expander-summary');var c=w.querySelector('.advanced-expander-body');if(b)b.setAttribute('aria-expanded','true');if(c)c.hidden=false;});}}catch(e){}})();`,
         }}
       />
 

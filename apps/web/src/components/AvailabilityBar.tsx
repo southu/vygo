@@ -43,7 +43,10 @@ export function AvailabilityBar() {
         {showApply ? (
           <Link
             href={ctaHrefs.apply}
-            className="inline-flex min-h-10 items-center rounded-lg bg-green px-4 py-2 text-sm font-semibold text-white hover:bg-green-dark"
+            /* bg-green/white is 2.62:1, below AA for normal text; bg-green-dark/white
+               is 5.48:1 and is already the design system's established darker-green
+               pairing (used as this same button's hover state elsewhere). */
+            className="inline-flex min-h-10 items-center rounded-lg bg-green-dark px-4 py-2 text-sm font-semibold text-white hover:bg-purple-dark"
             data-availability-action="apply"
             data-testid="availability-bar-cta"
           >

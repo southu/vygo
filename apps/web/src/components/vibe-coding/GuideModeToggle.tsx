@@ -4,19 +4,25 @@ import { useEffect, useState } from "react";
 import { GUIDE_MODE_STORAGE_KEY, type GuideMode } from "@/lib/guide-mode";
 
 function applyMode(mode: GuideMode) {
-  document.querySelectorAll<HTMLDetailsElement>("[data-advanced-expander]").forEach((details) => {
-    details.open = mode === "expert";
+  const expanded = mode === "expert";
+  document.querySelectorAll<HTMLElement>("[data-advanced-expander]").forEach((wrapper) => {
+    const button = wrapper.querySelector<HTMLButtonElement>(".advanced-expander-summary");
+    const body = wrapper.querySelector<HTMLElement>(".advanced-expander-body");
+    if (!button || !body) return;
+    button.setAttribute("aria-expanded", expanded ? "true" : "false");
+    body.hidden = !expanded;
   });
 }
 
 /**
  * Page-level Beginner/Expert toggle for the how-to guide. Expert expands
- * every [data-advanced-expander] <details> at once; Beginner collapses them
- * all. This only ever sets `.open` on click — it never listens for a
- * reader's own summary clicks — so each expander stays independently
- * operable afterward. The choice persists in localStorage; the inline
- * script rendered alongside the guide body re-applies it before hydration
- * so a returning Expert reader doesn't see a flash of collapsed content.
+ * every [data-advanced-expander] element at once; Beginner collapses them
+ * all. This only ever sets the button's `aria-expanded` and the body's
+ * `hidden` state on click — it never listens for a reader's own expander
+ * clicks — so each expander stays independently operable afterward. The
+ * choice persists in localStorage; the inline script rendered alongside the
+ * guide body re-applies it before hydration so a returning Expert reader
+ * doesn't see a flash of collapsed content.
  */
 export function GuideModeToggle() {
   const [mode, setMode] = useState<GuideMode>("beginner");

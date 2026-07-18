@@ -556,18 +556,18 @@
 
 .advanced-expander-summary {
   display: flex;
+  width: 100%;
   cursor: pointer;
-  list-style: none;
   align-items: center;
   gap: 0.6rem;
   padding: 0.85rem 1.1rem;
+  border: none;
+  background: none;
+  font-family: inherit;
   font-size: 0.9rem;
   font-weight: 600;
+  text-align: left;
   color: var(--color-ink);
-}
-
-.advanced-expander-summary::-webkit-details-marker {
-  display: none;
 }
 
 .advanced-expander-badge {
@@ -598,7 +598,7 @@
   transition: transform 0.15s ease;
 }
 
-.advanced-expander[open] > .advanced-expander-summary .advanced-expander-icon {
+.advanced-expander-summary[aria-expanded="true"] .advanced-expander-icon {
   transform: rotate(45deg);
 }
 
