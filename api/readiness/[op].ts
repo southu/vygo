@@ -225,6 +225,25 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null, credentials 
   }
 }
 
+/**
+ * Ops that intentionally allow cross-origin POSTs from ANY origin, no
+ * allowlist check. Mirrors `PERMISSIVE_CORS_PATHS` in apps/api/src/cors.ts:
+ * a customer's AI agent calls the ingest op from an arbitrary host/tool
+ * origin, not a browser tab on vygo.ai, so it cannot be restricted the way
+ * every other (browser-driven) readiness op is. The op itself still fails
+ * closed on bad tokens, oversized bodies, and rate limits — CORS here only
+ * controls which origins a *browser* would let read the response.
+ */
+const PERMISSIVE_CORS_OPS = new Set<string>(["submit"]);
+
+/** Reflects the requesting origin (or `*` when none was sent) with no credentials. */
+function applyPermissiveCorsHeaders(res: EdgeResponse, origin: string | null): void {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Origin", origin || "*");
+}
+
 function resolveOp(req: EdgeRequest): string | null {
   // Vercel dynamic segment is available on query for Node serverless handlers.
   const q = (req as EdgeRequest & { query?: Record<string, string | string[]> }).query;
@@ -1647,9 +1666,15 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   const allowedOrigins = resolveAllowedOrigins();
   const { allowed, origin } = evaluateOrigin(req.headers, allowedOrigins);
   const op = resolveOp(req);
+  const permissiveCors = !!op && PERMISSIVE_CORS_OPS.has(op);
 
   if (req.method === "OPTIONS") {
-    if (origin && allowed) {
+    if (permissiveCors) {
+      applyPermissiveCorsHeaders(res, origin);
+      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
+      res.setHeader("Access-Control-Max-Age", "600");
+    } else if (origin && allowed) {
       applyBaseHeaders(res, origin);
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
@@ -1659,13 +1684,17 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     return;
   }
 
-  applyBaseHeaders(res, origin && allowed ? origin : null);
+  if (permissiveCors) {
+    applyPermissiveCorsHeaders(res, origin);
+  } else {
+    applyBaseHeaders(res, origin && allowed ? origin : null);
 
-  if (origin && !allowed) {
-    res
-      .status(403)
-      .json({ error: { code: "FORBIDDEN_ORIGIN", message: "Origin is not allowed." } });
-    return;
+    if (origin && !allowed) {
+      res
+        .status(403)
+        .json({ error: { code: "FORBIDDEN_ORIGIN", message: "Origin is not allowed." } });
+      return;
+    }
   }
 
   if (!op || !ALLOWED_OPS.has(op)) {
