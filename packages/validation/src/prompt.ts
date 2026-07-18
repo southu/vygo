@@ -21,6 +21,21 @@ export const READINESS_PROMPT_REASSURANCE =
 /** Endpoint the customer's AI POSTs analysis results back to (see api/readiness/[op].ts "submit"). */
 export const READINESS_SUBMIT_URL = "https://www.vygo.ai/api/readiness/submit" as const;
 
+/**
+ * Placeholder token shown in the copyable curl example. The real per-session
+ * token is delivered separately (the SUBMISSION TOKEN line) so it never appears
+ * inside the example command shape.
+ */
+export const READINESS_SUBMIT_TOKEN_PLACEHOLDER = "YOUR_SUBMISSION_TOKEN" as const;
+
+/**
+ * Standard browser User-Agent for the default curl submission. Some edge/WAF
+ * configurations reject requests that carry a bare `curl/*` agent, so the
+ * command that is known to work sends a normal desktop-browser UA.
+ */
+export const READINESS_SUBMIT_BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" as const;
+
 const FIXED_RULES_LINES = [
   "RULES (fixed — do not relax):",
   "1. Read-only: inspect and report only. Do not modify files, run destructive commands, or propose code changes.",
@@ -94,33 +109,49 @@ export type BuildDiagnosticPromptInput = {
 /**
  * Instruction block appended after the analysis instructions, addressed to the
  * customer's AI: submit the results back to Vygo only if it has web/tool access.
- * Field names mirror the /api/readiness/submit contract (submission_token required,
- * results/results_text optional payload). AIs without web access are told to
- * output the results inside the delimited report block (explicit begin/end
- * markers) so the customer can paste it back into the readiness page.
+ *
+ * The DEFAULT (recommended) method is a curl POST that sets a standard browser
+ * User-Agent header — the path known to pass through the edge/WAF in front of
+ * /api/readiness/submit; a bare `curl/*` agent can be rejected. The command
+ * sends the structured `results` JSON, the raw `results_text` block, and the
+ * `submission_token`. Field names mirror the /api/readiness/submit contract
+ * (submission_token required; results/results_text optional payload, at least
+ * one present).
+ *
+ * The curl example uses the ${READINESS_SUBMIT_TOKEN_PLACEHOLDER} placeholder;
+ * the AI substitutes the real per-session token shown on the SUBMISSION TOKEN
+ * line above. AIs without web access are told to output the results inside the
+ * delimited report block (explicit begin/end markers) so the customer can paste
+ * it back into the readiness page.
  */
-function submissionInstructionBlock(token: string): string[] {
+function submissionInstructionBlock(_token: string): string[] {
   return [
     "SUBMIT RESULTS BACK TO VYGO (instructions for the AI running this prompt):",
-    "AFTER you have produced the report block above, IF you have web/tool access (an HTTP client, a web request tool, or code execution), submit the analysis results back to Vygo as JSON:",
-    "1. Method: POST",
-    `2. URL: ${READINESS_SUBMIT_URL}`,
-    "3. Headers: Content-Type: application/json",
-    "4. Body: a single JSON object with these exact fields:",
-    "   {",
-    `     "submission_token": "${token}",`,
-    '     "results": { "<report field name>": "<value or UNKNOWN>" },',
-    '     "results_text": "<the full report block as plain text, including delimiters>"',
-    "   }",
-    '   - "submission_token" (string, required): the submission token embedded above — include it in the body exactly as shown.',
-    '   - "results" (object, optional): the completed report fields as structured JSON.',
-    '   - "results_text" (string, optional): the raw report block text.',
-    '   Always include "submission_token"; include "results" and/or "results_text".',
-    "5. If you do NOT have web/tool access (no web access — you cannot make HTTP requests), do not attempt the request. Instead, output the results to the user inside a clearly delimited block with explicit begin and end markers:",
+    "AFTER you have produced the report block above, IF you have web/tool access (an HTTP client, a web request tool, or code execution), submit the analysis results back to Vygo.",
+    "",
+    "DEFAULT METHOD (recommended — known to work): a curl POST that sends a standard browser User-Agent header. A bare curl/* User-Agent can be rejected at the edge, so send the browser UA shown below. Run this command, substituting your real token for " +
+      `${READINESS_SUBMIT_TOKEN_PLACEHOLDER} (the SUBMISSION TOKEN shown near the top of this prompt), the structured report fields for the results object, and the full report block text for results_text:`,
+    "",
+    `curl -X POST ${READINESS_SUBMIT_URL} \\`,
+    `  -H 'User-Agent: ${READINESS_SUBMIT_BROWSER_UA}' \\`,
+    "  -H 'Content-Type: application/json' \\",
+    `  -d '{"submission_token": "${READINESS_SUBMIT_TOKEN_PLACEHOLDER}", "results": { "<report field name>": "<value or UNKNOWN>" }, "results_text": "<the full report block as plain text, including the ${READINESS_REPORT_V1_START} / ${READINESS_REPORT_V1_END} delimiters>"}'`,
+    "",
+    "Payload fields (single JSON object):",
+    `   - "submission_token" (string, required): your submission token. Replace ${READINESS_SUBMIT_TOKEN_PLACEHOLDER} with the SUBMISSION TOKEN value shown near the top of this prompt.`,
+    '   - "results" (object): the completed report fields as structured JSON.',
+    '   - "results_text" (string): the raw report block text, including delimiters.',
+    '   Always include "submission_token", and send BOTH "results" and "results_text".',
+    `   Endpoint: POST ${READINESS_SUBMIT_URL} with Content-Type: application/json.`,
+    "",
+    "FALLBACK — if you cannot run curl but have another HTTP client (a web request tool or code execution): make the same POST to the URL above with the same JSON body and the same browser User-Agent header.",
+    "",
+    "IF you do NOT have web/tool access (no web access — you cannot make HTTP requests), do not attempt the request. Instead, output the results to the user inside a clearly delimited block with explicit begin and end markers:",
     `   - Begin marker — the first line of the block, exactly: ${READINESS_REPORT_V1_START}`,
     `   - End marker — the last line of the block, exactly: ${READINESS_REPORT_V1_END}`,
     '   Tell the user to copy the entire block (including both marker lines) and paste it into the paste box on the Vygo readiness page (the "my AI couldn\'t send it" path).',
-    "6. Once the POST succeeds (HTTP 200), confirm to the user that the analysis results were successfully submitted to Vygo.",
+    "",
+    "Once the POST succeeds (HTTP 200), confirm to the user that the analysis results were successfully submitted to Vygo.",
   ];
 }
 

@@ -49,14 +49,26 @@ describe("buildDiagnosticPrompt", () => {
     );
   });
 
-  it("appends an explicit POST instruction block with the exact body shape", () => {
+  it("makes a browser-UA curl POST the default submission method", () => {
     const { prompt } = buildDiagnosticPrompt({ answers: ANSWERS, submissionToken: TOKEN })!;
-    assert.ok(prompt.includes(READINESS_SUBMIT_URL));
-    assert.ok(prompt.includes("Method: POST"));
+    assert.ok(prompt.includes(`curl -X POST ${READINESS_SUBMIT_URL}`));
+    // Standard browser User-Agent header (edge/WAF rejects bare curl/* agents).
+    assert.ok(prompt.includes("-H 'User-Agent: Mozilla/5.0"));
+    assert.ok(prompt.includes("-H 'Content-Type: application/json'"));
+    // Payload carries the token, structured results JSON, and raw results_text.
     assert.ok(prompt.includes('"submission_token"'));
-    assert.ok(prompt.includes(`"submission_token": "${TOKEN}"`));
     assert.ok(prompt.includes('"results"'));
     assert.ok(prompt.includes('"results_text"'));
+    assert.ok(prompt.includes("DEFAULT METHOD"));
+  });
+
+  it("uses a placeholder token in the curl example and never the real token", () => {
+    const { prompt } = buildDiagnosticPrompt({ answers: ANSWERS, submissionToken: TOKEN })!;
+    // The curl command shape carries the placeholder, not the real token value.
+    assert.ok(prompt.includes('"submission_token": "YOUR_SUBMISSION_TOKEN"'));
+    assert.ok(!prompt.includes(`"submission_token": "${TOKEN}"`));
+    // Real token is delivered separately, on the labeled SUBMISSION TOKEN line only.
+    assert.ok(prompt.includes(`SUBMISSION TOKEN (unique to this readiness session): ${TOKEN}`));
   });
 
   it("scopes submission to AIs with web/tool access and requires user confirmation", () => {
