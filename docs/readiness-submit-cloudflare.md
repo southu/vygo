@@ -56,11 +56,25 @@ configuration.**
 ## Current production observation (2026-07-18)
 
 The 1010 ban is **reputation- and configuration-dependent** and is **not always
-active** on this route. Re-running both tooling-UA `curl` commands below against
-production on 2026-07-18 from this environment returned **HTTP 401 `INVALID_TOKEN`
-JSON from the application** (the placeholder `REPLACE_WITH_TOKEN` is not a valid
-token), i.e. the requests currently **reach the app** rather than being edge-banned
-with 1010. The browser-UA request behaves the same (401 `INVALID_TOKEN`).
+active** on this route. Re-running the repro against production on 2026-07-18
+from this build environment, **all three** User-Agents below —
+`curl/8.0.0`, `python-requests/2.31.0`, and the desktop-Chrome UA — returned an
+identical **HTTP 401 `INVALID_TOKEN`** JSON response **from the application**
+(the placeholder `REPLACE_WITH_TOKEN` is not a valid token), i.e. the requests
+currently **reach the app** rather than being edge-banned with 1010:
+
+```
+HTTP/2 401
+server: cloudflare
+x-vercel-id: cle1::iad1::jn25d-1784400045773-6e3c54578856
+cf-ray: a1d39dddff48a0d5-ORD
+
+{"error":{"code":"INVALID_TOKEN","message":"The submission token is malformed or unknown."}}
+```
+
+The presence of the **`x-vercel-id`** header and the application's JSON body
+(not Cloudflare's 1010 HTML page) is the proof that the request cleared the
+Cloudflare edge and was handled by the Vercel/Next function on this egress.
 
 This does not contradict the reported failure: Cloudflare's Browser Integrity
 Check / Bot Fight Mode keys off source-IP reputation and verified-bot status in
