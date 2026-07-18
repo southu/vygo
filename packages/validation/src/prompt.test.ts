@@ -6,7 +6,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { READINESS_SUBMIT_URL, buildDiagnosticPrompt } from "./prompt.js";
+import { READINESS_PING_URL, READINESS_SUBMIT_URL, buildDiagnosticPrompt } from "./prompt.js";
 import { READINESS_REPORT_V1_END, READINESS_REPORT_V1_START } from "./report-schema.js";
 import type { ReadinessStage1Answers } from "./readiness-intake.js";
 
@@ -96,6 +96,28 @@ describe("buildDiagnosticPrompt", () => {
     );
     assert.ok(prompt.includes("paste it into the paste box"));
     assert.ok(prompt.includes("couldn't send it"));
+  });
+
+  it("includes an optional preflight GET to the ping endpoint before building the payload", () => {
+    const { prompt } = buildDiagnosticPrompt({ answers: ANSWERS, submissionToken: TOKEN })!;
+    assert.ok(prompt.includes("OPTIONAL PREFLIGHT"));
+    assert.ok(prompt.includes(`GET ${READINESS_PING_URL}`));
+    assert.ok(prompt.includes("confirm"));
+    assert.ok(prompt.includes("before you build the full submission payload"));
+  });
+
+  it("gives resilience fallback wording for a Cloudflare 1010 block on submit", () => {
+    const { prompt } = buildDiagnosticPrompt({ answers: ANSWERS, submissionToken: TOKEN })!;
+    // 403 + Cloudflare 1010 → retry identical request with a browser User-Agent.
+    assert.ok(prompt.includes("HTTP 403"));
+    assert.ok(prompt.includes("1010"));
+    assert.ok(prompt.includes("IDENTICAL request"));
+    assert.ok(prompt.includes("User-Agent"));
+    // Still blocked → wait 30 seconds and retry once more before reporting failure.
+    assert.ok(prompt.includes("wait 30 seconds"));
+    assert.ok(prompt.includes("retry the identical request once more"));
+    assert.ok(prompt.includes("report failure to the user"));
+    assert.ok(prompt.includes("response body"));
   });
 
   it("keeps the original analysis instructions unchanged around the additions", () => {

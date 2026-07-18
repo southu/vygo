@@ -74,6 +74,7 @@ const ALLOWED_OPS = new Set([
   "token",
   "submit",
   "status",
+  "ping",
 ]);
 
 /** Shared readiness edge rate-limit budget (aligns with Railway ~20/60s). */
@@ -234,7 +235,7 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null, credentials 
  * closed on bad tokens, oversized bodies, and rate limits — CORS here only
  * controls which origins a *browser* would let read the response.
  */
-const PERMISSIVE_CORS_OPS = new Set<string>(["submit"]);
+const PERMISSIVE_CORS_OPS = new Set<string>(["submit", "ping"]);
 
 /** Reflects the requesting origin (or `*` when none was sent) with no credentials. */
 function applyPermissiveCorsHeaders(res: EdgeResponse, origin: string | null): void {
@@ -1523,6 +1524,21 @@ async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
 }
 
 // ---------------------------------------------------------------------------
+// ping — liveness probe for the resilience preflight (no auth, no side effects)
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/readiness/ping
+ *   - 200 { ok: true } — whenever the edge function is reachable.
+ * A tiny connectivity check the readiness prompt tells the customer's AI to run
+ * before it builds the full submission payload. No token, no DB, no side
+ * effects — its only job is to confirm the edge is reachable.
+ */
+async function handlePing(_req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  return { status: 200, body: { ok: true } };
+}
+
+// ---------------------------------------------------------------------------
 // status — poll a submission token's ingest status (waiting page)
 // ---------------------------------------------------------------------------
 
@@ -1700,7 +1716,7 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   if (req.method === "OPTIONS") {
     if (permissiveCors) {
       applyPermissiveCorsHeaders(res, origin);
-      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
       res.setHeader("Access-Control-Max-Age", "600");
     } else if (origin && allowed) {
@@ -1734,7 +1750,7 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   }
 
   // submission / brief / snapshot / status are GET; score / snapshot-email / others are POST
-  const getOps = new Set(["submission", "brief", "snapshot", "status"]);
+  const getOps = new Set(["submission", "brief", "snapshot", "status", "ping"]);
   if (getOps.has(op)) {
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET, OPTIONS");
@@ -1779,6 +1795,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleSubmit(req);
     } else if (op === "status") {
       result = await handleStatusGet(req);
+    } else if (op === "ping") {
+      result = await handlePing(req);
     } else {
       result = await handleSubmissionGet(req);
     }

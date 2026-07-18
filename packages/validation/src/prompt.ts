@@ -22,6 +22,14 @@ export const READINESS_PROMPT_REASSURANCE =
 export const READINESS_SUBMIT_URL = "https://www.vygo.ai/api/readiness/submit" as const;
 
 /**
+ * Lightweight liveness probe (see api/readiness/[op].ts "ping"). The prompt
+ * tells the customer's AI to GET this first — an HTTP 200 with a tiny JSON body
+ * ({"ok": true}) confirms outbound connectivity before it builds the full
+ * submission payload. No auth, no side effects.
+ */
+export const READINESS_PING_URL = "https://www.vygo.ai/api/readiness/ping" as const;
+
+/**
  * Placeholder token shown in the copyable curl example. The real per-session
  * token is delivered separately (the SUBMISSION TOKEN line) so it never appears
  * inside the example command shape.
@@ -129,6 +137,10 @@ function submissionInstructionBlock(_token: string): string[] {
     "SUBMIT RESULTS BACK TO VYGO (instructions for the AI running this prompt):",
     "AFTER you have produced the report block above, IF you have web/tool access (an HTTP client, a web request tool, or code execution), submit the analysis results back to Vygo.",
     "",
+    "OPTIONAL PREFLIGHT (recommended — confirm connectivity first): before you build the full submission payload, make a quick GET request to the ping endpoint to confirm you can reach Vygo:",
+    `   GET ${READINESS_PING_URL}`,
+    `   A healthy response is HTTP 200 with a tiny JSON body ({"ok": true}). If it succeeds, go ahead and build the payload and submit it below. If the ping fails outright (no response / DNS error / no network), you likely have no outbound web access — skip the submit and use the no-web-access path at the end of this section instead. The preflight is optional; a failed or skipped preflight does not by itself mean the submit will fail.`,
+    "",
     "DEFAULT METHOD (recommended — known to work): a curl POST that sends a standard browser User-Agent header. A bare curl/* User-Agent can be rejected at the edge, so send the browser UA shown below. Run this command, substituting your real token for " +
       `${READINESS_SUBMIT_TOKEN_PLACEHOLDER} (the SUBMISSION TOKEN shown near the top of this prompt), the structured report fields for the results object, and the full report block text for results_text:`,
     "",
@@ -145,6 +157,11 @@ function submissionInstructionBlock(_token: string): string[] {
     `   Endpoint: POST ${READINESS_SUBMIT_URL} with Content-Type: application/json.`,
     "",
     "FALLBACK — if you cannot run curl but have another HTTP client (a web request tool or code execution): make the same POST to the URL above with the same JSON body and the same browser User-Agent header.",
+    "",
+    "IF THE SUBMIT IS BLOCKED (resilience — do not give up after the first failure):",
+    `   1. If the POST returns HTTP 403 with Cloudflare error 1010 (the body contains "error code: 1010" / "Access denied"), retry the IDENTICAL request — same URL, same JSON body — with a standard browser User-Agent header: -H 'User-Agent: ${READINESS_SUBMIT_BROWSER_UA}'. (The default command above already sets this UA; if you sent a bare curl/* agent, this is the fix.)`,
+    "   2. If it is STILL blocked after the User-Agent retry, wait 30 seconds, then retry the identical request once more.",
+    "   3. Only if it still fails after that second retry, report failure to the user. Include the full HTTP response body from the last attempt in your report so the block can be diagnosed.",
     "",
     "IF you do NOT have web/tool access (no web access — you cannot make HTTP requests), do not attempt the request. Instead, output the results to the user inside a clearly delimited block with explicit begin and end markers:",
     `   - Begin marker — the first line of the block, exactly: ${READINESS_REPORT_V1_START}`,
