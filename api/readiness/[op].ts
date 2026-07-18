@@ -1394,6 +1394,23 @@ async function handleToken(req: EdgeRequest): Promise<ReadinessHandlerResult> {
   }
 }
 
+/**
+ * A submission is only useful if it carries a non-empty `results` object
+ * and/or a non-blank `results_text` string. Without one of these the token
+ * would flip to "ready" with nothing for the waiting page to render, and it
+ * would then poll forever against a payload that can never display.
+ */
+function hasUsableResultsPayload(body: Record<string, unknown>): boolean {
+  const results = body.results;
+  const hasResults =
+    !!results &&
+    typeof results === "object" &&
+    !Array.isArray(results) &&
+    Object.keys(results as Record<string, unknown>).length > 0;
+  const resultsText = typeof body.results_text === "string" ? body.results_text.trim() : "";
+  return hasResults || resultsText.length > 0;
+}
+
 async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
   const rl = checkEdgeRateLimit(req);
   if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
@@ -1428,6 +1445,18 @@ async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
       status: 400,
       body: {
         error: { code: "VALIDATION_ERROR", message: "submission_token is required." },
+      },
+    };
+  }
+
+  if (!hasUsableResultsPayload(body)) {
+    return {
+      status: 400,
+      body: {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "A non-empty results object or results_text string is required.",
+        },
       },
     };
   }

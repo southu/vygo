@@ -586,10 +586,27 @@ describe("readiness routes without database", () => {
       headers: { "content-type": "application/json" },
       payload: {
         submission_token: "test-token-valid-length",
+        results: { score: 1 },
       },
     });
     assert.notEqual(res.statusCode, 404);
     assert.equal(res.statusCode, 503);
+  });
+
+  it("POST /v1/readiness/submit rejects a payload with no results or results_text before touching the database", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: {
+        submission_token: "test-token-valid-length",
+      },
+    });
+    assert.notEqual(res.statusCode, 404);
+    assert.equal(res.statusCode, 400);
+    const body = res.json() as { error?: { code?: string; message?: string } };
+    assert.equal(body.error?.code, "VALIDATION_ERROR");
   });
 
   it("GET /v1/readiness/status requires a token", async () => {
@@ -688,11 +705,11 @@ describe("readiness ingest flow with database", () => {
     assert.ok(first.token);
     assert.ok(second.token);
     assert.notEqual(first.token, second.token);
-    assert.equal(first.ttl, 1800);
+    assert.equal(first.ttl, 86400);
     assert.ok(first.expires_at);
-    // Short-lived: expiry lands ~30 minutes out, never more than 31.
+    // 24h-lived: expiry lands ~24 hours out, never more than 24h1m.
     const expiresInMs = new Date(first.expires_at as string).getTime() - Date.now();
-    assert.ok(expiresInMs > 0 && expiresInMs <= 31 * 60 * 1000);
+    assert.ok(expiresInMs > 0 && expiresInMs <= (24 * 60 + 1) * 60 * 1000);
 
     // Shape (a): structured JSON results object.
     const structured = await ctx.app.inject({
@@ -740,6 +757,68 @@ describe("readiness ingest flow with database", () => {
     );
   });
 
+  it("rejects a valid token submitted with no results or results_text, and leaves it non-ready", async () => {
+    rateLimitStore.clear();
+    const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+    assert.equal(tokenRes.statusCode, 200);
+    const { token } = tokenRes.json() as { token: string };
+
+    const empty = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token },
+    });
+    assert.equal(empty.statusCode, 400);
+    const emptyBody = empty.json() as { error?: { code?: string } };
+    assert.equal(emptyBody.error?.code, "VALIDATION_ERROR");
+
+    const status = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    assert.equal(status.statusCode, 200);
+    const statusBody = status.json() as { status?: string };
+    assert.equal(statusBody.status, "pending");
+  });
+
+  it("rejects an empty results object and a blank results_text string", async () => {
+    rateLimitStore.clear();
+    const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+    assert.equal(tokenRes.statusCode, 200);
+    const { token } = tokenRes.json() as { token: string };
+
+    const emptyObject = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, results: {} },
+    });
+    assert.equal(emptyObject.statusCode, 400);
+    assert.equal(
+      (emptyObject.json() as { error?: { code?: string } }).error?.code,
+      "VALIDATION_ERROR",
+    );
+
+    const blankText = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, results_text: "   " },
+    });
+    assert.equal(blankText.statusCode, 400);
+    assert.equal(
+      (blankText.json() as { error?: { code?: string } }).error?.code,
+      "VALIDATION_ERROR",
+    );
+
+    const status = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    assert.equal((status.json() as { status?: string }).status, "pending");
+  });
+
   it("rejects an unknown submission token with a 4xx JSON error", async () => {
     rateLimitStore.clear();
     const res = await ctx.app.inject({
@@ -748,10 +827,10 @@ describe("readiness ingest flow with database", () => {
       headers: { "content-type": "application/json" },
       payload: { submission_token: "not-a-real-token", results: { score: 1 } },
     });
-    assert.equal(res.statusCode, 400);
+    assert.equal(res.statusCode, 401);
     const body = res.json() as { error?: { code?: string; message?: string } };
     assert.equal(body.error?.code, "INVALID_TOKEN");
-    assert.ok(/unknown or expired/i.test(body.error?.message ?? ""));
+    assert.ok(/malformed or unknown/i.test(body.error?.message ?? ""));
   });
 
   it("reports pending before ingest, ready after, and redacts secrets on read-back", async () => {

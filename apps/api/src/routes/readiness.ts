@@ -206,11 +206,29 @@ function sanitizeIngestValue(value: unknown): { value: unknown; stripped: boolea
   return { value, stripped: false };
 }
 
-function sanitizeIngestPayload(
-  body: Record<string, unknown>,
-): { payload: Record<string, unknown>; stripped: boolean } {
+function sanitizeIngestPayload(body: Record<string, unknown>): {
+  payload: Record<string, unknown>;
+  stripped: boolean;
+} {
   const result = sanitizeIngestValue(body);
   return { payload: result.value as Record<string, unknown>, stripped: result.stripped };
+}
+
+/**
+ * A submission is only useful if it carries a non-empty `results` object
+ * and/or a non-blank `results_text` string. Without one of these the token
+ * would flip to "ready" with nothing for the waiting page to render, and it
+ * would then poll forever against a payload that can never display.
+ */
+function hasUsableResultsPayload(body: Record<string, unknown>): boolean {
+  const results = body.results;
+  const hasResults =
+    !!results &&
+    typeof results === "object" &&
+    !Array.isArray(results) &&
+    Object.keys(results as Record<string, unknown>).length > 0;
+  const resultsText = typeof body.results_text === "string" ? body.results_text.trim() : "";
+  return hasResults || resultsText.length > 0;
 }
 
 /**
@@ -229,7 +247,10 @@ async function enforceSubmitIpRateLimit(
   if (ipHashResult) {
     bucketKey = readinessSubmitIpRateLimitKey(ipHashResult.hash);
   } else {
-    const digest = createHash("sha256").update(`vygo-readiness-submit-rl:${rawIp}`).digest("hex").slice(0, 32);
+    const digest = createHash("sha256")
+      .update(`vygo-readiness-submit-rl:${rawIp}`)
+      .digest("hex")
+      .slice(0, 32);
     bucketKey = readinessSubmitIpRateLimitKey(`rlfb:${digest}`);
   }
   const result = await checkRateLimit(
@@ -241,7 +262,10 @@ async function enforceSubmitIpRateLimit(
   if (!result.allowed) {
     const retryAfter = Math.max(
       1,
-      Math.min(result.retryAfterSeconds || SUBMIT_IP_RL_WINDOW_SECONDS, SUBMIT_IP_RL_WINDOW_SECONDS),
+      Math.min(
+        result.retryAfterSeconds || SUBMIT_IP_RL_WINDOW_SECONDS,
+        SUBMIT_IP_RL_WINDOW_SECONDS,
+      ),
     );
     request.log.info(
       {
@@ -3396,6 +3420,17 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       return reply.status(400).send(safeError("VALIDATION_ERROR", "submission_token is required."));
     }
 
+    if (!hasUsableResultsPayload(body)) {
+      return reply
+        .status(400)
+        .send(
+          safeError(
+            "VALIDATION_ERROR",
+            "A non-empty results object or results_text string is required.",
+          ),
+        );
+    }
+
     if (!(await enforceSubmitTokenRateLimit(request, reply, deps, submissionToken))) return;
 
     const tokenId = ingestTokenLogId(submissionToken);
@@ -3458,10 +3493,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         return reply
           .status(403)
           .send(
-            safeError(
-              "TOKEN_EXHAUSTED",
-              "This submission token has reached its resubmit limit.",
-            ),
+            safeError("TOKEN_EXHAUSTED", "This submission token has reached its resubmit limit."),
           );
       }
 

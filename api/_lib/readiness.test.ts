@@ -347,6 +347,78 @@ describe("edge readiness ingest flow integration via proxy", () => {
     }
   });
 
+  it("POST /api/readiness/submit with no results or results_text returns 400 and leaves the token non-ready", async () => {
+    setupMock();
+    try {
+      const tokenRes = mockResponse();
+      await handler(mockRequest("POST", "token"), tokenRes);
+      const token = tokenRes.getBody().token as string;
+
+      const submitReq = mockRequest("POST", "submit", { submission_token: token });
+      const submitRes = mockResponse();
+      await handler(submitReq, submitRes);
+
+      assert.equal(submitRes.getStatusCode(), 400);
+      assert.equal(submitRes.getBody().error?.code, "VALIDATION_ERROR");
+
+      const statusRes = mockResponse();
+      await handler(mockStatusRequest(token), statusRes);
+      assert.equal(statusRes.getBody().status, "pending");
+    } finally {
+      teardownMock();
+    }
+  });
+
+  it("POST /api/readiness/submit with an empty results object and no results_text returns 400", async () => {
+    setupMock();
+    try {
+      const tokenRes = mockResponse();
+      await handler(mockRequest("POST", "token"), tokenRes);
+      const token = tokenRes.getBody().token as string;
+
+      const submitReq = mockRequest("POST", "submit", {
+        submission_token: token,
+        results: {},
+      });
+      const submitRes = mockResponse();
+      await handler(submitReq, submitRes);
+
+      assert.equal(submitRes.getStatusCode(), 400);
+      assert.equal(submitRes.getBody().error?.code, "VALIDATION_ERROR");
+
+      const statusRes = mockResponse();
+      await handler(mockStatusRequest(token), statusRes);
+      assert.equal(statusRes.getBody().status, "pending");
+    } finally {
+      teardownMock();
+    }
+  });
+
+  it("POST /api/readiness/submit with a blank results_text string and no results returns 400", async () => {
+    setupMock();
+    try {
+      const tokenRes = mockResponse();
+      await handler(mockRequest("POST", "token"), tokenRes);
+      const token = tokenRes.getBody().token as string;
+
+      const submitReq = mockRequest("POST", "submit", {
+        submission_token: token,
+        results_text: "   ",
+      });
+      const submitRes = mockResponse();
+      await handler(submitReq, submitRes);
+
+      assert.equal(submitRes.getStatusCode(), 400);
+      assert.equal(submitRes.getBody().error?.code, "VALIDATION_ERROR");
+
+      const statusRes = mockResponse();
+      await handler(mockStatusRequest(token), statusRes);
+      assert.equal(statusRes.getBody().status, "pending");
+    } finally {
+      teardownMock();
+    }
+  });
+
   it("GET /api/readiness/status returns pending for a freshly minted token", async () => {
     setupMock();
     try {
