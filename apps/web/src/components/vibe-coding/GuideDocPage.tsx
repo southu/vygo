@@ -61,6 +61,16 @@ export function GuideDocPage({
             </span>
           </div>
           <h1 className="mt-4 font-display text-4xl font-bold sm:text-5xl">{title}</h1>
+          <div className="mt-6">
+            <a
+              href={`/content/vibe-coding/ratchet-guide/${doc.sourceFile}`}
+              download={doc.sourceFile}
+              className="btn-secondary"
+              data-download-link="doc-markdown"
+            >
+              Download raw Markdown (.md)
+            </a>
+          </div>
           {doc.slug === "one-pager" ? (
             <div className="mt-8">
               <a
