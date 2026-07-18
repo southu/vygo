@@ -215,13 +215,13 @@ async function ensureSubmissionTables(sql: Sql): Promise<void> {
   `;
 }
 
-function applyBaseHeaders(res: EdgeResponse, origin: string | null): void {
+function applyBaseHeaders(res: EdgeResponse, origin: string | null, credentials = true): void {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Vary", "Origin");
   if (origin) {
     res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
+    if (credentials) res.setHeader("Access-Control-Allow-Credentials", "true");
   }
 }
 

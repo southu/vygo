@@ -24,6 +24,10 @@ export async function errorHandler(
 
   // Payload too large
   if (error.statusCode === 413 || error.code === "FST_ERR_CTP_BODY_TOO_LARGE") {
+    request.log.info(
+      { event: "request_rejected", reason: "payload_too_large", path: request.url.split("?")[0] },
+      "request rejected: payload too large",
+    );
     await reply.status(413).send(safeError("PAYLOAD_TOO_LARGE", "Request payload is too large."));
     return;
   }

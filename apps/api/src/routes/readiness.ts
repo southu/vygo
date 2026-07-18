@@ -15,7 +15,7 @@
  * POST   /v1/readiness/score-e2e        — TEST-ONLY score (no Turnstile; real evidence pipeline)
  * GET    /v1/readiness/snapshot/:id     — public snapshot read-back (incl. known e2e fixture ids)
  * POST   /v1/readiness/snapshot/:id/email — enqueue snapshot email copy
- * POST   /v1/readiness/token            — mint a short-lived per-submission ingest token
+ * POST   /v1/readiness/token            — mint a per-submission ingest token (24h, limited resubmits)
  * POST   /v1/readiness/submit           — AI ingest: store results for a submission token
  * GET    /v1/readiness/status           — poll submission-token status (pending/ready/expired)
  *
@@ -23,7 +23,7 @@
  * Never returns connection strings, DATABASE_URL, stack traces, or secrets.
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   createReadinessSession,
   findReadinessSessionByToken,
@@ -132,6 +132,173 @@ const STATUS_RL_WINDOW_SECONDS = 60;
 
 function readinessStatusIpRateLimitKey(ipHash: string): string {
   return `rl:readiness:status:v1:ip:${ipHash}`;
+}
+
+/**
+ * The AI-ingest POST endpoint gets its own strict, dedicated budgets (per-IP
+ * AND per-token) separate from the shared 20/60s interactive bucket, so a
+ * burst of ~10 rapid POSTs reliably hits 429 regardless of what else the
+ * client did on other readiness endpoints. Windows are short (temporary
+ * lockout, not permanent) so a fresh valid submission succeeds once the
+ * window rolls over.
+ */
+const SUBMIT_IP_RL_LIMIT = 8;
+const SUBMIT_IP_RL_WINDOW_SECONDS = 60;
+const SUBMIT_TOKEN_RL_LIMIT = 6;
+const SUBMIT_TOKEN_RL_WINDOW_SECONDS = 60;
+
+function readinessSubmitIpRateLimitKey(ipHash: string): string {
+  return `rl:readiness:submit:v1:ip:${ipHash}`;
+}
+
+function readinessSubmitTokenRateLimitKey(tokenId: string): string {
+  return `rl:readiness:submit:v1:token:${tokenId}`;
+}
+
+/**
+ * Ingest token lifecycle (mission-hardened): tokens live 24h from issuance and
+ * accept a small fixed number of resubmits (the paste fallback and a legitimate
+ * AI re-run both reuse the same token) before being rejected as exhausted.
+ */
+const INGEST_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const INGEST_TOKEN_TTL_SECONDS = 24 * 60 * 60;
+const INGEST_TOKEN_MAX_USES = 5;
+
+/** Short, non-reversible id for log correlation — never the raw token value. */
+function ingestTokenLogId(token: string): string {
+  return createHash("sha256").update(token).digest("hex").slice(0, 16);
+}
+
+/**
+ * Strip `<script>...</script>` blocks (and orphan opening tags) from every
+ * string leaf of a submitted ingest payload before it is stored. Defense in
+ * depth: the results view already renders through React text nodes (which
+ * escape by default), but stored payloads must themselves never carry live
+ * markup for any other consumer (ops export, email, future renderers).
+ */
+const SCRIPT_TAG_RE = /<script\b[^>]*>[\s\S]*?<\/script\s*>|<script\b[^>]*>/gi;
+
+function sanitizeIngestValue(value: unknown): { value: unknown; stripped: boolean } {
+  if (typeof value === "string") {
+    if (!SCRIPT_TAG_RE.test(value)) return { value, stripped: false };
+    SCRIPT_TAG_RE.lastIndex = 0;
+    return { value: value.replace(SCRIPT_TAG_RE, ""), stripped: true };
+  }
+  if (Array.isArray(value)) {
+    let stripped = false;
+    const out = value.map((item) => {
+      const result = sanitizeIngestValue(item);
+      if (result.stripped) stripped = true;
+      return result.value;
+    });
+    return { value: out, stripped };
+  }
+  if (value !== null && typeof value === "object") {
+    let stripped = false;
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      const result = sanitizeIngestValue(child);
+      if (result.stripped) stripped = true;
+      out[key] = result.value;
+    }
+    return { value: out, stripped };
+  }
+  return { value, stripped: false };
+}
+
+function sanitizeIngestPayload(
+  body: Record<string, unknown>,
+): { payload: Record<string, unknown>; stripped: boolean } {
+  const result = sanitizeIngestValue(body);
+  return { payload: result.value as Record<string, unknown>, stripped: result.stripped };
+}
+
+/**
+ * Rate-limit the AI-ingest submit endpoint by client IP (dedicated bucket).
+ * Checked BEFORE token validity so a burst against an already-exhausted or
+ * invalid token still trips 429 within ~10 rapid requests.
+ */
+async function enforceSubmitIpRateLimit(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: ReadinessRouteDeps,
+): Promise<boolean> {
+  const rawIp = resolveClientIp(request);
+  const ipHashResult = hashIpAddress(rawIp, deps.env);
+  let bucketKey: string;
+  if (ipHashResult) {
+    bucketKey = readinessSubmitIpRateLimitKey(ipHashResult.hash);
+  } else {
+    const digest = createHash("sha256").update(`vygo-readiness-submit-rl:${rawIp}`).digest("hex").slice(0, 32);
+    bucketKey = readinessSubmitIpRateLimitKey(`rlfb:${digest}`);
+  }
+  const result = await checkRateLimit(
+    deps.rateLimitStore,
+    bucketKey,
+    SUBMIT_IP_RL_LIMIT,
+    SUBMIT_IP_RL_WINDOW_SECONDS,
+  );
+  if (!result.allowed) {
+    const retryAfter = Math.max(
+      1,
+      Math.min(result.retryAfterSeconds || SUBMIT_IP_RL_WINDOW_SECONDS, SUBMIT_IP_RL_WINDOW_SECONDS),
+    );
+    request.log.info(
+      {
+        event: "readiness_submit_rejected",
+        reason: "rate_limited_ip",
+        retryAfterSeconds: retryAfter,
+      },
+      "readiness ingest rejected: rate limited (ip)",
+    );
+    await reply
+      .status(429)
+      .header("Retry-After", String(retryAfter))
+      .send(safeError("RATE_LIMITED", "Too many attempts. Please try again later."));
+    return false;
+  }
+  return true;
+}
+
+/** Rate-limit the AI-ingest submit endpoint by submission token (dedicated bucket). */
+async function enforceSubmitTokenRateLimit(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: ReadinessRouteDeps,
+  submissionToken: string,
+): Promise<boolean> {
+  const tokenId = ingestTokenLogId(submissionToken);
+  const bucketKey = readinessSubmitTokenRateLimitKey(tokenId);
+  const result = await checkRateLimit(
+    deps.rateLimitStore,
+    bucketKey,
+    SUBMIT_TOKEN_RL_LIMIT,
+    SUBMIT_TOKEN_RL_WINDOW_SECONDS,
+  );
+  if (!result.allowed) {
+    const retryAfter = Math.max(
+      1,
+      Math.min(
+        result.retryAfterSeconds || SUBMIT_TOKEN_RL_WINDOW_SECONDS,
+        SUBMIT_TOKEN_RL_WINDOW_SECONDS,
+      ),
+    );
+    request.log.info(
+      {
+        event: "readiness_submit_rejected",
+        reason: "rate_limited_token",
+        tokenId,
+        retryAfterSeconds: retryAfter,
+      },
+      "readiness ingest rejected: rate limited (token)",
+    );
+    await reply
+      .status(429)
+      .header("Retry-After", String(retryAfter))
+      .send(safeError("RATE_LIMITED", "Too many attempts. Please try again later."));
+    return false;
+  }
+  return true;
 }
 
 function readinessScoreIpRateLimitKey(ipHash: string): string {
@@ -801,6 +968,14 @@ export async function ensureReadinessTables(dbHandle: DatabaseHandle): Promise<v
       received_at timestamp with time zone DEFAULT now() NOT NULL
     )
   `;
+  try {
+    // Limited-resubmit token lifecycle: tracks how many times a token has
+    // successfully ingested a submission (see INGEST_TOKEN_MAX_USES).
+    await dbHandle.sql`ALTER TABLE readiness_ingest_tokens ADD COLUMN IF NOT EXISTS use_count integer DEFAULT 0 NOT NULL`;
+    await dbHandle.sql`CREATE INDEX IF NOT EXISTS readiness_ingest_tokens_expires_at_idx ON readiness_ingest_tokens (expires_at)`;
+  } catch {
+    // column/index races are non-fatal
+  }
   try {
     await dbHandle.sql`CREATE UNIQUE INDEX IF NOT EXISTS readiness_sessions_token_uidx ON readiness_sessions (token)`;
     await dbHandle.sql`CREATE INDEX IF NOT EXISTS readiness_sessions_updated_at_idx ON readiness_sessions (updated_at)`;
@@ -3169,7 +3344,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       await ensureReadinessTables(dbHandle);
 
       const token = randomUUID();
-      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + INGEST_TOKEN_TTL_MS);
 
       await dbHandle.sql`
         INSERT INTO readiness_ingest_tokens (token, expires_at)
@@ -3179,7 +3354,8 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       return reply.status(200).send({
         token,
         expires_at: expiresAt.toISOString(),
-        ttl: 1800,
+        ttl: INGEST_TOKEN_TTL_SECONDS,
+        max_uses: INGEST_TOKEN_MAX_USES,
       });
     } catch (error) {
       request.log.error(
@@ -3192,8 +3368,17 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
     }
   });
 
+  /**
+   * AI ingest endpoint. Deliberately permissive CORS (any Origin may POST here —
+   * AI tools run from arbitrary origins/hosts, not just the vygo.ai browser
+   * page); see `PERMISSIVE_CORS_PATHS` in cors.ts, which reflects the request
+   * Origin (or `*`) for this exact path instead of the strict marketing-site
+   * allowlist every other readiness endpoint uses. Every rejection path (rate
+   * limit, bad token, sanitization) is logged with reason + hashed ip/token id
+   * — never raw IP or the token value itself.
+   */
   app.post("/v1/readiness/submit", async (request, reply) => {
-    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+    if (!(await enforceSubmitIpRateLimit(request, reply, deps))) return;
 
     // Content-Type must be JSON if present.
     const ct = request.headers["content-type"];
@@ -3211,6 +3396,22 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       return reply.status(400).send(safeError("VALIDATION_ERROR", "submission_token is required."));
     }
 
+    if (!(await enforceSubmitTokenRateLimit(request, reply, deps, submissionToken))) return;
+
+    const tokenId = ingestTokenLogId(submissionToken);
+    const rawIp = resolveClientIp(request);
+    const ipHash = hashIpAddress(rawIp, deps.env)?.hash ?? null;
+
+    if (!TOKEN_RE.test(submissionToken)) {
+      request.log.info(
+        { event: "readiness_submit_rejected", reason: "invalid_token", tokenId, ipHash },
+        "readiness ingest rejected: malformed token",
+      );
+      return reply
+        .status(401)
+        .send(safeError("INVALID_TOKEN", "The submission token is malformed or unknown."));
+    }
+
     const dbHandle = deps.getDb();
     if (!dbHandle) {
       return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
@@ -3220,23 +3421,61 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       await ensureReadinessTables(dbHandle);
 
       // Validate token
-      const tokenRows = await dbHandle.sql<{ token: string; expires_at: Date }[]>`
-        SELECT token, expires_at
+      const tokenRows = await dbHandle.sql<
+        { token: string; expires_at: Date; use_count: number }[]
+      >`
+        SELECT token, expires_at, use_count
         FROM readiness_ingest_tokens
         WHERE token = ${submissionToken}
         LIMIT 1
       `;
       const tokenRow = tokenRows[0];
       if (!tokenRow) {
+        request.log.info(
+          { event: "readiness_submit_rejected", reason: "invalid_token", tokenId, ipHash },
+          "readiness ingest rejected: unknown token",
+        );
         return reply
-          .status(400)
-          .send(safeError("INVALID_TOKEN", "The submission token is unknown or expired."));
+          .status(401)
+          .send(safeError("INVALID_TOKEN", "The submission token is malformed or unknown."));
       }
 
       if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+        request.log.info(
+          { event: "readiness_submit_rejected", reason: "expired_token", tokenId, ipHash },
+          "readiness ingest rejected: expired token",
+        );
         return reply
-          .status(400)
-          .send(safeError("EXPIRED_TOKEN", "The submission token is unknown or expired."));
+          .status(410)
+          .send(safeError("EXPIRED_TOKEN", "The submission token has expired."));
+      }
+
+      if (tokenRow.use_count >= INGEST_TOKEN_MAX_USES) {
+        request.log.info(
+          { event: "readiness_submit_rejected", reason: "exhausted_token", tokenId, ipHash },
+          "readiness ingest rejected: token exhausted",
+        );
+        return reply
+          .status(403)
+          .send(
+            safeError(
+              "TOKEN_EXHAUSTED",
+              "This submission token has reached its resubmit limit.",
+            ),
+          );
+      }
+
+      const { payload: sanitizedBody, stripped } = sanitizeIngestPayload(body);
+      if (stripped) {
+        request.log.warn(
+          {
+            event: "readiness_submit_sanitized",
+            reason: "script_tag_stripped",
+            tokenId,
+            ipHash,
+          },
+          "readiness ingest: stripped disallowed markup from submitted payload",
+        );
       }
 
       // Persist submission. Pass jsonb as a pre-stringified parameter with an
@@ -3245,7 +3484,12 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       // sql.json() parameters reach the wire unserialized and throw.
       await dbHandle.sql`
         INSERT INTO readiness_ingest_submissions (token, payload)
-        VALUES (${submissionToken}, ${JSON.stringify(body)}::jsonb)
+        VALUES (${submissionToken}, ${JSON.stringify(sanitizedBody)}::jsonb)
+      `;
+      await dbHandle.sql`
+        UPDATE readiness_ingest_tokens
+        SET use_count = use_count + 1
+        WHERE token = ${submissionToken}
       `;
 
       return reply.status(200).send({

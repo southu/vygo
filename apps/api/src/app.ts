@@ -143,6 +143,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
     return payload;
   });
 
+  // Register CORS before other onRequest hooks so every early-rejection
+  // response (oversized body, etc.) still carries the right ACAO headers for
+  // browser-driven cross-origin callers.
+  registerCors(app, parseCorsOrigins(env));
+
   // Reject oversized bodies via Content-Length before the parser streams them,
   // so clients (and reverse proxies) receive a clean 413 instead of a reset.
   app.addHook("onRequest", async (request, reply) => {
@@ -150,13 +155,15 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
     if (raw == null) return;
     const length = Number(Array.isArray(raw) ? raw[0] : raw);
     if (Number.isFinite(length) && length > env.BODY_LIMIT_BYTES) {
+      request.log.info(
+        { event: "request_rejected", reason: "payload_too_large", path: request.url.split("?")[0] },
+        "request rejected: payload too large",
+      );
       return reply
         .status(413)
         .send(safeError("PAYLOAD_TOO_LARGE", "Request payload is too large."));
     }
   });
-
-  registerCors(app, parseCorsOrigins(env));
 
   const getDb = () => database;
 

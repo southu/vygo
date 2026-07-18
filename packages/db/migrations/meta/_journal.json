@@ -71,6 +71,13 @@
       "when": 1752696000000,
       "tag": "0009_readiness_scoring_v3",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1752699600000,
+      "tag": "0010_readiness_ingest_hardening",
+      "breakpoints": true
     }
   ]
 }
