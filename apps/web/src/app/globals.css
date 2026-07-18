@@ -125,6 +125,11 @@
     @apply mt-4;
   }
 
+  /* Comfortable reading measure for long-form guide body text. */
+  .guide-prose {
+    max-width: 72ch;
+  }
+
   .skip-link {
     @apply sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-purple focus:px-4 focus:py-2 focus:text-white;
   }
@@ -455,7 +460,9 @@
 }
 .callout-warning .callout-icon,
 .callout-warning .callout-label {
-  color: var(--color-amber);
+  /* --color-amber fails AA (4.5:1) as text against the tinted warning
+     background; the darker shade keeps the same hue at ~6:1. */
+  color: var(--color-amber-dark);
 }
 
 .callout-note {

@@ -20,7 +20,10 @@ module.exports = {
           dark: "var(--color-green-dark)",
         },
         red: "var(--color-red)",
-        amber: "var(--color-amber)",
+        amber: {
+          DEFAULT: "var(--color-amber)",
+          dark: "var(--color-amber-dark)",
+        },
         blue: "var(--color-blue)",
         trust: "var(--color-trust)",
       },

@@ -247,7 +247,7 @@ export default function RatchetGuidePage() {
 
         <GuideToc sections={guideToc} />
 
-        <div className="min-w-0">
+        <div className="min-w-0 guide-prose">
           <section data-section="overview">
             <h2 id="overview" className="group scroll-mt-24 font-display text-2xl font-bold">
               Understand what Ratchet does
