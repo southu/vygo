@@ -60,7 +60,48 @@ const guideToc: GuideTocEntry[] = [
   { id: "know-the-core-components", title: "Know the core components", level: 3 },
   { id: "read-the-full-system-guide", title: "Read the full system guide", level: 3 },
   { id: "browse-every-file-in-the-pack", title: "Browse every file in the pack", level: 3 },
+  { id: "troubleshooting-faq", title: "Troubleshooting & FAQ", level: 2 },
+  {
+    id: "cant-start-a-run-missing-field",
+    title: "I can't start a run — Composer says a field is missing",
+    level: 3,
+  },
+  {
+    id: "deploy-never-finishes",
+    title: "My deploy never finishes and the gate looks stuck",
+    level: 3,
+  },
+  {
+    id: "version-endpoint-not-updating",
+    title: "My version endpoint isn't returning the new SHA after I push",
+    level: 3,
+  },
+  {
+    id: "tester-keeps-failing",
+    title: "The tester keeps failing the same criterion every iteration",
+    level: 3,
+  },
+  {
+    id: "mission-stopped-before-pass-streak",
+    title: "My mission stopped before reaching a pass streak",
+    level: 3,
+  },
 ];
+
+/** Small forward-path link appended to the end of each major guide section. */
+function NextSectionLink({ href, title }: { href: string; title: string }) {
+  return (
+    <p className="mt-8">
+      <a
+        href={href}
+        className="inline-flex items-center gap-1 font-medium text-purple hover:underline"
+        data-guide-section-next
+      >
+        Next: {title} &rarr;
+      </a>
+    </p>
+  );
+}
 
 /**
  * Step-card content for "Run your first mission" — the guide's first
@@ -220,6 +261,7 @@ export default function RatchetGuidePage() {
               allowed to advance. A mission finishes only after a streak of consecutive
               live-verified passes &mdash; like a mechanical ratchet, the loop only moves forward.
             </p>
+            <NextSectionLink href="#quick-start" title="Run your first mission" />
           </section>
 
           <section className="mt-14" data-section="quick-start">
@@ -232,6 +274,7 @@ export default function RatchetGuidePage() {
               &mdash; no other reading required before you start.
             </p>
             <StepList steps={quickStartSteps} />
+            <NextSectionLink href="#core-workflow" title="Run the build, deploy, and test loop" />
           </section>
 
           <section className="mt-14" data-section="core-workflow">
@@ -347,6 +390,7 @@ export default function RatchetGuidePage() {
                 </tbody>
               </table>
             </div>
+            <NextSectionLink href="#going-further" title="Go further with advanced usage" />
           </section>
 
           <section className="mt-14" data-section="going-further">
@@ -561,6 +605,140 @@ export default function RatchetGuidePage() {
                 })}
               </ul>
             </AdvancedExpander>
+            <NextSectionLink href="#troubleshooting-faq" title="Troubleshooting & FAQ" />
+          </section>
+
+          <section className="mt-14" data-section="troubleshooting-faq">
+            <h2
+              id="troubleshooting-faq"
+              className="group scroll-mt-24 font-display text-2xl font-bold"
+            >
+              Troubleshooting &amp; FAQ
+              <HeadingAnchor id="troubleshooting-faq" />
+            </h2>
+            <p className="mt-4 text-muted">
+              The most common ways a mission gets stuck, in symptom &rarr; cause &rarr; fix order.
+              Each entry links back to the relevant how-to section above.
+            </p>
+
+            <h3
+              id="cant-start-a-run-missing-field"
+              className="group scroll-mt-24 mt-8 font-display text-xl font-semibold"
+            >
+              I can&apos;t start a run &mdash; Composer says a field is missing
+              <HeadingAnchor id="cant-start-a-run-missing-field" />
+            </h3>
+            <p className="mt-3 text-muted">
+              <strong>Cause:</strong> the product shell&apos;s <strong>Git remote</strong>,{" "}
+              <strong>Live URL</strong>, or <strong>Version endpoint</strong> field was never filled
+              in, so Composer has nothing to bind the mission to.
+            </p>
+            <p className="mt-2 text-muted">
+              <strong>Fix:</strong> go back to{" "}
+              <a href="#quick-start" className="text-purple hover:underline">
+                Run your first mission
+              </a>{" "}
+              and set all three product shell fields before queuing another run.
+            </p>
+
+            <h3
+              id="deploy-never-finishes"
+              className="group scroll-mt-24 mt-8 font-display text-xl font-semibold"
+            >
+              My deploy never finishes and the gate looks stuck
+              <HeadingAnchor id="deploy-never-finishes" />
+            </h3>
+            <p className="mt-3 text-muted">
+              <strong>Cause:</strong> the version endpoint is behind auth, pointed at the wrong
+              product, or otherwise unreachable, so the deploy gate can never see a matching SHA
+              even though the build succeeded.
+            </p>
+            <p className="mt-2 text-muted">
+              <strong>Fix:</strong> curl the endpoint directly with no login and confirm it belongs
+              to the same product shell as your live URL. See{" "}
+              <a
+                href="#wait-for-the-deploy-gate-to-confirm-your-push"
+                className="text-purple hover:underline"
+              >
+                Wait for the deploy gate to confirm your push
+              </a>
+              .
+            </p>
+
+            <h3
+              id="version-endpoint-not-updating"
+              className="group scroll-mt-24 mt-8 font-display text-xl font-semibold"
+            >
+              My version endpoint isn&apos;t returning the new SHA after I push
+              <HeadingAnchor id="version-endpoint-not-updating" />
+            </h3>
+            <p className="mt-3 text-muted">
+              <strong>Cause:</strong> the host isn&apos;t set to auto-deploy on push to the branch
+              you&apos;re pushing, or the endpoint returns a build-time constant instead of reading
+              the currently deployed SHA.
+            </p>
+            <p className="mt-2 text-muted">
+              <strong>Fix:</strong> confirm auto-deploy is wired to your deploy branch and that a
+              fresh <code>curl</code> of the endpoint changes after every push &mdash; see{" "}
+              <a href="#quick-start" className="text-purple hover:underline">
+                Confirm your deploy and version endpoint
+              </a>
+              .
+            </p>
+
+            <h3
+              id="tester-keeps-failing"
+              className="group scroll-mt-24 mt-8 font-display text-xl font-semibold"
+            >
+              The tester keeps failing the same criterion every iteration
+              <HeadingAnchor id="tester-keeps-failing" />
+            </h3>
+            <p className="mt-3 text-muted">
+              <strong>Cause:</strong> the builder isn&apos;t producing a real, content-changing
+              commit each iteration, or the tester is exercising a different live URL than the one
+              that actually changed.
+            </p>
+            <p className="mt-2 text-muted">
+              <strong>Fix:</strong> check git history for an actual advancing commit per iteration
+              (see{" "}
+              <a href="#build-real-provable-changes" className="text-purple hover:underline">
+                Build real, provable changes
+              </a>
+              ) and confirm the tester targets the same live app the deploy gate just confirmed (see{" "}
+              <a href="#test-only-the-live-deployed-app" className="text-purple hover:underline">
+                Test only the live, deployed app
+              </a>
+              ).
+            </p>
+
+            <h3
+              id="mission-stopped-before-pass-streak"
+              className="group scroll-mt-24 mt-8 font-display text-xl font-semibold"
+            >
+              My mission stopped before reaching a pass streak
+              <HeadingAnchor id="mission-stopped-before-pass-streak" />
+            </h3>
+            <p className="mt-3 text-muted">
+              <strong>Cause:</strong> the <strong>Max iterations</strong> or{" "}
+              <strong>Spend cap</strong> limit was reached before the required run of consecutive
+              passes.
+            </p>
+            <p className="mt-2 text-muted">
+              <strong>Fix:</strong> raise the iteration or spend limit, lower the{" "}
+              <strong>Pass streak</strong> field (see{" "}
+              <a href="#quick-start" className="text-purple hover:underline">
+                Set your limits
+              </a>
+              ), or split the goal into a multi-step campaign so each piece can finish on its own
+              (see{" "}
+              <a
+                href="#plan-multi-step-campaigns-instead-of-one-mega-mission"
+                className="text-purple hover:underline"
+              >
+                Plan multi-step campaigns instead of one mega-mission
+              </a>
+              ).
+            </p>
           </section>
         </div>
       </div>
