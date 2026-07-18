@@ -84,6 +84,35 @@ networks and passed through from others. The commands and header sets below are
 the exact, copy-pasteable repro; observe the **403 + `error code: 1010`** result
 from an ordinary (non-allowlisted) client network.
 
+Re-verified again on **2026-07-18** (iteration 3) from this environment: both
+tooling-UA commands returned **HTTP 401 `INVALID_TOKEN`** (reached the app), and
+the browser-UA command returned **HTTP 429** (rate-limited by the app, i.e. also
+past the edge). No `403`/`1010` was produced for any `User-Agent`, confirming the
+zone is **not currently enforcing** the Browser Integrity Check / Bot Fight Mode
+ban on this route.
+
+---
+
+## Operator prerequisites to reproduce / observe the block
+
+The `User-Agent` differential documented here is a **Cloudflare edge behavior**,
+not application logic. For the reported failure (and the exact 403 + 1010 repro
+below) to be observable in production, two preconditions must hold. Both are
+**ops/config settings outside this repo** — this doc records the behavior and the
+prerequisites; it does not (and must not) change Cloudflare configuration or
+application code.
+
+| Observable | Precondition | Current state (2026-07-18) |
+| --- | --- | --- |
+| Tooling-UA POST → **403 + `error code: 1010`** | Cloudflare zone `www.vygo.ai` has **Bot Fight Mode / Browser Integrity Check enabled** for the `/api/readiness/submit` route, and the client IP is a non-allowlisted / ordinary-reputation network | **Not enforcing** — tooling UAs reach the origin (`401 INVALID_TOKEN`) |
+| Browser-UA POST → **200** | A **valid, unexpired `submission_token`** is substituted for `REPLACE_WITH_TOKEN` at run time (never committed), and the edge is not rate-limiting | With the placeholder token the app returns `401`; under load the edge/app may return `429` |
+| `raw.githubusercontent.com/.../docs/readiness-submit-cloudflare.md` → **200** | The `southu/vygo` GitHub repo is **public** (or the raw URL is fetched with an authenticated token) | Repo is **private** → unauthenticated raw and API URLs return `404` even though the doc is committed on `main` |
+
+Enabling Bot Fight Mode / the Browser Integrity Check is done in the Cloudflare
+dashboard for the zone (**Security → Bots**, or a WAF rule). That is the ops
+prerequisite for the `1010` ban to be enforced; it is intentionally left to the
+zone owner and is not performed by this document.
+
 ---
 
 ## Reproduction
