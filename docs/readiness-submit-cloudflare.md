@@ -177,6 +177,24 @@ Content-Length: <n>
 
 - Assert on **HTTP 403** + the literal string **`1010`** in the body for the
   blocked case, and on **HTTP 200** for the browser case.
+- Quick pass/fail one-liners (print only the HTTP status, then grep the body for
+  the `1010` signal):
+
+  ```bash
+  # Blocked tooling UA — expect: 403 then a matching "1010" line
+  curl -sS -o /tmp/cf.out -w 'status=%{http_code}\n' -X POST \
+    'https://www.vygo.ai/api/readiness/submit' \
+    -H 'Content-Type: application/json' -H 'User-Agent: curl/8.0.0' \
+    -d '{"submission_token":"REPLACE_WITH_TOKEN","results":{"ok":true}}'
+  grep -o 'error code: 1010' /tmp/cf.out
+
+  # Browser UA — expect: status=200
+  curl -sS -o /dev/null -w 'status=%{http_code}\n' -X POST \
+    'https://www.vygo.ai/api/readiness/submit' \
+    -H 'Content-Type: application/json' \
+    -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' \
+    -d '{"submission_token":"REPLACE_WITH_TOKEN","results":{"ok":true}}'
+  ```
 - The `southu/vygo` GitHub repository is **private**. Unauthenticated fetches of
   `https://raw.githubusercontent.com/southu/vygo/main/docs/readiness-submit-cloudflare.md`
   (and the GitHub contents API) therefore return `404` even when the doc is
