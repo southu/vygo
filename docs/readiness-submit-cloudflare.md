@@ -25,6 +25,18 @@ submitter. This document reproduces and records that behavior.
 > into this doc, into a shell history that gets committed, or into any commit.
 > Substitute the real token only at run time in your own shell.
 
+> **Publication status:** This doc is committed and pushed on `main` at the
+> deployed SHA (confirm with `GET https://www.vygo.ai/version`). The
+> `southu/vygo` repository is **private**, so the unauthenticated
+> `raw.githubusercontent.com/.../main/docs/readiness-submit-cloudflare.md`
+> URL returns **404** — that is "no anonymous access", not "file missing".
+> Making that public URL serve 200 would require flipping the repo to public,
+> which is **deliberately declined**: sibling docs such as
+> `docs/credentials-and-decisions.md` contain real operational secrets that
+> must not be exposed to the public internet. Use the **authenticated** check in
+> [Verifying this doc is published on `main`](#verifying-this-doc-is-published-on-main)
+> instead.
+
 ---
 
 ## Responsible Cloudflare feature
