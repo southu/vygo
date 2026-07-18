@@ -119,6 +119,7 @@ const quickStartSteps: Step[] = [
           You can edit any step&apos;s title or body before accepting &mdash; Composer treats your
           edits as the source of truth for that step.
         </Callout>
+        <ScreenshotPlaceholder caption="The draft queue screen, showing the proposed steps and the Accept draft button." />
       </>
     ),
   },
@@ -138,11 +139,14 @@ const quickStartSteps: Step[] = [
   {
     title: "Start the run",
     body: (
-      <p>
-        Click <strong>Start run</strong>. Each iteration is automatic: the builder pushes real
-        commits, the deploy gate waits until your version endpoint matches the new SHA, and a tester
-        checks only the live app and returns PASS or FAIL.
-      </p>
+      <>
+        <p>
+          Click <strong>Start run</strong>. Each iteration is automatic: the builder pushes real
+          commits, the deploy gate waits until your version endpoint matches the new SHA, and a
+          tester checks only the live app and returns PASS or FAIL.
+        </p>
+        <ScreenshotPlaceholder caption="The mission control screen, showing the Start run button." />
+      </>
     ),
   },
   {
