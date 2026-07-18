@@ -332,6 +332,11 @@ export function ReadinessFlow() {
         }
 
         if (!sessionToken) {
+          try {
+            await fetch("/api/readiness/token", { method: "POST" });
+          } catch (e) {
+            console.error("Could not fetch readiness submission token", e);
+          }
           const created = await createReadinessSession({
             stage: "intake",
             draft: draftFromStage1(restoredStage1, {

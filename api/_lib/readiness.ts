@@ -51,6 +51,21 @@ export async function ensureReadinessTables(sql: Sql): Promise<void> {
       updated_at timestamp with time zone DEFAULT now() NOT NULL
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS readiness_ingest_tokens (
+      token text PRIMARY KEY,
+      expires_at timestamp with time zone NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS readiness_ingest_submissions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      token text NOT NULL,
+      payload jsonb NOT NULL,
+      received_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
   try {
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS readiness_sessions_token_uidx ON readiness_sessions (token)`;
     await sql`CREATE INDEX IF NOT EXISTS readiness_sessions_updated_at_idx ON readiness_sessions (updated_at)`;
@@ -365,6 +380,22 @@ export async function proxyCreateSession(
   inboundHeaders?: Record<string, string | string[] | undefined>,
 ): Promise<ReadinessHandlerResult> {
   return proxyJson("POST", "/v1/readiness/session", body ?? {}, env, inboundHeaders);
+}
+
+export async function proxyToken(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/token", body ?? {}, env, inboundHeaders);
+}
+
+export async function proxySubmit(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/submit", body ?? {}, env, inboundHeaders);
 }
 
 export async function proxyGetSession(

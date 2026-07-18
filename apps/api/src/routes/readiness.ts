@@ -20,6 +20,7 @@
  * Never returns connection strings, DATABASE_URL, stack traces, or secrets.
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { randomUUID } from "node:crypto";
 import {
   createReadinessSession,
   findReadinessSessionByToken,
@@ -774,6 +775,21 @@ export async function ensureReadinessTables(dbHandle: DatabaseHandle): Promise<v
       weights jsonb DEFAULT '{}'::jsonb NOT NULL,
       active boolean DEFAULT true NOT NULL,
       created_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
+  await dbHandle.sql`
+    CREATE TABLE IF NOT EXISTS readiness_ingest_tokens (
+      token text PRIMARY KEY,
+      expires_at timestamp with time zone NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
+  await dbHandle.sql`
+    CREATE TABLE IF NOT EXISTS readiness_ingest_submissions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      token text NOT NULL,
+      payload jsonb NOT NULL,
+      received_at timestamp with time zone DEFAULT now() NOT NULL
     )
   `;
   try {
@@ -3068,6 +3084,108 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       request.log.error(
         { event: "readiness_snapshot_email_failed" },
         error instanceof Error ? error.message : "snapshot email failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  app.post("/v1/readiness/token", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+      await dbHandle.sql`
+        INSERT INTO readiness_ingest_tokens (token, expires_at)
+        VALUES (${token}, ${expiresAt})
+      `;
+
+      return reply.status(200).send({
+        token,
+        expires_at: expiresAt.toISOString(),
+        ttl: 1800,
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_token_create_failed" },
+        error instanceof Error ? error.message : "token create failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  app.post("/v1/readiness/submit", async (request, reply) => {
+    if (!(await enforceReadinessRateLimit(request, reply, deps))) return;
+
+    // Content-Type must be JSON if present.
+    const ct = request.headers["content-type"];
+    if (ct && !isJsonContentType(ct)) {
+      return reply
+        .status(415)
+        .send(safeError("UNSUPPORTED_MEDIA_TYPE", "Content-Type must be application/json."));
+    }
+
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const submissionToken =
+      typeof body.submission_token === "string" ? body.submission_token.trim() : "";
+
+    if (!submissionToken) {
+      return reply.status(400).send(safeError("VALIDATION_ERROR", "submission_token is required."));
+    }
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureReadinessTables(dbHandle);
+
+      // Validate token
+      const tokenRows = await dbHandle.sql<{ token: string; expires_at: Date }[]>`
+        SELECT token, expires_at
+        FROM readiness_ingest_tokens
+        WHERE token = ${submissionToken}
+        LIMIT 1
+      `;
+      const tokenRow = tokenRows[0];
+      if (!tokenRow) {
+        return reply
+          .status(400)
+          .send(safeError("INVALID_TOKEN", "The submission token is unknown or expired."));
+      }
+
+      if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+        return reply
+          .status(400)
+          .send(safeError("EXPIRED_TOKEN", "The submission token is unknown or expired."));
+      }
+
+      // Persist submission
+      await dbHandle.sql`
+        INSERT INTO readiness_ingest_submissions (token, payload)
+        VALUES (${submissionToken}, ${dbHandle.sql.json(body as never)})
+      `;
+
+      return reply.status(200).send({
+        message: "Vygo has successfully received your readiness results.",
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "readiness_submit_failed" },
+        error instanceof Error ? error.message : "submit failed",
       );
       return reply
         .status(500)

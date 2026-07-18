@@ -544,4 +544,43 @@ describe("readiness routes without database", () => {
     assert.equal(body.snapshotId, undefined);
     assert.ok(body.error?.code);
   });
+
+  it("POST /v1/readiness/token is registered and returns 503 without database", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/token",
+    });
+    assert.notEqual(res.statusCode, 404);
+    assert.equal(res.statusCode, 503);
+  });
+
+  it("POST /v1/readiness/submit is registered and validates presence of token", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: {},
+    });
+    assert.notEqual(res.statusCode, 404);
+    assert.equal(res.statusCode, 400);
+    const body = res.json() as { error?: { code?: string; message?: string } };
+    assert.equal(body.error?.code, "VALIDATION_ERROR");
+    assert.ok(body.error?.message?.includes("submission_token"));
+  });
+
+  it("POST /v1/readiness/submit returns 503 without database when token is present", async () => {
+    rateLimitStore.clear();
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: {
+        submission_token: "test-token-valid-length",
+      },
+    });
+    assert.notEqual(res.statusCode, 404);
+    assert.equal(res.statusCode, 503);
+  });
 });

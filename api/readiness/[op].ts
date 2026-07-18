@@ -16,7 +16,7 @@
  */
 import postgres from "postgres";
 import type { Sql } from "postgres";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   logLeadRow,
   proxyEmailPrompt,
@@ -33,6 +33,8 @@ import {
   proxyScorePreview,
   proxyScoreE2E,
   proxySnapshotEmail,
+  proxyToken,
+  proxySubmit,
   resolveDatabaseUrl,
   resolveEdgeClientIp,
   type ReadinessHandlerResult,
@@ -67,6 +69,8 @@ const ALLOWED_OPS = new Set([
   "score-e2e",
   "snapshot",
   "snapshot-email",
+  "token",
+  "submit",
 ]);
 
 /** Shared readiness edge rate-limit budget (aligns with Railway ~20/60s). */
@@ -154,6 +158,21 @@ async function ensureSubmissionTables(sql: Sql): Promise<void> {
       active boolean DEFAULT true NOT NULL,
       metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
       created_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS readiness_ingest_tokens (
+      token text PRIMARY KEY,
+      expires_at timestamp with time zone NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS readiness_ingest_submissions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      token text NOT NULL,
+      payload jsonb NOT NULL,
+      received_at timestamp with time zone DEFAULT now() NOT NULL
     )
   `;
 }
@@ -1275,6 +1294,148 @@ async function handleSnapshotEmail(req: EdgeRequest): Promise<ReadinessHandlerRe
   return proxySnapshotEmail(id, parsedBody.value ?? {}, process.env, req.headers);
 }
 
+async function handleToken(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const url = resolveDatabaseUrl();
+  if (!url) {
+    return proxyToken({}, process.env, req.headers);
+  }
+
+  try {
+    const sql = getSql(url);
+    await ensureSubmissionTables(sql);
+
+    const token = randomUUID();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    await sql`
+      INSERT INTO readiness_ingest_tokens (token, expires_at)
+      VALUES (${token}, ${expiresAt})
+    `;
+
+    return {
+      status: 200,
+      body: {
+        token,
+        expires_at: expiresAt.toISOString(),
+        ttl: 1800,
+      },
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Could not create submission token.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
+async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const contentType = contentTypeBase(req.headers);
+  if (contentType && contentType !== "application/json") {
+    return {
+      status: 415,
+      body: {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "Content-Type must be application/json.",
+        },
+      },
+    };
+  }
+
+  const parsedBody = readJsonBody(req);
+  if (!parsedBody.ok) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+    };
+  }
+
+  const body = (parsedBody.value ?? {}) as Record<string, unknown>;
+  const submissionToken =
+    typeof body.submission_token === "string" ? body.submission_token.trim() : "";
+
+  if (!submissionToken) {
+    return {
+      status: 400,
+      body: {
+        error: { code: "VALIDATION_ERROR", message: "submission_token is required." },
+      },
+    };
+  }
+
+  const url = resolveDatabaseUrl();
+  if (!url) {
+    return proxySubmit(body, process.env, req.headers);
+  }
+
+  try {
+    const sql = getSql(url);
+    await ensureSubmissionTables(sql);
+
+    // Validate token
+    const tokenRows = await sql<{ token: string; expires_at: Date }[]>`
+      SELECT token, expires_at
+      FROM readiness_ingest_tokens
+      WHERE token = ${submissionToken}
+      LIMIT 1
+    `;
+    const tokenRow = tokenRows[0];
+    if (!tokenRow) {
+      return {
+        status: 400,
+        body: {
+          error: { code: "INVALID_TOKEN", message: "The submission token is unknown or expired." },
+        },
+      };
+    }
+
+    if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+      return {
+        status: 400,
+        body: {
+          error: { code: "EXPIRED_TOKEN", message: "The submission token is unknown or expired." },
+        },
+      };
+    }
+
+    // Persist submission
+    await sql`
+      INSERT INTO readiness_ingest_submissions (token, payload)
+      VALUES (${submissionToken}, ${sql.json(body as never)})
+    `;
+
+    return {
+      status: 200,
+      body: {
+        message: "Vygo has successfully received your readiness results.",
+      },
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Could not submit readiness results.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // HTTP entry
 // ---------------------------------------------------------------------------
@@ -1351,6 +1512,10 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleSnapshotEmail(req);
     } else if (op === "brief") {
       result = await handleBriefGet(req);
+    } else if (op === "token") {
+      result = await handleToken(req);
+    } else if (op === "submit") {
+      result = await handleSubmit(req);
     } else {
       result = await handleSubmissionGet(req);
     }
