@@ -171,98 +171,6 @@ function checkStatusRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterS
   return { allowed: true, retryAfterSeconds: 0 };
 }
 
-// ---------------------------------------------------------------------------
-// Cloudflare Browser Integrity Check (error 1010) — reproduced at the origin
-//
-// In production www.vygo.ai is fronted by Cloudflare with Bot Fight Mode /
-// Browser Integrity Check enabled. That control bans requests whose
-// `User-Agent` is a well-known automation/tooling signature (curl,
-// python-requests, wget, …) with **HTTP 403 + Cloudflare error code 1010**
-// before the request reaches this origin, while it lets recognizable browser
-// signatures through. The readiness `submit` ingest is called server-to-server
-// by a customer's automation, so this is exactly the control that blocks the
-// legitimate submitter — the reported failure documented in
-// docs/readiness-submit-cloudflare.md.
-//
-// Because the edge control keys off IP reputation / verified-bot status in
-// addition to the UA signature, it was observed *not* enforcing on this route
-// from some egress networks (tooling UAs reached the origin instead of getting
-// the 1010 ban). We reproduce the ban deterministically at the origin for the
-// ingest route so the documented failure mode is reliably observable, matching
-// Cloudflare's 403 + `error code: 1010` response byte-for-behavior. The
-// emulation only runs for requests that actually arrived through the Cloudflare
-// edge (identified by the CF-* headers Cloudflare injects on origin-bound
-// requests); direct / local / unit-test traffic carries no such headers and
-// runs the normal app logic unchanged.
-// ---------------------------------------------------------------------------
-
-/** First value of a (possibly array) request header, lowercased name lookup. */
-function firstHeaderValue(headers: EdgeRequest["headers"], name: string): string {
-  const raw = headers[name];
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  return typeof value === "string" ? value : "";
-}
-
-/**
- * True when the request reached the origin through Cloudflare. Cloudflare
- * injects `CF-RAY` / `CF-Connecting-IP` on every origin-bound request it
- * proxies; unit tests and direct hits to the function have neither.
- */
-function isCloudflareEdgeRequest(headers: EdgeRequest["headers"]): boolean {
-  return !!(firstHeaderValue(headers, "cf-ray") || firstHeaderValue(headers, "cf-connecting-ip"));
-}
-
-/** Known automation / non-browser User-Agent signatures Cloudflare bans (1010). */
-const TOOLING_UA_RE =
-  /(curl\/|python-requests\/|python-urllib|urllib\/|wget\/|libwww-perl|go-http-client|okhttp\/|java\/|httpie\/|node-fetch|axios\/|got\/|guzzle|apache-httpclient|postmanruntime|insomnia|scrapy|winhttp|powershell|\bbot\b|\bspider\b|\bcrawler\b)/i;
-
-/**
- * Mirrors Cloudflare's Browser Integrity Check verdict: a request passes only
- * when it presents a recognizable browser signature (Mozilla/5.0 + a rendering
- * engine token) and is not a known automation/tooling UA. Empty UAs fail.
- */
-function isBrowserUserAgent(userAgent: string): boolean {
-  const value = userAgent.trim();
-  if (!value) return false;
-  if (TOOLING_UA_RE.test(value)) return false;
-  return (
-    /^mozilla\/5\.0\b/i.test(value) &&
-    /(applewebkit|gecko|chrome|safari|firefox|edg\/|opr\/|trident)/i.test(value)
-  );
-}
-
-/**
- * Sends Cloudflare's "Access denied" page for a banned browser signature —
- * HTTP 403 with error code 1010 — reproducing the edge response at the origin.
- */
-function sendCloudflareBrowserBan(res: EdgeResponse): void {
-  const rayId = `${randomUUID().replace(/-/g, "").slice(0, 16)}-EWR`;
-  const html = `<!DOCTYPE html>
-<html lang="en-US">
-<head>
-<title>Access denied | www.vygo.ai used Cloudflare to restrict access</title>
-<meta charset="UTF-8" />
-<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<meta name="robots" content="noindex, nofollow" />
-</head>
-<body>
-<h1>Access denied</h1>
-<p>Error code <span data-translate="error_desc">1010</span></p>
-<p>You do not have access to www.vygo.ai.</p>
-<p>The owner of this website (www.vygo.ai) has banned your access based on your browser's signature (error code: 1010).</p>
-<p>This request was blocked by Cloudflare's Browser Integrity Check / Bot Fight Mode because the request's User-Agent was identified as an automated (non-browser) client.</p>
-<p>Cloudflare Ray ID: <code>${rayId}</code></p>
-<p>Performance &amp; security by Cloudflare</p>
-</body>
-</html>
-`;
-  res.setHeader("Content-Type", "text/html; charset=UTF-8");
-  res.setHeader("Cache-Control", "no-store");
-  res.setHeader("Cf-Mitigated", "challenge");
-  res.setHeader("Server", "cloudflare");
-  res.status(403).send(html);
-}
-
 async function ensureSubmissionTables(sql: Sql): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS readiness_submissions (
@@ -1838,22 +1746,6 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   } else if (req.method !== "POST") {
     res.setHeader("Allow", "POST, OPTIONS");
     res.status(405).json({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." } });
-    return;
-  }
-
-  // Cloudflare Browser Integrity Check (error 1010) for the ingest route,
-  // reproduced at the origin for requests that arrived through the CF edge.
-  // Tooling User-Agents are banned (403 + 1010); recognizable browsers pass the
-  // integrity check and reach the app. See docs/readiness-submit-cloudflare.md.
-  if (op === "submit" && isCloudflareEdgeRequest(req.headers)) {
-    const userAgent = firstHeaderValue(req.headers, "user-agent");
-    if (!isBrowserUserAgent(userAgent)) {
-      sendCloudflareBrowserBan(res);
-      return;
-    }
-    res.status(200).json({
-      message: "Vygo has successfully received your readiness results.",
-    });
     return;
   }
 

@@ -1,5 +1,15 @@
 # Readiness submit — Cloudflare bot block (error 1010)
 
+> **STATUS (2026-07-18): the origin 1010 emulation described below has been
+> REMOVED.** A prior iteration reproduced Cloudflare's `403 / error code: 1010`
+> at the origin for `/api/readiness/submit` so the failure was deterministically
+> observable. That origin shim was the actual blocker, and it has been removed so
+> the route now reaches its real handler for every client (including default
+> tooling User-Agents). The exception, the Cloudflare‑API state, and how to
+> reproduce/remove it are documented in
+> [`cloudflare-readiness-waf-exception.md`](./cloudflare-readiness-waf-exception.md).
+> The historical reproduction notes below are retained for context only.
+
 ## Summary
 
 Automated POSTs to the production readiness ingest endpoint
@@ -59,18 +69,21 @@ allowlist rule for the `/api/readiness/submit` path by API-token header, source
 IP, or verified bot). This document only reproduces and records the behavior;
 it does not change Cloudflare configuration.
 
-### Enforcement note
+### Enforcement note (historical — no longer in effect)
 
 The Cloudflare edge control keys off source-IP reputation and verified-bot
 status in addition to the `User-Agent` signature, so from some egress networks
 the tooling `User-Agent` was observed reaching the origin instead of receiving
 the 1010 ban. To make the documented failure mode **deterministically
-reproducible** on this route, the origin reproduces Cloudflare's Browser
-Integrity Check verdict for `/api/readiness/submit`: requests that arrive
-through the Cloudflare edge with a non-browser `User-Agent` get the same
-**HTTP 403 + `error code: 1010`** response, and recognizable browser signatures
-pass through to the app. The differentiator, the status codes, and the bodies
-documented below therefore hold on every request through production.
+reproducible** on this route, a prior iteration had the origin reproduce
+Cloudflare's Browser Integrity Check verdict for `/api/readiness/submit`.
+
+**That origin emulation has since been removed** (see the STATUS banner at the
+top and [`cloudflare-readiness-waf-exception.md`](./cloudflare-readiness-waf-exception.md)):
+`/api/readiness/submit` now runs its real handler for every client, so a default
+tooling `User-Agent` reaches the origin and gets a normal API response rather
+than a `403 / 1010` block. The reproduction commands below therefore describe the
+**historical** behavior, not current production.
 
 ---
 
@@ -240,6 +253,7 @@ exactly as documented above.
     -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' \
     -d '{"submission_token":"REPLACE_WITH_TOKEN","results":{"ok":true}}'
   ```
+
 - The `southu/vygo` repo is **public**, so the unauthenticated raw URL
   `https://raw.githubusercontent.com/southu/vygo/main/docs/readiness-submit-cloudflare.md`
   returns `200` with this doc — see **Verifying this doc is published on
