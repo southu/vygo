@@ -10,6 +10,74 @@
 > [`cloudflare-readiness-waf-exception.md`](./cloudflare-readiness-waf-exception.md).
 > The historical reproduction notes below are retained for context only.
 
+---
+
+## End-to-end verification against production (2026-07-18)
+
+This section records a live, end-to-end verification of the readiness-submission
+flow **exactly as a fresh end user's AI coder would experience it**, run against
+production `https://www.vygo.ai`. It supersedes the historical iteration-9
+"Re-verified" note further down: with the origin 1010 emulation removed, **both**
+the default `curl` User-Agent and a browser User-Agent now reach the origin and
+receive the product success message.
+
+- **Verified on:** 2026-07-18
+- **Deployed SHA under test:** `GET https://www.vygo.ai/version` →
+  **`4916724aadcc6548a1f495f62ea019988d9104e0`** (HTTP 200). This is the exact
+  SHA production served at verification time.
+- **Home page regression:** `GET https://www.vygo.ai/` → HTTP 200 over HTTPS.
+
+### 1. Live prompt content (served through the normal product flow)
+
+The readiness-submission prompt is built client-side and shipped in the
+`/readiness` page bundle. Discovered by loading `https://www.vygo.ai/readiness`
+(HTTP 200) and following its `_next` chunk it references — the prompt text lives
+in `/_next/static/chunks/2262-ccc07752c4fcbce5.js` (path/hash will change on each
+deploy; discover it from the live page rather than assuming it). The live prompt
+confirms all three required properties:
+
+- **Default submission method is curl with a browser User-Agent.** The prompt's
+  `DEFAULT METHOD (recommended — known to work)` block is a `curl -X POST` to
+  `https://www.vygo.ai/api/readiness/submit` that sets
+  `-H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'`.
+- **Preflight guidance is present.** `OPTIONAL PREFLIGHT (recommended — confirm
+connectivity first)` tells the AI to `GET https://www.vygo.ai/api/readiness/ping`
+  before building the payload.
+- **Fallback guidance is present.** A `FALLBACK` clause (use another HTTP client
+  with the same body/UA) plus an `IF THE SUBMIT IS BLOCKED (resilience …)` block
+  that retries with the browser UA on a `403 / error code: 1010`, waits and
+  retries once more, and finally routes to the no-web-access paste-back path.
+
+### 2. Ping liveness probe
+
+```
+GET https://www.vygo.ai/api/readiness/ping  →  HTTP 200  {"ok":true}
+```
+
+### 3. Submission token
+
+A valid **test** submission token was minted through the normal product flow at
+run time via `POST https://www.vygo.ai/api/readiness/token` (HTTP 200). The token
+is a **runtime secret** — it is never hardcoded, logged into the repo, or written
+into this doc.
+
+### 4. Submit — both User-Agent variants reach the origin and succeed
+
+A well-formed payload carrying all **22 required report fields plus `confidence`**
+(inside `results`, alongside `results_text` and the `submission_token`) was
+`POST`ed to `https://www.vygo.ai/api/readiness/submit` twice — the two requests
+differ **only** by the `User-Agent` header:
+
+| Variant                | `User-Agent` sent                                                                                                   | Result                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| (a) default tooling UA | `curl/8.5.0` (curl's own default)                                                                                   | **HTTP 200** — `{"message":"Vygo has successfully received your readiness results."}` |
+| (b) browser UA         | `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36` | **HTTP 200** — `{"message":"Vygo has successfully received your readiness results."}` |
+
+Neither request received a Cloudflare `403` or `error code: 1010` challenge/block;
+both reached the real origin handler and returned the product success message. The
+default-UA path succeeding confirms the historical 1010 block (reproduced by the
+now-removed origin shim) is no longer in effect on this route.
+
 ## Summary
 
 Automated POSTs to the production readiness ingest endpoint
@@ -222,12 +290,19 @@ test-fixture DSNs and obvious placeholder examples (e.g.
 `re_live_abcdefghijklmnopqrst`). Real submission tokens, API keys, and secrets
 live in the secret manager, never in git (see `credentials-and-decisions.md`).
 
+> **Superseded — historical.** The iteration-9 note below described the
+> deterministic 1010 block produced by the now-removed origin shim. It no longer
+> reflects production: see [End-to-end verification against production
+> (2026-07-18)](#end-to-end-verification-against-production-2026-07-18) at the top
+> of this doc, where the default `curl/8.5.0` UA now also returns `HTTP 200` with
+> the success message.
+
 Re-verified against production on **2026-07-18** (iteration 9): `curl/8.0.0`
 and `python-requests/2.31.0` → `HTTP 403` + `error code: 1010`; browser UA →
 `HTTP 200 {"message":"Vygo has successfully received your readiness results."}`;
 `GET /version` (SHA matches pushed `HEAD`) and `GET /` (home renders, non-empty
-body ~123 KB) → `HTTP 200`. The differentiator remains the `User-Agent` header
-exactly as documented above.
+body ~123 KB) → `HTTP 200`. The differentiator was the `User-Agent` header
+exactly as documented above (before the origin shim was removed).
 
 ---
 
