@@ -91,6 +91,15 @@ past the edge). No `403`/`1010` was produced for any `User-Agent`, confirming th
 zone is **not currently enforcing** the Browser Integrity Check / Bot Fight Mode
 ban on this route.
 
+Re-verified a further time on **2026-07-18** (iteration 4) from this environment:
+`curl/8.0.0`, `python-requests/2.31.0`, **and** the desktop-Chrome UA each again
+returned **HTTP 401 `INVALID_TOKEN`** from the application (no rate-limit this
+pass, so all three were plain `401`), with `server: cloudflare` **and** an
+`x-vercel-id` header present on every response. Still no `403`/`1010` for any
+`User-Agent` — the zone continues to let tooling `User-Agents` reach the origin
+on this route, so the reported edge ban is **not reproducible from this network
+against the current zone configuration**.
+
 ---
 
 ## Operator prerequisites to reproduce / observe the block
