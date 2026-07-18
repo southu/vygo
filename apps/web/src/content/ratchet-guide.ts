@@ -81,6 +81,9 @@ export const guideDocs: [GuideDoc, ...GuideDoc[]] = [
 /** Print/PDF-friendly self-contained HTML rendering of the one-pager (from the pack). */
 export const guideOnePagerPrintHref = "/content/vibe-coding/ratchet-guide/one-pager-print";
 
+/** Raw versioned Markdown for the pack README, backing the guide index's download link. */
+export const guideIndexMarkdownHref = "/content/vibe-coding/ratchet-guide/README.md";
+
 export function getGuideDoc(slug: string): GuideDoc {
   const doc = guideDocs.find((entry) => entry.slug === slug);
   if (!doc) {

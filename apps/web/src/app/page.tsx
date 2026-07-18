@@ -14,9 +14,14 @@ import { EngagementCard } from "@/components/EngagementCard";
 import { HardenCallout } from "@/components/HardenCallout";
 import { OpsPlanCard } from "@/components/OpsPlanCard";
 import { FAQAccordion } from "@/components/FAQAccordion";
+import { StepList } from "@/components/vibe-coding/StepCard";
+import { StartFreeLeadForm } from "@/components/StartFreeLeadForm";
+import { setupSteps } from "@/content/guide-setup";
+import { getGuideDoc, guideIndex, guideIndexMarkdownHref } from "@/content/ratchet-guide";
 
 export default function HomePage() {
   const { hero } = homepage;
+  const rebuildDoc = getGuideDoc("rebuild");
 
   return (
     <main id="main-content">
@@ -55,6 +60,67 @@ export default function HomePage() {
             production={hero.production}
             caption={hero.diagramCaption}
           />
+        </div>
+      </section>
+
+      {/* Get set up first — the very first action, before any other content */}
+      <section className="section-pad border-t border-border bg-surface" data-section="setup-first">
+        <div className="container-page max-w-3xl">
+          <p className="eyebrow">Step 1</p>
+          <h2 className="mt-4 font-display text-3xl font-bold sm:text-4xl">Get set up first</h2>
+          <p className="mt-4 text-lg text-muted">
+            Do this once, before reading anything else: download the free guide pack, open it in
+            your AI coding tool, and paste one setup prompt.
+          </p>
+          <StepList steps={setupSteps} />
+          <div className="mt-8">
+            <StartFreeLeadForm />
+          </div>
+
+          <div className="mt-10 grid gap-4 sm:grid-cols-2" data-section="document-journey">
+            <div className="card">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Formatted page
+              </p>
+              <a
+                href={guideIndex.href}
+                className="mt-2 block font-display text-base font-semibold text-purple hover:underline"
+                data-doc-link="guide-formatted"
+              >
+                Read the Ratchet system guide
+              </a>
+              <a
+                href={guideIndexMarkdownHref}
+                download="README.md"
+                className="mt-3 inline-block text-sm font-semibold text-purple underline"
+                data-doc-link="guide-raw"
+                data-download-link="guide-index-markdown"
+              >
+                Download raw Markdown (.md)
+              </a>
+            </div>
+            <div className="card">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                Formatted page
+              </p>
+              <a
+                href={rebuildDoc.href}
+                className="mt-2 block font-display text-base font-semibold text-purple hover:underline"
+                data-doc-link="rebuild-formatted"
+              >
+                Read the rebuild checklist
+              </a>
+              <a
+                href={`/content/vibe-coding/ratchet-guide/${rebuildDoc.sourceFile}`}
+                download={rebuildDoc.sourceFile}
+                className="mt-3 inline-block text-sm font-semibold text-purple underline"
+                data-doc-link="rebuild-raw"
+                data-download-link="doc-markdown"
+              >
+                Download raw Markdown (.md)
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -10,7 +10,12 @@ import { ScreenshotPlaceholder } from "@/components/vibe-coding/ScreenshotPlaceh
 import { AdvancedExpander } from "@/components/vibe-coding/AdvancedExpander";
 import { GuideModeToggle } from "@/components/vibe-coding/GuideModeToggle";
 import { getVibeModulePage } from "@/content/vibe-coding-modules";
-import { guideDocs, guidePackEntryHref, isRenderedGuideDoc } from "@/content/ratchet-guide";
+import {
+  guideDocs,
+  guideIndexMarkdownHref,
+  guidePackEntryHref,
+  isRenderedGuideDoc,
+} from "@/content/ratchet-guide";
 import { setupSteps } from "@/content/guide-setup";
 import { readGuidePackManifest } from "@/lib/guide-source";
 import { GUIDE_MODE_STORAGE_KEY } from "@/lib/guide-mode";
@@ -241,7 +246,7 @@ export default function RatchetGuidePage() {
     <ModulePage module={module}>
       <div className="container-page -mt-4 pb-4">
         <a
-          href="/content/vibe-coding/ratchet-guide/README.md"
+          href={guideIndexMarkdownHref}
           download="README.md"
           className="btn-secondary"
           data-download-link="guide-index-markdown"
