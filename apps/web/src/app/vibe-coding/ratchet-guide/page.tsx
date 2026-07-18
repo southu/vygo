@@ -7,9 +7,12 @@ import { StepList, type Step } from "@/components/vibe-coding/StepCard";
 import { Callout } from "@/components/vibe-coding/Callout";
 import { CodeBlock } from "@/components/vibe-coding/CodeBlock";
 import { ScreenshotPlaceholder } from "@/components/vibe-coding/ScreenshotPlaceholder";
+import { AdvancedExpander } from "@/components/vibe-coding/AdvancedExpander";
+import { GuideModeToggle } from "@/components/vibe-coding/GuideModeToggle";
 import { getVibeModulePage } from "@/content/vibe-coding-modules";
 import { guideDocs, guidePackEntryHref, isRenderedGuideDoc } from "@/content/ratchet-guide";
 import { readGuidePackManifest } from "@/lib/guide-source";
+import { GUIDE_MODE_STORAGE_KEY } from "@/lib/guide-mode";
 
 const module = getVibeModulePage("ratchet-guide");
 const manifest = readGuidePackManifest();
@@ -115,11 +118,13 @@ const quickStartSteps: Step[] = [
           steps instead of one mega-mission. Click <strong>Accept draft</strong> to take the queue
           as-is for a first run.
         </p>
-        <Callout type="tip">
-          You can edit any step&apos;s title or body before accepting &mdash; Composer treats your
-          edits as the source of truth for that step.
-        </Callout>
         <ScreenshotPlaceholder caption="The draft queue screen, showing the proposed steps and the Accept draft button." />
+        <AdvancedExpander title="Editing draft steps before accepting">
+          <Callout type="tip">
+            You can edit any step&apos;s title or body before accepting &mdash; Composer treats your
+            edits as the source of truth for that step.
+          </Callout>
+        </AdvancedExpander>
       </>
     ),
   },
@@ -195,6 +200,10 @@ export default function RatchetGuidePage() {
         className="container-page section-pad border-t border-border lg:grid lg:grid-cols-[14rem_1fr] lg:items-start lg:gap-10 xl:grid-cols-[16rem_1fr] xl:gap-14"
         data-guide-body
       >
+        <div className="lg:col-span-2">
+          <GuideModeToggle />
+        </div>
+
         <GuideToc sections={guideToc} />
 
         <div className="min-w-0">
@@ -252,9 +261,14 @@ export default function RatchetGuidePage() {
             <p className="mt-3 text-muted">
               The coding agent changes the product and must produce real git history: an actual
               commit that advances the branch, matches the pushed remote, and leaves a clean working
-              tree &mdash; not just a claim of being done. Empty &ldquo;success&rdquo; commits and
-              force-pushed or rewritten history are rejected as proof-of-work.
+              tree &mdash; not just a claim of being done.
             </p>
+            <AdvancedExpander title="What counts as proof-of-work">
+              <p>
+                Empty &ldquo;success&rdquo; commits and force-pushed or rewritten history are
+                rejected as proof-of-work.
+              </p>
+            </AdvancedExpander>
 
             <h3
               id="wait-for-the-deploy-gate-to-confirm-your-push"
@@ -267,15 +281,17 @@ export default function RatchetGuidePage() {
               After a push, the deploy gate polls your product&apos;s version endpoint until it
               returns the SHA that was just pushed.
             </p>
-            <Callout type="note">
-              SHA matching is case-insensitive, and a long-enough prefix of the full SHA counts as a
-              match &mdash; you don&apos;t need to return the entire hash.
-            </Callout>
-            <Callout type="warning">
-              If the version endpoint is behind auth, wrong, or bound to a different product than
-              the live URL under test, the gate times out and the run looks stuck even though the
-              build succeeded.
-            </Callout>
+            <AdvancedExpander title="Version endpoint matching and auth pitfalls">
+              <Callout type="note">
+                SHA matching is case-insensitive, and a long-enough prefix of the full SHA counts as
+                a match &mdash; you don&apos;t need to return the entire hash.
+              </Callout>
+              <Callout type="warning">
+                If the version endpoint is behind auth, wrong, or bound to a different product than
+                the live URL under test, the gate times out and the run looks stuck even though the
+                build succeeded.
+              </Callout>
+            </AdvancedExpander>
 
             <h3
               id="test-only-the-live-deployed-app"
@@ -351,14 +367,19 @@ export default function RatchetGuidePage() {
               <HeadingAnchor id="plan-multi-step-campaigns-instead-of-one-mega-mission" />
             </h3>
             <p className="mt-3 text-muted">
-              A real product goal is often several missions, not one. Composer's planner expands a
-              multi-part goal into a handful of focused steps &mdash; each easier to accept on the
-              live site, easier to resume on failure, and less likely to be partially completed by a
-              builder. Scope every step to the correct product shell (product app, control plane, or
-              sandbox); pointing acceptance checks at one shell's repo while the live URL belongs to
-              another is a common deploy-gate poison pill. The control plane itself can be improved
-              by the same loop, as long as it has its own cloneable remote and version signal.
+              A real product goal is often several missions, not one. Composer&apos;s planner
+              expands a multi-part goal into a handful of focused steps.
             </p>
+            <AdvancedExpander title="Scoping campaigns across product shells">
+              <p>
+                Each step is easier to accept on the live site, easier to resume on failure, and
+                less likely to be partially completed by a builder. Scope every step to the correct
+                product shell (product app, control plane, or sandbox); pointing acceptance checks
+                at one shell&apos;s repo while the live URL belongs to another is a common
+                deploy-gate poison pill. The control plane itself can be improved by the same loop,
+                as long as it has its own cloneable remote and version signal.
+              </p>
+            </AdvancedExpander>
 
             <h3
               id="turn-on-infrastructure-provisioning-carefully"
@@ -368,12 +389,17 @@ export default function RatchetGuidePage() {
               <HeadingAnchor id="turn-on-infrastructure-provisioning-carefully" />
             </h3>
             <p className="mt-3 text-muted">
-              Some missions can plan or provision infrastructure before the build starts. Treat
-              planner output as untrusted input to an allowlist, prefer binding a known cloud
-              project identity over creating new ones, and fail closed when identity checks fail.
-              Leave optional provisioning off until the core build-deploy-test loop is reliable on
-              its own.
+              Some missions can plan or provision infrastructure before the build starts. Leave
+              optional provisioning off until the core build-deploy-test loop is reliable on its
+              own.
             </p>
+            <AdvancedExpander title="Provisioning configuration deep-dive">
+              <p>
+                Treat planner output as untrusted input to an allowlist, prefer binding a known
+                cloud project identity over creating new ones, and fail closed when identity checks
+                fail.
+              </p>
+            </AdvancedExpander>
 
             <h3
               id="avoid-the-common-design-pitfalls"
@@ -382,17 +408,22 @@ export default function RatchetGuidePage() {
               Avoid the common design pitfalls
               <HeadingAnchor id="avoid-the-common-design-pitfalls" />
             </h3>
-            <Callout type="warning">
-              Keep the version signal public and reachable by the deploy gate &mdash; auth blocking
-              it makes loops look stuck even when the build is fine.
-            </Callout>
-            <Callout type="warning">
-              Never trust agent claims over git reality; require a real, content-changing,
-              fast-forward commit.
-            </Callout>
-            <Callout type="warning">
-              Keep cloud tokens and credentials out of builder and tester environments entirely.
-            </Callout>
+            <p className="mt-3 text-muted">
+              A short list of mistakes that repeatedly derail otherwise-working loops.
+            </p>
+            <AdvancedExpander title="The three most common failure modes">
+              <Callout type="warning">
+                Keep the version signal public and reachable by the deploy gate &mdash; auth
+                blocking it makes loops look stuck even when the build is fine.
+              </Callout>
+              <Callout type="warning">
+                Never trust agent claims over git reality; require a real, content-changing,
+                fast-forward commit.
+              </Callout>
+              <Callout type="warning">
+                Keep cloud tokens and credentials out of builder and tester environments entirely.
+              </Callout>
+            </AdvancedExpander>
 
             <h3
               id="know-the-core-components"
@@ -401,53 +432,61 @@ export default function RatchetGuidePage() {
               Know the core components
               <HeadingAnchor id="know-the-core-components" />
             </h3>
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full border-collapse text-sm text-ink-soft">
-                <thead>
-                  <tr>
-                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
-                      Component
-                    </th>
-                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
-                      Role
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    [
-                      "Composer",
-                      "Human-facing surface: capture goals, manage product shells, queue missions",
-                    ],
-                    ["Ratchet loop", "Orchestration: builder → deploy gate → live tester → streak"],
-                    [
-                      "Credentials boundary",
-                      "Secrets stay brokered; agents never hold cloud tokens",
-                    ],
-                    [
-                      "Product shells",
-                      "One product = one repo + one live URL + one version signal",
-                    ],
-                    [
-                      "Optional helpers",
-                      "Observe and report only — never implement product features",
-                    ],
-                  ].map(([component, role]) => (
-                    <tr key={component}>
-                      <td className="border border-border px-3 py-2 align-top font-medium text-ink">
-                        {component}
-                      </td>
-                      <td className="border border-border px-3 py-2 align-top">{role}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-4 text-sm text-muted">
-              Ratchet is not a general chat UI for product end users, not a drop-in CI replacement,
-              not &ldquo;overnight helpers ship features&rdquo; on their own, and not a place to put
-              secrets in agent prompts.
+            <p className="mt-3 text-muted">
+              A quick reference for the five pieces that make up the system.
             </p>
+            <AdvancedExpander title="Component reference table">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm text-ink-soft">
+                  <thead>
+                    <tr>
+                      <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
+                        Component
+                      </th>
+                      <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
+                        Role
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      [
+                        "Composer",
+                        "Human-facing surface: capture goals, manage product shells, queue missions",
+                      ],
+                      [
+                        "Ratchet loop",
+                        "Orchestration: builder → deploy gate → live tester → streak",
+                      ],
+                      [
+                        "Credentials boundary",
+                        "Secrets stay brokered; agents never hold cloud tokens",
+                      ],
+                      [
+                        "Product shells",
+                        "One product = one repo + one live URL + one version signal",
+                      ],
+                      [
+                        "Optional helpers",
+                        "Observe and report only — never implement product features",
+                      ],
+                    ].map(([component, role]) => (
+                      <tr key={component}>
+                        <td className="border border-border px-3 py-2 align-top font-medium text-ink">
+                          {component}
+                        </td>
+                        <td className="border border-border px-3 py-2 align-top">{role}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-4 text-sm">
+                Ratchet is not a general chat UI for product end users, not a drop-in CI
+                replacement, not &ldquo;overnight helpers ship features&rdquo; on their own, and not
+                a place to put secrets in agent prompts.
+              </p>
+            </AdvancedExpander>
 
             <h3
               id="read-the-full-system-guide"
@@ -499,30 +538,46 @@ export default function RatchetGuidePage() {
                 markdown or self-contained HTML, served alongside it.
               </p>
             </div>
-            <ul className="mt-6 space-y-3">
-              {manifest.documents.map((entry) => {
-                const rendered = isRenderedGuideDoc(entry.filename);
-                return (
-                  <li key={entry.filename} className="card">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <a
-                        href={guidePackEntryHref(entry.filename)}
-                        className="font-mono text-sm font-semibold text-purple hover:underline"
-                      >
-                        {entry.filename}
-                      </a>
-                      <span className="chip" data-entry-kind={rendered ? "page" : "file"}>
-                        {rendered ? "Guide page" : "Pack file"}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-muted">{entry.title}</p>
-                  </li>
-                );
-              })}
-            </ul>
+            <AdvancedExpander title={`Full manifest (${manifest.documents.length} files)`}>
+              <ul className="space-y-3">
+                {manifest.documents.map((entry) => {
+                  const rendered = isRenderedGuideDoc(entry.filename);
+                  return (
+                    <li key={entry.filename} className="card">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <a
+                          href={guidePackEntryHref(entry.filename)}
+                          className="font-mono text-sm font-semibold text-purple hover:underline"
+                        >
+                          {entry.filename}
+                        </a>
+                        <span className="chip" data-entry-kind={rendered ? "page" : "file"}>
+                          {rendered ? "Guide page" : "Pack file"}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-muted">{entry.title}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </AdvancedExpander>
           </section>
         </div>
       </div>
+
+      {/*
+       * Re-applies a stored Expert preference to every Advanced expander
+       * before hydration, so a returning Expert reader never sees a flash
+       * of collapsed content on reload. Runs during initial HTML parsing,
+       * after every [data-advanced-expander] element above it in the DOM.
+       */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){try{if(window.localStorage.getItem(${JSON.stringify(
+            GUIDE_MODE_STORAGE_KEY,
+          )})==="expert"){document.querySelectorAll('[data-advanced-expander]').forEach(function(d){d.open=true;});}}catch(e){}})();`,
+        }}
+      />
 
       <BackToTop />
     </ModulePage>
