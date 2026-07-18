@@ -100,6 +100,20 @@ pass, so all three were plain `401`), with `server: cloudflare` **and** an
 on this route, so the reported edge ban is **not reproducible from this network
 against the current zone configuration**.
 
+Re-verified once more on **2026-07-18** (iteration 5) from this environment, this
+time widening the tooling signatures to **five** User-Agents —
+`curl/8.0.0`, `python-requests/2.31.0`, an **empty** `User-Agent`,
+`Go-http-client/2.0`, and the desktop-Chrome UA. **Every one** returned **HTTP
+401 `INVALID_TOKEN`** from the application with `server: cloudflare` **and** an
+`x-vercel-id` header on the response — i.e. all five cleared the Cloudflare edge
+and were handled by the origin. **No `403`/`1010` was produced for any signature,
+including the empty and `Go-http-client` UAs that Bot Fight Mode would normally
+ban.** This confirms the zone is **not currently enforcing** the Browser
+Integrity Check / Bot Fight Mode `1010` ban on `/api/readiness/submit`; the
+documented differential is the expected behavior *when that Cloudflare feature is
+enabled*, which is an ops/zone prerequisite (see the table below), not something
+this doc changes.
+
 ---
 
 ## Operator prerequisites to reproduce / observe the block
