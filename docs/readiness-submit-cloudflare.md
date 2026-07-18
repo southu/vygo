@@ -53,6 +53,25 @@ configuration.**
 
 ---
 
+## Current production observation (2026-07-18)
+
+The 1010 ban is **reputation- and configuration-dependent** and is **not always
+active** on this route. Re-running both tooling-UA `curl` commands below against
+production on 2026-07-18 from this environment returned **HTTP 401 `INVALID_TOKEN`
+JSON from the application** (the placeholder `REPLACE_WITH_TOKEN` is not a valid
+token), i.e. the requests currently **reach the app** rather than being edge-banned
+with 1010. The browser-UA request behaves the same (401 `INVALID_TOKEN`).
+
+This does not contradict the reported failure: Cloudflare's Browser Integrity
+Check / Bot Fight Mode keys off source-IP reputation and verified-bot status in
+addition to the `User-Agent` signature (see [Notes on reproducing](#notes-on-reproducing)),
+so the same tooling `User-Agent` is banned with error 1010 from some client
+networks and passed through from others. The commands and header sets below are
+the exact, copy-pasteable repro; observe the **403 + `error code: 1010`** result
+from an ordinary (non-allowlisted) client network.
+
+---
+
 ## Reproduction
 
 ### 1. Blocked — default tooling User-Agent → HTTP 403, Cloudflare error 1010
