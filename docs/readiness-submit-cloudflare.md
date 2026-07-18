@@ -173,6 +173,39 @@ Content-Length: <n>
 
 ---
 
+## Verifying this doc is published on `main`
+
+The `southu/vygo` GitHub repository is **private**. An unauthenticated fetch of
+
+```
+https://raw.githubusercontent.com/southu/vygo/main/docs/readiness-submit-cloudflare.md
+```
+
+therefore returns **`404`** even when this file is committed and pushed on
+`main` — a `404` here means "no anonymous access", **not** "file missing". This
+is expected while the repo stays private and is not something a commit can
+change; only flipping repository visibility (or fetching with credentials)
+affects it. Repository visibility is intentionally **not** changed by this
+mission: the repo history and sibling docs (e.g. `credentials-and-decisions.md`)
+must not be exposed publicly.
+
+To confirm the doc is on `main`, use an **authenticated** fetch:
+
+```bash
+# GitHub CLI (uses your gh auth token)
+gh api repos/southu/vygo/contents/docs/readiness-submit-cloudflare.md?ref=main \
+  --jq '.path, .sha'
+
+# or the raw endpoint with a token
+curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github.raw" \
+  'https://api.github.com/repos/southu/vygo/contents/docs/readiness-submit-cloudflare.md?ref=main'
+```
+
+Both return the committed content (HTTP 200) when the doc is present on `main`.
+
+---
+
 ## Notes on reproducing
 
 - Assert on **HTTP 403** + the literal string **`1010`** in the body for the
@@ -195,9 +228,7 @@ Content-Length: <n>
     -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' \
     -d '{"submission_token":"REPLACE_WITH_TOKEN","results":{"ok":true}}'
   ```
-- The `southu/vygo` GitHub repository is **private**. Unauthenticated fetches of
-  `https://raw.githubusercontent.com/southu/vygo/main/docs/readiness-submit-cloudflare.md`
-  (and the GitHub contents API) therefore return `404` even when the doc is
-  committed on `main`; fetch the raw URL with an authenticated token, or view it
-  on the repo's `main` branch, to read it.
+- The `southu/vygo` repo is **private**, so the unauthenticated raw URL `404`s
+  even when this doc is on `main` — see **Verifying this doc is published on
+  `main`** above for the authenticated check.
 - Do not commit real tokens. Every example uses `REPLACE_WITH_TOKEN`.
