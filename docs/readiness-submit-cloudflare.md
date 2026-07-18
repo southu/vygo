@@ -216,6 +216,25 @@ curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
 
 Both return the committed content (HTTP 200) when the doc is present on `main`.
 
+### Why publication stays private (verified 2026-07-18)
+
+The decline to flip the repo to public is not cautionary hand-waving — a secret
+scan of the tracked tree confirms the repository holds **live credentials** that
+must never reach the public internet, for example a Resend API key
+(`re_…`) in `docs/credentials-and-decisions.md` and Postgres connection strings
+(`postgres://…:…@…`) elsewhere in the tree and in history. Making
+`raw.githubusercontent.com/southu/vygo/...` serve `200` anonymously requires
+repository visibility = public, which would expose those secrets and the full
+git history at once and cannot be undone. That trade is **declined**; the
+authenticated checks above are the supported way to confirm this doc is on
+`main`.
+
+Re-verified against production on **2026-07-18** (iteration 6): `curl/8.0.0`
+and `python-requests/2.31.0` → `HTTP 403` + `error code: 1010`; browser UA →
+`HTTP 200 {"message":"Vygo has successfully received your readiness results."}`;
+`GET /version` and `GET /` → `HTTP 200`. The differentiator remains the
+`User-Agent` header exactly as documented above.
+
 ---
 
 ## Notes on reproducing
