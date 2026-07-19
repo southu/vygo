@@ -1,8 +1,9 @@
 # Verify-human first-run-fail / later-run-pass — Root Cause Analysis
 
-**Status:** RCA + recommended fix approach. **No product fix is implemented in
-this mission** — the verify-human gate and Turnstile success criteria are left
-unchanged. Builds on the reproduction in
+**Status:** RCA + **implemented client-side fix** (see "Recommended fix
+approach" → now shipped). The server Turnstile verifier, sitekey, and
+`!turnstileToken` rejection are unchanged; only the client readiness gating was
+corrected. Builds on the reproduction in
 [`verify-human-flake-repro.md`](./verify-human-flake-repro.md).
 **Date:** 2026-07-19 · **Revision:** builder HEAD (see `GET /version`).
 
@@ -22,6 +23,7 @@ The symptom surfaces at a client-side validation guard, before any network call:
 
 1. **Assertion / guard that fails (WaitlistForm):**
    `apps/web/src/components/WaitlistForm.tsx:470-473` — `validateStep2()`:
+
    ```
    if (!turnstileToken) {
      next.turnstileToken = turnstileFailed
@@ -29,6 +31,7 @@ The symptom surfaces at a client-side validation guard, before any network call:
        : "Please complete the verification challenge.";
    }
    ```
+
    `validateStep2()` is the submit gate (`WaitlistForm.tsx:514` —
    `if (!validateStep2()) return;`). When `turnstileToken` is still `""`, submit
    returns early and **no POST to `/api/apply` is made** — matching the observed
@@ -37,12 +40,14 @@ The symptom surfaces at a client-side validation guard, before any network call:
 2. **Why the token can be empty at click time — the async callback:**
    `apps/web/src/components/WaitlistForm.tsx:348-359` — the token is set **only**
    inside `window.turnstile.render(...)`'s `callback`:
+
    ```
    callback: (token: string) => {
      setTurnstileToken(token);
      ...
    }
    ```
+
    The widget script itself is injected **async** (`script.async = true`,
    `render=explicit`) at `WaitlistForm.tsx:382-388`, so `render()` and its
    `callback` only fire after the script downloads, the widget mounts, and the
@@ -50,9 +55,11 @@ The symptom surfaces at a client-side validation guard, before any network call:
 
 3. **Why the button lets the user click too early — no readiness gating:**
    `apps/web/src/components/WaitlistForm.tsx:1251` — the submit button is:
+
    ```
    disabled={status === "submitting"}
    ```
+
    It is disabled **only** while a request is in flight. There is **no**
    `disabled` / "verifying…" state tied to `turnstileToken` being empty, and
    **no** auto-submit or queued-submit once the callback fires. The whole
@@ -88,7 +95,7 @@ The symptom surfaces at a client-side validation guard, before any network call:
   the failing path; the guard is a pure function of local React state
   (`turnstileToken` / `turnstileFailed`).
 - **Not deploy lag:** the SHA is stable across the fail and the pass; the retry
-  succeeds against the *same* deployed revision.
+  succeeds against the _same_ deployed revision.
 - **Not test order dependence:** the race is intra-interaction (one form
   instance), independent of any other test.
 
@@ -96,9 +103,11 @@ The symptom surfaces at a client-side validation guard, before any network call:
 
 `apps/web/e2e/helpers.ts:57-63` — `installTurnstileStub()` issues the token
 **synchronously** on `render()`:
+
 ```
 // Immediate token so validation never races the stub.
 ```
+
 This removes the exact async gap that bites real users, so e2e is always green.
 Unit/integration tests inject `PassThroughTurnstileVerifier`
 (`apps/api/src/services/turnstile.ts:20-24`), which also never exercises the
@@ -108,7 +117,7 @@ suite — a coverage gap that masks a live defect.
 ## Evidence summary (from the repro, re-confirmed against code)
 
 - Real managed Turnstile widget vs a headless bot: cold automated runs
-  consistently fail (bot cannot solve a *managed* challenge) — confirms the gate
+  consistently fail (bot cannot solve a _managed_ challenge) — confirms the gate
   is present, enforced, and reachable on live without secrets, but is a harness
   artifact, not the user flake.
 - Isolated app-layer race (inject `window.turnstile` whose `callback` fires
@@ -117,10 +126,22 @@ suite — a coverage gap that masks a live defect.
   deterministically. That is the reported flake, and it lands precisely on
   `validateStep2()` / the `ScoreGateForm` guard above.
 
-## Recommended fix approach (design only — not implemented here)
+## Fix approach (implemented)
 
 Goal: make the human-verification forms **never present a submittable state that
 is guaranteed to fail**, and recover automatically once the token arrives.
+
+**Shipped implementation:** both forms now **queue one submit** when the user
+clicks before the Turnstile token is issued (token empty, not failed). The click
+is recorded (`pendingSubmitRef`), the button shows a disabled "Verifying you're
+human…" affordance with `aria-busy`, and the submit **auto-fires from the token
+callback** the moment the token lands — so the first cold click succeeds with no
+second user retry. A failed widget still blocks with the existing fallback
+instructions; a queued submit is cancelled if the widget errors. The e2e harness
+gained a delayed-token stub (`installDelayedTurnstileStub`) plus a regression
+test that reproduces the async gap and asserts the single click succeeds.
+Changed: `WaitlistForm.tsx`, `readiness/ScoreGateForm.tsx`, `e2e/helpers.ts`,
+`e2e/waitlist-form.spec.ts`. The design intent below is retained for reference.
 
 1. **Track verification readiness explicitly.** Add a small state, e.g.
    `turnstileStatus: "loading" | "ready" | "error"` in both `WaitlistForm` and

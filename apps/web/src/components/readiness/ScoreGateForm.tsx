@@ -105,11 +105,16 @@ export function ScoreGateForm({
     "idle",
   );
   const [feedback, setFeedback] = useState("");
+  // A submit clicked before the Turnstile token is issued is queued and auto-fired
+  // from the token callback, so the first cold attempt succeeds without a retry.
+  const [awaitingToken, setAwaitingToken] = useState(false);
 
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
   /** Synchronous double-submit guard (state alone can race before re-render). */
   const inFlightRef = useRef(false);
+  /** Submit intent recorded while the token is still loading; fired on callback. */
+  const pendingSubmitRef = useRef(false);
   const siteKey = readinessE2E ? TURNSTILE_TEST_SITE_KEY : resolveTurnstileSiteKey();
 
   useEffect(() => {
@@ -208,7 +213,9 @@ export function ScoreGateForm({
     if (!name.trim()) next.name = "Name is required.";
     if (!email.trim() || !isEmail(email.trim())) next.email = "A valid email is required.";
     if (!privacyAccepted) next.privacyAccepted = "Privacy consent is required.";
-    if (!turnstileToken) {
+    // A still-loading token (no failure yet) does not block: the submit is queued
+    // and auto-fires once the callback lands. A failed widget still blocks here.
+    if (!turnstileToken && turnstileFailed) {
       next.turnstileToken = "Complete the verification challenge.";
     }
     setErrors(next);
@@ -218,7 +225,24 @@ export function ScoreGateForm({
       return;
     }
 
+    if (!turnstileToken) {
+      pendingSubmitRef.current = true;
+      setAwaitingToken(true);
+      setStatus("idle");
+      setFeedback("");
+      return;
+    }
+
+    await runScore();
+  };
+
+  const runScore = async () => {
+    if (inFlightRef.current || status === "submitting" || status === "already_submitted") {
+      return;
+    }
+
     inFlightRef.current = true;
+    setAwaitingToken(false);
     setStatus("submitting");
     setFeedback("");
     try {
@@ -258,6 +282,28 @@ export function ScoreGateForm({
       }
     }
   };
+
+  // Auto-fire a queued submit once the Turnstile token lands (closes the cold
+  // first-attempt race so one early click succeeds instead of erroring).
+  useEffect(() => {
+    if (turnstileToken && pendingSubmitRef.current && !inFlightRef.current) {
+      pendingSubmitRef.current = false;
+      void runScore();
+    }
+    // runScore reads the latest token/values from this render's closure.
+  }, [turnstileToken]);
+
+  // If the widget fails while a submit is queued, cancel the queue and surface
+  // the challenge error rather than waiting on a token that will never arrive.
+  useEffect(() => {
+    if (turnstileFailed && pendingSubmitRef.current) {
+      pendingSubmitRef.current = false;
+      setAwaitingToken(false);
+      setErrors((prev) => ({ ...prev, turnstileToken: "Complete the verification challenge." }));
+      setStatus("error");
+      setFeedback(c.error);
+    }
+  }, [turnstileFailed]);
 
   const fieldClass =
     "mt-1.5 w-full rounded-xl border border-border bg-canvas px-3 py-2.5 text-sm text-ink shadow-sm focus-visible:border-purple";
@@ -452,10 +498,15 @@ export function ScoreGateForm({
         <button
           type="submit"
           className="btn-primary w-full sm:w-auto"
-          disabled={status === "submitting"}
+          disabled={status === "submitting" || awaitingToken}
+          aria-busy={status === "submitting" || awaitingToken ? true : undefined}
           data-testid="gate-submit"
         >
-          {status === "submitting" ? c.submitting : c.submit}
+          {status === "submitting"
+            ? c.submitting
+            : awaitingToken
+              ? "Verifying you're human…"
+              : c.submit}
         </button>
       </form>
     </div>

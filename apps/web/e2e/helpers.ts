@@ -70,6 +70,33 @@ export async function installTurnstileStub(page: Page, token = "test-turnstile-t
   }, token);
 }
 
+/**
+ * Install a Turnstile stub whose callback fires only after `delayMs`, mimicking a
+ * real widget that issues its token asynchronously. This reproduces the cold
+ * first-attempt race the synchronous stub hides — use it to prove the submit is
+ * queued and auto-fires once the token lands, without a second user retry.
+ */
+export async function installDelayedTurnstileStub(
+  page: Page,
+  { token = "test-turnstile-token", delayMs = 1200 }: { token?: string; delayMs?: number } = {},
+) {
+  await page.addInitScript(
+    ({ tok, delay }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w = window as any;
+      w.turnstile = {
+        render: (_el: HTMLElement, opts: { callback: (t: string) => void }) => {
+          window.setTimeout(() => opts.callback(tok), delay);
+          return "widget-test-delayed";
+        },
+        reset: () => undefined,
+        remove: () => undefined,
+      };
+    },
+    { tok: token, delay: delayMs },
+  );
+}
+
 export async function fillStep1(
   page: Page,
   values: {

@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   fillStep1,
   fillStep2,
+  installDelayedTurnstileStub,
   installTurnstileStub,
   mockAvailability,
   piiLeakInAnalytics,
@@ -497,5 +498,60 @@ test.describe("WaitlistForm", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("waitlist-modal")).toHaveCount(0);
     await expect(invoker).toBeFocused();
+  });
+});
+
+test.describe("WaitlistForm cold first-attempt (async Turnstile token)", () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAvailability(page, "waitlist");
+    // Token arrives ~1.2s after render — reproduces the real cold race the
+    // synchronous stub hides.
+    await installDelayedTurnstileStub(page, { delayMs: 1200 });
+  });
+
+  test("first click before token lands is queued and auto-submits on arrival", async ({ page }) => {
+    await page.goto("/waitlist");
+    await fillStep1(page, { email: `cold-${Date.now()}@example.com` });
+    await page.getByTestId("waitlist-continue").click();
+    await expect(page.locator('[data-waitlist-step="2"]')).toBeVisible();
+
+    await page.locator("#stage").selectOption("live_users");
+    await page.locator("#primaryBlocker").selectOption("security");
+    await page.locator("#desiredStartWindow").selectOption("within_30_days");
+    await page
+      .locator("#message")
+      .fill("We need production hardening before an enterprise rollout next month.");
+    await page.locator("#privacyAccepted").check();
+
+    let posts = 0;
+    let sawToken = false;
+    await page.route("**/v1/waitlist", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      posts += 1;
+      const body = route.request().postDataJSON() as { turnstileToken?: string };
+      sawToken = body.turnstileToken === "test-turnstile-token";
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { accepted: true, message: "Your application has been received." },
+        }),
+      });
+    });
+
+    const submit = page.getByTestId("waitlist-submit");
+    // Click immediately — the token has not been issued yet (widget delay 1.2s).
+    await submit.click();
+    // No client "complete the challenge" error; the submit is queued.
+    await expect(page.locator('[data-field-error="turnstileToken"]')).toHaveCount(0);
+    await expect(submit).toBeDisabled();
+
+    // A single click succeeds once the delayed token lands — no second retry.
+    await expect(page.getByTestId("waitlist-success-card")).toBeVisible({ timeout: 5_000 });
+    expect(posts).toBe(1);
+    expect(sawToken).toBe(true);
   });
 });

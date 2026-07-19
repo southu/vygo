@@ -187,6 +187,11 @@ export function WaitlistForm({
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileFailed, setTurnstileFailed] = useState(false);
   const [showErrorSummary, setShowErrorSummary] = useState(false);
+  // A submit clicked while the Turnstile token is still being issued is queued
+  // (not rejected) and auto-fires from the token callback — so the first cold
+  // click succeeds instead of failing the client guard during the render race.
+  const [awaitingToken, setAwaitingToken] = useState(false);
+  const pendingSubmitRef = useRef(false);
 
   const formStartedAtRef = useRef<number>(Date.now());
   const attributionRef = useRef<WaitlistAttribution>(captureAttribution());
@@ -222,6 +227,8 @@ export function WaitlistForm({
     setShowErrorSummary(false);
     setStatus("idle");
     setStatusMessage("");
+    setAwaitingToken(false);
+    pendingSubmitRef.current = false;
     trackAnalytics("waitlist_form_view", { mode, step: 1, offer: offer ?? "general" });
     // Focus heading when opened (modal or page mount).
     const t = window.setTimeout(() => {
@@ -456,7 +463,7 @@ export function WaitlistForm({
     return Object.keys(next).length === 0;
   };
 
-  const validateStep2 = () => {
+  const validateStep2 = (opts?: { allowPendingTurnstile?: boolean }) => {
     const next: Partial<Record<string, string>> = {};
     if (!values.stage) next.stage = "Select a stage.";
     if (!values.primaryBlocker) next.primaryBlocker = "Select a primary blocker.";
@@ -468,9 +475,14 @@ export function WaitlistForm({
       next.privacyAccepted = "Acceptance of the Privacy Policy and Terms of Use is required.";
     }
     if (!turnstileToken) {
-      next.turnstileToken = turnstileFailed
-        ? "Verification is unavailable. Follow the fallback instructions below."
-        : "Please complete the verification challenge.";
+      if (turnstileFailed) {
+        next.turnstileToken =
+          "Verification is unavailable. Follow the fallback instructions below.";
+      } else if (!opts?.allowPendingTurnstile) {
+        // Token still loading: only surface the "complete the challenge" error when
+        // the caller is not going to queue the submit and auto-fire on the callback.
+        next.turnstileToken = "Please complete the verification challenge.";
+      }
     }
     applyFieldErrors(next);
     return Object.keys(next).length === 0;
@@ -511,9 +523,27 @@ export function WaitlistForm({
   const onSubmitGuarded = async (event: FormEvent) => {
     event.preventDefault();
     if (submittingRef.current || status === "submitting") return;
-    if (!validateStep2()) return;
+    // Validate everything except a still-loading Turnstile token. A failed widget
+    // (turnstileFailed) still blocks here with the fallback message.
+    if (!validateStep2({ allowPendingTurnstile: true })) return;
+
+    if (!turnstileToken) {
+      // Token not issued yet (widget callback still pending): queue the submit and
+      // fire it automatically once the token arrives, so this first click succeeds.
+      pendingSubmitRef.current = true;
+      setAwaitingToken(true);
+      announcePolite("Verifying you're human…");
+      return;
+    }
+
+    await runSubmit();
+  };
+
+  const runSubmit = async () => {
+    if (submittingRef.current || status === "submitting") return;
 
     submittingRef.current = true;
+    setAwaitingToken(false);
     setStatus("submitting");
     announcePolite("Submitting your application…");
     setErrors({});
@@ -647,6 +677,29 @@ export function WaitlistForm({
       submittingRef.current = false;
     }
   };
+
+  // Auto-fire a queued submit once the Turnstile token lands (closes the cold
+  // first-attempt race: one early click is honored instead of erroring).
+  useEffect(() => {
+    if (turnstileToken && pendingSubmitRef.current && !submittingRef.current) {
+      pendingSubmitRef.current = false;
+      void runSubmit();
+    }
+    // runSubmit reads the latest token/values from this render's closure.
+  }, [turnstileToken]);
+
+  // If the widget fails while a submit is queued, cancel the queue and surface
+  // the fallback instructions instead of waiting on a token that will never come.
+  useEffect(() => {
+    if (turnstileFailed && pendingSubmitRef.current) {
+      pendingSubmitRef.current = false;
+      setAwaitingToken(false);
+      applyFieldErrors({
+        turnstileToken: "Verification is unavailable. Follow the fallback instructions below.",
+      });
+      setStatus("error");
+    }
+  }, [turnstileFailed]);
 
   const errorEntries = Object.entries(errors).filter(([, msg]) => Boolean(msg));
 
@@ -1248,11 +1301,15 @@ export function WaitlistForm({
               key="submit"
               type="submit"
               className="btn-primary"
-              disabled={status === "submitting"}
-              aria-busy={status === "submitting" ? true : undefined}
+              disabled={status === "submitting" || awaitingToken}
+              aria-busy={status === "submitting" || awaitingToken ? true : undefined}
               data-testid="waitlist-submit"
             >
-              {status === "submitting" ? "Submitting…" : submitLabel}
+              {status === "submitting"
+                ? "Submitting…"
+                : awaitingToken
+                  ? "Verifying you're human…"
+                  : submitLabel}
             </button>
           )}
         </div>
