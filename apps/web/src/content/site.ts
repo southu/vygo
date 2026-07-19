@@ -64,6 +64,7 @@ export function getPrimaryNav(): NavItem[] {
     { href: "/security", label: "Security" },
     { href: "/why-vygo", label: "Why vygo.ai" },
     { href: "/vibe-coding", label: "Vibe coding" },
+    { href: "/readiness", label: "Readiness Check" },
   ];
 
   if (commercialFlags.showPublicPricing) {
