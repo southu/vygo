@@ -200,7 +200,9 @@ test.describe("Site behavior preservation", () => {
   }, testInfo) => {
     await page.goto("/");
 
-    if (testInfo.project.name === "mobile") {
+    // Desktop primary nav only takes over at xl; mobile and tablet viewports
+    // both collapse it behind the hamburger drawer.
+    if (testInfo.project.name === "mobile" || testInfo.project.name === "tablet") {
       await page.getByTestId("mobile-nav-toggle").click();
       await page
         .getByTestId("mobile-navigation")
@@ -248,7 +250,7 @@ test.describe("Site behavior preservation", () => {
 
   test("non-waitlist navigation still works", async ({ page }, testInfo) => {
     await page.goto("/");
-    if (testInfo.project.name === "mobile") {
+    if (testInfo.project.name === "mobile" || testInfo.project.name === "tablet") {
       await page.getByTestId("mobile-nav-toggle").click();
       await page.getByTestId("mobile-navigation").getByRole("link", { name: "Method" }).click();
       await expect(page).toHaveURL(/\/method/);
