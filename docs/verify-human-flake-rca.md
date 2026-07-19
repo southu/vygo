@@ -143,6 +143,40 @@ test that reproduces the async gap and asserts the single click succeeds.
 Changed: `WaitlistForm.tsx`, `readiness/ScoreGateForm.tsx`, `e2e/helpers.ts`,
 `e2e/waitlist-form.spec.ts`. The design intent below is retained for reference.
 
+### Follow-up: the queue could hang forever when the callback never fires
+
+The queue fix above assumed the token eventually arrives (late, but arrives).
+Production surfaced a stricter cold failure: `window.turnstile` is defined,
+`render()` returns a widget id, **but the callback never fires at all** — no
+token, and no `error-callback` either (no visible challenge iframe, PAT calls
+401). In that state the queued submit had nothing to auto-fire it, and the
+existing safeguards did not help: the 8s script-load timer
+(`WaitlistForm.tsx`) only trips when `window.turnstile` is **absent**, and the
+`turnstileFailed` cancel effect only fires on an explicit widget error. So the
+button sat on a disabled **"Verifying you're human…"** indefinitely — the exact
+infinite-pending state the tester reproduced twice in fresh cold contexts.
+
+**Shipped:** a **bounded timeout** (`PENDING_TOKEN_TIMEOUT_MS = 10s`) on the
+queued-submit wait in both forms. If no token lands within the window, the form
+exits the pending state into the existing actionable affordance — the
+`turnstile-fallback` panel plus a `turnstileToken` field error — instead of an
+infinite spinner, and re-enables Submit for a retry. 10s sits comfortably above
+the ~1–2s a real widget takes to auto-issue a token (so a legitimate challenge
+is never cut off) and below the ≥20s that defines the "stuck" failure. No
+empty-token POST is ever made, so the soft-accept server path is not reached as
+a false success. In `WaitlistForm` the timeout sets a dedicated
+`verificationTimedOut` flag (not `turnstileFailed`) because that form's render
+effect re-runs on `status` changes and resets `turnstileFailed`, which would
+otherwise silently clear the fallback; `ScoreGateForm`'s render effect does not
+depend on `status`, so it reuses `turnstileFailed`.
+
+Coverage: `installStuckTurnstileStub` (render returns an id, callback never
+fires) plus two independent cold-context tests per form asserting the timeout
+reaches the fallback terminal state — they fail if the infinite-pending state,
+an empty-token false success, or warm-path-only success returns. Changed:
+`WaitlistForm.tsx`, `readiness/ScoreGateForm.tsx`, `e2e/helpers.ts`,
+`e2e/waitlist-form.spec.ts`, `e2e/readiness-gate.spec.ts`.
+
 1. **Track verification readiness explicitly.** Add a small state, e.g.
    `turnstileStatus: "loading" | "ready" | "error"` in both `WaitlistForm` and
    `ScoreGateForm`, set to `ready` inside the Turnstile `callback` (alongside

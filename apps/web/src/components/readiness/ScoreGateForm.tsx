@@ -12,6 +12,14 @@ const TURNSTILE_TEST_SITE_KEY = "1x00000000000000000000AA";
 /** Cloudflare always-pass dummy response token (paired with test sitekey/secret). */
 const TURNSTILE_TEST_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 
+/**
+ * Hard ceiling (ms) on a queued submit's wait for the Turnstile token. Guards
+ * the cold first-attempt hang where the widget renders but its callback never
+ * fires: without it the gate button would sit on "Verifying you're human…"
+ * forever. Matches WaitlistForm's PENDING_TOKEN_TIMEOUT_MS.
+ */
+const PENDING_TOKEN_TIMEOUT_MS = 10_000;
+
 function resolveTurnstileSiteKey(): string {
   return process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || TURNSTILE_TEST_SITE_KEY;
 }
@@ -304,6 +312,27 @@ export function ScoreGateForm({
       setFeedback(c.error);
     }
   }, [turnstileFailed]);
+
+  // Bound the queued-submit wait: if the Turnstile callback never fires (widget
+  // renders but issues no token — the cold first-attempt hang) exit the pending
+  // state into the fallback/error affordance instead of an infinite
+  // "Verifying you're human…". Cleared when the token lands or the widget errors.
+  useEffect(() => {
+    if (!awaitingToken) return;
+    const timer = window.setTimeout(() => {
+      if (inFlightRef.current || !pendingSubmitRef.current) return;
+      pendingSubmitRef.current = false;
+      setAwaitingToken(false);
+      setTurnstileFailed(true);
+      setErrors((prev) => ({
+        ...prev,
+        turnstileToken: "Verification did not complete. Reload to try again.",
+      }));
+      setStatus("error");
+      setFeedback(c.error);
+    }, PENDING_TOKEN_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [awaitingToken]);
 
   const fieldClass =
     "mt-1.5 w-full rounded-xl border border-border bg-canvas px-3 py-2.5 text-sm text-ink shadow-sm focus-visible:border-purple";

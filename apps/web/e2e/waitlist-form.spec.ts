@@ -1,8 +1,9 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import {
   fillStep1,
   fillStep2,
   installDelayedTurnstileStub,
+  installStuckTurnstileStub,
   installTurnstileStub,
   mockAvailability,
   piiLeakInAnalytics,
@@ -553,5 +554,85 @@ test.describe("WaitlistForm cold first-attempt (async Turnstile token)", () => {
     await expect(page.getByTestId("waitlist-success-card")).toBeVisible({ timeout: 5_000 });
     expect(posts).toBe(1);
     expect(sawToken).toBe(true);
+  });
+});
+
+// The production cold hang: window.turnstile is defined and a widget renders,
+// but its callback never fires, so the token stays empty forever. Before the
+// bounded-timeout fix a queued submit sat on "Verifying you're human…"
+// indefinitely (no success, no fallback, no POST). Each test below runs in its
+// own fresh Playwright browser context with no prior verify-human warm-up, so
+// together they prove two independent cold first attempts both reach a terminal
+// state — not a warm-run-dependent pass.
+test.describe("WaitlistForm cold first-attempt (Turnstile callback never fires)", () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAvailability(page, "waitlist");
+    // Widget mounts but never issues a token — the exact production hang.
+    await installStuckTurnstileStub(page);
+  });
+
+  async function reachStuckSubmit(page: Page, posts: { count: number }) {
+    await page.goto("/waitlist");
+    await fillStep1(page, { email: `stuck-${Date.now()}@example.com` });
+    await page.getByTestId("waitlist-continue").click();
+    await expect(page.locator('[data-waitlist-step="2"]')).toBeVisible();
+
+    await page.locator("#stage").selectOption("live_users");
+    await page.locator("#primaryBlocker").selectOption("security");
+    await page.locator("#desiredStartWindow").selectOption("within_30_days");
+    await page
+      .locator("#message")
+      .fill("We need production hardening before an enterprise rollout next month.");
+    await page.locator("#privacyAccepted").check();
+
+    // A submit with an empty token must never be soft-accepted as success.
+    await page.route("**/v1/waitlist", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      posts.count += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: { accepted: true, message: "Your application has been received." },
+        }),
+      });
+    });
+
+    const submit = page.getByTestId("waitlist-submit");
+    await submit.click();
+    // The click is queued (not rejected): shows the pending affordance, no POST yet.
+    await expect(submit).toBeDisabled();
+    await expect(submit).toContainText(/Verifying you.?re human/i);
+    return submit;
+  }
+
+  test("first cold attempt: never-firing token times out into fallback, not an infinite spinner", async ({
+    page,
+  }) => {
+    const posts = { count: 0 };
+    const submit = await reachStuckSubmit(page, posts);
+
+    // Bounded timeout must exit the pending state into the actionable fallback —
+    // NOT sit on "Verifying you're human…" forever and NOT fake a success.
+    await expect(page.getByTestId("turnstile-fallback")).toBeVisible({ timeout: 14_000 });
+    await expect(page.locator('[data-field-error="turnstileToken"]')).toBeVisible();
+    await expect(submit).not.toBeDisabled();
+    await expect(submit).not.toContainText(/Verifying you.?re human/i);
+    await expect(page.getByTestId("waitlist-success-card")).toHaveCount(0);
+    // No empty-token POST was ever soft-accepted as success.
+    expect(posts.count).toBe(0);
+  });
+
+  test("second independent cold context reaches the same terminal fallback", async ({ page }) => {
+    const posts = { count: 0 };
+    const submit = await reachStuckSubmit(page, posts);
+
+    await expect(page.getByTestId("turnstile-fallback")).toBeVisible({ timeout: 14_000 });
+    await expect(submit).not.toBeDisabled();
+    await expect(page.getByTestId("waitlist-success-card")).toHaveCount(0);
+    expect(posts.count).toBe(0);
   });
 });

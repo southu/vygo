@@ -29,6 +29,19 @@ import { useAvailability } from "./AvailabilityProvider";
  */
 const TURNSTILE_TEST_SITE_KEY = "1x0000000000000000000000000000000AA";
 
+/**
+ * Hard ceiling (ms) on a queued submit's wait for the Turnstile token. The cold
+ * first-attempt hang is a widget that renders (render() returns an id) but whose
+ * callback never fires — no token, no error-callback — so the 8s script-load
+ * timer (which only trips when window.turnstile is absent) never helps and the
+ * submit would sit on "Verifying you're human…" forever. On timeout we exit the
+ * pending state into the existing fallback/error affordance. Kept comfortably
+ * above the ~1–2s a real widget takes to auto-issue a token, and below the ≥20s
+ * window that defines the "stuck" failure, so a real challenge is never cut off
+ * but the infinite-pending state cannot occur.
+ */
+const PENDING_TOKEN_TIMEOUT_MS = 10_000;
+
 type FormState = {
   fullName: string;
   email: string;
@@ -186,6 +199,11 @@ export function WaitlistForm({
   const [assertiveMessage, setAssertiveMessage] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileFailed, setTurnstileFailed] = useState(false);
+  // Set when a queued submit's bounded wait elapses without a token. Kept separate
+  // from turnstileFailed because the render effect re-runs on `status` changes and
+  // resets turnstileFailed on a (re-)render — this flag it never touches, so the
+  // timeout fallback cannot be silently cleared.
+  const [verificationTimedOut, setVerificationTimedOut] = useState(false);
   const [showErrorSummary, setShowErrorSummary] = useState(false);
   // A submit clicked while the Turnstile token is still being issued is queued
   // (not rejected) and auto-fires from the token callback — so the first cold
@@ -228,6 +246,7 @@ export function WaitlistForm({
     setStatus("idle");
     setStatusMessage("");
     setAwaitingToken(false);
+    setVerificationTimedOut(false);
     pendingSubmitRef.current = false;
     trackAnalytics("waitlist_form_view", { mode, step: 1, offer: offer ?? "general" });
     // Focus heading when opened (modal or page mount).
@@ -357,6 +376,7 @@ export function WaitlistForm({
           callback: (token: string) => {
             setTurnstileToken(token);
             setTurnstileFailed(false);
+            setVerificationTimedOut(false);
             setErrors((prev) => {
               if (!prev.turnstileToken) return prev;
               const next = { ...prev };
@@ -531,6 +551,7 @@ export function WaitlistForm({
       // Token not issued yet (widget callback still pending): queue the submit and
       // fire it automatically once the token arrives, so this first click succeeds.
       pendingSubmitRef.current = true;
+      setVerificationTimedOut(false);
       setAwaitingToken(true);
       announcePolite("Verifying you're human…");
       return;
@@ -700,6 +721,28 @@ export function WaitlistForm({
       setStatus("error");
     }
   }, [turnstileFailed]);
+
+  // Bound the queued-submit wait: if the Turnstile callback never fires (widget
+  // renders but issues no token — the cold first-attempt hang) exit the pending
+  // state into the fallback/error affordance instead of an infinite
+  // "Verifying you're human…". Cleared automatically when the token lands (the
+  // auto-fire effect flips awaitingToken off) or the widget errors.
+  useEffect(() => {
+    if (!awaitingToken) return;
+    const timer = window.setTimeout(() => {
+      if (submittingRef.current || !pendingSubmitRef.current) return;
+      pendingSubmitRef.current = false;
+      setAwaitingToken(false);
+      setVerificationTimedOut(true);
+      applyFieldErrors({
+        turnstileToken:
+          "Verification did not complete. Follow the fallback instructions below or reload to try again.",
+      });
+      setStatus("error");
+      trackAnalytics("waitlist_failure", { code: "turnstile_timeout" });
+    }, PENDING_TOKEN_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [awaitingToken]);
 
   const errorEntries = Object.entries(errors).filter(([, msg]) => Boolean(msg));
 
@@ -1236,7 +1279,7 @@ export function WaitlistForm({
             <div data-testid="turnstile-region">
               <p className="text-sm font-medium text-ink">Verification</p>
               <div ref={turnstileContainerRef} className="mt-2" id="turnstileToken" />
-              {turnstileFailed ? (
+              {turnstileFailed || verificationTimedOut ? (
                 <div
                   className="mt-3 rounded-xl border border-border bg-canvas p-3 text-sm text-ink-soft"
                   data-testid="turnstile-fallback"

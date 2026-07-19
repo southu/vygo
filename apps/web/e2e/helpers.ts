@@ -97,6 +97,27 @@ export async function installDelayedTurnstileStub(
   );
 }
 
+/**
+ * Install a Turnstile stub whose `render()` returns a widget id but whose
+ * callback NEVER fires — no token, no error-callback. This reproduces the exact
+ * cold first-attempt hang seen in production: window.turnstile is defined, a
+ * widget mounts, yet the token stays empty forever. Use it to prove a queued
+ * submit does not sit on "Verifying you're human…" indefinitely but instead
+ * exits into the bounded-timeout fallback/error affordance.
+ */
+export async function installStuckTurnstileStub(page: Page) {
+  await page.addInitScript(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    w.turnstile = {
+      // Return a widget id (render succeeds) but never invoke callback/error-callback.
+      render: () => "widget-test-stuck",
+      reset: () => undefined,
+      remove: () => undefined,
+    };
+  });
+}
+
 export async function fillStep1(
   page: Page,
   values: {

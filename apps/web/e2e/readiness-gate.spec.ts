@@ -1,5 +1,9 @@
 import { test, expect, type Route } from "@playwright/test";
-import { installDelayedTurnstileStub, installTurnstileStub } from "./helpers";
+import {
+  installDelayedTurnstileStub,
+  installStuckTurnstileStub,
+  installTurnstileStub,
+} from "./helpers";
 
 /**
  * Cold first-attempt regression coverage for the readiness score gate
@@ -162,6 +166,45 @@ test.describe("Readiness score gate cold first-attempt (async Turnstile token)",
     } finally {
       await context.close();
     }
+  });
+});
+
+test.describe("Readiness score gate cold first-attempt (Turnstile callback never fires)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/v1/readiness/session/**", routeGateSession);
+    await page.route("**/api/readiness/token", routeMintToken);
+    // Widget mounts but its callback never fires — the production cold hang.
+    await installStuckTurnstileStub(page);
+  });
+
+  test("never-firing token times out into fallback, not an infinite spinner", async ({ page }) => {
+    const score = scoreRoute("snap-stuck-gate-1");
+    await page.route("**/v1/readiness/score", score.handler);
+
+    await page.goto(`/readiness?token=${GATE_TOKEN}`);
+    const gate = page.getByTestId("readiness-score-gate");
+    await expect(gate).toBeVisible();
+    await expect(gate).toHaveAttribute("data-readiness-e2e", "0");
+
+    await page.getByTestId("gate-name").fill("Stuck Cold Tester");
+    await page.getByTestId("gate-email").fill("stuck-gate@example.com");
+    await page.getByTestId("gate-privacy").check();
+
+    const submit = page.getByTestId("gate-submit");
+    await submit.click();
+    // The click is queued (pending affordance), not rejected — no POST yet.
+    await expect(submit).toBeDisabled();
+    await expect(submit).toHaveText(/Verifying you're human/i);
+
+    // Bounded timeout must exit the pending state into an actionable fallback —
+    // never sit on "Verifying you're human…" forever, never fake a success.
+    await expect(page.getByTestId("turnstile-fallback")).toBeVisible({ timeout: 14_000 });
+    await expect(submit).not.toBeDisabled();
+    await expect(submit).not.toHaveText(/Verifying you're human/i);
+    // No score POST was ever made with an empty token.
+    expect(score.state.posts).toBe(0);
+    // Stayed on the gate — no false navigation to a snapshot.
+    await expect(page).not.toHaveURL(/\/readiness\/snapshot/);
   });
 });
 
