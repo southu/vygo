@@ -63,6 +63,29 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Readiness Check — prominent CTA banner directly below the hero */}
+      <section
+        className="section-pad border-t border-border bg-purple-soft/40"
+        data-section="readiness-cta"
+      >
+        <div className="container-page">
+          <div className="card flex flex-col gap-6 border-2 border-purple/30 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-2xl">
+              <p className="eyebrow">{homepage.readinessCta.eyebrow}</p>
+              <h2 className="mt-3 font-display text-2xl font-bold sm:text-3xl">
+                {homepage.readinessCta.heading}
+              </h2>
+              <p className="mt-3 text-base text-muted">{homepage.readinessCta.body}</p>
+            </div>
+            <div className="sm:flex-shrink-0">
+              <CtaLink href={homepage.readinessCta.cta.href}>
+                {homepage.readinessCta.cta.label}
+              </CtaLink>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Get set up first — the very first action, before any other content */}
       <section className="section-pad border-t border-border bg-surface" data-section="setup-first">
         <div className="container-page max-w-3xl">

@@ -13,6 +13,7 @@ export const ctas = {
   viewFullMethod: "View the full method",
   reviewEngagementDetails: "Review engagement details",
   reviewSecurityApproach: "Review our security approach",
+  takeReadinessCheck: "Take the Readiness Check",
   insightContextual:
     "Have a working product and a production deadline? Apply for the next audit opening.",
 } as const;
@@ -26,4 +27,6 @@ export const ctaHrefs = {
   method: "/method",
   security: "/security",
   pricing: "/pricing",
+  // Absolute (not root-relative) so next/link doesn't normalize away the trailing slash.
+  readiness: "https://www.vygo.ai/readiness/",
 } as const;

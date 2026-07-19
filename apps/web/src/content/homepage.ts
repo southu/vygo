@@ -34,6 +34,12 @@ export const homepage = {
       ],
     },
   },
+  readinessCta: {
+    eyebrow: "FREE DIAGNOSTIC",
+    heading: "Not sure how production-ready your prototype really is?",
+    body: "Take the free Readiness Check — a few guided questions surface the security, scalability, and operational gaps before they cost you a deal or an outage.",
+    cta: { label: ctas.takeReadinessCheck, href: ctaHrefs.readiness },
+  },
   pains: {
     heading: "Growing pains are proof it’s working.",
     intro:
