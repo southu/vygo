@@ -28,7 +28,7 @@
     padding-bottom: 4.5rem;
   }
 
-  @media (min-width: 1024px) {
+  @media (min-width: 1280px) {
     body {
       padding-bottom: 0;
     }

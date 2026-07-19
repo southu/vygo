@@ -16,7 +16,7 @@ export function SiteHeader() {
       <div className="container-page flex h-16 items-center justify-between gap-4 lg:h-[4.25rem]">
         <LogoText />
 
-        <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex" data-nav="desktop">
+        <nav aria-label="Primary" className="hidden items-center gap-1 xl:flex" data-nav="desktop">
           {nav.map((item) => (
             <Link
               key={item.href}
