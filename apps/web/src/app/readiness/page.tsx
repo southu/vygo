@@ -25,10 +25,13 @@ export default function ReadinessPage() {
             {c.title}
           </h1>
           <p className="mt-4 text-base text-muted sm:text-lg">{c.body}</p>
-          {/* Prefetch link to reference the token issuance flow in the page source */}
-          <link rel="prefetch" href="/api/readiness/token" />
-          {/* Prefetch link to reference the submission status poll flow in the page source */}
-          <link rel="prefetch" href="/api/readiness/status" />
+          {/*
+            Token issuance flow: POST /api/readiness/token (see ReadinessFlow).
+            Status poll flow: GET /api/readiness/status?token=... (see lib/readiness/api.ts).
+            Referenced here as comments, not <link rel="prefetch">, because prefetching
+            these URLs without the required method/query param triggers real 405/400
+            responses and browser console errors on page load.
+          */}
           <ReadinessFlow />
           {/*
             Static Stage 3 paste-back shell in the HTML document so GET /readiness
