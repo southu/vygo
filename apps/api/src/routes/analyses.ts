@@ -308,6 +308,15 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
 
     const user = "demo@vygo.ai";
     const secondProject = "Project Beta";
+    // Stable seeded readiness-snapshot fixture ids (served publicly by
+    // GET /v1/readiness/snapshot/:id). Each demo COMPLETED run carries one so a
+    // history entry opens the EXISTING results component (SnapshotView) at
+    // /readiness/snapshot?id=<snapshotId> populated with a real scored report.
+    const snapshotIds = {
+      legacy: "00000000-0000-4000-a000-0000000000e3", // mixed profile
+      rerun: "00000000-0000-4000-a000-0000000000e2", // strong profile
+      beta: "00000000-0000-4000-a000-0000000000e1", // weak profile
+    } as const;
 
     const dbHandle = deps.getDb();
     if (!dbHandle) {
@@ -334,6 +343,7 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
           source: "vygo_demo_fixture",
           fixture: "legacy_single_analysis",
           user,
+          snapshotId: snapshotIds.legacy,
           results_text:
             "Legacy readiness analysis for demo@vygo.ai — the single pre-migration analysis, preserved byte-for-byte as the first entry of 'Default project'.",
           results: {
@@ -346,11 +356,12 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
           source: "vygo_demo_fixture",
           fixture: "newer_pending_run",
           results_text:
-            "A newer run that is still pending; it must NOT shadow the completed legacy result.",
+            "A newer run that is still pending; it must NOT shadow the completed result.",
         };
         const secondProjectAnalysis = {
           source: "vygo_demo_fixture",
           fixture: "second_project_analysis",
+          snapshotId: snapshotIds.beta,
           results_text: "A completed analysis stored under a distinct second project.",
           results: {
             overall_score: 88,
@@ -393,6 +404,51 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
         `;
       }
 
+      // Idempotent, additive upgrades so a demo user seeded BEFORE this change
+      // also gains (a) a resolvable snapshotId on each completed run so history
+      // entries open the existing results component, and (b) a SECOND completed
+      // run in 'Default project' (a re-run) whose newer completion becomes the
+      // project's current result while the older completed run stays listed and
+      // openable. Scoped to the demo user only.
+      await sql`
+        UPDATE analyses
+        SET submission = submission || ${JSON.stringify({ snapshotId: snapshotIds.legacy })}::jsonb
+        WHERE user_identifier = ${user}
+          AND submission->>'fixture' = 'legacy_single_analysis'
+          AND (submission->>'snapshotId') IS NULL
+      `;
+      await sql`
+        UPDATE analyses
+        SET submission = submission || ${JSON.stringify({ snapshotId: snapshotIds.beta })}::jsonb
+        WHERE user_identifier = ${user}
+          AND submission->>'fixture' = 'second_project_analysis'
+          AND (submission->>'snapshotId') IS NULL
+      `;
+      const rerunExisting = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM analyses
+        WHERE user_identifier = ${user} AND submission->>'fixture' = 'default_project_rerun'
+      `;
+      if ((rerunExisting[0]?.n ?? 0) === 0) {
+        const rerun = {
+          source: "vygo_demo_fixture",
+          fixture: "default_project_rerun",
+          user,
+          snapshotId: snapshotIds.rerun,
+          results_text:
+            "A re-run of the Default project analysis. This newer completed run is the project's current result; the earlier completed run stays in history and remains openable.",
+          results: {
+            overall_score: 84,
+            band: "strong",
+            dimensions: { clarity: 88, evidence: 80, alignment: 85 },
+          },
+        };
+        await sql`
+          INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
+          VALUES (${user}, ${DEFAULT_PROJECT_IDENTIFIER}, 'completed', ${JSON.stringify(rerun)}::jsonb,
+                  '2024-08-01T00:00:00Z', '2024-08-01T00:00:00Z')
+        `;
+      }
+
       const rows = await listAnalyses(dbHandle.sql, { user });
       const analyses = rows.map(toAnalysisPublic);
       const projects = Array.from(new Set(rows.map((r) => r.project_identifier)));
@@ -408,7 +464,7 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
         count: analyses.length,
         analyses,
         verify: {
-          legacyResult: `/v1/analyses/result?user=${enc(user)}`,
+          currentDefaultResult: `/v1/analyses/result?user=${enc(user)}`,
           defaultProjectHistory: `/v1/analyses?user=${enc(user)}&project=${enc(DEFAULT_PROJECT_IDENTIFIER)}`,
           secondProjectHistory: `/v1/analyses?user=${enc(user)}&project=${enc(secondProject)}`,
           allHistory: `/v1/analyses?user=${enc(user)}`,

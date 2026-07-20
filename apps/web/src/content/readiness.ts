@@ -38,6 +38,8 @@ export const readinessContent = {
     runAgain: "Run again",
     landingHint:
       "Already have a completed analysis? Start a new one for any project — your earlier results stay available.",
+    historyLabel: "View analysis history",
+    historyHint: "Browse every past run grouped by project, with each project's current result.",
   },
   stage1: {
     progressLabel: "Stage 1 of 3 — intake",

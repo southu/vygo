@@ -869,6 +869,14 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
               >
                 {na.label}
               </Link>
+              {/* History view: past runs grouped by project, each with its current result. */}
+              <Link
+                href="/analyses"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:border-purple hover:text-purple"
+                data-testid="snapshot-history-link"
+              >
+                {na.historyLabel}
+              </Link>
               <span className="text-xs text-muted">{na.landingHint}</span>
             </div>
             {data.bucket ? (

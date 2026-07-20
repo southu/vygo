@@ -2839,23 +2839,74 @@ const DEMO_USER = "demo@vygo.ai";
 const DEMO_SECOND_PROJECT = "Project Beta";
 
 /**
+ * Stable seeded readiness-snapshot fixture ids. Each is served publicly by
+ * GET /v1/readiness/snapshot/:id (→ the /readiness/snapshot?id=... results
+ * route) with a real scored report and no prior submission required. Every demo
+ * COMPLETED run carries one so a history entry opens the EXISTING readiness
+ * analysis-detail/results component (SnapshotView) populated with that run's
+ * report — the same UI/route a fresh run lands on, not a parallel results view.
+ */
+const DEMO_SNAPSHOT_IDS = {
+  legacy: "00000000-0000-4000-a000-0000000000e3", // mixed profile
+  rerun: "00000000-0000-4000-a000-0000000000e2", // strong profile
+  beta: "00000000-0000-4000-a000-0000000000e1", // weak profile
+} as const;
+
+/**
  * The legacy single-analysis payload. Retained verbatim through the migration
- * so `/api/analyses/result?user=demo@vygo.ai` (the legacy result URL) keeps
- * returning exactly this content as the latest completed run of the migrated
- * 'Default project'. Scoring fields are illustrative sample data only — the
- * fixture never runs or alters the scorer.
+ * so it keeps rendering exactly this content as the earliest completed run of
+ * the migrated 'Default project'. Scoring fields are illustrative sample data
+ * only — the fixture never runs or alters the scorer.
  */
 function demoLegacySubmission(): Record<string, unknown> {
   return {
     source: "vygo_demo_fixture",
     fixture: "legacy_single_analysis",
     user: DEMO_USER,
+    snapshotId: DEMO_SNAPSHOT_IDS.legacy,
     results_text:
       "Legacy readiness analysis for demo@vygo.ai — the single pre-migration analysis, preserved byte-for-byte as the first entry of 'Default project'.",
     results: {
       overall_score: 72,
       band: "developing",
       dimensions: { clarity: 80, evidence: 65, alignment: 71 },
+    },
+  };
+}
+
+/**
+ * A NEWER completed run in the SAME 'Default project' — a re-run. Its later
+ * completion makes it the project's current result, while the earlier legacy
+ * run stays listed in history and remains openable at its own snapshot.
+ */
+function demoRerunSubmission(): Record<string, unknown> {
+  return {
+    source: "vygo_demo_fixture",
+    fixture: "default_project_rerun",
+    user: DEMO_USER,
+    snapshotId: DEMO_SNAPSHOT_IDS.rerun,
+    results_text:
+      "A re-run of the Default project analysis. This newer completed run is the project's current result; the earlier completed run stays in history and remains openable.",
+    results: {
+      overall_score: 84,
+      band: "strong",
+      dimensions: { clarity: 88, evidence: 80, alignment: 85 },
+    },
+  };
+}
+
+/** Second-project completed run, stored under a distinct project label. */
+function demoSecondProjectSubmission(): Record<string, unknown> {
+  return {
+    source: "vygo_demo_fixture",
+    fixture: "second_project_analysis",
+    user: DEMO_USER,
+    snapshotId: DEMO_SNAPSHOT_IDS.beta,
+    results_text: "A completed analysis stored under a distinct second project.",
+    results: {
+      overall_score: 88,
+      band: "strong",
+      dimensions: { clarity: 90, evidence: 85, alignment: 89 },
     },
   };
 }
@@ -2871,9 +2922,12 @@ function demoLegacySubmission(): Record<string, unknown> {
  * Seeded shape:
  *   - 'Default project': a legacy analysis (oldest created_at, completed) that
  *     was inserted under the pre-migration 'unspecified' project and re-homed
- *     by the same Default-project migration, PLUS a newer non-completed
- *     (pending) run in the same project.
+ *     by the same Default-project migration, a newer non-completed (pending)
+ *     run, AND a newest COMPLETED re-run — so the project's current result is
+ *     the re-run while the older completed legacy run stays listed and openable.
  *   - 'Project Beta': a distinct second project with its own completed analysis.
+ * Every completed run carries a `snapshotId` resolving to a real readiness
+ * snapshot, so a history entry opens the existing results component.
  */
 async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerResult> {
   const rl = checkEdgeRateLimit(req);
@@ -2921,9 +2975,9 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
         WHERE user_identifier = ${user} AND status = 'received'
       `;
 
-      // 2) A NEWER, non-completed run in the SAME 'Default project'. Default
-      //    result retrieval must still return the completed legacy analysis (1),
-      //    never this pending one.
+      // 2) A NEWER, non-completed run in the SAME 'Default project'. Result
+      //    retrieval must never return this pending run, and it must not shadow
+      //    a completed run.
       await sql`
         INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
         VALUES (
@@ -2932,7 +2986,7 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
             source: "vygo_demo_fixture",
             fixture: "newer_pending_run",
             results_text:
-              "A newer run that is still pending; it must NOT shadow the completed legacy result.",
+              "A newer run that is still pending; it must NOT shadow the completed result.",
           })}::jsonb,
           '2024-06-01T00:00:00Z', '2024-06-01T00:00:00Z'
         )
@@ -2944,17 +2998,43 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
         INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
         VALUES (
           ${user}, ${DEMO_SECOND_PROJECT}, 'completed',
-          ${JSON.stringify({
-            source: "vygo_demo_fixture",
-            fixture: "second_project_analysis",
-            results_text: "A completed analysis stored under a distinct second project.",
-            results: {
-              overall_score: 88,
-              band: "strong",
-              dimensions: { clarity: 90, evidence: 85, alignment: 89 },
-            },
-          })}::jsonb,
+          ${JSON.stringify(demoSecondProjectSubmission())}::jsonb,
           '2024-03-01T00:00:00Z', '2024-03-01T00:00:00Z'
+        )
+      `;
+    }
+
+    // Idempotent, additive upgrades so a demo user seeded BEFORE this change
+    // also gains (a) a resolvable snapshotId on each completed run, so history
+    // entries open the existing SnapshotView results component, and (b) a SECOND
+    // completed run in 'Default project' (a re-run) whose newer completion is
+    // the project's current result while the older completed run stays listed
+    // and openable. Scoped to the demo user only; real users are untouched.
+    await sql`
+      UPDATE analyses
+      SET submission = submission || ${JSON.stringify({ snapshotId: DEMO_SNAPSHOT_IDS.legacy })}::jsonb
+      WHERE user_identifier = ${user}
+        AND submission->>'fixture' = 'legacy_single_analysis'
+        AND (submission->>'snapshotId') IS NULL
+    `;
+    await sql`
+      UPDATE analyses
+      SET submission = submission || ${JSON.stringify({ snapshotId: DEMO_SNAPSHOT_IDS.beta })}::jsonb
+      WHERE user_identifier = ${user}
+        AND submission->>'fixture' = 'second_project_analysis'
+        AND (submission->>'snapshotId') IS NULL
+    `;
+    const rerunExisting = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM analyses
+      WHERE user_identifier = ${user} AND submission->>'fixture' = 'default_project_rerun'
+    `;
+    if ((rerunExisting[0]?.n ?? 0) === 0) {
+      await sql`
+        INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
+        VALUES (
+          ${user}, ${DEFAULT_PROJECT_IDENTIFIER}, 'completed',
+          ${JSON.stringify(demoRerunSubmission())}::jsonb,
+          '2024-08-01T00:00:00Z', '2024-08-01T00:00:00Z'
         )
       `;
     }
@@ -2982,17 +3062,19 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
         count: analyses.length,
         analyses,
         verify: {
-          legacyResult: `/api/analyses/result?user=${enc(user)}`,
+          currentDefaultResult: `/api/analyses/result?user=${enc(user)}`,
           defaultProjectHistory: `/api/analyses?user=${enc(user)}&project=${enc(DEFAULT_PROJECT_IDENTIFIER)}`,
           secondProjectHistory: `/api/analyses?user=${enc(user)}&project=${enc(DEMO_SECOND_PROJECT)}`,
           allHistory: `/api/analyses?user=${enc(user)}`,
+          history: "/analyses",
           dashboard: "/dashboard",
         },
         notes: [
-          "legacyResult returns the latest COMPLETED analysis of 'Default project' — the migrated legacy analysis (oldest created_at), NOT the newer pending run.",
-          "defaultProjectHistory lists both the migrated legacy analysis and the newer pending run, each with its own status and created_at.",
+          "currentDefaultResult returns the latest COMPLETED analysis of 'Default project' — the newer re-run, NOT the older legacy run and never the pending run.",
+          "defaultProjectHistory lists both completed runs (the migrated legacy analysis and the newer re-run) plus the newer pending run, each with its own status, created_at, and snapshotId.",
+          "Each COMPLETED run carries a snapshotId; open /readiness/snapshot?id=<snapshotId> to render that run in the existing results component.",
           "secondProjectHistory lists this user's analyses under a distinct project, separate from 'Default project'.",
-          "Re-running this endpoint is non-destructive: it seeds once, then returns the existing state (seeded=false).",
+          "Re-running this endpoint is non-destructive: it seeds once, then only performs idempotent additive upgrades.",
         ],
       },
     };

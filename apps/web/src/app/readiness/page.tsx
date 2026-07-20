@@ -66,6 +66,25 @@ export default function ReadinessPage() {
             </a>
           </div>
           {/*
+            Entry point into the analysis history view (past runs grouped by
+            project, each project's current result openable in the existing
+            results component). Rendered server-side so the history link is always
+            present in the readiness flow's page source.
+          */}
+          <div
+            className="mt-3 flex flex-col gap-3 rounded-xl border border-border bg-canvas px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            data-testid="readiness-history-entry"
+          >
+            <p className="text-sm text-muted">{na.historyHint}</p>
+            <a
+              href="/analyses"
+              className="btn-secondary shrink-0 text-sm"
+              data-testid="readiness-history-link"
+            >
+              {na.historyLabel}
+            </a>
+          </div>
+          {/*
             Token issuance flow: POST /api/readiness/token (see ReadinessFlow).
             Status poll flow: GET /api/readiness/status?token=... (see lib/readiness/api.ts).
             Referenced here as comments, not <link rel="prefetch">, because prefetching
