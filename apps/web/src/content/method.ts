@@ -58,6 +58,26 @@ export const methodContent = {
       gate: "Staging product matches agreed behavior for launch candidates.",
     },
     {
+      title: "Quality assurance & UAT, built into every build",
+      weeks: "Throughout the build",
+      objectives:
+        "Engineer quality in from day one instead of inspecting it at the end: test plans are built against validated requirements, and automated and manual testing runs throughout the build rather than only at launch.",
+      activities: [
+        "Test plans written against validated requirements from day one",
+        "Automated and manual testing run continuously throughout the build",
+        "Structured user acceptance testing (UAT) with customers before launch",
+      ],
+      involvement:
+        "Confirm acceptance criteria against requirements, review test evidence, and take part in structured UAT before launch.",
+      deliverables: [
+        "Requirement-linked test plans",
+        "Automated and manual test suites with results",
+        "Signed-off UAT and release readiness",
+      ],
+      risks: ["Requirements that shift after test plans are agreed", "Limited customer availability for UAT"],
+      gate: "Structured UAT is passed and accepted before the launch and handoff step.",
+    },
+    {
       title: "Harden",
       weeks: "Weeks 8–12",
       objectives: "Prove the platform can survive real load, failure, and operational use.",
