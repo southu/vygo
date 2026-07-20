@@ -188,6 +188,46 @@ function checkStatusRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterS
   return { allowed: true, retryAfterSeconds: 0 };
 }
 
+/**
+ * Dedicated read-poll budget for the scoped analysis read paths (detail-by-id,
+ * latest-result, scoped history list). A normal client polls an in-progress run
+ * on a short interval until it completes, so these GETs cannot share the 20/60s
+ * ops budget (checkEdgeRateLimit) — a run that legitimately takes a couple of
+ * minutes to complete would trip RATE_LIMITED long before the client observed
+ * the completed result. This bucket is sized for sustained polling (a 2s poll
+ * interval fits comfortably under 120/60s) while still bounding abuse, and is
+ * kept separate from the status-poll bucket so the two never starve each other.
+ */
+const pollRlBuckets = new Map<string, { count: number; expiresAt: number }>();
+const POLL_RL_LIMIT = 120;
+const POLL_RL_WINDOW_MS = 60 * 1000;
+
+function checkPollRateLimit(req: EdgeRequest): { allowed: boolean; retryAfterSeconds: number } {
+  const raw = resolveEdgeClientIp(req.headers) || "unknown";
+  const ipPart = createHash("sha256").update(String(raw)).digest("hex").slice(0, 32);
+  const shard = raw === "unknown" ? Math.floor(Date.now() / POLL_RL_WINDOW_MS) : 0;
+  const key = `readiness:poll:${ipPart}:t${shard}`;
+  const now = Date.now();
+  const existing = pollRlBuckets.get(key);
+  if (!existing || existing.expiresAt <= now) {
+    pollRlBuckets.set(key, { count: 1, expiresAt: now + POLL_RL_WINDOW_MS });
+    if (pollRlBuckets.size > 500) {
+      for (const [k, v] of pollRlBuckets) {
+        if (v.expiresAt <= now) pollRlBuckets.delete(k);
+      }
+    }
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+  existing.count += 1;
+  if (existing.count > POLL_RL_LIMIT) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((existing.expiresAt - now) / 1000)),
+    };
+  }
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
 async function ensureSubmissionTables(sql: Sql): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS readiness_submissions (
@@ -2762,10 +2802,13 @@ async function handleComplete(req: EdgeRequest): Promise<ReadinessHandlerResult>
 
 /** POST create / GET list. Direct Postgres when the edge is wired; else proxy. */
 async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult> {
-  const rl = checkEdgeRateLimit(req);
+  const method = (req.method || "GET").toUpperCase();
+  // A GET is a scoped history read that a client polls while a run is in
+  // progress, so it draws on the generous poll budget; a POST creates a row and
+  // stays on the strict 20/60s ops budget.
+  const rl = method === "GET" ? checkPollRateLimit(req) : checkEdgeRateLimit(req);
   if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
 
-  const method = (req.method || "GET").toUpperCase();
   const url = resolveDatabaseUrl();
 
   if (method === "POST") {
@@ -3003,7 +3046,10 @@ async function handleSubmissionsList(req: EdgeRequest): Promise<ReadinessHandler
 
 /** GET one analysis by id. Direct Postgres when the edge is wired; else proxy. */
 async function handleAnalysisGet(req: EdgeRequest): Promise<ReadinessHandlerResult> {
-  const rl = checkEdgeRateLimit(req);
+  // Read-only detail poll: a client polls this endpoint for an in-progress run
+  // until it completes, so it uses the generous poll budget rather than the
+  // 20/60s ops budget (which would trip RATE_LIMITED mid-run).
+  const rl = checkPollRateLimit(req);
   if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
 
   const id = queryParam(req, "id");
@@ -3055,7 +3101,9 @@ async function handleAnalysisGet(req: EdgeRequest): Promise<ReadinessHandlerResu
  * completes. A newer pending/failed run never shadows the last completed one.
  */
 async function handleAnalysisResult(req: EdgeRequest): Promise<ReadinessHandlerResult> {
-  const rl = checkEdgeRateLimit(req);
+  // Read-only latest-result poll: same polling budget as the detail endpoint so
+  // a client can poll for a project's completed result without RATE_LIMITED.
+  const rl = checkPollRateLimit(req);
   if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
 
   const user = queryParam(req, "user").trim();

@@ -255,6 +255,33 @@ async function completeRun(user, project, runId, snapshotId, label) {
   return r;
 }
 
+/**
+ * Poll the scoped run-detail endpoint N times as a normal client would while a
+ * run is in progress, WITHOUT recording every exchange (that would bloat the
+ * transcript). Returns the per-status tally so the caller can assert no request
+ * was RATE_LIMITED (429). A count well above the 20/60s ops budget proves the
+ * detail path draws on the dedicated poll budget, not the ops one.
+ */
+async function pollDetail(runId, user, times) {
+  const statuses = [];
+  let rateLimited = 0;
+  let lastJson = null;
+  for (let i = 0; i < times; i++) {
+    // Path-based scoped detail: /api/analysis/<run-id>?user=<scope> → handleAnalysisGet.
+    const path = `${EP.detail}/${encodeURIComponent(runId)}?user=${encodeURIComponent(user)}`;
+    const res = await fetch(`${BASE}${path}`, { headers: { Accept: "application/json" } });
+    const text = await res.text();
+    try {
+      lastJson = JSON.parse(text);
+    } catch {
+      lastJson = null;
+    }
+    statuses.push(res.status);
+    if (res.status === 429 || lastJson?.error?.code === "RATE_LIMITED") rateLimited += 1;
+  }
+  return { statuses, rateLimited, lastJson };
+}
+
 /** Drain any stale in-progress runs so the fixture is deterministic. */
 async function drainInProgress(user, project) {
   const rows = await listHistory(user, project);
@@ -322,6 +349,49 @@ async function main() {
     "start endpoint: 201 → 409 (in-progress) → 200 → 201 (after completion)",
     t1.status === 201 && tdup.status === 409 && t2.status === 201,
     `sequence 201/${tdup.status}/200/${t2.status}`,
+  );
+
+  // ---- Detail-poll rate-limit reproduction (poll budget, not ops budget) ----
+  // Reproduce the tester's scenario: obtain a token, POST start, then poll the
+  // scoped detail endpoint until the run completes. The old shared 20/60s ops
+  // budget tripped RATE_LIMITED mid-run; the dedicated poll budget lets a normal
+  // client poll to completion. Issue >20 polls in one window (over the old ops
+  // limit) so a regression back to that budget would fail this check.
+  await drainInProgress(API_USER, PROJECT_B);
+  const pollStart = await startRun(API_USER, PROJECT_B, 201, "poll check: start run (201 in_progress)");
+  const pollRunId = pollStart.json?.run_id;
+  const POLL_TIMES = 25; // > 20 = old ops budget; must all pass under the poll budget
+  const beforeComplete = await pollDetail(pollRunId, API_USER, POLL_TIMES);
+  await completeRun(API_USER, PROJECT_B, pollRunId, SNAP.b1, "poll check: complete run (200 completed)");
+  const afterComplete = await pollDetail(pollRunId, API_USER, 3);
+  const completedSeen = isCompleted(afterComplete.lastJson?.analysis?.status);
+  const resultVisible = hasNonEmptyResult(afterComplete.lastJson?.analysis);
+  // Record a single compact summary exchange rather than every poll.
+  transcript.push({
+    step: "poll check: poll scoped detail endpoint through completion (no RATE_LIMITED)",
+    request: {
+      method: "GET",
+      url: `${EP.detail}/<run-id>?user=${redact(API_USER)}`,
+      note: `${POLL_TIMES} in-progress polls + 3 post-completion polls in one 60s window`,
+    },
+    response: {
+      in_progress_polls: beforeComplete.statuses.length,
+      in_progress_rate_limited: beforeComplete.rateLimited,
+      post_completion_polls: afterComplete.statuses.length,
+      post_completion_rate_limited: afterComplete.rateLimited,
+      final_status: afterComplete.lastJson?.analysis?.status ?? null,
+      old_ops_budget_per_min: 20,
+    },
+  });
+  record(
+    "detail-poll-no-rate-limit",
+    "a client can poll the scoped detail endpoint through completion without RATE_LIMITED",
+    beforeComplete.rateLimited === 0 &&
+      afterComplete.rateLimited === 0 &&
+      POLL_TIMES > 20 &&
+      completedSeen &&
+      resultVisible,
+    `${POLL_TIMES}+3 polls, ${beforeComplete.rateLimited + afterComplete.rateLimited} rate-limited, final=${afterComplete.lastJson?.analysis?.status}`,
   );
 
   // ---- run_id capability: complete succeeds with a DIFFERENT session token ----
