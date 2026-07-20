@@ -1,14 +1,83 @@
-import type { ChartDimension } from "@/components/charts/types";
+import type { ChartDimension, ChartSubMetric } from "@/components/charts/types";
 import { clampScore, scoreSeverity } from "@/lib/readiness/severity";
 import { microCtaForPillar } from "@/lib/readiness/micro-cta";
 import { dimensionSectionId, dimensionSlug } from "@/lib/readiness/dimension-slug";
 import type { DimensionRisk } from "@/lib/readiness/report-chart-data";
+import {
+  EvidenceStripDisclosure,
+  WrittenAnalysisDisclosure,
+  type EvidenceRow,
+} from "@/components/readiness/DeepDiveDisclosures";
 
 type ReadinessDeepDivesProps = {
   dimensions: ChartDimension[];
   riskMap: DimensionRisk[];
   className?: string;
 };
+
+/** Normalize an evidence answer_value (string | number | array) to clean text. */
+function answerText(value: unknown, max = 160): string {
+  if (value == null) return "";
+  const raw = Array.isArray(value)
+    ? value
+        .map((v) => (typeof v === "string" || typeof v === "number" ? String(v) : ""))
+        .filter(Boolean)
+        .join(", ")
+    : typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+      ? String(value)
+      : "";
+  const t = raw.replace(/\s+/g, " ").trim();
+  if (!t || /^(nan|undefined|null)$/i.test(t)) return "";
+  return t.length <= max ? t : `${t.slice(0, max - 1)}…`;
+}
+
+/** Lowest-scoring sub-metric that carries a verbatim reported answer. */
+function lowestWithAnswer(subs: ChartSubMetric[]): ChartSubMetric | null {
+  const withAnswer = subs
+    .filter((sm) => sm.name && answerText(sm.evidence?.answer_value).length > 0)
+    .slice()
+    .sort((a, b) => a.score - b.score);
+  return withAnswer[0] ?? null;
+}
+
+/**
+ * Two synthesized analysis paragraphs for a dimension, grounded in the
+ * build-time self-assessment scores + sub-metric answers (never generic copy).
+ */
+function analysisParagraphs(dim: ChartDimension, score: number, tierLabel: string): string[] {
+  const lead = `On ${dim.dimension}, the aggregate readiness score is ${score}/100 (${tierLabel.toLowerCase()} tier). This reflects the sub-metric checks from the build-time self-assessment rather than a generic maturity label.`;
+  const keyed = dim.sub_metrics
+    .filter((sm) => sm.name)
+    .slice()
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 3);
+  const detail = keyed.length
+    ? `Lowest-scoring checks include ${keyed
+        .map((sm) => {
+          const ans = answerText(sm.evidence?.answer_value, 60);
+          const s = Math.round(clampScore(sm.score));
+          return ans ? `${sm.name} (${s}/100; “${ans}”)` : `${sm.name} (${s}/100)`;
+        })
+        .join("; ")}.`
+    : `Sub-metric detail for ${dim.dimension} was limited in this assessment; treat the dimension score as the primary signal.`;
+  return [lead, detail];
+}
+
+/** One Evidence Strip row per dimension that has a quotable reported answer. */
+function buildEvidenceRows(dimensions: ChartDimension[]): EvidenceRow[] {
+  const rows: EvidenceRow[] = [];
+  for (const dim of dimensions) {
+    const sm = lowestWithAnswer(dim.sub_metrics);
+    if (!sm) continue;
+    rows.push({
+      dimension: dim.dimension,
+      riskFactor: sm.name,
+      score: Math.round(clampScore(sm.score)),
+      answer: answerText(sm.evidence?.answer_value, 200),
+    });
+  }
+  return rows;
+}
 
 /**
  * Server-rendered deep-dive section for each radar dimension. Each section owns
@@ -20,6 +89,7 @@ type ReadinessDeepDivesProps = {
 export function ReadinessDeepDives({ dimensions, riskMap, className }: ReadinessDeepDivesProps) {
   if (dimensions.length === 0) return null;
   const riskByDimension = new Map(riskMap.map((r) => [r.dimension, r]));
+  const evidenceRows = buildEvidenceRows(dimensions);
 
   return (
     <section className={`section-pad pt-0 ${className ?? ""}`} data-testid="readiness-deep-dives">
@@ -33,6 +103,8 @@ export function ReadinessDeepDives({ dimensions, riskMap, className }: Readiness
             Click any dimension on the radar above to jump straight to its breakdown.
           </p>
         </div>
+
+        <EvidenceStripDisclosure rows={evidenceRows} />
 
         {dimensions.map((dim) => {
           const score = Math.round(clampScore(dim.score));
@@ -97,6 +169,12 @@ export function ReadinessDeepDives({ dimensions, riskMap, className }: Readiness
                   <p className="mt-1.5 text-sm leading-snug text-ink-soft">{risk.reason}</p>
                 </div>
               ) : null}
+
+              <WrittenAnalysisDisclosure
+                dimension={dim.dimension}
+                slug={slug}
+                paragraphs={analysisParagraphs(dim, score, sev.label)}
+              />
 
               {dim.sub_metrics.length > 0 ? (
                 <ul
