@@ -179,6 +179,14 @@
       "destination": "/api/readiness/submissions"
     },
     {
+      "source": "/api/railway/query",
+      "destination": "/api/readiness/query"
+    },
+    {
+      "source": "/v1/railway/query",
+      "destination": "/api/readiness/query"
+    },
+    {
       "source": "/api/analysis/start",
       "destination": "/api/readiness/start"
     },
