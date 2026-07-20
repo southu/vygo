@@ -55,6 +55,10 @@
       "destination": "/api/jobs?resource=admin-roles"
     },
     {
+      "source": "/careers/:id",
+      "destination": "/careers-role?id=:id"
+    },
+    {
       "source": "/api/apply/:id",
       "destination": "/api/apply?applyId=:id"
     },
