@@ -500,7 +500,7 @@ function DimensionSection({
       </div>
 
       <div
-        className="max-w-prose space-y-4 rounded-2xl border border-border bg-canvas/60 px-5 py-5 sm:px-6"
+        className="max-w-prose space-y-4 rounded-2xl border border-border bg-muted-surface px-5 py-5 sm:px-6"
         data-testid={`snapshot-dim-analysis-${dimension}`}
       >
         <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-muted">

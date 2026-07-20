@@ -5,6 +5,10 @@
   --color-ink-soft: #2e3440;
   --color-muted: #64748b;
   --color-border: #e3e1da;
+  /* Muted panel fill: a step deeper than canvas so inset prose blocks read as a
+     distinct filled surface (sits between --color-canvas and --color-border).
+     Body text (--color-ink-soft) on this fill is ~10.4:1 — well past WCAG AA. */
+  --color-muted-surface: #eceae2;
   --color-purple: #5b47e0;
   --color-purple-dark: #4535b8;
   --color-purple-soft: #e8e6fa;

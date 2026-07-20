@@ -10,6 +10,7 @@ module.exports = {
         "ink-soft": "var(--color-ink-soft)",
         muted: "var(--color-muted)",
         border: "var(--color-border)",
+        "muted-surface": "var(--color-muted-surface)",
         purple: {
           DEFAULT: "var(--color-purple)",
           dark: "var(--color-purple-dark)",
