@@ -21,12 +21,12 @@ const PILLAR_LABELS: Record<string, string> = {
  * behaviour already targets ({@link dimensionSectionId}), so the two never drift.
  *
  * Desktop-only (>=1024px): it lives in the left gutter beside the centered
- * reading column. The outer wrapper is absolutely positioned (out of flow) so
- * the nav never reflows or overlaps the report content; the inner <nav> — the
- * element with the links — is itself `position: sticky`, so it keeps its own
- * sticky computed position and stays in view while the report scrolls. Hidden
- * entirely below the desktop breakpoint — see `.readiness-pillar-nav` in
- * globals.css.
+ * reading column. The inner <nav> — the element with the links — is
+ * `position: fixed`, so it stays pinned to the viewport while the report
+ * scrolls (sticky was unreliable under the page's `overflow-x: hidden`
+ * ancestor). The wrapper stays out of flow, so the nav never reflows or
+ * overlaps the report content. Hidden entirely below the desktop breakpoint —
+ * see `.readiness-pillar-nav` in globals.css.
  */
 export function ReadinessPillarNav({ dimensions }: ReadinessPillarNavProps) {
   if (dimensions.length === 0) return null;
