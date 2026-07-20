@@ -127,12 +127,20 @@
       "destination": "/api/readiness/snapshot?id=:id"
     },
     {
+      "source": "/api/analyses/result",
+      "destination": "/api/readiness/result"
+    },
+    {
       "source": "/api/analyses/:id",
       "destination": "/api/readiness/analysis?id=:id"
     },
     {
       "source": "/api/analyses",
       "destination": "/api/readiness/analyses"
+    },
+    {
+      "source": "/v1/analyses/result",
+      "destination": "/api/readiness/result"
     },
     {
       "source": "/v1/analyses/:id",

@@ -10,7 +10,11 @@ import { DEFAULT_MARKETING_ORIGINS, isAllowedApiOrigin } from "@vygo/config";
  * fails closed on bad tokens, oversized bodies, and rate limits — CORS here
  * only controls which origins a *browser* would let read the response.
  */
-const PERMISSIVE_CORS_PATHS = new Set<string>(["/v1/readiness/submit", "/v1/analyses"]);
+const PERMISSIVE_CORS_PATHS = new Set<string>([
+  "/v1/readiness/submit",
+  "/v1/analyses",
+  "/v1/analyses/result",
+]);
 
 /**
  * Strict origin validation everywhere except `PERMISSIVE_CORS_PATHS`: only the

@@ -43,10 +43,16 @@ export {
 } from "./applications.js";
 export {
   ensureAnalysesTable,
+  backfillDefaultProject,
   insertAnalysis,
   listAnalyses,
   findAnalysisById,
+  findLatestCompletedAnalysis,
   toAnalysisPublic,
+  isCompletedStatus,
+  resolveProjectIdentifier,
+  DEFAULT_PROJECT_IDENTIFIER,
+  LEGACY_UNSPECIFIED_PROJECTS,
   type AnalysisRow,
   type AnalysisPublic,
   type InsertAnalysisInput,

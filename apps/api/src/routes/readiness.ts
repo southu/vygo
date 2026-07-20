@@ -3688,9 +3688,10 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           const { submission_token: _omitToken, ...analysisSubmission } = sanitizedBody;
           const analysis = await insertAnalysis(dbHandle.sql, {
             user,
-            // A missing project must never overwrite a prior analysis, so fall
-            // back to a stable placeholder rather than dropping the row.
-            project: project ?? "unspecified",
+            // A missing project lands in 'Default project' (insertAnalysis
+            // resolves it): every ingest is a new history row, never an
+            // overwrite.
+            project,
             status,
             submission: analysisSubmission,
           });

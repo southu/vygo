@@ -443,6 +443,24 @@ export async function proxyGetAnalysis(
   return proxyJson("GET", `/v1/analyses/${encodeURIComponent(id)}`, undefined, env, inboundHeaders);
 }
 
+/** Proxy default result retrieval (latest completed per project) to Railway. */
+export async function proxyGetAnalysisResult(
+  filters: { user: string; project?: string | null },
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  const params = new URLSearchParams();
+  params.set("user", filters.user);
+  if (filters.project) params.set("project", filters.project);
+  return proxyJson(
+    "GET",
+    `/v1/analyses/result?${params.toString()}`,
+    undefined,
+    env,
+    inboundHeaders,
+  );
+}
+
 export async function proxyGetSession(
   token: string,
   env: NodeJS.ProcessEnv = process.env,

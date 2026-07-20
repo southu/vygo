@@ -23,7 +23,10 @@ import {
   insertAnalysis,
   listAnalyses,
   findAnalysisById,
+  findLatestCompletedAnalysis,
   toAnalysisPublic,
+  resolveProjectIdentifier,
+  DEFAULT_PROJECT_IDENTIFIER,
   type DatabaseHandle,
 } from "@vygo/db";
 import type { ApiEnv } from "@vygo/config";
@@ -160,11 +163,10 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
         .status(400)
         .send(safeError("VALIDATION_ERROR", "A user identifier (user or email) is required."));
     }
-    if (!project) {
-      return reply
-        .status(400)
-        .send(safeError("VALIDATION_ERROR", "A project identifier (project) is required."));
-    }
+    // A missing project stores the analysis in 'Default project' rather than
+    // rejecting: the collection model always keeps every analysis, and an
+    // unprojected run is the legacy single-analysis case.
+    const resolvedProject = resolveProjectIdentifier(project);
 
     const status = pickString(record, ["status"]) ?? "received";
 
@@ -178,7 +180,7 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
       // Retain the FULL submission payload verbatim for lead follow-up.
       const row = await insertAnalysis(dbHandle.sql, {
         user,
-        project,
+        project: resolvedProject,
         status,
         submission: record,
       });
@@ -231,6 +233,59 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
       request.log.error(
         { event: "analyses_list_failed" },
         error instanceof Error ? error.message : "analyses list failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
+  // Default result retrieval: the latest COMPLETED analysis for a (user,
+  // project). `project` defaults to 'Default project', so the legacy result
+  // URL (`?user=<id>`) resolves the migrated single analysis until a newer run
+  // completes. A newer pending/failed run never shadows the last completed one.
+  app.get("/v1/analyses/result", async (request, reply) => {
+    if (!(await enforceAnalysesRateLimit(request, reply, deps))) return;
+
+    const query = (request.query ?? {}) as Record<string, unknown>;
+    const user = pickString(query, ["user", "user_identifier", "email"]);
+    const projectRaw = pickString(query, ["project", "project_identifier", "project_name"]);
+    const project = resolveProjectIdentifier(projectRaw);
+
+    if (!user) {
+      return reply
+        .status(400)
+        .send(
+          safeError(
+            "SCOPE_REQUIRED",
+            "A user scope query parameter is required to retrieve a result.",
+          ),
+        );
+    }
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      await ensureAnalysesTable(dbHandle.sql);
+      const row = await findLatestCompletedAnalysis(dbHandle.sql, { user, project });
+      if (!row) {
+        return reply
+          .status(404)
+          .send(safeError("NOT_FOUND", "No completed analysis found for this project."));
+      }
+      return reply.status(200).send({
+        ok: true,
+        project,
+        defaultProject: DEFAULT_PROJECT_IDENTIFIER,
+        analysis: toAnalysisPublic(row),
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "analyses_result_failed" },
+        error instanceof Error ? error.message : "analyses result failed",
       );
       return reply
         .status(500)

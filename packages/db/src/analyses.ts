@@ -13,6 +13,78 @@
  */
 import type { Sql } from "postgres";
 
+/**
+ * Canonical home for a user's legacy single analysis. A submission created
+ * without an explicit project lands here, and the 0012 data migration re-homes
+ * every pre-existing analysis (previously stored under the `unspecified`
+ * placeholder or a blank project) into this project as its first history entry.
+ * Legacy result retrieval defaults to the latest COMPLETED analysis of this
+ * project.
+ */
+export const DEFAULT_PROJECT_IDENTIFIER = "Default project";
+
+/** Placeholder project values the pre-collection model wrote — re-homed by 0012. */
+export const LEGACY_UNSPECIFIED_PROJECTS = ["unspecified", ""] as const;
+
+/**
+ * Statuses that are explicitly NOT completed (still in flight, or a terminal
+ * failure). Any other status — including the legacy default `received` and an
+ * explicit `completed` — counts as a completed run for default result
+ * retrieval. Kept as a denylist so the legacy single analysis (status
+ * `received`) still resolves as the completed result after migration, while a
+ * newer `pending`/`failed` run does not shadow it.
+ */
+const NON_COMPLETED_STATUSES = new Set<string>([
+  "pending",
+  "processing",
+  "queued",
+  "running",
+  "in_progress",
+  "inprogress",
+  "started",
+  "starting",
+  "working",
+  "failed",
+  "failure",
+  "error",
+  "errored",
+  "cancelled",
+  "canceled",
+  "aborted",
+  "rejected",
+  "expired",
+  "timeout",
+  "timed_out",
+  "incomplete",
+  "draft",
+  "new",
+]);
+
+function normalizeStatus(status: unknown): string {
+  return String(status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/** True when a status denotes a finished (completed) run for result retrieval. */
+export function isCompletedStatus(status: unknown): boolean {
+  const normalized = normalizeStatus(status);
+  if (!normalized) return true;
+  return !NON_COMPLETED_STATUSES.has(normalized);
+}
+
+/** Resolve the project a new analysis should be stored under. */
+export function resolveProjectIdentifier(project?: string | null): string {
+  const trimmed = typeof project === "string" ? project.trim() : "";
+  if (!trimmed) return DEFAULT_PROJECT_IDENTIFIER;
+  if ((LEGACY_UNSPECIFIED_PROJECTS as readonly string[]).includes(trimmed)) {
+    return DEFAULT_PROJECT_IDENTIFIER;
+  }
+  return trimmed.slice(0, 512);
+}
+
 export type AnalysisRow = {
   id: string;
   user_identifier: string;
@@ -35,7 +107,8 @@ export type AnalysisPublic = {
 
 export type InsertAnalysisInput = {
   user: string;
-  project: string;
+  /** Missing/placeholder resolves to 'Default project' (see resolveProjectIdentifier). */
+  project?: string | null;
   status?: string;
   submission: Record<string, unknown>;
 };
@@ -71,6 +144,30 @@ export async function ensureAnalysesTable(sql: Sql): Promise<void> {
     CREATE INDEX IF NOT EXISTS analyses_created_at_idx
       ON analyses (created_at)
   `;
+  await backfillDefaultProject(sql);
+}
+
+let defaultProjectBackfilled = false;
+
+/**
+ * Data migration (mirrors migrations/0012_analyses_default_project.sql): re-home
+ * every pre-existing analysis stored under the legacy `unspecified`/blank
+ * project placeholder into the 'Default project' history, preserving the
+ * `submission` content byte-for-byte (only the project label changes). Runs at
+ * most once per process from the lazy bootstrap so the collection model takes
+ * effect on serverless deploys even when the one-off `db:migrate` step has not
+ * run. Idempotent: the WHERE clause matches nothing after the first pass.
+ */
+export async function backfillDefaultProject(sql: Sql): Promise<void> {
+  if (defaultProjectBackfilled) return;
+  await sql`
+    UPDATE analyses
+    SET project_identifier = ${DEFAULT_PROJECT_IDENTIFIER}
+    WHERE project_identifier IS NULL
+       OR btrim(project_identifier) = ''
+       OR project_identifier = 'unspecified'
+  `;
+  defaultProjectBackfilled = true;
 }
 
 function toIso(value: Date | string): string {
@@ -100,6 +197,9 @@ export function toAnalysisPublic(row: AnalysisRow): AnalysisPublic {
 export async function insertAnalysis(sql: Sql, input: InsertAnalysisInput): Promise<AnalysisRow> {
   const status =
     input.status && input.status.trim() ? input.status.trim().slice(0, 64) : "received";
+  // A missing/placeholder project lands in 'Default project' rather than
+  // overwriting anything: every insert is a new history row.
+  const project = resolveProjectIdentifier(input.project);
   // jsonb is passed as a pre-stringified parameter with an explicit cast: the
   // drizzle postgres-js driver overrides this handle's jsonb serializers with an
   // identity fn, so `sql.json()` parameters reach the wire unserialized and
@@ -108,7 +208,7 @@ export async function insertAnalysis(sql: Sql, input: InsertAnalysisInput): Prom
     INSERT INTO analyses (user_identifier, project_identifier, status, submission)
     VALUES (
       ${input.user},
-      ${input.project},
+      ${project},
       ${status},
       ${JSON.stringify(input.submission ?? {})}::jsonb
     )
@@ -170,4 +270,31 @@ export async function findAnalysisById(sql: Sql, id: string): Promise<AnalysisRo
     LIMIT 1
   `;
   return rows[0] ?? null;
+}
+
+/**
+ * Default result retrieval for a (user, project): the latest COMPLETED analysis
+ * by created_at. A newer non-completed (pending/failed) run never shadows the
+ * last completed one. `project` defaults to 'Default project' so a legacy
+ * result lookup with only a user resolves the migrated single analysis. Returns
+ * null when the user/project has no completed analysis yet.
+ */
+export async function findLatestCompletedAnalysis(
+  sql: Sql,
+  input: { user: string; project?: string | null },
+): Promise<AnalysisRow | null> {
+  const user = input.user.trim();
+  if (!user) return null;
+  const project = resolveProjectIdentifier(input.project);
+  const rows = await sql<AnalysisRow[]>`
+    SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+    FROM analyses
+    WHERE user_identifier = ${user} AND project_identifier = ${project}
+    ORDER BY created_at DESC
+    LIMIT 200
+  `;
+  for (const row of rows) {
+    if (isCompletedStatus(row.status)) return row;
+  }
+  return null;
 }

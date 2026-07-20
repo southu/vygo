@@ -40,6 +40,7 @@ import {
   proxyCreateAnalysis,
   proxyListAnalyses,
   proxyGetAnalysis,
+  proxyGetAnalysisResult,
   resolveDatabaseUrl,
   resolveEdgeClientIp,
   type ReadinessHandlerResult,
@@ -80,6 +81,7 @@ const ALLOWED_OPS = new Set([
   "ping",
   "analyses",
   "analysis",
+  "result",
 ]);
 
 /** Shared readiness edge rate-limit budget (aligns with Railway ~20/60s). */
@@ -240,7 +242,7 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null, credentials 
  * closed on bad tokens, oversized bodies, and rate limits — CORS here only
  * controls which origins a *browser* would let read the response.
  */
-const PERMISSIVE_CORS_OPS = new Set<string>(["submit", "ping", "analyses", "analysis"]);
+const PERMISSIVE_CORS_OPS = new Set<string>(["submit", "ping", "analyses", "analysis", "result"]);
 
 /** Reflects the requesting origin (or `*` when none was sent) with no credentials. */
 function applyPermissiveCorsHeaders(res: EdgeResponse, origin: string | null): void {
@@ -1523,7 +1525,7 @@ async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
         const { submission_token: _omitToken, ...analysisSubmission } = body;
         await sql`
           INSERT INTO analyses (user_identifier, project_identifier, status, submission)
-          VALUES (${user}, ${project ?? "unspecified"}, ${status}, ${JSON.stringify(analysisSubmission)}::jsonb)
+          VALUES (${user}, ${resolveProjectIdentifierEdge(project)}, ${status}, ${JSON.stringify(analysisSubmission)}::jsonb)
         `;
       }
     } catch (analysisError) {
@@ -1740,6 +1742,53 @@ async function handleStatusGet(req: EdgeRequest): Promise<ReadinessHandlerResult
 
 const ANALYSES_FIELD_MAX = 512;
 
+/** Canonical home for a legacy/unprojected single analysis (mirrors @vygo/db). */
+const DEFAULT_PROJECT_IDENTIFIER = "Default project";
+
+/** Statuses that are NOT completed; anything else (incl. legacy `received`). */
+const NON_COMPLETED_STATUSES_EDGE = new Set<string>([
+  "pending",
+  "processing",
+  "queued",
+  "running",
+  "in_progress",
+  "inprogress",
+  "started",
+  "starting",
+  "working",
+  "failed",
+  "failure",
+  "error",
+  "errored",
+  "cancelled",
+  "canceled",
+  "aborted",
+  "rejected",
+  "expired",
+  "timeout",
+  "timed_out",
+  "incomplete",
+  "draft",
+  "new",
+]);
+
+function isCompletedStatusEdge(status: unknown): boolean {
+  const normalized = String(status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (!normalized) return true;
+  return !NON_COMPLETED_STATUSES_EDGE.has(normalized);
+}
+
+/** Resolve the project a new analysis (or a lookup) should use. */
+function resolveProjectIdentifierEdge(project?: string | null): string {
+  const trimmed = typeof project === "string" ? project.trim() : "";
+  if (!trimmed || trimmed === "unspecified") return DEFAULT_PROJECT_IDENTIFIER;
+  return trimmed.slice(0, ANALYSES_FIELD_MAX);
+}
+
 function pickAnalysesField(record: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
     const value = record[key];
@@ -1880,7 +1929,24 @@ async function ensureAnalysesTablesEdge(sql: Sql): Promise<void> {
     CREATE INDEX IF NOT EXISTS analyses_user_created_idx
       ON analyses (user_identifier, created_at DESC)
   `;
+  // Data migration (mirrors migrations/0012_analyses_default_project.sql):
+  // re-home every pre-existing analysis stored under the legacy
+  // `unspecified`/blank project into 'Default project' as its first history
+  // entry, preserving submission content byte-for-byte. Runs at most once per
+  // process; idempotent (matches nothing after the first pass).
+  if (!edgeDefaultProjectBackfilled) {
+    await sql`
+      UPDATE analyses
+      SET project_identifier = ${DEFAULT_PROJECT_IDENTIFIER}
+      WHERE project_identifier IS NULL
+         OR btrim(project_identifier) = ''
+         OR project_identifier = 'unspecified'
+    `;
+    edgeDefaultProjectBackfilled = true;
+  }
 }
+
+let edgeDefaultProjectBackfilled = false;
 
 type AnalysesEdgeRow = {
   id: string;
@@ -1967,17 +2033,9 @@ async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult>
         },
       };
     }
-    if (!project) {
-      return {
-        status: 400,
-        body: {
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "A project identifier (project) is required.",
-          },
-        },
-      };
-    }
+    // A missing project stores the analysis in 'Default project' rather than
+    // rejecting — an unprojected run is the legacy single-analysis case.
+    const resolvedProject = resolveProjectIdentifierEdge(project);
 
     if (!url) return proxyCreateAnalysis(record, process.env, req.headers);
 
@@ -1987,7 +2045,7 @@ async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult>
       const status = pickAnalysesField(record, ["status"]) ?? "received";
       const rows = await sql<AnalysesEdgeRow[]>`
         INSERT INTO analyses (user_identifier, project_identifier, status, submission)
-        VALUES (${user}, ${project}, ${status}, ${JSON.stringify(record)}::jsonb)
+        VALUES (${user}, ${resolvedProject}, ${status}, ${JSON.stringify(record)}::jsonb)
         RETURNING id, user_identifier, project_identifier, status, submission, created_at, updated_at
       `;
       const inserted = rows[0];
@@ -2112,6 +2170,74 @@ async function handleAnalysisGet(req: EdgeRequest): Promise<ReadinessHandlerResu
   }
 }
 
+/**
+ * GET /api/analyses/result?user=<id>[&project=<name>]
+ *
+ * Default result retrieval: the latest COMPLETED analysis for a (user,
+ * project). `project` defaults to 'Default project', so the legacy result URL
+ * (`?user=<id>`) resolves the migrated single analysis until a newer run
+ * completes. A newer pending/failed run never shadows the last completed one.
+ */
+async function handleAnalysisResult(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const user = queryParam(req, "user").trim();
+  if (!user || user.length > ANALYSES_FIELD_MAX) {
+    return {
+      status: 400,
+      body: {
+        error: {
+          code: "SCOPE_REQUIRED",
+          message: "A user scope query parameter is required to retrieve a result.",
+        },
+      },
+    };
+  }
+  const project = resolveProjectIdentifierEdge(queryParam(req, "project").trim() || null);
+
+  const url = resolveDatabaseUrl();
+  if (!url) return proxyGetAnalysisResult({ user, project }, process.env, req.headers);
+
+  try {
+    const sql = getSql(url);
+    await ensureAnalysesTablesEdge(sql);
+    const rows = await sql<AnalysesEdgeRow[]>`
+      SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+      FROM analyses WHERE user_identifier = ${user} AND project_identifier = ${project}
+      ORDER BY created_at DESC LIMIT 200`;
+    const completed = rows.find((row) => isCompletedStatusEdge(row.status));
+    if (!completed) {
+      return {
+        status: 404,
+        body: {
+          error: { code: "NOT_FOUND", message: "No completed analysis found for this project." },
+        },
+      };
+    }
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        project,
+        defaultProject: DEFAULT_PROJECT_IDENTIFIER,
+        analysis: toAnalysesPublicEdge(completed),
+      },
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred. Please try again later.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // HTTP entry
 // ---------------------------------------------------------------------------
@@ -2160,7 +2286,15 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
 
   // submission / brief / snapshot / status / analysis are GET; analyses accepts
   // both (POST create / GET list); score / snapshot-email / others are POST.
-  const getOps = new Set(["submission", "brief", "snapshot", "status", "ping", "analysis"]);
+  const getOps = new Set([
+    "submission",
+    "brief",
+    "snapshot",
+    "status",
+    "ping",
+    "analysis",
+    "result",
+  ]);
   const getOrPostOps = new Set(["analyses"]);
   if (getOrPostOps.has(op)) {
     if (req.method !== "GET" && req.method !== "POST") {
@@ -2220,6 +2354,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleAnalyses(req);
     } else if (op === "analysis") {
       result = await handleAnalysisGet(req);
+    } else if (op === "result") {
+      result = await handleAnalysisResult(req);
     } else {
       result = await handleSubmissionGet(req);
     }
