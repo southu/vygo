@@ -139,6 +139,8 @@ export const pricingContent = {
         "Automated tests and deployment pipeline",
         "Monitoring and operational runbooks",
         "Full IP handoff",
+        "Structured UAT program — your team validates every feature before cutover",
+        "Independent QA sign-off on every release",
       ],
     },
     {
@@ -157,6 +159,8 @@ export const pricingContent = {
         "Load testing and SLO dashboards",
         "SOC 2 Type I readiness program",
         "Full IP handoff",
+        "Structured UAT program — your team validates every feature before cutover",
+        "Independent QA sign-off on every release",
       ],
     },
     {
@@ -175,6 +179,8 @@ export const pricingContent = {
         "Type II evidence program and auditor coordination",
         "ISO 27001 pathway where required",
         "Full IP handoff",
+        "Structured UAT program — your team validates every feature before cutover",
+        "Independent QA sign-off on every release",
       ],
     },
   ],
