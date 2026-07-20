@@ -2081,17 +2081,58 @@ function annotateCurrentEdge(analyses: Record<string, unknown>[]): {
 }
 
 /**
+ * Add the derived top-level `result`/`result_text` to a single public analysis
+ * object whose `submission` was served by the proxy backend (which returns the
+ * raw submission but no derived result). A no-op when the object already carries
+ * a result. Keeps completed runs showing a non-empty result on the proxy path,
+ * matching the direct-edge shape from toAnalysesPublicEdge.
+ */
+function withDerivedResultEdge(analysis: Record<string, unknown>): Record<string, unknown> {
+  const submission =
+    analysis.submission &&
+    typeof analysis.submission === "object" &&
+    !Array.isArray(analysis.submission)
+      ? (analysis.submission as Record<string, unknown>)
+      : {};
+  const { result, result_text } = deriveAnalysisResultEdge(submission, analysis.status);
+  return { result, result_text, ...analysis };
+}
+
+/**
  * Add the explicit current marker to a list/demo handler result whose body
  * already carries an `analyses` array (used for the proxy fallback paths so the
- * marker is present regardless of which backend served the list).
+ * marker is present regardless of which backend served the list). Also derives
+ * each row's top-level `result`/`result_text` so completed runs display a
+ * non-empty result on the proxy path.
  */
 function annotateListResult(result: ReadinessHandlerResult): ReadinessHandlerResult {
   const body = result.body as Record<string, unknown> | undefined;
   if (result.status === 200 && body && Array.isArray(body.analyses)) {
-    const { analyses, currentByProject } = annotateCurrentEdge(
-      body.analyses as Record<string, unknown>[],
-    );
+    const withResult = (body.analyses as Record<string, unknown>[]).map(withDerivedResultEdge);
+    const { analyses, currentByProject } = annotateCurrentEdge(withResult);
     return { ...result, body: { ...body, analyses, currentByProject } };
+  }
+  return result;
+}
+
+/**
+ * Add the derived `result`/`result_text` to a single-analysis proxy result
+ * (GET one by id, GET latest result) so the completed run displays a non-empty
+ * result regardless of which backend served it.
+ */
+function annotateSingleAnalysisResult(result: ReadinessHandlerResult): ReadinessHandlerResult {
+  const body = result.body as Record<string, unknown> | undefined;
+  if (
+    result.status === 200 &&
+    body &&
+    body.analysis &&
+    typeof body.analysis === "object" &&
+    !Array.isArray(body.analysis)
+  ) {
+    return {
+      ...result,
+      body: { ...body, analysis: withDerivedResultEdge(body.analysis as Record<string, unknown>) },
+    };
   }
   return result;
 }
@@ -2974,7 +3015,8 @@ async function handleAnalysisGet(req: EdgeRequest): Promise<ReadinessHandlerResu
   }
 
   const url = resolveDatabaseUrl();
-  if (!url) return proxyGetAnalysis(id, process.env, req.headers);
+  if (!url)
+    return annotateSingleAnalysisResult(await proxyGetAnalysis(id, process.env, req.headers));
 
   try {
     const sql = getSql(url);
@@ -3031,7 +3073,10 @@ async function handleAnalysisResult(req: EdgeRequest): Promise<ReadinessHandlerR
   const project = resolveProjectIdentifierEdge(queryParam(req, "project").trim() || null);
 
   const url = resolveDatabaseUrl();
-  if (!url) return proxyGetAnalysisResult({ user, project }, process.env, req.headers);
+  if (!url)
+    return annotateSingleAnalysisResult(
+      await proxyGetAnalysisResult({ user, project }, process.env, req.headers),
+    );
 
   try {
     const sql = getSql(url);
