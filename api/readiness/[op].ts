@@ -2454,6 +2454,20 @@ async function handleStart(req: EdgeRequest): Promise<ReadinessHandlerResult> {
         run_id: row.id,
         project: row.project_identifier,
         analysis: toAnalysesPublicEdge(row),
+        // Discoverability handoff: a started run stays `in_progress` until it is
+        // explicitly completed — there is no background worker that auto-finishes
+        // it. An acceptance/test session must POST /api/readiness/complete with
+        // this `run_id` to move the run to `completed` (which is also what clears
+        // the same-project 409 duplicate-start guard). Surfaced inline so an
+        // independent poller never mistakes the intended `in_progress` state for a
+        // stuck run.
+        next: {
+          action: "complete",
+          method: "POST",
+          endpoint: "/api/readiness/complete",
+          body: { run_id: row.id, status: "completed" },
+          note: "Run stays in_progress until completed; completing it unblocks the next same-project start (409 → 201).",
+        },
       },
     };
   } catch (error) {
@@ -3458,7 +3472,9 @@ async function handleRailwayQuery(req: EdgeRequest): Promise<ReadinessHandlerRes
     users = ACCEPTANCE_QUERY_USERS;
   }
 
-  const source = resolveDatabaseUrl() ? "railway-postgres (edge DATABASE_URL)" : "railway-postgres (proxied via Railway API)";
+  const source = resolveDatabaseUrl()
+    ? "railway-postgres (edge DATABASE_URL)"
+    : "railway-postgres (proxied via Railway API)";
 
   try {
     const analysisRows: Record<string, unknown>[] = [];
@@ -3475,8 +3491,7 @@ async function handleRailwayQuery(req: EdgeRequest): Promise<ReadinessHandlerRes
           a.submission && typeof a.submission === "object" && !Array.isArray(a.submission)
             ? (a.submission as Record<string, unknown>)
             : {};
-        const snapshotId =
-          typeof submission.snapshotId === "string" ? submission.snapshotId : null;
+        const snapshotId = typeof submission.snapshotId === "string" ? submission.snapshotId : null;
         analysisRows.push({
           run_id: shortRunId(a.id),
           analysis_id: a.id,
@@ -3496,9 +3511,13 @@ async function handleRailwayQuery(req: EdgeRequest): Promise<ReadinessHandlerRes
           created_at: a.created_at,
         });
         const key = `${a.user}::${a.project}`;
-        const agg =
-          projectAgg.get(key) ??
-          { user: String(a.user ?? ""), project: String(a.project ?? ""), completed: 0, total: 0, current: null };
+        const agg = projectAgg.get(key) ?? {
+          user: String(a.user ?? ""),
+          project: String(a.project ?? ""),
+          completed: 0,
+          total: 0,
+          current: null,
+        };
         agg.total += 1;
         if (isCompletedStatusEdge(a.status)) agg.completed += 1;
         if (a.current === true) agg.current = shortRunId(a.id);
