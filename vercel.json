@@ -175,6 +175,38 @@
       "destination": "/api/readiness/analyses"
     },
     {
+      "source": "/api/submissions",
+      "destination": "/api/readiness/submissions"
+    },
+    {
+      "source": "/api/analysis/start",
+      "destination": "/api/readiness/start"
+    },
+    {
+      "source": "/api/analysis/complete",
+      "destination": "/api/readiness/complete"
+    },
+    {
+      "source": "/api/analysis/result",
+      "destination": "/api/readiness/result"
+    },
+    {
+      "source": "/api/analysis/demo",
+      "destination": "/api/readiness/demo"
+    },
+    {
+      "source": "/api/analysis/submissions",
+      "destination": "/api/readiness/submissions"
+    },
+    {
+      "source": "/api/analysis/:id",
+      "destination": "/api/readiness/analysis?id=:id"
+    },
+    {
+      "source": "/api/analysis",
+      "destination": "/api/readiness/analyses"
+    },
+    {
       "source": "/v1/analyses/start",
       "destination": "/api/readiness/start"
     },

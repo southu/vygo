@@ -84,6 +84,7 @@ const ALLOWED_OPS = new Set([
   "ping",
   "analyses",
   "analysis",
+  "submissions",
   "result",
   "demo",
   "start",
@@ -254,6 +255,7 @@ const PERMISSIVE_CORS_OPS = new Set<string>([
   "ping",
   "analyses",
   "analysis",
+  "submissions",
   "result",
   "demo",
   "start",
@@ -2712,6 +2714,93 @@ async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult>
   }
 }
 
+/**
+ * GET /api/submissions?user=<id>[&project=<name>]
+ *
+ * Scoped listing of the submission records backing a user's analyses. Each row
+ * pairs an analysis id/status with the exact submission payload that was
+ * recorded for that run, so reps/leads can follow up on the submission and
+ * analysis records without direct database access. Like the analyses list this
+ * is scope-required: an omitted/blank/oversized `user` is rejected with no data,
+ * so there is no unscoped path that would span users.
+ */
+async function handleSubmissionsList(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const user = queryParam(req, "user").trim();
+  const project = queryParam(req, "project").trim() || null;
+
+  if (!user || user.length > ANALYSES_FIELD_MAX) {
+    return {
+      status: 400,
+      body: {
+        error: {
+          code: "SCOPE_REQUIRED",
+          message:
+            "A user scope query parameter is required to list submissions; unscoped listing is not permitted.",
+        },
+      },
+    };
+  }
+
+  const toSubmissionRecord = (analysis: Record<string, unknown>): Record<string, unknown> => ({
+    analysis_id: analysis.id,
+    user: analysis.user,
+    project: analysis.project,
+    status: analysis.status,
+    submission: analysis.submission ?? {},
+    created_at: analysis.created_at,
+    updated_at: analysis.updated_at,
+  });
+
+  const url = resolveDatabaseUrl();
+  if (!url) {
+    // No direct edge DB — reuse the analyses proxy and reshape into submission
+    // records so the response shape stays stable regardless of the backend.
+    const proxied = await proxyListAnalyses({ user, project }, process.env, req.headers);
+    const body = proxied.body as Record<string, unknown> | undefined;
+    const analyses = Array.isArray(body?.analyses)
+      ? (body!.analyses as Record<string, unknown>[])
+      : null;
+    if (proxied.status === 200 && analyses) {
+      const submissions = analyses.map(toSubmissionRecord);
+      return { status: 200, body: { ok: true, count: submissions.length, submissions } };
+    }
+    return proxied;
+  }
+
+  try {
+    const sql = getSql(url);
+    await ensureAnalysesTablesEdge(sql);
+    let rows: AnalysesEdgeRow[];
+    if (project) {
+      rows = await sql<AnalysesEdgeRow[]>`
+        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+        FROM analyses WHERE user_identifier = ${user} AND project_identifier = ${project}
+        ORDER BY created_at DESC LIMIT 200`;
+    } else {
+      rows = await sql<AnalysesEdgeRow[]>`
+        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+        FROM analyses WHERE user_identifier = ${user}
+        ORDER BY created_at DESC LIMIT 200`;
+    }
+    const submissions = rows.map((row) => toSubmissionRecord(toAnalysesPublicEdge(row)));
+    return { status: 200, body: { ok: true, count: submissions.length, submissions } };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred. Please try again later.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
 /** GET one analysis by id. Direct Postgres when the edge is wired; else proxy. */
 async function handleAnalysisGet(req: EdgeRequest): Promise<ReadinessHandlerResult> {
   const rl = checkEdgeRateLimit(req);
@@ -3147,6 +3236,7 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     "status",
     "ping",
     "analysis",
+    "submissions",
     "result",
     "demo",
   ]);
@@ -3210,6 +3300,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleAnalyses(req);
     } else if (op === "analysis") {
       result = await handleAnalysisGet(req);
+    } else if (op === "submissions") {
+      result = await handleSubmissionsList(req);
     } else if (op === "result") {
       result = await handleAnalysisResult(req);
     } else if (op === "demo") {

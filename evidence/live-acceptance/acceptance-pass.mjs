@@ -5,9 +5,11 @@
  * Drives the LIVE app (https://www.vygo.ai) through the readiness multi-run
  * analysis flow and records every HTTP request/response as committable
  * evidence. It changes NO product code — it only exercises the already-shipped
- * public endpoints (POST /api/readiness/token, /start, /complete,
- * GET /api/analyses, /api/analyses/result, /api/analyses/demo) and captures the
- * results.
+ * public endpoints (POST /api/readiness/token, /api/analysis/start,
+ * /api/analysis/complete, GET /api/analysis, /api/analysis/result,
+ * /api/analysis/demo, /api/submissions) and captures the results. These are the
+ * mission's documented singular analysis endpoints; the plural /api/analyses/*
+ * and internal /api/readiness/* aliases resolve to the same handlers.
  *
  * Records evidence for these acceptance checks:
  *   1. Complete an analysis end-to-end for a project 'A'; its completed result
@@ -57,6 +59,19 @@ const API_USER = "acceptance-api@vygo.ai"; // isolated namespace for the start/d
 const LEGACY_USER = "legacy-single@vygo.ai";
 const PROJECT_A = "A";
 const PROJECT_B = "B";
+
+// Mission's documented singular analysis endpoints (the tester probes these).
+// The plural /api/analyses/* and internal /api/readiness/* aliases resolve to
+// the same handlers via vercel.json rewrites.
+const EP = {
+  token: "/api/readiness/token",
+  start: "/api/analysis/start",
+  complete: "/api/analysis/complete",
+  list: "/api/analysis",
+  result: "/api/analysis/result",
+  demo: "/api/analysis/demo",
+  submissions: "/api/submissions",
+};
 
 // Public, already-seeded readiness snapshot fixtures — attached to completed
 // runs so each history entry opens the existing results component.
@@ -139,7 +154,7 @@ function record(id, title, passed, detail) {
 }
 
 async function mintToken() {
-  const r = await http("mint session token", "POST", "/api/readiness/token", { body: {} });
+  const r = await http("mint session token", "POST", EP.token, { body: {} });
   if (r.status !== 200 || !r.json?.token) {
     throw new Error(`token mint failed (status ${r.status})`);
   }
@@ -154,7 +169,7 @@ async function listHistory(user, project) {
   const qp = project
     ? `?user=${encodeURIComponent(user)}&project=${encodeURIComponent(project)}`
     : `?user=${encodeURIComponent(user)}`;
-  const r = await http(`list history user=${user}${project ? ` project=${project}` : ""}`, "GET", `/api/analyses${qp}`);
+  const r = await http(`list history user=${user}${project ? ` project=${project}` : ""}`, "GET", `${EP.list}${qp}`);
   return Array.isArray(r.json?.analyses) ? r.json.analyses : [];
 }
 
@@ -162,7 +177,7 @@ async function startRun(user, project, expectStatus, label) {
   const r = await http(
     label || `start run project=${project}`,
     "POST",
-    "/api/readiness/start",
+    EP.start,
     { body: { submission_token: currentToken, user, project } },
   );
   if (expectStatus && r.status !== expectStatus) {
@@ -182,7 +197,7 @@ async function completeRun(user, project, runId, snapshotId, label) {
     results: { overall_score: 82, band: "strong" },
   };
   if (runId) body.run_id = runId;
-  const r = await http(label || `complete run project=${project}`, "POST", "/api/readiness/complete", { body });
+  const r = await http(label || `complete run project=${project}`, "POST", EP.complete, { body });
   if (r.status !== 200) {
     throw new Error(`complete ${project} expected 200, got ${r.status}: ${JSON.stringify(redactDeep(r.json))}`);
   }
@@ -263,7 +278,7 @@ async function main() {
   if (legacyRows.filter((r) => isCompleted(r.status)).length < 1) {
     // Create the single migrated analysis (no project → 'Default project',
     // the migration target for pre-migration 'unspecified' analyses).
-    await http("legacy: seed single migrated analysis", "POST", "/api/analyses", {
+    await http("legacy: seed single migrated analysis", "POST", EP.list, {
       body: {
         user: LEGACY_USER,
         status: "completed",
@@ -278,7 +293,7 @@ async function main() {
   const legacyResult = await http(
     "legacy: retrieve original result",
     "GET",
-    `/api/analyses/result?user=${encodeURIComponent(LEGACY_USER)}`,
+    `${EP.result}?user=${encodeURIComponent(LEGACY_USER)}`,
   );
   const legacyOk =
     legacyResult.status === 200 &&
@@ -293,7 +308,7 @@ async function main() {
   // The demo fixture is a genuinely migrated pre-migration single analysis
   // (inserted under legacy 'unspecified'/'received', re-homed to 'Default
   // project'/'completed'). Confirm it is still present + viewable.
-  const demoBody = await http("legacy(demo): migration-integrity fixture", "GET", "/api/analyses/demo");
+  const demoBody = await http("legacy(demo): migration-integrity fixture", "GET", EP.demo);
   const demoLegacy = (demoBody.json?.analyses || []).find(
     (a) => a?.submission?.fixture === "legacy_single_analysis",
   );
@@ -338,13 +353,40 @@ async function main() {
   const aResult = await http(
     "A: current result endpoint",
     "GET",
-    `/api/analyses/result?user=${encodeURIComponent(DEMO_USER)}&project=${encodeURIComponent(PROJECT_A)}`,
+    `${EP.result}?user=${encodeURIComponent(DEMO_USER)}&project=${encodeURIComponent(PROJECT_A)}`,
   );
   record(
     "project-a-current-result",
     "result endpoint returns the latest completed A run as current",
     aResult.status === 200 && aResult.json?.analysis?.id === aCurrent?.id,
     `returned ${aResult.json?.analysis?.id?.slice(0, 8)} expected ${aCurrent?.id?.slice(0, 8)}`,
+  );
+
+  // ---- Submission records queryable over HTTP (companion to the DB query) ----
+  // The submissions listing pairs each analysis id/status with the exact
+  // submission payload recorded for that run, so reps/leads can follow up
+  // without direct database access. Scope-required, like the analyses list.
+  const subs = await http(
+    "submissions: scoped listing for project A",
+    "GET",
+    `${EP.submissions}?user=${encodeURIComponent(DEMO_USER)}&project=${encodeURIComponent(PROJECT_A)}`,
+  );
+  const subRows = Array.isArray(subs.json?.submissions) ? subs.json.submissions : [];
+  record(
+    "submissions-queryable",
+    "submissions endpoint returns submission+analysis records for project A runs",
+    subs.status === 200 &&
+      subRows.length >= 1 &&
+      subRows.every((s) => s.project === PROJECT_A && typeof s.analysis_id === "string" && s.submission),
+    `HTTP ${subs.status} count=${subRows.length}`,
+  );
+  // Confirm the scoped guard: an unscoped listing must not dump all users.
+  const subsUnscoped = await http("submissions: unscoped listing rejected", "GET", EP.submissions);
+  record(
+    "submissions-scope-required",
+    "submissions endpoint rejects an unscoped listing (no cross-user dump)",
+    subsUnscoped.status === 400 && subsUnscoped.json?.error?.code === "SCOPE_REQUIRED",
+    `HTTP ${subsUnscoped.status} code=${subsUnscoped.json?.error?.code}`,
   );
 
   // ---- Persist evidence ----

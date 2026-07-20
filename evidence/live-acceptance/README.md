@@ -9,7 +9,7 @@ endpoints and record the results.
 
 | file | what it is |
 | --- | --- |
-| `acceptance-pass.mjs` | Node (no deps) driver: mints a session token, runs projects **A** & **B** end-to-end via `POST /api/readiness/start` + `/complete`, re-runs A, checks the duplicate-start guard, verifies the legacy single-analysis user, and asserts history/current. Re-runnable & idempotent. |
+| `acceptance-pass.mjs` | Node (no deps) driver: mints a session token, runs projects **A** & **B** end-to-end via `POST /api/analysis/start` + `/api/analysis/complete`, re-runs A, checks the duplicate-start guard, verifies the legacy single-analysis user, lists submission records via `GET /api/submissions`, and asserts history/current. Re-runnable & idempotent. |
 | `db-query.sh` | Read-only DB evidence via the vault provisioner path (`vault-provisioner-query sql`). Allowlisted `SELECT` only; never prints credentials. |
 | `output/api-transcript.json` | Full HTTP request/response transcript (session tokens redacted). |
 | `output/summary.md` | Per-check PASS/FAIL table + the visible history snapshot. |
@@ -33,12 +33,12 @@ Reproduce: `node evidence/live-acceptance/acceptance-pass.mjs` then
 
 | # | mission check | evidence |
 | --- | --- | --- |
-| 1 | Complete an analysis end-to-end for project **A**; completed result appears | `api-transcript.json` (A start→complete); `GET /api/analyses/result?user=demo@vygo.ai&project=A`; renders on `/analyses` |
+| 1 | Complete an analysis end-to-end for project **A**; completed result appears | `api-transcript.json` (A start→complete); `GET /api/analysis/result?user=demo@vygo.ai&project=A`; renders on `/analyses` |
 | 2 | Start & complete a second analysis for project **B** | `api-transcript.json` (B start→complete); B group on `/analyses` |
 | 3 | Re-run A → history shows all three runs (A run1, B run, A run2), labeled per project, latest-per-project **current** | `summary.md` history table; `/analyses` groups A (2 runs) + B (1 run) with per-project "Current result"; `db-query.txt` per-project counts + current run |
-| 4 | Legacy pre-migration single-analysis user still retains original result | `legacy-single@vygo.ai` via `GET /api/analyses/result?user=legacy-single@vygo.ai`; migration-integrity fixture in `/api/analyses/demo` (`fixture=legacy_single_analysis`, byte-for-byte in `Default project`); `db-query.txt` |
+| 4 | Legacy pre-migration single-analysis user still retains original result | `legacy-single@vygo.ai` via `GET /api/analysis/result?user=legacy-single@vygo.ai`; migration-integrity fixture in `/api/analysis/demo` (`fixture=legacy_single_analysis`, byte-for-byte in `Default project`); `db-query.txt` |
 | 5 | Start endpoint (a) accepts a new run once the prior run completed, (b) rejects a duplicate start with an error status only while a run is in progress | `api-transcript.json`: **201** start → **409 `run_in_progress`** duplicate → **200** complete → **201** start-after-complete |
-| 6 | Submission + analysis records queryable in the provisioned Railway DB (project `composer`) | `db-query.txt` (analyses rows + submission payloads for all acceptance runs) |
+| 6 | Submission + analysis records queryable in the provisioned Railway DB (project `composer`) | `db-query.txt` (analyses rows + submission payloads for all acceptance runs); also over HTTP via scope-required `GET /api/submissions?user=…` |
 
 `composer` is the mission's allowlisted project label; provisioning **reused**
 the existing Railway project (dashboard `…/project/1b8abe52…`, folder `vygo`)
