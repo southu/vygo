@@ -23,6 +23,8 @@ export interface Role {
   title: string;
   location: string;
   type: string;
+  /** One-line teaser shown on the public careers list (GET /api/roles). */
+  summary: string;
   description: string;
   status: RoleStatus;
   created_at: string;
@@ -54,6 +56,8 @@ const SEED_ROLES: readonly Role[] = [
     title: "Founding Full-Stack Engineer",
     location: "Remote (US)",
     type: "full-time",
+    summary:
+      "Own product surfaces end to end across our TypeScript monorepo — marketing web, edge API, and worker.",
     description:
       "Own product surfaces end to end across our TypeScript monorepo — marketing web, edge API, and worker. You will ship the features that turn Vygo's readiness product into a durable business, working directly with the founders on architecture, DX, and reliability.",
     status: "open",
@@ -65,6 +69,8 @@ const SEED_ROLES: readonly Role[] = [
     title: "Product Designer",
     location: "Remote (US/EU)",
     type: "contract",
+    summary:
+      "Shape the end-to-end experience of the Vygo readiness assessment and results surfaces.",
     description:
       "Shape the end-to-end experience of the Vygo readiness assessment and results surfaces. You will partner with engineering to move quickly from prototype to production, owning the visual and interaction system that makes complex readiness data feel effortless.",
     status: "open",
@@ -76,11 +82,28 @@ const SEED_ROLES: readonly Role[] = [
     title: "Go-to-Market Lead",
     location: "Remote (US)",
     type: "full-time",
+    summary:
+      "Build Vygo's go-to-market motion from first principles: positioning, lifecycle, and the early sales playbook.",
     description:
       "Build the go-to-market motion for Vygo from first principles: positioning, lifecycle, and the early sales playbook. You will own the pipeline from first touch through activation and work closely with the founders on messaging and pricing.",
     status: "open",
     created_at: "2026-01-20T09:00:00.000Z",
     updated_at: "2026-01-20T09:00:00.000Z",
+  },
+  {
+    // Seeded closed role: excluded from GET /api/roles and the public careers
+    // list, but readable via GET /api/roles/:id so the detail page can render its
+    // graceful "no longer open" state. Kept deterministic for verification.
+    id: "developer-advocate",
+    title: "Developer Advocate",
+    location: "Remote (US)",
+    type: "full-time",
+    summary: "Grow the Vygo developer community through content, docs, and hands-on education.",
+    description:
+      "Grow the Vygo developer community through content, documentation, and hands-on education. You would have partnered with engineering and go-to-market to make the Ratchet build-and-verify loop approachable for teams shipping AI-built software.",
+    status: "closed",
+    created_at: "2025-12-02T09:00:00.000Z",
+    updated_at: "2026-01-27T09:00:00.000Z",
   },
 ];
 
@@ -103,12 +126,13 @@ function nullIfEmpty(value: unknown): string | null {
 /** Compact list item for GET /api/roles (open roles only). */
 export function toRoleListItem(
   role: Role,
-): Pick<Role, "id" | "title" | "location" | "type" | "status"> {
+): Pick<Role, "id" | "title" | "location" | "type" | "summary" | "status"> {
   return {
     id: role.id,
     title: role.title,
     location: role.location,
     type: role.type,
+    summary: role.summary,
     status: role.status,
   };
 }
@@ -143,6 +167,7 @@ export type RoleInput = {
   title?: unknown;
   location?: unknown;
   type?: unknown;
+  summary?: unknown;
   description?: unknown;
   status?: unknown;
 };
@@ -151,15 +176,26 @@ function coerceStatus(value: unknown, fallback: RoleStatus): RoleStatus {
   return value === "closed" ? "closed" : value === "open" ? "open" : fallback;
 }
 
+/** First sentence (or a trimmed prefix) of a description, for a list teaser. */
+function deriveSummary(description: string): string {
+  const trimmed = description.trim();
+  if (trimmed === "") return "";
+  const sentenceEnd = trimmed.search(/[.!?](\s|$)/);
+  const firstSentence = sentenceEnd >= 0 ? trimmed.slice(0, sentenceEnd + 1) : trimmed;
+  return firstSentence.length > 200 ? `${firstSentence.slice(0, 197).trimEnd()}…` : firstSentence;
+}
+
 /** Create a role (admin). Missing string fields default to safe empty-ish values. */
 export function createRole(input: RoleInput): Role {
   const ts = nowIso();
+  const description = nullIfEmpty(input.description) ?? "";
   const role: Role = {
     id: `role-${randomUUID()}`,
     title: nullIfEmpty(input.title) ?? "Untitled role",
     location: nullIfEmpty(input.location) ?? "Remote",
     type: nullIfEmpty(input.type) ?? "full-time",
-    description: nullIfEmpty(input.description) ?? "",
+    summary: nullIfEmpty(input.summary) ?? deriveSummary(description),
+    description,
     status: coerceStatus(input.status, "open"),
     created_at: ts,
     updated_at: ts,
@@ -175,6 +211,7 @@ export function updateRole(id: string, input: RoleInput): Role | null {
   if (nullIfEmpty(input.title) != null) role.title = nullIfEmpty(input.title) as string;
   if (nullIfEmpty(input.location) != null) role.location = nullIfEmpty(input.location) as string;
   if (nullIfEmpty(input.type) != null) role.type = nullIfEmpty(input.type) as string;
+  if (nullIfEmpty(input.summary) != null) role.summary = nullIfEmpty(input.summary) as string;
   if (typeof input.description === "string") role.description = input.description;
   if (input.status === "open" || input.status === "closed") role.status = input.status;
   role.updated_at = nowIso();

@@ -71,7 +71,7 @@ export function getPrimaryNav(): NavItem[] {
     items.push({ href: "/pricing", label: "Pricing" });
   }
 
-  items.push({ href: "/waitlist", label: "Waitlist" });
+  items.push({ href: "/careers", label: "Careers" }, { href: "/waitlist", label: "Waitlist" });
 
   return items;
 }
@@ -91,6 +91,7 @@ export function getFooterNav(): NavItem[] {
     { href: "/why-vygo", label: "Why vygo.ai" },
     { href: "/vibe-coding", label: "Vibe coding" },
     { href: "/guide", label: "Guide" },
+    { href: "/careers", label: "Careers" },
   ];
 
   if (commercialFlags.showPublicPricing) {
