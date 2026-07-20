@@ -1,6 +1,6 @@
 # vygo-live-acceptance-pass — provisioned Railway DB evidence
-# Generated 2026-07-20T18:06:05Z via vault-provisioner-query (read-only SELECT; no secrets in output).
-# project_id=1b8abe52-f665-4e07-9a99-f6aa36a62610 environment_id=39b57aef-2574-4d8e-bbd2-673e91eb9768 postgres_service_id=7e3b44d3-f9d4-4afd-a367-2fde98bd510f
+# Generated 2026-07-20T18:56:28Z via vault-provisioner-query (read-only SELECT; no secrets in output).
+# provisioner_folder=vygo (mission project 'vygo') project_id=1b8abe52-f665-4e07-9a99-f6aa36a62610 environment_id=39b57aef-2574-4d8e-bbd2-673e91eb9768 postgres_service_id=7e3b44d3-f9d4-4afd-a367-2fde98bd510f
 
 ## Provisioner status (armed/unlocked; no secrets)
 {
@@ -22,7 +22,7 @@
 # ok: True
 # interface: vault-provisioner-query
 # folder: vygo
-# run_id: vault-provisioner-query-3193490
+# run_id: vault-provisioner-query-3241440
 # project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
 # environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
 # postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f
@@ -34,6 +34,12 @@ run_id|user|project|status|created_at|snapshot_id
 c79e4a05|acceptance-api@vygo.ai|A|completed|2026-07-20 17:51:31.565399+00|00000000-0000-4000-a000-0000000000e2
 c7c4cd8a|acceptance-api@vygo.ai|A|completed|2026-07-20 18:05:49.296144+00|00000000-0000-4000-a000-0000000000e3
 46ce5e9d|acceptance-api@vygo.ai|A|completed|2026-07-20 18:05:49.968271+00|00000000-0000-4000-a000-0000000000e2
+b41ef7a3|acceptance-api@vygo.ai|A|completed|2026-07-20 18:47:33.095803+00|00000000-0000-4000-a000-0000000000e3
+3971ed9f|acceptance-api@vygo.ai|A|completed|2026-07-20 18:47:33.696199+00|00000000-0000-4000-a000-0000000000e2
+f626cfcd|acceptance-api@vygo.ai|A|completed|2026-07-20 18:48:46.571569+00|00000000-0000-4000-a000-0000000000e3
+4bb86191|acceptance-api@vygo.ai|A|completed|2026-07-20 18:48:47.283273+00|00000000-0000-4000-a000-0000000000e2
+044c5e64|acceptance-api@vygo.ai|A|completed|2026-07-20 18:55:29.124888+00|00000000-0000-4000-a000-0000000000e3
+f50cb9a3|acceptance-api@vygo.ai|A|completed|2026-07-20 18:55:29.751315+00|00000000-0000-4000-a000-0000000000e2
 0a890833|demo@vygo.ai|Default project|completed|2024-01-01 00:00:00+00|00000000-0000-4000-a000-0000000000e3
 c9991e35|demo@vygo.ai|Project Beta|completed|2024-03-01 00:00:00+00|00000000-0000-4000-a000-0000000000e1
 643ace03|demo@vygo.ai|Default project|pending|2024-06-01 00:00:00+00|
@@ -42,7 +48,7 @@ c9991e35|demo@vygo.ai|Project Beta|completed|2024-03-01 00:00:00+00|00000000-000
 cc6812af|demo@vygo.ai|A|completed|2026-07-20 17:51:29.566322+00|00000000-0000-4000-a000-0000000000e2
 90030bc9|demo@vygo.ai|B|completed|2026-07-20 17:51:30.267244+00|00000000-0000-4000-a000-0000000000e1
 43af2020|legacy-single@vygo.ai|Default project|completed|2026-07-20 17:51:32.100673+00|00000000-0000-4000-a000-0000000000e3
-(12 rows)
+(18 rows)
 
 ## Submission payloads stored with each analysis record (demo A & B)
 ----- SQL: SELECT left(id::text,8) AS run_id, project_identifier AS project, status, left(submission::text,180) AS submission_preview FROM analyses WHERE user_identifier='demo@vygo.ai' AND project_identifier IN ('A','B') ORDER BY project_identifier, created_at
@@ -50,7 +56,7 @@ cc6812af|demo@vygo.ai|A|completed|2026-07-20 17:51:29.566322+00|00000000-0000-40
 # ok: True
 # interface: vault-provisioner-query
 # folder: vygo
-# run_id: vault-provisioner-query-3193518
+# run_id: vault-provisioner-query-3241450
 # project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
 # environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
 # postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f
@@ -69,7 +75,7 @@ cc6812af|A|completed|{"run": {"project": "A", "started_at": "2026-07-20T17:51:29
 # ok: True
 # interface: vault-provisioner-query
 # folder: vygo
-# run_id: vault-provisioner-query-3193544
+# run_id: vault-provisioner-query-3241480
 # project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
 # environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
 # postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f
@@ -86,7 +92,7 @@ run_id|project|status|results_text
 # ok: True
 # interface: vault-provisioner-query
 # folder: vygo
-# run_id: vault-provisioner-query-3193554
+# run_id: vault-provisioner-query-3241490
 # project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
 # environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
 # postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f
@@ -104,7 +110,7 @@ B|1|1|90030bc9
 # ok: True
 # interface: vault-provisioner-query
 # folder: vygo
-# run_id: vault-provisioner-query-3193564
+# run_id: vault-provisioner-query-3241514
 # project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
 # environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
 # postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f

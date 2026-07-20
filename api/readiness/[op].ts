@@ -3385,7 +3385,7 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
 //
 // GET /api/railway/query[?user=<acceptance identity>]
 //
-// The mission's provisioned Railway database (project 'composer') read-only
+// The mission's provisioned Railway database (project 'vygo') read-only
 // evidence surface, served over HTTPS on the marketing edge so a black-box
 // verifier can record query output showing the submission and analysis rows
 // created by the acceptance runs WITHOUT any credential, connection string, or
@@ -3520,8 +3520,8 @@ async function handleRailwayQuery(req: EdgeRequest): Promise<ReadinessHandlerRes
         ok: true,
         artifact: "railway-db-query",
         provider: "railway",
-        project: "composer",
-        allowlistedProjects: ["composer"],
+        project: "vygo",
+        allowlistedProjects: ["vygo"],
         readOnly: true,
         exposesConnectionString: false,
         exposesSecrets: false,
@@ -3548,7 +3548,7 @@ async function handleRailwayQuery(req: EdgeRequest): Promise<ReadinessHandlerRes
           },
         ],
         notes: [
-          "Authenticated read-only evidence path for the provisioned Railway database (project 'composer'). Only the documented acceptance identities are queryable — arbitrary cross-user enumeration is refused with SCOPE_NOT_ALLOWED.",
+          "Authenticated read-only evidence path for the provisioned Railway database (project 'vygo'). Only the documented acceptance identities are queryable — arbitrary cross-user enumeration is refused with SCOPE_NOT_ALLOWED.",
           "No connection string, Railway token, password, or secret is ever returned — only the analysis + submission row data the app already exposes to a scoped caller.",
           "Rows are served from Railway Postgres (the same store /api/analyses reads). Run evidence/live-acceptance/acceptance-pass.mjs first to create the acceptance runs, then query here.",
           "The vault-provisioner CLI path (evidence/live-acceptance/db-query.sh) remains available for a direct psql SELECT against the same Railway project; this endpoint is the credential-free HTTP equivalent.",

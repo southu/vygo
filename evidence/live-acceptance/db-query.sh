@@ -3,8 +3,8 @@
 # Read-only database evidence for the vygo-live-acceptance-pass mission.
 #
 # Confirms the submission + analysis records created by acceptance-pass.mjs are
-# queryable in the provisioned Railway database (project 'composer' → reused
-# Railway project, folder 'vygo'). It uses the vault provisioner read-path
+# queryable in the provisioned Railway database (project 'vygo' → reused
+# Railway project, vault-provisioner folder 'vygo'). It uses the read-path
 # (`vault-provisioner-query sql`): register_run(folder) → short-lived lease →
 # Railway GraphQL → psql DATABASE_PUBLIC_URL → release. The tool runs
 # allowlisted SELECT statements only and NEVER prints connection strings or
@@ -21,9 +21,9 @@ SUMMARY="${PROVISION_SUMMARY:-$RATCHET_SHARED_DIR/provision.json}"
 read_id() { [ -f "$SUMMARY" ] && jq -r "$1 // empty" "$SUMMARY" 2>/dev/null || true; }
 
 # Vault-provisioner folder for the mission's allowlisted project. The mission's
-# provisioning project_name is 'composer' (allowlist ['composer']); it maps to
-# the reused Railway project whose non-secret ids are below. Overridable via env.
-FOLDER="${VAULT_PROVISIONER_FOLDER:-composer}"
+# provisioning project_name is 'vygo' (allowlist ['vygo']); it maps to the
+# reused Railway project whose non-secret ids are below. Overridable via env.
+FOLDER="${VAULT_PROVISIONER_FOLDER:-vygo}"
 
 PROJECT_ID="${RAILWAY_PROJECT_ID:-$(read_id '.project_id')}"
 ENV_ID="${RAILWAY_ENVIRONMENT_ID:-$(read_id '.environment_id')}"
@@ -45,7 +45,7 @@ q() {
 
 echo "# vygo-live-acceptance-pass — provisioned Railway DB evidence"
 echo "# Generated $(date -u +%Y-%m-%dT%H:%M:%SZ) via vault-provisioner-query (read-only SELECT; no secrets in output)."
-echo "# provisioner_folder=$FOLDER (mission project 'composer') project_id=$PROJECT_ID environment_id=$ENV_ID postgres_service_id=$SERVICE_ID"
+echo "# provisioner_folder=$FOLDER (mission project 'vygo') project_id=$PROJECT_ID environment_id=$ENV_ID postgres_service_id=$SERVICE_ID"
 echo
 
 echo "## Provisioner status (armed/unlocked; no secrets)"

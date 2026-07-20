@@ -10,7 +10,7 @@ endpoints and record the results.
 | file | what it is |
 | --- | --- |
 | `acceptance-pass.mjs` | Node (no deps) driver: mints a session token, runs projects **A** & **B** end-to-end via `POST /api/analysis/start` + `/api/analysis/complete`, re-runs A, checks the duplicate-start guard, verifies the legacy single-analysis user, lists submission records via `GET /api/submissions`, and asserts history/current. Re-runnable & idempotent. |
-| `railway-query.sh` | Credential-free **HTTP** read-only DB evidence: `curl https://www.vygo.ai/api/railway/query`. Returns the acceptance runs' analysis + submission rows from the provisioned Railway DB (project `composer`) as recorded query output. Allowlist-scoped to the documented acceptance identities; never returns a connection string or secret. |
+| `railway-query.sh` | Credential-free **HTTP** read-only DB evidence: `curl https://www.vygo.ai/api/railway/query`. Returns the acceptance runs' analysis + submission rows from the provisioned Railway DB (project `vygo`) as recorded query output. Allowlist-scoped to the documented acceptance identities; never returns a connection string or secret. |
 | `db-query.sh` | Read-only DB evidence via the vault provisioner CLI path (`vault-provisioner-query sql`). Allowlisted `SELECT` only; never prints credentials. |
 | `output/api-transcript.json` | Full HTTP request/response transcript (session tokens redacted). |
 | `output/summary.md` | Per-check PASS/FAIL table + the visible history snapshot. |
@@ -18,12 +18,12 @@ endpoints and record the results.
 | `output/railway-query.json` | Captured DB query output via the HTTP `/api/railway/query` path. |
 
 Reproduce: `node evidence/live-acceptance/acceptance-pass.mjs`, then either DB
-evidence path (they read the SAME Railway Postgres, project `composer`):
+evidence path (they read the SAME Railway Postgres, project `vygo`):
 
 - HTTP (no credentials): `bash evidence/live-acceptance/railway-query.sh > evidence/live-acceptance/output/railway-query.json`
 - CLI (direct psql SELECT): `bash evidence/live-acceptance/db-query.sh > evidence/live-acceptance/output/db-query.txt`
 
-### `/api/railway/query` — authenticated, read-only Railway `composer` query
+### `/api/railway/query` — authenticated, read-only Railway `vygo` query
 
 `GET https://www.vygo.ai/api/railway/query` is the credential-free HTTP evidence
 surface for the provisioned Railway database. It returns three query blocks —
@@ -35,7 +35,7 @@ return every documented acceptance identity in one payload, or pass one of them
 `user` is refused with `SCOPE_NOT_ALLOWED`, so it can never enumerate arbitrary
 accounts. No connection string, Railway token, password, or secret is ever
 returned. `GET /provisioning-status` documents this path under
-`databaseEvidence` (`project: composer`, `queryEndpoint: /api/railway/query`).
+`databaseEvidence` (`project: vygo`, `queryEndpoint: /api/railway/query`).
 
 The end-user **history view** lives at `/analyses` and is discoverable from
 `/readiness` (the "View analysis history" entry). It groups every run by project,
@@ -64,12 +64,12 @@ legacy pre-migration identity is viewable at `/analyses?fixture=legacy`.
 | 3 | Re-run A → history shows all three runs (A run1, B run, A run2), labeled per project, latest-per-project **current** | `summary.md` history table; `/analyses` groups A (2 runs) + B (1 run) with per-project "Current result" + a visible **★ Current** badge on the latest completed run; the list response carries an **explicit** `current` marker (per-row `current` boolean + a `currentByProject` map) — check `history-current-marker`; `db-query.txt` per-project counts + current run |
 | 4 | Legacy pre-migration single-analysis user still retains original result | `legacy-single@vygo.ai` via `GET /api/analysis/result?user=legacy-single@vygo.ai`; directly viewable in the history UI at **`/analyses?fixture=legacy`** (seed-on-read `GET /api/analysis/demo?user=legacy-single@vygo.ai`) — check `legacy-fixture-viewable`; migration-integrity fixture in `/api/analysis/demo` (`fixture=legacy_single_analysis`, byte-for-byte in `Default project`); `db-query.txt` |
 | 5 | Start endpoint (a) accepts a new run once the prior run completed, (b) rejects a duplicate start with an error status only while a run is in progress | `api-transcript.json`: **201** start → **409 `run_in_progress`** duplicate → **200** complete → **201** start-after-complete |
-| 6 | Submission + analysis records queryable in the provisioned Railway DB (project `composer`) | **HTTP:** `output/railway-query.json` (`GET /api/railway/query` — analyses + submissions + per-project counts for the acceptance runs, no credentials); **CLI:** `db-query.txt` (direct psql SELECT via the vault provisioner); also via scope-required `GET /api/submissions?user=…` |
+| 6 | Submission + analysis records queryable in the provisioned Railway DB (project `vygo`) | **HTTP:** `output/railway-query.json` (`GET /api/railway/query` — analyses + submissions + per-project counts for the acceptance runs, no credentials); **CLI:** `db-query.txt` (direct psql SELECT via the vault provisioner); also via scope-required `GET /api/submissions?user=…` |
 
-`composer` is the mission's allowlisted project label; provisioning **reused**
-the existing Railway project (dashboard `…/project/1b8abe52…`, folder `vygo`)
-per `shared/provision_summary.json` (`created:false, reused:true`), which is the
-Postgres that backs the live app.
+`vygo` is the mission's allowlisted project label (matching the vault-provisioner
+folder); provisioning **reused** the existing Railway project (dashboard
+`…/project/1b8abe52…`, folder `vygo`) per `shared/provision_summary.json`
+(`created:false, reused:true`), which is the Postgres that backs the live app.
 
 ## Guarantees
 

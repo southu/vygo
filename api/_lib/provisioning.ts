@@ -141,12 +141,12 @@ export function buildProvisioningStatus(
   return {
     artifact: "railway-provisioning-status",
     app: "vygo",
-    // The mission's provisioning project (allowlist ['composer']). It maps to the
+    // The mission's provisioning project (allowlist ['vygo']). It maps to the
     // reused Railway project whose dashboard/folder is 'vygo' (created:false,
     // reused:true) — `railwayProjectFolder` records that honestly.
-    project: "composer",
-    provisioningProject: "composer",
-    allowlistedProjects: ["composer"],
+    project: "vygo",
+    provisioningProject: "vygo",
+    allowlistedProjects: ["vygo"],
     railwayProjectFolder: "vygo",
     commit: commit || undefined,
     generatedBy: "vercel-edge-function",
@@ -297,7 +297,7 @@ export function buildProvisioningStatus(
       verificationCommands: VERIFICATION_COMMANDS,
     },
     // Retrievable, read-only DB evidence path for the mission's provisioning
-    // project 'composer'. A black-box verifier can confirm the acceptance runs'
+    // project 'vygo'. A black-box verifier can confirm the acceptance runs'
     // submission + analysis rows are queryable WITHOUT any credential: the vault
     // provisioner mints a short-lived lease per query (register_run(folder) →
     // lease → Railway GraphQL → psql → release) and runs allowlisted SELECT only.
@@ -305,8 +305,8 @@ export function buildProvisioningStatus(
     // evidence script path appear here — never a connection string or token.
     databaseEvidence: {
       provider: "railway",
-      project: "composer",
-      allowlistedProjects: ["composer"],
+      project: "vygo",
+      allowlistedProjects: ["vygo"],
       readOnly: true,
       exposesConnectionString: false,
       // Two authorized, credential-free read paths to the SAME Railway Postgres:
@@ -318,18 +318,18 @@ export function buildProvisioningStatus(
       queryEndpointNote:
         "GET /api/railway/query returns the acceptance runs' analysis + submission rows as recorded query output. Allowlist-scoped to the documented acceptance identities (omit `user` for all, or pass one); refuses any other user. No credential, token, or connection string is ever returned.",
       connectionMethod:
-        "register_run(folder=composer) -> lease -> Railway GraphQL (Postgres service) -> psql DATABASE_PUBLIC_URL -> release",
-      folder: "composer",
+        "register_run(folder=vygo) -> lease -> Railway GraphQL (Postgres service) -> psql DATABASE_PUBLIC_URL -> release",
+      folder: "vygo",
       tables: ["analyses", "readiness_ingest_submissions"],
       evidenceScript: "evidence/live-acceptance/db-query.sh",
       httpEvidenceScript: "evidence/live-acceptance/railway-query.sh",
       recordedOutput: "evidence/live-acceptance/output/db-query.txt",
       recordedHttpOutput: "evidence/live-acceptance/output/railway-query.json",
       exampleQuery:
-        'curl -fsS https://www.vygo.ai/api/railway/query | jq .   # or: vault-provisioner-query sql --folder composer --sql "SELECT project_identifier, status, count(*) FROM analyses GROUP BY 1,2"',
+        'curl -fsS https://www.vygo.ai/api/railway/query | jq .   # or: vault-provisioner-query sql --folder vygo --sql "SELECT project_identifier, status, count(*) FROM analyses GROUP BY 1,2"',
       note:
         "The acceptance runs' submission and analysis rows are queryable read-only for project " +
-        "'composer' two ways: the credential-free HTTP endpoint GET /api/railway/query on this edge, " +
+        "'vygo' two ways: the credential-free HTTP endpoint GET /api/railway/query on this edge, " +
         "and the vault-provisioner CLI (allowlisted SELECT only). No connection string, token, or " +
         "secret is ever returned (secrets_in_output: false).",
     },
