@@ -461,6 +461,20 @@ export async function proxyGetAnalysisResult(
   );
 }
 
+/**
+ * Proxy the idempotent demo-fixture seed to the Railway API. Used only when the
+ * edge has no direct DATABASE_URL; the Railway route seeds the same shared
+ * Postgres, so the result is identical either way.
+ */
+export async function proxyAnalysesDemo(
+  user: string | null,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  const qs = user ? `?user=${encodeURIComponent(user)}` : "";
+  return proxyJson("GET", `/v1/analyses/demo${qs}`, undefined, env, inboundHeaders);
+}
+
 export async function proxyGetSession(
   token: string,
   env: NodeJS.ProcessEnv = process.env,

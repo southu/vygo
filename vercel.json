@@ -59,6 +59,22 @@
       "destination": "/careers-role?id=:id"
     },
     {
+      "source": "/results",
+      "destination": "/result"
+    },
+    {
+      "source": "/analysis",
+      "destination": "/analyses"
+    },
+    {
+      "source": "/history",
+      "destination": "/dashboard"
+    },
+    {
+      "source": "/projects",
+      "destination": "/dashboard"
+    },
+    {
       "source": "/api/apply/:id",
       "destination": "/api/apply?applyId=:id"
     },
@@ -131,6 +147,10 @@
       "destination": "/api/readiness/result"
     },
     {
+      "source": "/api/analyses/demo",
+      "destination": "/api/readiness/demo"
+    },
+    {
       "source": "/api/analyses/:id",
       "destination": "/api/readiness/analysis?id=:id"
     },
@@ -141,6 +161,10 @@
     {
       "source": "/v1/analyses/result",
       "destination": "/api/readiness/result"
+    },
+    {
+      "source": "/v1/analyses/demo",
+      "destination": "/api/readiness/demo"
     },
     {
       "source": "/v1/analyses/:id",

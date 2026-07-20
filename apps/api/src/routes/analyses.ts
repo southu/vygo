@@ -293,6 +293,114 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
     }
   });
 
+  // Idempotent, non-destructive demo fixture for browser-only verification.
+  // Seeds a fixed demo user (demo@vygo.ai) whose history exercises the whole
+  // analysis-history model: legacy → 'Default project' migration integrity, a
+  // newer non-completed run that must not shadow the completed one, and a
+  // distinct second project. Only inserts when the demo user has no rows yet
+  // and only ever touches the demo user's namespace — real data is untouched.
+  app.get("/v1/analyses/demo", async (request, reply) => {
+    if (!(await enforceAnalysesRateLimit(request, reply, deps))) return;
+
+    const user = "demo@vygo.ai";
+    const secondProject = "Project Beta";
+
+    const dbHandle = deps.getDb();
+    if (!dbHandle) {
+      return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
+    }
+
+    try {
+      const sql = dbHandle.sql;
+      await ensureAnalysesTable(sql);
+
+      const existing = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM analyses WHERE user_identifier = ${user}
+      `;
+      const seeded = (existing[0]?.n ?? 0) === 0;
+
+      if (seeded) {
+        const legacy = {
+          source: "vygo_demo_fixture",
+          fixture: "legacy_single_analysis",
+          user,
+          results_text:
+            "Legacy readiness analysis for demo@vygo.ai — the single pre-migration analysis, preserved byte-for-byte as the first entry of 'Default project'.",
+          results: {
+            overall_score: 72,
+            band: "developing",
+            dimensions: { clarity: 80, evidence: 65, alignment: 71 },
+          },
+        };
+        await sql`
+          INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
+          VALUES (${user}, 'unspecified', 'received', ${sql.json(legacy)},
+                  '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')
+        `;
+        await sql`
+          UPDATE analyses
+          SET project_identifier = ${DEFAULT_PROJECT_IDENTIFIER}
+          WHERE user_identifier = ${user}
+            AND (project_identifier IS NULL
+                 OR btrim(project_identifier) = ''
+                 OR project_identifier = 'unspecified')
+        `;
+        await sql`
+          INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
+          VALUES (${user}, ${DEFAULT_PROJECT_IDENTIFIER}, 'pending', ${sql.json({
+            source: "vygo_demo_fixture",
+            fixture: "newer_pending_run",
+            results_text:
+              "A newer run that is still pending; it must NOT shadow the completed legacy result.",
+          })}, '2024-06-01T00:00:00Z', '2024-06-01T00:00:00Z')
+        `;
+        await sql`
+          INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
+          VALUES (${user}, ${secondProject}, 'completed', ${sql.json({
+            source: "vygo_demo_fixture",
+            fixture: "second_project_analysis",
+            results_text: "A completed analysis stored under a distinct second project.",
+            results: {
+              overall_score: 88,
+              band: "strong",
+              dimensions: { clarity: 90, evidence: 85, alignment: 89 },
+            },
+          })}, '2024-03-01T00:00:00Z', '2024-03-01T00:00:00Z')
+        `;
+      }
+
+      const rows = await listAnalyses(dbHandle.sql, { user });
+      const analyses = rows.map(toAnalysisPublic);
+      const projects = Array.from(new Set(rows.map((r) => r.project_identifier)));
+      const enc = (s: string) => encodeURIComponent(s);
+      return reply.status(200).send({
+        ok: true,
+        seeded,
+        idempotent: true,
+        user,
+        defaultProject: DEFAULT_PROJECT_IDENTIFIER,
+        secondProject,
+        projects,
+        count: analyses.length,
+        analyses,
+        verify: {
+          legacyResult: `/v1/analyses/result?user=${enc(user)}`,
+          defaultProjectHistory: `/v1/analyses?user=${enc(user)}&project=${enc(DEFAULT_PROJECT_IDENTIFIER)}`,
+          secondProjectHistory: `/v1/analyses?user=${enc(user)}&project=${enc(secondProject)}`,
+          allHistory: `/v1/analyses?user=${enc(user)}`,
+        },
+      });
+    } catch (error) {
+      request.log.error(
+        { event: "analyses_demo_failed" },
+        error instanceof Error ? error.message : "analyses demo failed",
+      );
+      return reply
+        .status(500)
+        .send(safeError("INTERNAL_ERROR", "An unexpected error occurred. Please try again later."));
+    }
+  });
+
   app.get("/v1/analyses/:id", async (request, reply) => {
     if (!(await enforceAnalysesRateLimit(request, reply, deps))) return;
 
