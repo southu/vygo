@@ -1508,6 +1508,32 @@ async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
       VALUES (${submissionToken}, ${sql.json(body as never)})
     `;
 
+    // Durable analyses store (lead follow-up): also persist a NEW row keyed by
+    // the real (user, project) with the FULL payload retained verbatim, so
+    // /api/analyses can list/retrieve it independently of the expiring
+    // token-status store. Best-effort: never fail an accepted submission on an
+    // analyses-store hiccup.
+    try {
+      const { user, project, status } = deriveAnalysesIdentityEdge(body);
+      if (user) {
+        await ensureAnalysesTablesEdge(sql);
+        // Retain the full readiness form payload verbatim, but drop the
+        // per-submission capability token (transport metadata, not a form
+        // field) so the publicly listable analyses response never echoes it.
+        const { submission_token: _omitToken, ...analysisSubmission } = body;
+        await sql`
+          INSERT INTO analyses (user_identifier, project_identifier, status, submission)
+          VALUES (${user}, ${project ?? "unspecified"}, ${status}, ${JSON.stringify(analysisSubmission)}::jsonb)
+        `;
+      }
+    } catch (analysisError) {
+      // Non-blocking: the submission itself already succeeded above.
+      if (typeof console !== "undefined") {
+        console.warn("readiness submit: analyses-store persist failed (non-blocking)");
+      }
+      void analysisError;
+    }
+
     return {
       status: 200,
       body: {
@@ -1723,6 +1749,115 @@ function pickAnalysesField(record: Record<string, unknown>, keys: string[]): str
     }
   }
   return null;
+}
+
+/** Candidate structured keys and free-text patterns for (user, project). */
+const ANALYSES_USER_KEYS = [
+  "user",
+  "user_identifier",
+  "userIdentifier",
+  "userId",
+  "user_id",
+  "email",
+  "user_email",
+  "userEmail",
+  "contact_email",
+  "contactEmail",
+];
+const ANALYSES_PROJECT_KEYS = [
+  "project",
+  "project_identifier",
+  "projectIdentifier",
+  "projectId",
+  "project_id",
+  "project_name",
+  "projectName",
+  "project_slug",
+  "projectSlug",
+  "slug",
+];
+const ANALYSES_EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+const ANALYSES_PROJECT_TEXT_RE =
+  /\bprojects?\b["'\s:=_-]*["']?([A-Za-z0-9][A-Za-z0-9 ._-]{0,63}?)["']?(?=[\s,.;)"'}\]]|$)/i;
+
+function analysesPlainObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/**
+ * Discover (user, project, status) for the durable analyses store from a
+ * readiness ingest payload: explicit structured keys first (across the body and
+ * its nested results/report/contact objects), then a free-text fallback that
+ * scans the report summary / results_text / whole payload for an email and a
+ * `project <name>` mention.
+ */
+function deriveAnalysesIdentityEdge(body: Record<string, unknown>): {
+  user: string | null;
+  project: string | null;
+  status: string;
+} {
+  const results = analysesPlainObject(body.results);
+  const report = analysesPlainObject(body.report);
+  const contact = analysesPlainObject(body.contact);
+  const candidates = [
+    contact,
+    results ? analysesPlainObject(results.contact) : null,
+    report ? analysesPlainObject(report.contact) : null,
+    body,
+    results,
+    report,
+    analysesPlainObject(body.payload),
+    analysesPlainObject(body.meta),
+  ].filter((o): o is Record<string, unknown> => o != null);
+
+  const pick = (keys: string[]): string | null => {
+    for (const obj of candidates) {
+      const value = pickAnalysesField(obj, keys);
+      if (value) return value;
+    }
+    return null;
+  };
+
+  let user = pick(ANALYSES_USER_KEYS);
+  let project = pick(ANALYSES_PROJECT_KEYS);
+
+  const freeParts: string[] = [];
+  const pushText = (v: unknown) => {
+    if (typeof v === "string" && v.trim()) freeParts.push(v);
+  };
+  pushText(body.results_text);
+  for (const src of [results, report]) {
+    if (!src) continue;
+    pushText(src.summary);
+    pushText(src.results_text);
+    pushText(src.project);
+  }
+  const freeText = freeParts.join("\n");
+  let whole: string | null = null;
+  const scan = (): string => {
+    if (whole == null) {
+      try {
+        whole = JSON.stringify(body);
+      } catch {
+        whole = "";
+      }
+    }
+    return `${freeText}\n${whole}`;
+  };
+
+  if (!user) {
+    const m = freeText.match(ANALYSES_EMAIL_RE) ?? scan().match(ANALYSES_EMAIL_RE);
+    if (m) user = m[0].slice(0, ANALYSES_FIELD_MAX);
+  }
+  if (!project) {
+    const m = freeText.match(ANALYSES_PROJECT_TEXT_RE) ?? scan().match(ANALYSES_PROJECT_TEXT_RE);
+    if (m?.[1]) project = m[1].trim().slice(0, ANALYSES_FIELD_MAX);
+  }
+
+  const status = pick(["status", "bucket", "state"]) ?? "received";
+  return { user, project, status };
 }
 
 async function ensureAnalysesTablesEdge(sql: Sql): Promise<void> {

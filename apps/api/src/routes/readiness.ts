@@ -25,6 +25,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { createHash, randomUUID } from "node:crypto";
 import {
+  ensureAnalysesTable,
+  insertAnalysis,
   createReadinessSession,
   findReadinessSessionByToken,
   patchReadinessSessionByToken,
@@ -229,6 +231,153 @@ function hasUsableResultsPayload(body: Record<string, unknown>): boolean {
     Object.keys(results as Record<string, unknown>).length > 0;
   const resultsText = typeof body.results_text === "string" ? body.results_text.trim() : "";
   return hasResults || resultsText.length > 0;
+}
+
+/**
+ * Durable analyses store derivation.
+ *
+ * A readiness ingest submission must land in the durable `analyses` store (not
+ * only the expiring token-status store) keyed by a real (user, project) so
+ * sales reps can follow up. The user identifier and project identifier are
+ * discovered from the submitted payload — first from explicit structured keys
+ * (checked across the body and its nested `results`/`report`/`contact`
+ * objects), then, as a fallback, by scanning free-text (report summary +
+ * `results_text` + the whole payload) for an email address and a
+ * `project <name>` mention. The FULL payload is retained verbatim regardless.
+ */
+const ANALYSIS_USER_KEYS = [
+  "user",
+  "user_identifier",
+  "userIdentifier",
+  "userId",
+  "user_id",
+  "email",
+  "user_email",
+  "userEmail",
+  "contact_email",
+  "contactEmail",
+];
+const ANALYSIS_PROJECT_KEYS = [
+  "project",
+  "project_identifier",
+  "projectIdentifier",
+  "projectId",
+  "project_id",
+  "project_name",
+  "projectName",
+  "project_slug",
+  "projectSlug",
+  "slug",
+];
+const ANALYSIS_STATUS_KEYS = ["status", "bucket", "state"];
+/** First email anywhere in a blob of text (global-safe, not anchored). */
+const ANALYSIS_EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+/** `project alpha`, `project: beta`, `project="gamma"` … capture the name. */
+const ANALYSIS_PROJECT_TEXT_RE =
+  /\bprojects?\b["'\s:=_-]*["']?([A-Za-z0-9][A-Za-z0-9 ._-]{0,63}?)["']?(?=[\s,.;)"'}\]]|$)/i;
+const ANALYSIS_MAX_FIELD_LEN = 512;
+
+function analysisIdentityString(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? trimmed.slice(0, ANALYSIS_MAX_FIELD_LEN) : null;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value).slice(0, ANALYSIS_MAX_FIELD_LEN);
+  }
+  return null;
+}
+
+function asPlainObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** Nested objects that may carry structured identity fields, in priority order. */
+function analysisCandidateObjects(body: Record<string, unknown>): Record<string, unknown>[] {
+  const results = asPlainObject(body.results);
+  const report = asPlainObject(body.report);
+  const contact = asPlainObject(body.contact);
+  const objs: (Record<string, unknown> | null)[] = [
+    contact,
+    results ? asPlainObject(results.contact) : null,
+    report ? asPlainObject(report.contact) : null,
+    body,
+    results,
+    report,
+    asPlainObject(body.payload),
+    asPlainObject(body.meta),
+  ];
+  return objs.filter((o): o is Record<string, unknown> => o != null);
+}
+
+function analysisPickStructured(objs: Record<string, unknown>[], keys: string[]): string | null {
+  for (const obj of objs) {
+    for (const key of keys) {
+      const value = analysisIdentityString(obj[key]);
+      if (value) return value;
+    }
+  }
+  return null;
+}
+
+/** Concatenate report free-text likely to carry the email / project mention. */
+function analysisFreeText(body: Record<string, unknown>): string {
+  const parts: string[] = [];
+  const push = (v: unknown) => {
+    if (typeof v === "string" && v.trim()) parts.push(v);
+  };
+  push(body.results_text);
+  const results = asPlainObject(body.results);
+  const report = asPlainObject(body.report);
+  for (const src of [results, report]) {
+    if (!src) continue;
+    push(src.summary);
+    push(src.results_text);
+    push(src.project);
+  }
+  return parts.join("\n");
+}
+
+function deriveAnalysisIdentity(body: Record<string, unknown>): {
+  user: string | null;
+  project: string | null;
+  status: string;
+} {
+  const objs = analysisCandidateObjects(body);
+
+  let user = analysisPickStructured(objs, ANALYSIS_USER_KEYS);
+  let project = analysisPickStructured(objs, ANALYSIS_PROJECT_KEYS);
+
+  // Fallback: scan free-text first (report summary / results_text), then the
+  // whole payload, for an email address and a `project <name>` mention.
+  const freeText = analysisFreeText(body);
+  let wholePayload: string | null = null;
+  const scanText = (): string => {
+    if (wholePayload == null) {
+      try {
+        wholePayload = JSON.stringify(body);
+      } catch {
+        wholePayload = "";
+      }
+    }
+    return `${freeText}\n${wholePayload}`;
+  };
+
+  if (!user) {
+    const emailMatch = freeText.match(ANALYSIS_EMAIL_RE) ?? scanText().match(ANALYSIS_EMAIL_RE);
+    if (emailMatch) user = emailMatch[0].slice(0, ANALYSIS_MAX_FIELD_LEN);
+  }
+  if (!project) {
+    const projMatch =
+      freeText.match(ANALYSIS_PROJECT_TEXT_RE) ?? scanText().match(ANALYSIS_PROJECT_TEXT_RE);
+    if (projMatch?.[1]) project = projMatch[1].trim().slice(0, ANALYSIS_MAX_FIELD_LEN);
+  }
+
+  const status = analysisPickStructured(objs, ANALYSIS_STATUS_KEYS) ?? "received";
+
+  return { user, project, status };
 }
 
 /**
@@ -3523,6 +3672,56 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         SET use_count = use_count + 1
         WHERE token = ${submissionToken}
       `;
+
+      // Durable analyses store (lead follow-up): persist a NEW row keyed by the
+      // real (user, project) with the FULL payload retained verbatim, so
+      // /api/analyses can list/retrieve it independently of the expiring
+      // token-status store. Best-effort: never fail an accepted submission on
+      // an analyses-store hiccup.
+      try {
+        const { user, project, status } = deriveAnalysisIdentity(sanitizedBody);
+        if (user) {
+          await ensureAnalysesTable(dbHandle.sql);
+          // Retain the full readiness form payload verbatim, but drop the
+          // per-submission capability token (transport metadata, not a form
+          // field) so the publicly listable analyses response never echoes it.
+          const { submission_token: _omitToken, ...analysisSubmission } = sanitizedBody;
+          const analysis = await insertAnalysis(dbHandle.sql, {
+            user,
+            // A missing project must never overwrite a prior analysis, so fall
+            // back to a stable placeholder rather than dropping the row.
+            project: project ?? "unspecified",
+            status,
+            submission: analysisSubmission,
+          });
+          request.log.info(
+            {
+              event: "readiness_submit_analysis_persisted",
+              tokenId,
+              analysisId: analysis.id,
+              hasProject: project != null,
+            },
+            "readiness ingest persisted to analyses store",
+          );
+        } else {
+          request.log.info(
+            { event: "readiness_submit_analysis_skipped", reason: "no_user_identifier", tokenId },
+            "readiness ingest not persisted to analyses store: no user identifier in payload",
+          );
+        }
+      } catch (analysisError) {
+        request.log.warn(
+          {
+            event: "readiness_submit_analysis_failed",
+            tokenId,
+            reason:
+              analysisError instanceof Error
+                ? analysisError.message.slice(0, 200)
+                : "analysis_persist_failed",
+          },
+          "failed to persist readiness ingest to analyses store (non-blocking)",
+        );
+      }
 
       return reply.status(200).send({
         message: "Vygo has successfully received your readiness results.",
