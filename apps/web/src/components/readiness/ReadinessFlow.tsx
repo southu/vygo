@@ -147,17 +147,35 @@ function newAnalysisRequestedFromUrl(): boolean {
   }
 }
 
-/** Outcome of a run-start attempt against POST /api/readiness/start. */
-type RunStartOutcome = "started" | "conflict" | "error";
+/**
+ * Outcome of a run-start attempt against POST /api/readiness/start.
+ * - "started": a new run was created (HTTP 2xx).
+ * - "conflict": the SAME project already has an in-progress run (HTTP 409) — the
+ *   backend guardrail blocked a duplicate; we surface it, we never proceed.
+ * - "rate_limited": the per-user start limit was hit (HTTP 429).
+ * - "blocked": guardrail state could not be confirmed (provisioning/credential
+ *   failure, unexpected status, or a transport error). We FAIL CLOSED here —
+ *   the start is treated as blocked rather than silently allowed through.
+ */
+type RunStartOutcome = "started" | "conflict" | "rate_limited" | "blocked";
+
+/** A run-start attempt result, carrying the pointer data a block needs to show. */
+type RunStartResult = {
+  outcome: RunStartOutcome;
+  /** For a 409 conflict: the id of the already-running run (pointer target). */
+  runId: string | null;
+};
 
 /**
  * Start a fresh, non-destructive readiness run for `project`. Creates a new,
  * distinct run row server-side (never upserts) so prior completed analyses are
- * preserved. A 409 means the same project already has a fresh in-progress run —
- * still non-blocking, we continue with it. Best-effort: any transport failure
- * degrades to "error" and the caller still lets the user proceed.
+ * preserved. Surfaces the backend guardrails rather than swallowing them:
+ * a 409 (same project already running) and 429 (per-user rate limit) each map
+ * to a distinct outcome the caller renders as an in-flow message. Fails closed:
+ * any other non-OK status or a transport failure becomes "blocked", never a
+ * silent success.
  */
-async function startReadinessRun(project: string, credential: string): Promise<RunStartOutcome> {
+async function startReadinessRun(project: string, credential: string): Promise<RunStartResult> {
   try {
     const res = await fetch("/api/readiness/start", {
       method: "POST",
@@ -167,11 +185,23 @@ async function startReadinessRun(project: string, credential: string): Promise<R
       },
       body: JSON.stringify({ project, submission_token: credential }),
     });
-    if (res.ok) return "started";
-    if (res.status === 409) return "conflict";
-    return "error";
+    if (res.ok) return { outcome: "started", runId: null };
+    if (res.status === 409) {
+      // Duplicate-start block. Read run_id (best-effort) so the message can
+      // point the user at the analysis that is already running.
+      const payload = (await res.json().catch(() => null)) as { run_id?: unknown } | null;
+      const runId =
+        payload && typeof payload.run_id === "string" && payload.run_id.trim()
+          ? payload.run_id.trim()
+          : null;
+      return { outcome: "conflict", runId };
+    }
+    if (res.status === 429) return { outcome: "rate_limited", runId: null };
+    // Any other status (e.g. 503 provisioning_unavailable / 401) is a state we
+    // cannot confirm as safe → fail closed.
+    return { outcome: "blocked", runId: null };
   } catch {
-    return "error";
+    return { outcome: "blocked", runId: null };
   }
 }
 
@@ -244,6 +274,8 @@ export function ReadinessFlow() {
   const [newProjectInput, setNewProjectInput] = useState("");
   const [startStatus, setStartStatus] = useState<"idle" | "starting" | RunStartOutcome>("idle");
   const [runProject, setRunProject] = useState("");
+  /** run_id of the already-running analysis, when a start was blocked as a duplicate. */
+  const [conflictRunId, setConflictRunId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [email, setEmail] = useState("");
@@ -1158,16 +1190,23 @@ export function ReadinessFlow() {
       credential = await mintSubmissionToken();
       if (credential) setSubmissionToken(credential);
     }
-    const outcome: RunStartOutcome = credential
+    // No credential means the guardrail state can't be checked → fail closed.
+    const result: RunStartResult = credential
       ? await startReadinessRun(project, credential)
-      : "error";
+      : { outcome: "blocked", runId: null };
     // Remember the label for the choose-existing list and file it on the session.
     setKnownProjects(rememberProjectLabel(project));
     setProjectLabel(project);
     setRunProject(project);
-    await persist(stage1, "intake", { project }, undefined, { projectLabel: project });
-    setStartStatus(outcome);
-    trackAnalytics("run_started", { via: "readiness_start", outcome });
+    setConflictRunId(result.runId);
+    // Only advance the session into intake when a run actually started. A
+    // blocked/limited/duplicate start keeps the user on the project step with a
+    // visible message instead of silently proceeding.
+    if (result.outcome === "started") {
+      await persist(stage1, "intake", { project }, undefined, { projectLabel: project });
+    }
+    setStartStatus(result.outcome);
+    trackAnalytics("run_started", { via: "readiness_start", outcome: result.outcome });
   };
 
   /** Advance from the project step into the existing intake questions. */
@@ -1184,6 +1223,7 @@ export function ReadinessFlow() {
   const startNewAnalysis = () => {
     trackAnalytics("new_analysis_clicked", { from: view });
     setStartStatus("idle");
+    setConflictRunId(null);
     setStage1(EMPTY_STAGE1);
     setStepIndex(0);
     setPasteText("");
@@ -1528,19 +1568,98 @@ export function ReadinessFlow() {
 
   if (view === "project") {
     const existing = knownProjects.length > 0 ? knownProjects : [c.project.defaultProject];
-    const started =
-      startStatus === "started" || startStatus === "conflict" || startStatus === "error";
-    const startedNote =
-      startStatus === "conflict"
-        ? c.project.runningNote
-        : startStatus === "error"
-          ? c.project.errorNote
-          : c.project.started;
+    // A real, non-destructive start advances to intake. A blocked guardrail
+    // (duplicate / rate limit / fail-closed) instead renders an in-flow alert
+    // ABOVE the still-usable project form so the user can retry or pick another
+    // project — it must never silently proceed.
+    const started = startStatus === "started";
+    const guardrailBlocked =
+      startStatus === "conflict" || startStatus === "rate_limited" || startStatus === "blocked";
     const canStart = chosenProject.length > 0 && startStatus !== "starting";
     const optionBase =
       "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm transition-colors";
     const optionSelected = "border-purple bg-purple-soft/40";
     const optionIdle = "border-border bg-canvas hover:border-purple/40";
+
+    // In-flow guardrail alerts. Reuse the site's established alert box pattern
+    // (rounded-xl border + tinted background + role="alert"), matching the
+    // WaitlistForm error/notice styling — no ad-hoc inline styles. The duplicate
+    // block (red) and the rate-limit notice (amber) read as distinct situations.
+    const startBlockNotice =
+      startStatus === "conflict" ? (
+        <div
+          className="rounded-xl border border-red bg-red/5 p-4"
+          role="alert"
+          aria-live="assertive"
+          data-testid="readiness-start-blocked"
+          data-block-reason="duplicate"
+        >
+          <p className="text-sm font-semibold text-red" data-testid="readiness-duplicate-title">
+            {c.project.duplicateTitle}
+          </p>
+          <p className="mt-2 text-sm text-ink-soft" data-testid="readiness-duplicate-message">
+            {c.project.duplicateBodyPrefix}
+            <span className="font-semibold text-ink" data-testid="readiness-duplicate-project">
+              {runProject}
+            </span>
+            {c.project.duplicateBodySuffix}
+          </p>
+          <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <a
+              href="/analyses"
+              className="font-semibold text-purple underline hover:text-purple-dark"
+              data-testid="readiness-duplicate-pointer"
+              {...(conflictRunId ? { "data-run-id": conflictRunId } : {})}
+            >
+              {c.project.duplicatePointerLink}
+            </a>
+            {conflictRunId ? (
+              <span className="text-muted">
+                {c.project.duplicatePointerLabel}{" "}
+                <code
+                  className="font-mono text-xs text-ink-soft"
+                  data-testid="readiness-duplicate-run-id"
+                >
+                  {conflictRunId}
+                </code>
+              </span>
+            ) : null}
+          </p>
+        </div>
+      ) : startStatus === "rate_limited" ? (
+        <div
+          className="rounded-xl border border-amber bg-amber/10 p-4"
+          role="alert"
+          aria-live="assertive"
+          data-testid="readiness-start-blocked"
+          data-block-reason="rate-limit"
+        >
+          <p
+            className="text-sm font-semibold text-amber-dark"
+            data-testid="readiness-rate-limit-title"
+          >
+            {c.project.rateLimitTitle}
+          </p>
+          <p className="mt-2 text-sm text-ink-soft" data-testid="readiness-rate-limit-message">
+            {c.project.rateLimitBody}
+          </p>
+        </div>
+      ) : (
+        <div
+          className="rounded-xl border border-red bg-red/5 p-4"
+          role="alert"
+          aria-live="assertive"
+          data-testid="readiness-start-blocked"
+          data-block-reason="unavailable"
+        >
+          <p className="text-sm font-semibold text-red" data-testid="readiness-blocked-title">
+            {c.project.blockedTitle}
+          </p>
+          <p className="mt-2 text-sm text-ink-soft" data-testid="readiness-blocked-message">
+            {c.project.blockedBody}
+          </p>
+        </div>
+      );
     return (
       <div
         className="readiness-assessment mt-8"
@@ -1558,7 +1677,7 @@ export function ReadinessFlow() {
           {started ? (
             <div data-testid="readiness-project-started" role="status" aria-live="polite">
               <p className="font-semibold text-ink" data-testid="readiness-run-started-message">
-                {startedNote}
+                {c.project.started}
               </p>
               <p className="mt-2 text-sm text-muted">
                 {c.project.projectPrefix}:{" "}
@@ -1577,6 +1696,7 @@ export function ReadinessFlow() {
             </div>
           ) : (
             <fieldset>
+              {guardrailBlocked ? <div className="mb-5">{startBlockNotice}</div> : null}
               <legend className="text-sm font-medium text-ink-soft">
                 {c.project.existingGroupLabel}
               </legend>

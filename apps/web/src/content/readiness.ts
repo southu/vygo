@@ -27,11 +27,25 @@ export const readinessContent = {
     continue: "Continue to intake",
     started:
       "New analysis run started — it's in progress. Your earlier completed results stay available.",
-    runningNote:
-      "A run is already in progress for this project — continuing with it. Earlier results are untouched.",
-    errorNote:
-      "We couldn't record the run just now, but you can still continue this analysis — nothing earlier was changed.",
     projectPrefix: "Project",
+    /**
+     * Guardrail messages surfaced in-flow when a start is blocked. Each is a
+     * distinct, DOM-visible alert so a block is never silent. `duplicate` and
+     * `rateLimit` deliberately differ in wording (and colour) so the two
+     * guardrails read as different situations to the user.
+     */
+    duplicateTitle: "An analysis is already running for this project",
+    duplicateBodyPrefix: "We didn't start a second analysis for ",
+    duplicateBodySuffix:
+      " because one is already in progress. Wait for it to finish before starting another — or start a new analysis for a different project.",
+    duplicatePointerLabel: "Running analysis reference:",
+    duplicatePointerLink: "View your analyses",
+    rateLimitTitle: "You've hit the analysis start limit",
+    rateLimitBody:
+      "You've started a lot of analyses in a short time, so we've paused new starts for now. Please wait a little while and try again — your existing runs and results are safe.",
+    blockedTitle: "We couldn't start this analysis",
+    blockedBody:
+      "We couldn't confirm it was safe to start a new run just now, so we've held off rather than start one silently. Please try again in a moment.",
   },
   newAnalysis: {
     label: "New analysis",
