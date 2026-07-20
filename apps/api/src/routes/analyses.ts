@@ -46,6 +46,17 @@ export type AnalysesRouteDeps = {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ANALYSES_RL_LIMIT = 30;
 const ANALYSES_RL_WINDOW_SECONDS = 60;
+// Read-only poll budget. The scoped read paths (GET list, GET result, GET
+// :id detail) are polled by a normal client while a run is in progress until it
+// completes, so they cannot share the 30/60s create/ingest budget — a run that
+// legitimately takes a couple of minutes would trip RATE_LIMITED long before
+// the client observes the completed result, and the burst starves every other
+// call behind it. A separate, generous budget on its own key sizes for
+// sustained polling (a 2s interval fits comfortably under 120/60s) while still
+// bounding abuse. The marketing edge proxies its scoped reads here, so this is
+// the effective ceiling a live poller hits.
+const ANALYSES_POLL_RL_LIMIT = 120;
+const ANALYSES_POLL_RL_WINDOW_SECONDS = 60;
 const MAX_FIELD_LEN = 512;
 
 function isJsonContentType(header: string | string[] | undefined): boolean {
@@ -98,20 +109,35 @@ function pickString(record: Record<string, unknown>, keys: string[]): string | n
   return null;
 }
 
+async function resolveRateLimitKeyPart(
+  request: FastifyRequest,
+  deps: AnalysesRouteDeps,
+): Promise<string> {
+  const rawIp = resolveClientIp(request);
+  const ipHashResult = hashIpAddress(rawIp, deps.env);
+  if (ipHashResult) return ipHashResult.hash;
+  const { createHmac } = await import("node:crypto");
+  return `rlfb:${createHmac("sha256", "vygo-analyses-rl").update(rawIp).digest("hex").slice(0, 32)}`;
+}
+
+async function replyRateLimited(
+  reply: FastifyReply,
+  retryAfterSeconds: number | undefined,
+): Promise<void> {
+  const retryAfter = Math.max(1, Math.min(retryAfterSeconds || 60, 60));
+  await reply
+    .status(429)
+    .header("Retry-After", String(retryAfter))
+    .send(safeError("RATE_LIMITED", "Too many attempts. Please try again later."));
+}
+
+/** Strict create/ingest budget — mutating and fixture-seeding routes. */
 async function enforceAnalysesRateLimit(
   request: FastifyRequest,
   reply: FastifyReply,
   deps: AnalysesRouteDeps,
 ): Promise<boolean> {
-  const rawIp = resolveClientIp(request);
-  const ipHashResult = hashIpAddress(rawIp, deps.env);
-  let keyPart: string;
-  if (ipHashResult) {
-    keyPart = ipHashResult.hash;
-  } else {
-    const { createHmac } = await import("node:crypto");
-    keyPart = `rlfb:${createHmac("sha256", "vygo-analyses-rl").update(rawIp).digest("hex").slice(0, 32)}`;
-  }
+  const keyPart = await resolveRateLimitKeyPart(request, deps);
   const result = await checkRateLimit(
     deps.rateLimitStore,
     `rl:analyses:v1:ip:${keyPart}`,
@@ -119,11 +145,31 @@ async function enforceAnalysesRateLimit(
     ANALYSES_RL_WINDOW_SECONDS,
   );
   if (!result.allowed) {
-    const retryAfter = Math.max(1, Math.min(result.retryAfterSeconds || 60, 60));
-    await reply
-      .status(429)
-      .header("Retry-After", String(retryAfter))
-      .send(safeError("RATE_LIMITED", "Too many attempts. Please try again later."));
+    await replyRateLimited(reply, result.retryAfterSeconds);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Generous read-only poll budget — scoped GET reads a client polls while a run
+ * is in progress (list, result, detail-by-id). Kept on its own key so it never
+ * shares (or starves) the strict create/ingest budget.
+ */
+async function enforceAnalysesPollRateLimit(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  deps: AnalysesRouteDeps,
+): Promise<boolean> {
+  const keyPart = await resolveRateLimitKeyPart(request, deps);
+  const result = await checkRateLimit(
+    deps.rateLimitStore,
+    `rl:analyses-poll:v1:ip:${keyPart}`,
+    ANALYSES_POLL_RL_LIMIT,
+    ANALYSES_POLL_RL_WINDOW_SECONDS,
+  );
+  if (!result.allowed) {
+    await replyRateLimited(reply, result.retryAfterSeconds);
     return false;
   }
   return true;
@@ -339,7 +385,8 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
   });
 
   app.get("/v1/analyses", async (request, reply) => {
-    if (!(await enforceAnalysesRateLimit(request, reply, deps))) return;
+    // Scoped history read — polled while a run is in progress; poll budget.
+    if (!(await enforceAnalysesPollRateLimit(request, reply, deps))) return;
 
     const query = (request.query ?? {}) as Record<string, unknown>;
     const user = pickString(query, ["user", "user_identifier", "email"]);
@@ -389,7 +436,8 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
   // URL (`?user=<id>`) resolves the migrated single analysis until a newer run
   // completes. A newer pending/failed run never shadows the last completed one.
   app.get("/v1/analyses/result", async (request, reply) => {
-    if (!(await enforceAnalysesRateLimit(request, reply, deps))) return;
+    // Latest-result read — polled to completion; poll budget.
+    if (!(await enforceAnalysesPollRateLimit(request, reply, deps))) return;
 
     const query = (request.query ?? {}) as Record<string, unknown>;
     const user = pickString(query, ["user", "user_identifier", "email"]);
@@ -640,7 +688,8 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
   });
 
   app.get("/v1/analyses/:id", async (request, reply) => {
-    if (!(await enforceAnalysesRateLimit(request, reply, deps))) return;
+    // Scoped detail-by-id — the primary in-progress poll target; poll budget.
+    if (!(await enforceAnalysesPollRateLimit(request, reply, deps))) return;
 
     const id = (request.params as { id?: string })?.id ?? "";
     if (!UUID_RE.test(id)) {
