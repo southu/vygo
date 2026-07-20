@@ -127,6 +127,22 @@
       "destination": "/api/readiness/snapshot?id=:id"
     },
     {
+      "source": "/api/analyses/:id",
+      "destination": "/api/readiness/analysis?id=:id"
+    },
+    {
+      "source": "/api/analyses",
+      "destination": "/api/readiness/analyses"
+    },
+    {
+      "source": "/v1/analyses/:id",
+      "destination": "/api/readiness/analysis?id=:id"
+    },
+    {
+      "source": "/v1/analyses",
+      "destination": "/api/readiness/analyses"
+    },
+    {
       "source": "/v1/public/availability",
       "destination": "/api/availability"
     },

@@ -26,6 +26,7 @@ import { registerTestSurfaceRoutes, TEST_SUPPORT_ROUTES } from "./routes/test-su
 import { registerWaitlistRoutes } from "./routes/waitlist.js";
 import { registerApplyRoutes } from "./routes/apply.js";
 import { registerReadinessRoutes } from "./routes/readiness.js";
+import { registerAnalysesRoutes } from "./routes/analyses.js";
 import { registerOpsRoutes } from "./routes/ops.js";
 import { registerResendWebhookRoutes } from "./routes/webhooks-resend.js";
 import {
@@ -329,6 +330,14 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
     getDb,
     rateLimitStore,
     turnstile,
+  });
+
+  // Readiness analyses store (lead follow-up): many analyses per user, keyed by
+  // (user, project). Aliased as /api/analyses on the marketing edge.
+  registerAnalysesRoutes(app, {
+    env,
+    getDb,
+    rateLimitStore,
   });
 
   // Internal ops (readiness list / brief / CSV) — Basic Auth via OPS_BASIC_AUTH_*.

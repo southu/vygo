@@ -412,6 +412,37 @@ export async function proxyGetStatus(
   );
 }
 
+/** Proxy analyses create to the Railway API (durable Postgres). */
+export async function proxyCreateAnalysis(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/analyses", body ?? {}, env, inboundHeaders);
+}
+
+/** Proxy analyses list (optionally filtered by user/project) to the Railway API. */
+export async function proxyListAnalyses(
+  filters: { user?: string | null; project?: string | null },
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  const params = new URLSearchParams();
+  if (filters.user) params.set("user", filters.user);
+  if (filters.project) params.set("project", filters.project);
+  const qs = params.toString();
+  return proxyJson("GET", `/v1/analyses${qs ? `?${qs}` : ""}`, undefined, env, inboundHeaders);
+}
+
+/** Proxy analyses get-by-id to the Railway API. */
+export async function proxyGetAnalysis(
+  id: string,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("GET", `/v1/analyses/${encodeURIComponent(id)}`, undefined, env, inboundHeaders);
+}
+
 export async function proxyGetSession(
   token: string,
   env: NodeJS.ProcessEnv = process.env,

@@ -37,6 +37,9 @@ import {
   proxyToken,
   proxySubmit,
   proxyGetStatus,
+  proxyCreateAnalysis,
+  proxyListAnalyses,
+  proxyGetAnalysis,
   resolveDatabaseUrl,
   resolveEdgeClientIp,
   type ReadinessHandlerResult,
@@ -75,6 +78,8 @@ const ALLOWED_OPS = new Set([
   "submit",
   "status",
   "ping",
+  "analyses",
+  "analysis",
 ]);
 
 /** Shared readiness edge rate-limit budget (aligns with Railway ~20/60s). */
@@ -235,7 +240,7 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null, credentials 
  * closed on bad tokens, oversized bodies, and rate limits — CORS here only
  * controls which origins a *browser* would let read the response.
  */
-const PERMISSIVE_CORS_OPS = new Set<string>(["submit", "ping"]);
+const PERMISSIVE_CORS_OPS = new Set<string>(["submit", "ping", "analyses", "analysis"]);
 
 /** Reflects the requesting origin (or `*` when none was sent) with no credentials. */
 function applyPermissiveCorsHeaders(res: EdgeResponse, origin: string | null): void {
@@ -1704,6 +1709,265 @@ async function handleStatusGet(req: EdgeRequest): Promise<ReadinessHandlerResult
 }
 
 // ---------------------------------------------------------------------------
+// analyses (readiness analyses store — many per user, keyed by user + project)
+// ---------------------------------------------------------------------------
+
+const ANALYSES_FIELD_MAX = 512;
+
+function pickAnalysesField(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim().slice(0, ANALYSES_FIELD_MAX);
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value).slice(0, ANALYSES_FIELD_MAX);
+    }
+  }
+  return null;
+}
+
+async function ensureAnalysesTablesEdge(sql: Sql): Promise<void> {
+  await sql`
+    CREATE TABLE IF NOT EXISTS analyses (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+      user_identifier text NOT NULL,
+      project_identifier text NOT NULL,
+      status text DEFAULT 'received' NOT NULL,
+      submission jsonb NOT NULL,
+      created_at timestamp with time zone DEFAULT now() NOT NULL,
+      updated_at timestamp with time zone DEFAULT now() NOT NULL
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS analyses_user_project_created_idx
+      ON analyses (user_identifier, project_identifier, created_at DESC)
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS analyses_user_created_idx
+      ON analyses (user_identifier, created_at DESC)
+  `;
+}
+
+type AnalysesEdgeRow = {
+  id: string;
+  user_identifier: string;
+  project_identifier: string;
+  status: string;
+  submission: unknown;
+  created_at: Date | string;
+  updated_at: Date | string;
+};
+
+function toAnalysesPublicEdge(row: AnalysesEdgeRow): Record<string, unknown> {
+  const submission =
+    row.submission && typeof row.submission === "object" && !Array.isArray(row.submission)
+      ? (row.submission as Record<string, unknown>)
+      : {};
+  const iso = (v: Date | string) => (v instanceof Date ? v.toISOString() : String(v));
+  return {
+    id: row.id,
+    user: row.user_identifier,
+    project: row.project_identifier,
+    status: row.status,
+    submission,
+    created_at: iso(row.created_at),
+    updated_at: iso(row.updated_at),
+  };
+}
+
+/** POST create / GET list. Direct Postgres when the edge is wired; else proxy. */
+async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const method = (req.method || "GET").toUpperCase();
+  const url = resolveDatabaseUrl();
+
+  if (method === "POST") {
+    const contentType = contentTypeBase(req.headers);
+    if (contentType && contentType !== "application/json") {
+      return {
+        status: 415,
+        body: {
+          error: {
+            code: "UNSUPPORTED_MEDIA_TYPE",
+            message: "Content-Type must be application/json.",
+          },
+        },
+      };
+    }
+    const parsedBody = readJsonBody(req);
+    if (!parsedBody.ok) {
+      return {
+        status: 400,
+        body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+      };
+    }
+    const record =
+      parsedBody.value && typeof parsedBody.value === "object" && !Array.isArray(parsedBody.value)
+        ? (parsedBody.value as Record<string, unknown>)
+        : {};
+    const user = pickAnalysesField(record, [
+      "user",
+      "user_identifier",
+      "userId",
+      "user_id",
+      "email",
+      "user_email",
+    ]);
+    const project = pickAnalysesField(record, [
+      "project",
+      "project_identifier",
+      "projectId",
+      "project_id",
+      "project_name",
+    ]);
+    if (!user) {
+      return {
+        status: 400,
+        body: {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "A user identifier (user or email) is required.",
+          },
+        },
+      };
+    }
+    if (!project) {
+      return {
+        status: 400,
+        body: {
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "A project identifier (project) is required.",
+          },
+        },
+      };
+    }
+
+    if (!url) return proxyCreateAnalysis(record, process.env, req.headers);
+
+    try {
+      const sql = getSql(url);
+      await ensureAnalysesTablesEdge(sql);
+      const status = pickAnalysesField(record, ["status"]) ?? "received";
+      const rows = await sql<AnalysesEdgeRow[]>`
+        INSERT INTO analyses (user_identifier, project_identifier, status, submission)
+        VALUES (${user}, ${project}, ${status}, ${JSON.stringify(record)}::jsonb)
+        RETURNING id, user_identifier, project_identifier, status, submission, created_at, updated_at
+      `;
+      const inserted = rows[0];
+      if (!inserted) {
+        return {
+          status: 500,
+          body: { error: { code: "INTERNAL_ERROR", message: "Analysis insert returned no row." } },
+        };
+      }
+      return { status: 201, body: { ok: true, analysis: toAnalysesPublicEdge(inserted) } };
+    } catch (error) {
+      return {
+        status: 500,
+        body: {
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "An unexpected error occurred. Please try again later.",
+          },
+        },
+        logError: error,
+      };
+    }
+  }
+
+  // GET list (optionally filtered by user/project).
+  const user = queryParam(req, "user").trim() || null;
+  const project = queryParam(req, "project").trim() || null;
+
+  if (!url) return proxyListAnalyses({ user, project }, process.env, req.headers);
+
+  try {
+    const sql = getSql(url);
+    await ensureAnalysesTablesEdge(sql);
+    let rows: AnalysesEdgeRow[];
+    if (user && project) {
+      rows = await sql<AnalysesEdgeRow[]>`
+        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+        FROM analyses WHERE user_identifier = ${user} AND project_identifier = ${project}
+        ORDER BY created_at DESC LIMIT 200`;
+    } else if (user) {
+      rows = await sql<AnalysesEdgeRow[]>`
+        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+        FROM analyses WHERE user_identifier = ${user}
+        ORDER BY created_at DESC LIMIT 200`;
+    } else if (project) {
+      rows = await sql<AnalysesEdgeRow[]>`
+        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+        FROM analyses WHERE project_identifier = ${project}
+        ORDER BY created_at DESC LIMIT 200`;
+    } else {
+      rows = await sql<AnalysesEdgeRow[]>`
+        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+        FROM analyses ORDER BY created_at DESC LIMIT 200`;
+    }
+    const analyses = rows.map(toAnalysesPublicEdge);
+    return { status: 200, body: { ok: true, count: analyses.length, analyses } };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred. Please try again later.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
+/** GET one analysis by id. Direct Postgres when the edge is wired; else proxy. */
+async function handleAnalysisGet(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const rl = checkEdgeRateLimit(req);
+  if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
+
+  const id = queryParam(req, "id");
+  if (!id || !UUID_RE.test(id)) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Invalid analysis id." } },
+    };
+  }
+
+  const url = resolveDatabaseUrl();
+  if (!url) return proxyGetAnalysis(id, process.env, req.headers);
+
+  try {
+    const sql = getSql(url);
+    await ensureAnalysesTablesEdge(sql);
+    const rows = await sql<AnalysesEdgeRow[]>`
+      SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+      FROM analyses WHERE id = ${id} LIMIT 1`;
+    const row = rows[0];
+    if (!row) {
+      return {
+        status: 404,
+        body: { error: { code: "NOT_FOUND", message: "Analysis not found." } },
+      };
+    }
+    return { status: 200, body: { ok: true, analysis: toAnalysesPublicEdge(row) } };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred. Please try again later.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // HTTP entry
 // ---------------------------------------------------------------------------
 
@@ -1749,9 +2013,19 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     return;
   }
 
-  // submission / brief / snapshot / status are GET; score / snapshot-email / others are POST
-  const getOps = new Set(["submission", "brief", "snapshot", "status", "ping"]);
-  if (getOps.has(op)) {
+  // submission / brief / snapshot / status / analysis are GET; analyses accepts
+  // both (POST create / GET list); score / snapshot-email / others are POST.
+  const getOps = new Set(["submission", "brief", "snapshot", "status", "ping", "analysis"]);
+  const getOrPostOps = new Set(["analyses"]);
+  if (getOrPostOps.has(op)) {
+    if (req.method !== "GET" && req.method !== "POST") {
+      res.setHeader("Allow", "GET, POST, OPTIONS");
+      res
+        .status(405)
+        .json({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." } });
+      return;
+    }
+  } else if (getOps.has(op)) {
     if (req.method !== "GET") {
       res.setHeader("Allow", "GET, OPTIONS");
       res
@@ -1797,6 +2071,10 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleStatusGet(req);
     } else if (op === "ping") {
       result = await handlePing(req);
+    } else if (op === "analyses") {
+      result = await handleAnalyses(req);
+    } else if (op === "analysis") {
+      result = await handleAnalysisGet(req);
     } else {
       result = await handleSubmissionGet(req);
     }

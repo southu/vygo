@@ -42,6 +42,17 @@ export {
   type ApplicationPublicRow,
 } from "./applications.js";
 export {
+  ensureAnalysesTable,
+  insertAnalysis,
+  listAnalyses,
+  findAnalysisById,
+  toAnalysisPublic,
+  type AnalysisRow,
+  type AnalysisPublic,
+  type InsertAnalysisInput,
+  type ListAnalysesFilters,
+} from "./analyses.js";
+export {
   generateReadinessSessionToken,
   redactSensitivePaste,
   redactSessionDraft,
