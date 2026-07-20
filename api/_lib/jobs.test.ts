@@ -5,7 +5,15 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { validateApplication, type ApplicationInput } from "./jobs.js";
+import {
+  countApplicationsByRole,
+  createApplication,
+  getApplication,
+  listApplications,
+  updateApplicationStatus,
+  validateApplication,
+  type ApplicationInput,
+} from "./jobs.js";
 
 function base(overrides: Partial<ApplicationInput> = {}): ApplicationInput {
   return {
@@ -62,5 +70,41 @@ describe("validateApplication", () => {
     const result = validateApplication(base());
     assert.equal(result.ok, true);
     if (result.ok) assert.equal(result.coverNote, null);
+  });
+});
+
+describe("application review lifecycle", () => {
+  it("creates, reads, lists by role, counts, and advances status", () => {
+    const roleId = `test-role-${Math.floor(Math.random() * 1e9)}`;
+    const created = createApplication(roleId, {
+      name: "Casey Rivera",
+      email: "casey@example.com",
+      resume: "https://example.com/casey.pdf",
+      coverNote: "Excited to help.",
+    });
+    assert.equal(created.status, "new");
+
+    const fetched = getApplication(created.id);
+    assert.equal(fetched?.name, "Casey Rivera");
+    assert.equal(fetched?.email, "casey@example.com");
+    assert.equal(fetched?.resume, "https://example.com/casey.pdf");
+    assert.equal(fetched?.cover_note, "Excited to help.");
+
+    const forRole = listApplications(roleId);
+    assert.equal(forRole.length, 1);
+    assert.equal(forRole[0]?.id, created.id);
+
+    assert.equal(countApplicationsByRole()[roleId], 1);
+
+    const reviewed = updateApplicationStatus(created.id, "reviewed");
+    assert.equal(reviewed?.status, "reviewed");
+    const decided = updateApplicationStatus(created.id, "decided");
+    assert.equal(decided?.status, "decided");
+    assert.equal(getApplication(created.id)?.status, "decided");
+  });
+
+  it("returns null for an unknown application id", () => {
+    assert.equal(getApplication("does-not-exist"), null);
+    assert.equal(updateApplicationStatus("does-not-exist", "reviewed"), null);
   });
 });

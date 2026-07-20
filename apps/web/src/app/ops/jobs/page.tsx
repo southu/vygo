@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { OpsJobsClient } from "./OpsJobsClient";
 
 export const metadata: Metadata = {
-  title: "Ops · Job roles",
+  title: "Ops · Job roles & applications",
   robots: { index: false, follow: false },
-  description: "Internal job-role management (ops only).",
+  description: "Internal job-role management and application review (ops only).",
 };
 
 /**

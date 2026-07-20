@@ -142,6 +142,17 @@ export function toRoleDetail(role: Role): Role & { created: string; updated: str
   return { ...role, created: role.created_at, updated: role.updated_at };
 }
 
+/**
+ * Admin role for GET /api/internal/roles — role detail plus the count of
+ * applications submitted for it, so the admin roles list shows per-role tracking.
+ */
+export function toRoleAdmin(
+  role: Role,
+  applicationCount: number,
+): Role & { created: string; updated: string; application_count: number } {
+  return { ...toRoleDetail(role), application_count: applicationCount };
+}
+
 export function toApplicationPublic(app: Application): Application {
   return { ...app };
 }
@@ -295,6 +306,21 @@ export function listApplications(roleId?: string): Application[] {
   const all = [...applications.values()];
   const filtered = roleId ? all.filter((a) => a.role_id === roleId) : all;
   return filtered.sort((a, b) => b.created_at.localeCompare(a.created_at)).map((a) => ({ ...a }));
+}
+
+/** Read a single application (admin detail). Returns null when the id is unknown. */
+export function getApplication(id: string): Application | null {
+  const app = applications.get(id.trim());
+  return app ? { ...app } : null;
+}
+
+/** Number of applications submitted per role id (admin roles-list counts). */
+export function countApplicationsByRole(): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const app of applications.values()) {
+    counts[app.role_id] = (counts[app.role_id] ?? 0) + 1;
+  }
+  return counts;
 }
 
 export function isApplicationStatus(value: unknown): value is ApplicationStatus {

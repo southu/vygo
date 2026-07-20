@@ -8,7 +8,7 @@ import {
   saveOpsCredentials,
 } from "@/lib/ops-auth";
 
-/** Role shape returned by GET/PATCH/POST /api/internal/roles (toRoleDetail). */
+/** Role shape returned by GET/PATCH/POST /api/internal/roles (toRoleAdmin). */
 type AdminRole = {
   id: string;
   title: string;
@@ -19,6 +19,48 @@ type AdminRole = {
   status: "open" | "closed";
   created_at: string;
   updated_at: string;
+  /** Number of applications submitted for this role (admin roles-list count). */
+  application_count?: number;
+};
+
+/** Application shape returned by GET/PATCH /api/internal/applications (toApplicationPublic). */
+type AdminApplication = {
+  id: string;
+  role_id: string;
+  name: string;
+  email: string;
+  resume: string | null;
+  cover_note: string | null;
+  status: ApplicationStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+type ApplicationStatus = "new" | "reviewed" | "decided";
+
+/** Ordered lifecycle; the next status after the current one, or null at the end. */
+const APPLICATION_STATUSES: readonly ApplicationStatus[] = ["new", "reviewed", "decided"];
+
+function nextStatus(status: ApplicationStatus): ApplicationStatus | null {
+  const i = APPLICATION_STATUSES.indexOf(status);
+  return i >= 0 && i < APPLICATION_STATUSES.length - 1
+    ? (APPLICATION_STATUSES[i + 1] ?? null)
+    : null;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toISOString().slice(0, 10);
+}
+
+function isHttpLink(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+
+const STATUS_BADGE: Record<ApplicationStatus, string> = {
+  new: "bg-blue-100 text-blue-800",
+  reviewed: "bg-amber-100 text-amber-800",
+  decided: "bg-green-100 text-green-800",
 };
 
 type RoleFields = {
@@ -56,6 +98,15 @@ export function OpsJobsClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editFields, setEditFields] = useState<RoleFields>(EMPTY_FIELDS);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Applications review: which role is expanded, its applications, and the
+  // selected application's detail id.
+  const [viewingRoleId, setViewingRoleId] = useState<string | null>(null);
+  const [applications, setApplications] = useState<AdminApplication[]>([]);
+  const [appsLoading, setAppsLoading] = useState(false);
+  const [appsError, setAppsError] = useState<string | null>(null);
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const [appBusyId, setAppBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     setAuthHeader(loadOpsAuthHeader());
@@ -236,6 +287,79 @@ export function OpsJobsClient() {
       setListError("Reopen failed.");
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const loadApplications = useCallback(
+    async (header: string, roleId: string) => {
+      setAppsLoading(true);
+      setAppsError(null);
+      try {
+        const res = await fetch(opsApiUrl("/api/internal/applications", { role_id: roleId }), {
+          headers: { accept: "application/json", authorization: header },
+          cache: "no-store",
+        });
+        if (res.status === 401) {
+          onUnauthorized("Authentication required. Enter ops credentials.");
+          return;
+        }
+        if (!res.ok) {
+          setAppsError(`Could not load applications (HTTP ${res.status}).`);
+          setApplications([]);
+          return;
+        }
+        const body = (await res.json()) as AdminApplication[];
+        setApplications(Array.isArray(body) ? body : []);
+      } catch {
+        setAppsError("Could not load applications.");
+        setApplications([]);
+      } finally {
+        setAppsLoading(false);
+      }
+    },
+    [onUnauthorized],
+  );
+
+  const viewApplications = (role: AdminRole) => {
+    setSelectedAppId(null);
+    setNotice(null);
+    if (viewingRoleId === role.id) {
+      setViewingRoleId(null);
+      setApplications([]);
+      return;
+    }
+    setViewingRoleId(role.id);
+    setApplications([]);
+    if (authHeader) void loadApplications(authHeader, role.id);
+  };
+
+  const setStatus = async (app: AdminApplication, status: ApplicationStatus) => {
+    if (!authHeader) return;
+    setAppBusyId(app.id);
+    setAppsError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(
+        opsApiUrl(`/api/internal/applications/${encodeURIComponent(app.id)}`),
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json", authorization: authHeader },
+          cache: "no-store",
+          body: JSON.stringify({ status }),
+        },
+      );
+      if (res.status === 401) return onUnauthorized("Session expired. Sign in again.");
+      if (!res.ok) {
+        setAppsError(`Status update failed (HTTP ${res.status}).`);
+        return;
+      }
+      setNotice(`Application from ${app.name} is now “${status}”.`);
+      if (viewingRoleId) await loadApplications(authHeader, viewingRoleId);
+      await loadRoles(authHeader);
+    } catch {
+      setAppsError("Status update failed.");
+    } finally {
+      setAppBusyId(null);
     }
   };
 
@@ -464,65 +588,277 @@ export function OpsJobsClient() {
                     </div>
                   </form>
                 ) : (
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-display text-lg font-semibold text-ink">
-                          {role.title}
-                        </h3>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            role.status === "open"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-neutral-200 text-neutral-700"
-                          }`}
-                        >
-                          {role.status}
-                        </span>
+                  <>
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-display text-lg font-semibold text-ink">
+                            {role.title}
+                          </h3>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              role.status === "open"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-neutral-200 text-neutral-700"
+                            }`}
+                          >
+                            {role.status}
+                          </span>
+                          <span
+                            className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-700"
+                            data-testid="role-application-count"
+                            data-count={role.application_count ?? 0}
+                          >
+                            {role.application_count ?? 0}{" "}
+                            {(role.application_count ?? 0) === 1 ? "application" : "applications"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-muted">
+                          {role.location} · {role.type}
+                        </p>
+                        <p className="mt-2 max-w-2xl text-sm text-ink-soft">{role.summary}</p>
                       </div>
-                      <p className="mt-1 text-sm text-muted">
-                        {role.location} · {role.type}
-                      </p>
-                      <p className="mt-2 max-w-2xl text-sm text-ink-soft">{role.summary}</p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => startEdit(role)}
-                        data-testid="role-edit"
-                      >
-                        Edit
-                      </button>
-                      {role.status === "open" ? (
+                      <div className="flex shrink-0 flex-wrap gap-2">
                         <button
                           type="button"
                           className="btn btn-secondary"
-                          onClick={() => void closeRole(role)}
-                          disabled={isBusy}
-                          data-testid="role-close"
+                          onClick={() => viewApplications(role)}
+                          data-testid="role-view-applications"
+                          aria-expanded={viewingRoleId === role.id}
                         >
-                          {isBusy ? "…" : "Close"}
+                          {viewingRoleId === role.id ? "Hide applications" : "View applications"}
                         </button>
-                      ) : (
                         <button
                           type="button"
-                          className="btn btn-primary"
-                          onClick={() => void reopenRole(role)}
-                          disabled={isBusy}
-                          data-testid="role-reopen"
+                          className="btn btn-secondary"
+                          onClick={() => startEdit(role)}
+                          data-testid="role-edit"
                         >
-                          {isBusy ? "…" : "Reopen"}
+                          Edit
                         </button>
-                      )}
+                        {role.status === "open" ? (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => void closeRole(role)}
+                            disabled={isBusy}
+                            data-testid="role-close"
+                          >
+                            {isBusy ? "…" : "Close"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => void reopenRole(role)}
+                            disabled={isBusy}
+                            data-testid="role-reopen"
+                          >
+                            {isBusy ? "…" : "Reopen"}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                    {viewingRoleId === role.id ? (
+                      <ApplicationsPanel
+                        loading={appsLoading}
+                        error={appsError}
+                        applications={applications}
+                        selectedAppId={selectedAppId}
+                        appBusyId={appBusyId}
+                        onSelect={(id) => setSelectedAppId((cur) => (cur === id ? null : id))}
+                        onSetStatus={setStatus}
+                        onRefresh={() => authHeader && void loadApplications(authHeader, role.id)}
+                      />
+                    ) : null}
+                  </>
                 )}
               </li>
             );
           })}
         </ul>
       </section>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: ApplicationStatus }) {
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[status]}`}
+      data-testid="application-status"
+    >
+      {status}
+    </span>
+  );
+}
+
+function ApplicationsPanel({
+  loading,
+  error,
+  applications,
+  selectedAppId,
+  appBusyId,
+  onSelect,
+  onSetStatus,
+  onRefresh,
+}: {
+  loading: boolean;
+  error: string | null;
+  applications: AdminApplication[];
+  selectedAppId: string | null;
+  appBusyId: string | null;
+  onSelect: (id: string) => void;
+  onSetStatus: (app: AdminApplication, status: ApplicationStatus) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div
+      className="mt-4 rounded-xl border border-border bg-canvas p-4"
+      data-testid="applications-panel"
+    >
+      <div className="flex items-center justify-between">
+        <h4 className="font-display text-base font-semibold text-ink">
+          Applications{" "}
+          <span className="text-sm font-normal text-muted">
+            {loading ? "(loading…)" : `(${applications.length})`}
+          </span>
+        </h4>
+        <button type="button" className="btn btn-secondary" onClick={onRefresh}>
+          Refresh
+        </button>
+      </div>
+
+      {error ? (
+        <p className="mt-3 rounded-lg border border-red-600/30 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
+
+      {applications.length === 0 && !loading ? (
+        <p className="mt-3 text-sm text-muted">No applications submitted yet.</p>
+      ) : null}
+
+      <ul className="mt-3 space-y-3" data-testid="applications-list">
+        {applications.map((app) => {
+          const isOpen = selectedAppId === app.id;
+          const isBusy = appBusyId === app.id;
+          const next = nextStatus(app.status);
+          return (
+            <li
+              key={app.id}
+              className="rounded-xl border border-border bg-surface p-4"
+              data-testid="application-row"
+              data-application-id={app.id}
+              data-application-status={app.status}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-ink" data-testid="application-name">
+                      {app.name}
+                    </span>
+                    <StatusBadge status={app.status} />
+                  </div>
+                  <p className="mt-1 text-sm text-muted">
+                    <span data-testid="application-email">{app.email}</span> · submitted{" "}
+                    <span data-testid="application-submitted">{formatDate(app.created_at)}</span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => onSelect(app.id)}
+                  data-testid="application-open"
+                  aria-expanded={isOpen}
+                >
+                  {isOpen ? "Hide detail" : "View detail"}
+                </button>
+              </div>
+
+              {isOpen ? (
+                <div
+                  className="mt-4 space-y-4 border-t border-border pt-4"
+                  data-testid="application-detail"
+                >
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Resume
+                    </p>
+                    {app.resume ? (
+                      isHttpLink(app.resume) ? (
+                        <a
+                          className="mt-1 inline-block break-all text-sm text-blue-700 underline"
+                          href={app.resume}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-testid="application-resume-link"
+                        >
+                          {app.resume}
+                        </a>
+                      ) : (
+                        <p
+                          className="mt-1 whitespace-pre-wrap text-sm text-ink-soft"
+                          data-testid="application-resume-text"
+                        >
+                          {app.resume}
+                        </p>
+                      )
+                    ) : (
+                      <p className="mt-1 text-sm text-muted">No resume provided.</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Cover note
+                    </p>
+                    {app.cover_note ? (
+                      <p
+                        className="mt-1 whitespace-pre-wrap text-sm text-ink-soft"
+                        data-testid="application-cover-note"
+                      >
+                        {app.cover_note}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-sm text-muted">No cover note provided.</p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      Status
+                    </span>
+                    {APPLICATION_STATUSES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        className={`btn ${s === app.status ? "btn-primary" : "btn-secondary"}`}
+                        disabled={isBusy || s === app.status}
+                        onClick={() => onSetStatus(app, s)}
+                        data-testid={`application-set-${s}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                    {next ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={isBusy}
+                        onClick={() => onSetStatus(app, next)}
+                        data-testid="application-advance"
+                      >
+                        {isBusy ? "…" : `Advance to ${next}`}
+                      </button>
+                    ) : (
+                      <span className="text-sm text-muted">Lifecycle complete.</span>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

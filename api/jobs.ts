@@ -13,7 +13,8 @@
  *   GET   /api/internal/roles/:id           read a role
  *   PATCH /api/internal/roles/:id           update a role
  *   POST  /api/internal/roles/:id/close     close a role (status 'closed')
- *   GET   /api/internal/applications        list applications
+ *   GET   /api/internal/applications        list applications (optional ?role_id=)
+ *   GET   /api/internal/applications/:id    read one application (full detail)
  *   PATCH /api/internal/applications/:id    update an application's status
  *
  * All paths land here via vercel.json rewrites carrying an explicit `resource`
@@ -21,14 +22,17 @@
  */
 import {
   closeRole,
+  countApplicationsByRole,
   createApplication,
   createRole,
+  getApplication,
   getRole,
   isApplicationStatus,
   listApplications,
   listAllRoles,
   listOpenRoles,
   toApplicationPublic,
+  toRoleAdmin,
   toRoleDetail,
   toRoleListItem,
   updateApplicationStatus,
@@ -153,7 +157,8 @@ function handleRoleApply(req: EdgeReqEx, res: EdgeResponse): void {
 function handleInternalRoles(req: EdgeReqEx, res: EdgeResponse): void {
   const method = methodOf(req);
   if (method === "GET" || method === "HEAD") {
-    res.status(200).json(listAllRoles().map(toRoleDetail));
+    const counts = countApplicationsByRole();
+    res.status(200).json(listAllRoles().map((r) => toRoleAdmin(r, counts[r.id] ?? 0)));
     return;
   }
   if (method === "POST") {
@@ -172,7 +177,8 @@ function handleInternalRole(req: EdgeReqEx, res: EdgeResponse): void {
   if (method === "GET" || method === "HEAD") {
     const role = id ? getRole(id) : null;
     if (!role) return notFound(res, "Role not found.");
-    res.status(200).json(toRoleDetail(role));
+    const counts = countApplicationsByRole();
+    res.status(200).json(toRoleAdmin(role, counts[role.id] ?? 0));
     return;
   }
   if (method === "PATCH" || method === "PUT") {
@@ -202,9 +208,16 @@ function handleInternalApplications(req: EdgeReqEx, res: EdgeResponse): void {
 }
 
 function handleInternalApplication(req: EdgeReqEx, res: EdgeResponse): void {
-  if (methodOf(req) !== "PATCH" && methodOf(req) !== "PUT")
-    return methodNotAllowed(res, "PATCH, PUT, OPTIONS");
+  const method = methodOf(req);
   const id = queryParam(req, "id").trim();
+  if (method === "GET" || method === "HEAD") {
+    const app = id ? getApplication(id) : null;
+    if (!app) return notFound(res, "Application not found.");
+    res.status(200).json(toApplicationPublic(app));
+    return;
+  }
+  if (method !== "PATCH" && method !== "PUT")
+    return methodNotAllowed(res, "GET, PATCH, PUT, OPTIONS");
   const parsed = readJsonBody(req);
   if (!parsed.ok) return badRequest(res, "Request body must be valid JSON.");
   const status = (parsed.value as { status?: unknown } | null)?.status;
