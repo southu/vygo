@@ -6,6 +6,12 @@ export const readinessContent = {
     title: "Is your product production-ready?",
     body: "Answer a few questions. We’ll generate a read-only diagnostic prompt tailored to how you build — no secrets, no code changes.",
   },
+  radar: {
+    eyebrow: "Readiness Radar",
+    title: "What a readiness report looks like",
+    body: "Five assessment dimensions on one radial view — scored from a live self-assessment. Hover or tab to any dimension to see its top critical risk factor.",
+    hint: "Hover, tap, or tab to a dimension node to reveal its top critical risk.",
+  },
   stage1: {
     progressLabel: "Stage 1 of 3 — intake",
     questions: {

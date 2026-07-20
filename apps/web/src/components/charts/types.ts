@@ -28,6 +28,12 @@ export type ChartDimension = {
    * segment). Derived from a real sub-metric when available — never filler.
    */
   evidence?: ChartEvidence | null;
+  /**
+   * Human-readable name of the dimension's top critical risk factor — the
+   * lowest-scored sub-metric that carries real evidence. Never invented:
+   * populated only from a real sub-metric label (see pickDimensionRiskFactor).
+   */
+  riskFactor?: string;
 };
 
 export type ReadinessChartData = {
@@ -89,9 +95,24 @@ export function formatEvidenceAnswer(value: unknown, max = EVIDENCE_ANSWER_MAX_C
  * sub-metric that has real evidence (highlights the binding constraint).
  */
 export function pickDimensionEvidence(subMetrics: ChartSubMetric[]): ChartEvidence | null {
+  return pickDimensionRiskSubMetric(subMetrics)?.evidence ?? null;
+}
+
+/**
+ * The dimension's binding constraint: the lowest-scored sub-metric that has real
+ * evidence. This is the "top critical risk factor" surfaced in radar tooltips.
+ */
+export function pickDimensionRiskSubMetric(subMetrics: ChartSubMetric[]): ChartSubMetric | null {
   const withEv = subMetrics
     .filter((sm) => hasChartEvidence(sm.evidence))
     .slice()
     .sort((a, b) => a.score - b.score);
-  return withEv[0]?.evidence ?? null;
+  return withEv[0] ?? null;
+}
+
+/** Name of the dimension's top critical risk factor (lowest sub-metric with evidence). */
+export function pickDimensionRiskFactor(subMetrics: ChartSubMetric[]): string | undefined {
+  const sm = pickDimensionRiskSubMetric(subMetrics);
+  const name = sm?.name?.trim();
+  return name ? name : undefined;
 }

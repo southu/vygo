@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { readinessContent } from "@/content/readiness";
 import { ReadinessFlow } from "@/components/readiness/ReadinessFlow";
+import { ReadinessRadarChart } from "@/components/charts";
+import {
+  getReadinessReportChartData,
+  getReadinessReportRiskMap,
+} from "@/lib/readiness/report-chart-data";
 
 export const metadata: Metadata = {
   title: "Readiness Check",
@@ -12,6 +17,10 @@ export const metadata: Metadata = {
 export default function ReadinessPage() {
   const c = readinessContent.page;
   const s3 = readinessContent.stage3;
+  const radar = readinessContent.radar;
+  // Real report data (build-time self-assessment) drives the radar + its tooltips.
+  const chartData = getReadinessReportChartData();
+  const riskMap = getReadinessReportRiskMap();
   return (
     <main
       id="main-content"
@@ -75,6 +84,32 @@ export default function ReadinessPage() {
           </div>
         </div>
       </section>
+
+      {chartData.dimensions.length > 0 ? (
+        <section className="section-pad pt-0" data-testid="readiness-radar-section">
+          <div className="container-page max-w-2xl">
+            <div className="card">
+              <p className="eyebrow">{radar.eyebrow}</p>
+              <h2 className="mt-3 font-display text-2xl font-bold tracking-tight">{radar.title}</h2>
+              <p className="mt-3 text-sm text-muted">{radar.body}</p>
+              <ReadinessRadarChart dimensions={chartData.dimensions} className="mt-6" />
+              <p className="mt-3 text-center text-xs text-muted" data-testid="readiness-radar-hint">
+                {radar.hint}
+              </p>
+            </div>
+            {/*
+              Machine-verifiable source of truth: the top critical risk factor per
+              dimension, derived from the same self-assessment report that drives the
+              radar tooltips. Lets automated checks compare tooltip text to report data.
+            */}
+            <script
+              type="application/json"
+              data-testid="readiness-radar-risk-data"
+              dangerouslySetInnerHTML={{ __html: JSON.stringify(riskMap) }}
+            />
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

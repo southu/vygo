@@ -15,6 +15,8 @@ export type EvidenceTooltipCardProps = {
   score: number;
   evidence: ChartEvidence;
   title?: string;
+  /** Name of the top critical risk factor (e.g. the binding sub-metric). */
+  riskFactor?: string;
   id?: string;
   className?: string;
 };
@@ -27,11 +29,13 @@ export function EvidenceTooltipCard({
   score,
   evidence,
   title,
+  riskFactor,
   id,
   className,
 }: EvidenceTooltipCardProps) {
   const answer = formatEvidenceAnswer(evidence.answer_value);
   const rounded = Math.round(score);
+  const risk = riskFactor?.trim();
   const summary = `Scored ${rounded} — ${evidence.reason.trim()}`;
 
   return (
@@ -52,6 +56,15 @@ export function EvidenceTooltipCard({
         Score {rounded}
         <span className="ml-1 text-xs font-semibold text-muted">/100</span>
       </p>
+      {risk ? (
+        <p
+          className="mt-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-red"
+          data-testid="chart-evidence-risk-factor"
+        >
+          <span className="text-muted">Top critical risk: </span>
+          {risk}
+        </p>
+      ) : null}
       <p className="mt-1.5 text-xs leading-snug text-ink-soft" data-testid="chart-evidence-reason">
         {evidence.reason.trim()}
       </p>
@@ -66,6 +79,7 @@ export function EvidenceTooltipCard({
       ) : null}
       {/* Compact single-line summary for machine/readers that expect one string */}
       <p className="sr-only" data-testid="chart-evidence-summary">
+        {risk ? `Top critical risk: ${risk}. ` : ""}
         {summary}
         {answer ? ` Answer: ${answer}` : ""}
       </p>
@@ -79,6 +93,8 @@ type InteractiveChartSegmentProps = {
   evidence?: ChartEvidence | null;
   /** Optional short label used in aria and tooltip title. */
   label?: string;
+  /** Name of the top critical risk factor shown in the tooltip. */
+  riskFactor?: string;
   className?: string;
   /** Extra attributes for the interactive control (data-testid, etc.). */
   controlClassName?: string;
@@ -122,6 +138,7 @@ export function InteractiveChartSegment({
   score,
   evidence,
   label,
+  riskFactor,
   className,
   controlClassName,
   children,
@@ -268,7 +285,13 @@ export function InteractiveChartSegment({
       </div>
       {open ? (
         <div className={`chart-evidence-tooltip-anchor ${placementClass}`} aria-hidden={false}>
-          <EvidenceTooltipCard id={tipId} score={score} evidence={evidence} title={label} />
+          <EvidenceTooltipCard
+            id={tipId}
+            score={score}
+            evidence={evidence}
+            title={label}
+            riskFactor={riskFactor}
+          />
         </div>
       ) : null}
     </div>

@@ -231,6 +231,7 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   score={score}
                   evidence={dim.evidence}
                   label={dim.dimension}
+                  riskFactor={dim.riskFactor}
                   segmentKind="radar-axis"
                   testId={`radar-axis-${slugify(dim.dimension)}`}
                   tooltipPlacement={h.top < 40 ? "bottom" : "top"}
@@ -263,6 +264,7 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   score={clampScore(dim.score)}
                   evidence={dim.evidence}
                   label={dim.dimension}
+                  riskFactor={dim.riskFactor}
                   segmentKind="radar-axis"
                   testId={`radar-axis-chip-${slugify(dim.dimension)}`}
                   tooltipPlacement="top"
