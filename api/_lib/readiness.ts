@@ -398,6 +398,28 @@ export async function proxySubmit(
   return proxyJson("POST", "/v1/readiness/submit", body ?? {}, env, inboundHeaders);
 }
 
+/**
+ * Proxy a run START to the Railway API (durable Postgres run store). Used when
+ * the marketing edge has no DATABASE_URL of its own; the credential is carried
+ * in the forwarded body (`submission_token`) so the upstream authenticates it.
+ */
+export async function proxyRunStart(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/start", body ?? {}, env, inboundHeaders);
+}
+
+/** Proxy a run COMPLETE to the Railway API (durable Postgres run store). */
+export async function proxyRunComplete(
+  body: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  inboundHeaders?: Record<string, string | string[] | undefined>,
+): Promise<ReadinessHandlerResult> {
+  return proxyJson("POST", "/v1/readiness/complete", body ?? {}, env, inboundHeaders);
+}
+
 export async function proxyGetStatus(
   token: string,
   env: NodeJS.ProcessEnv = process.env,

@@ -36,6 +36,8 @@ import {
   proxySnapshotEmail,
   proxyToken,
   proxySubmit,
+  proxyRunStart,
+  proxyRunComplete,
   proxyGetStatus,
   proxyCreateAnalysis,
   proxyListAnalyses,
@@ -2270,15 +2272,10 @@ async function handleStart(req: EdgeRequest): Promise<ReadinessHandlerResult> {
   }
   const url = resolveDatabaseUrl();
   if (!url) {
-    // Fail closed: without the store we cannot enforce the guard or limits.
-    return {
-      status: 503,
-      body: {
-        error: "unavailable",
-        code: "UNAVAILABLE",
-        message: "The run store is temporarily unavailable. Please try again later.",
-      },
-    };
+    // The marketing edge has no DATABASE_URL of its own: proxy the start to the
+    // Railway API (durable run store). Forward the credential in the body so the
+    // upstream authenticates it even if it only arrived as a Bearer header.
+    return proxyRunStart({ ...body, submission_token: credential }, process.env, req.headers);
   }
 
   try {
@@ -2453,14 +2450,8 @@ async function handleComplete(req: EdgeRequest): Promise<ReadinessHandlerResult>
   }
   const url = resolveDatabaseUrl();
   if (!url) {
-    return {
-      status: 503,
-      body: {
-        error: "unavailable",
-        code: "UNAVAILABLE",
-        message: "The run store is temporarily unavailable. Please try again later.",
-      },
-    };
+    // No local store on the edge: proxy the completion to the Railway API.
+    return proxyRunComplete({ ...body, submission_token: credential }, process.env, req.headers);
   }
 
   try {
