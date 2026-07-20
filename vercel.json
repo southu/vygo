@@ -135,12 +135,28 @@
       "destination": "/api/readiness/score-e2e"
     },
     {
+      "source": "/v1/readiness/start",
+      "destination": "/api/readiness/start"
+    },
+    {
+      "source": "/v1/readiness/complete",
+      "destination": "/api/readiness/complete"
+    },
+    {
       "source": "/v1/readiness/snapshot/:id/email",
       "destination": "/api/readiness/snapshot-email?id=:id"
     },
     {
       "source": "/v1/readiness/snapshot/:id",
       "destination": "/api/readiness/snapshot?id=:id"
+    },
+    {
+      "source": "/api/analyses/start",
+      "destination": "/api/readiness/start"
+    },
+    {
+      "source": "/api/analyses/complete",
+      "destination": "/api/readiness/complete"
     },
     {
       "source": "/api/analyses/result",
@@ -157,6 +173,14 @@
     {
       "source": "/api/analyses",
       "destination": "/api/readiness/analyses"
+    },
+    {
+      "source": "/v1/analyses/start",
+      "destination": "/api/readiness/start"
+    },
+    {
+      "source": "/v1/analyses/complete",
+      "destination": "/api/readiness/complete"
     },
     {
       "source": "/v1/analyses/result",

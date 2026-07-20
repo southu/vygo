@@ -84,6 +84,9 @@ const ALLOWED_OPS = new Set([
   "analysis",
   "result",
   "demo",
+  "start",
+  "run",
+  "complete",
 ]);
 
 /** Shared readiness edge rate-limit budget (aligns with Railway ~20/60s). */
@@ -251,6 +254,9 @@ const PERMISSIVE_CORS_OPS = new Set<string>([
   "analysis",
   "result",
   "demo",
+  "start",
+  "run",
+  "complete",
 ]);
 
 /** Reflects the requesting origin (or `*` when none was sent) with no credentials. */
@@ -1983,6 +1989,585 @@ function toAnalysesPublicEdge(row: AnalysesEdgeRow): Record<string, unknown> {
   };
 }
 
+// ---------------------------------------------------------------------------
+// run START (per-project, status-aware) + COMPLETE
+//
+// Replaces the old account-level "analysis already exists" singleton guard.
+// A signed-in caller may ALWAYS start a new run for a project (a new, distinct
+// run id every time — create, never upsert) unless that SAME project already
+// has a fresh in-progress run, in which case a distinct 409 conflict is
+// returned. Per-user rate limits (max starts/day, max concurrent in-progress
+// runs across projects) replace the removed singleton as the abuse ceiling.
+// Historical completed/failed runs never block a new start.
+// ---------------------------------------------------------------------------
+
+/** Read a positive integer override from the environment, else the default. */
+function runStartEnvInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (typeof raw === "string" && raw.trim()) {
+    const n = Number.parseInt(raw.trim(), 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return fallback;
+}
+
+/**
+ * Per-user run-start limits. Constants (env-overridable) — never magic numbers
+ * scattered in the handler. Removing the singleton guard must not permit
+ * unbounded abuse, so a signed-in user is capped at:
+ *   - RUN_START_MAX_PER_DAY starts per rolling 24h, AND
+ *   - RUN_START_MAX_CONCURRENT in-progress runs across all their projects.
+ */
+const RUN_START_MAX_PER_DAY = runStartEnvInt("READINESS_START_MAX_PER_DAY", 10);
+const RUN_START_MAX_CONCURRENT = runStartEnvInt("READINESS_START_MAX_CONCURRENT", 3);
+/**
+ * An in-progress run older than this is treated as stale: it no longer blocks a
+ * new start and no longer counts against the concurrency ceiling, so a crashed
+ * or abandoned run can never wedge a project permanently. The explicit COMPLETE
+ * endpoint is the normal way a run leaves in-progress; this is the safety net.
+ */
+const RUN_STALE_MINUTES = runStartEnvInt("READINESS_RUN_STALE_MINUTES", 15);
+
+/** Canonical status a freshly started run carries until it completes/fails. */
+const RUN_IN_PROGRESS_STATUS = "in_progress";
+/** Marker stamped into a run's submission so start-created rows are countable. */
+const RUN_STARTED_VIA = "readiness_start";
+
+function normalizeStatusToken(status: unknown): string {
+  return String(status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/** Terminal failure statuses a run may be completed into. */
+const RUN_FAILED_STATUSES_EDGE = new Set<string>([
+  "failed",
+  "failure",
+  "error",
+  "errored",
+  "cancelled",
+  "canceled",
+  "aborted",
+  "rejected",
+]);
+
+/**
+ * Credential/provisioning failure states. If the run pipeline reports one of
+ * these, START fails closed with a clear error and creates NO run — never a
+ * half-started run and never a run proceeding without credentials.
+ */
+const CREDENTIAL_FAILURE_STATES = new Set<string>([
+  "vault_locked",
+  "consumer_not_armed",
+  "vault_access_denied",
+  "provisioning_failed",
+  "credentials_unavailable",
+  "credential_failure",
+  "vault_unavailable",
+  "not_provisioned",
+]);
+
+/** Body keys carrying the auth credential — stripped before a run is persisted. */
+const RUN_CREDENTIAL_KEYS = [
+  "submission_token",
+  "token",
+  "auth_token",
+  "authToken",
+  "session_token",
+  "sessionToken",
+  "authorization",
+  "credential",
+];
+
+function stripCredentialFields(body: Record<string, unknown>): Record<string, unknown> {
+  const clone: Record<string, unknown> = { ...body };
+  for (const key of RUN_CREDENTIAL_KEYS) delete clone[key];
+  return clone;
+}
+
+/**
+ * Extract the auth credential from a start/complete request: an
+ * `Authorization: Bearer <token>` header, or a token field in the JSON body.
+ * The credential is a readiness submission token (minted by
+ * POST /api/readiness/token) — the app's existing capability mechanism.
+ */
+function extractRunCredential(req: EdgeRequest, body: Record<string, unknown>): string | null {
+  const auth = req.headers["authorization"];
+  const rawAuth = Array.isArray(auth) ? auth[0] : auth;
+  if (typeof rawAuth === "string" && rawAuth.trim()) {
+    const m = /^Bearer\s+(.+)$/i.exec(rawAuth.trim());
+    const bearer = m?.[1]?.trim();
+    if (bearer) return bearer.slice(0, 128);
+  }
+  for (const key of RUN_CREDENTIAL_KEYS) {
+    const value = body[key];
+    if (typeof value === "string" && value.trim()) return value.trim().slice(0, 128);
+  }
+  return null;
+}
+
+/** Inspect a start payload for a credential/provisioning failure state signal. */
+function detectCredentialFailureState(body: Record<string, unknown>): string | null {
+  const nested = [
+    analysesPlainObject(body.provisioning),
+    analysesPlainObject(body.credentials),
+    analysesPlainObject(body.vault),
+    analysesPlainObject(body.pipeline),
+  ].filter((o): o is Record<string, unknown> => o != null);
+
+  for (const flag of ["vault_locked", "consumer_not_armed", "vault_access_denied"]) {
+    if (body[flag] === true) return flag;
+    for (const obj of nested) if (obj[flag] === true) return flag;
+  }
+
+  const candidates: unknown[] = [
+    body.credential_state,
+    body.vault_state,
+    body.provisioning_state,
+    body.pipeline_state,
+    body.state,
+    body.status_reason,
+  ];
+  for (const obj of nested) {
+    candidates.push(obj.state, obj.status, obj.reason);
+  }
+  for (const c of candidates) {
+    if (typeof c === "string" && CREDENTIAL_FAILURE_STATES.has(normalizeStatusToken(c))) {
+      return normalizeStatusToken(c);
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve the authenticated principal (the "user" the per-user limits key on).
+ * Prefer an explicit user/email identity from the payload; otherwise derive a
+ * stable pseudo-identity from the credential itself, so the credential (session)
+ * IS the user when no explicit identity was supplied.
+ */
+function resolveRunPrincipal(body: Record<string, unknown>, credential: string): string {
+  const identity = deriveAnalysesIdentityEdge(body).user;
+  if (identity) return identity;
+  return `sess:${createHash("sha256").update(credential).digest("hex").slice(0, 24)}`;
+}
+
+type RunCredentialCheck = { ok: true } | { ok: false; result: ReadinessHandlerResult };
+
+/** Distinct, self-documenting 401 for a missing/invalid run credential. */
+function unauthenticatedRunResult(message: string): ReadinessHandlerResult {
+  return {
+    status: 401,
+    body: {
+      error: "unauthenticated",
+      code: "UNAUTHENTICATED",
+      message,
+      how_to_authenticate: {
+        step1: "POST /api/readiness/token",
+        step2: "send the returned token as Authorization: Bearer <token> or body.submission_token",
+      },
+    },
+  };
+}
+
+/** Validate the credential against the readiness ingest-token store. */
+async function validateRunCredential(
+  sql: Sql,
+  credential: string | null,
+): Promise<RunCredentialCheck> {
+  if (!credential || !TOKEN_RE.test(credential)) {
+    return {
+      ok: false,
+      result: unauthenticatedRunResult(
+        "A valid session credential is required to start a run. Obtain one from POST /api/readiness/token, then send it as `Authorization: Bearer <token>` or as `submission_token` in the JSON body.",
+      ),
+    };
+  }
+  const rows = await sql<{ token: string; expires_at: Date | string }[]>`
+    SELECT token, expires_at FROM readiness_ingest_tokens WHERE token = ${credential} LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row || new Date(row.expires_at).getTime() < Date.now()) {
+    return {
+      ok: false,
+      result: unauthenticatedRunResult(
+        "The session credential is unknown or expired. Obtain a fresh one from POST /api/readiness/token.",
+      ),
+    };
+  }
+  return { ok: true };
+}
+
+const RUN_START_DOCS: Record<string, unknown> = {
+  ok: true,
+  endpoint: "POST /api/readiness/start",
+  description:
+    "Start a new readiness analysis run for a project. Creates a new, distinct run id every time (never upserts). Historical completed/failed runs never block a new start; only a fresh in-progress run for the same project does.",
+  authentication:
+    "Required. Obtain a token from POST /api/readiness/token, then send it as `Authorization: Bearer <token>` or as `submission_token` in the JSON body. Unauthenticated requests are rejected with 401.",
+  body: {
+    project: "project label/identifier for this run (optional; defaults to 'Default project')",
+    user: "optional user/email identity; when omitted the credential identifies the user",
+  },
+  responses: {
+    "201": "{ ok: true, status: 'in_progress', run_id, project, analysis }",
+    "401": "{ error: 'unauthenticated' } — missing/invalid credential",
+    "409": "{ error: 'run_in_progress', project, run_id } — same project already running",
+    "429 (concurrent)": "{ error: 'too_many_concurrent_runs', limit }",
+    "429 (daily)": "{ error: 'rate_limited', limit, window: '24h' }",
+    "503":
+      "{ error: 'provisioning_unavailable', state } — credential/provisioning failure (fails closed)",
+  },
+  companion: {
+    complete:
+      "POST /api/readiness/complete { run_id | project, results?, results_text?, status? } — moves a run out of in-progress so the next start succeeds",
+    result: "GET /api/analyses/result?user=<id>&project=<name> — latest completed run",
+    list: "GET /api/analyses?user=<id>[&project=<name>] — run history",
+  },
+  limits: {
+    maxStartsPerDay: RUN_START_MAX_PER_DAY,
+    maxConcurrentRuns: RUN_START_MAX_CONCURRENT,
+  },
+};
+
+/** POST start / GET usage docs. Direct Postgres only (fails closed without DB). */
+async function handleStart(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const method = (req.method || "GET").toUpperCase();
+  if (method === "GET") {
+    return { status: 200, body: RUN_START_DOCS };
+  }
+
+  const contentType = contentTypeBase(req.headers);
+  if (contentType && contentType !== "application/json") {
+    return {
+      status: 415,
+      body: {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "Content-Type must be application/json.",
+        },
+      },
+    };
+  }
+  const parsedBody = readJsonBody(req);
+  if (!parsedBody.ok) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+    };
+  }
+  const body = analysesPlainObject(parsedBody.value) ?? {};
+
+  // 1. Authentication — a valid session credential is mandatory. Reject a
+  // wholly unauthenticated request up front (401) so it is never masked by a
+  // transient store outage below.
+  const credential = extractRunCredential(req, body);
+  if (!credential) {
+    return unauthenticatedRunResult(
+      "A valid session credential is required to start a run. Obtain one from POST /api/readiness/token, then send it as `Authorization: Bearer <token>` or as `submission_token` in the JSON body.",
+    );
+  }
+  const url = resolveDatabaseUrl();
+  if (!url) {
+    // Fail closed: without the store we cannot enforce the guard or limits.
+    return {
+      status: 503,
+      body: {
+        error: "unavailable",
+        code: "UNAVAILABLE",
+        message: "The run store is temporarily unavailable. Please try again later.",
+      },
+    };
+  }
+
+  try {
+    const sql = getSql(url);
+    await ensureSubmissionTables(sql);
+    await ensureAnalysesTablesEdge(sql);
+
+    const credCheck = await validateRunCredential(sql, credential);
+    if (!credCheck.ok) return credCheck.result;
+
+    // 2. Fail closed on credential/provisioning failure states — create NO run.
+    const failureState = detectCredentialFailureState(body);
+    if (failureState) {
+      return {
+        status: 503,
+        body: {
+          error: "provisioning_unavailable",
+          code: "PROVISIONING_UNAVAILABLE",
+          state: failureState,
+          message:
+            "Cannot start a run: the credential/provisioning pipeline is not ready. No run was created.",
+        },
+      };
+    }
+
+    const principal = resolveRunPrincipal(body, credential);
+    const project = resolveProjectIdentifierEdge(pickAnalysesField(body, ANALYSES_PROJECT_KEYS));
+
+    // 3. Per-project in-progress guard — a fresh run for the SAME project blocks.
+    const activeSameProject = await sql<{ id: string; created_at: Date | string }[]>`
+      SELECT id, created_at FROM analyses
+      WHERE user_identifier = ${principal}
+        AND project_identifier = ${project}
+        AND status = ${RUN_IN_PROGRESS_STATUS}
+        AND submission->>'started_via' = ${RUN_STARTED_VIA}
+        AND created_at > now() - make_interval(mins => ${RUN_STALE_MINUTES})
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    if (activeSameProject[0]) {
+      return {
+        status: 409,
+        body: {
+          error: "run_in_progress",
+          code: "RUN_IN_PROGRESS",
+          project,
+          run_id: activeSameProject[0].id,
+          message: `A run is already in progress for project "${project}". Wait for it to complete (or POST /api/readiness/complete) before starting another.`,
+        },
+      };
+    }
+
+    // 4. Per-user concurrency ceiling across ALL projects.
+    const concurrentRows = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM analyses
+      WHERE user_identifier = ${principal}
+        AND status = ${RUN_IN_PROGRESS_STATUS}
+        AND submission->>'started_via' = ${RUN_STARTED_VIA}
+        AND created_at > now() - make_interval(mins => ${RUN_STALE_MINUTES})
+    `;
+    if ((concurrentRows[0]?.n ?? 0) >= RUN_START_MAX_CONCURRENT) {
+      return {
+        status: 429,
+        body: {
+          error: "too_many_concurrent_runs",
+          code: "TOO_MANY_CONCURRENT_RUNS",
+          limit: RUN_START_MAX_CONCURRENT,
+          current: concurrentRows[0]?.n ?? 0,
+          message: `Too many runs in progress at once (limit ${RUN_START_MAX_CONCURRENT}). Let a run finish before starting another. No run was created.`,
+        },
+        retryAfterSeconds: 30,
+      };
+    }
+
+    // 5. Per-user rolling-day start ceiling.
+    const dailyRows = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM analyses
+      WHERE user_identifier = ${principal}
+        AND submission->>'started_via' = ${RUN_STARTED_VIA}
+        AND created_at > now() - interval '24 hours'
+    `;
+    if ((dailyRows[0]?.n ?? 0) >= RUN_START_MAX_PER_DAY) {
+      return {
+        status: 429,
+        body: {
+          error: "rate_limited",
+          code: "RATE_LIMITED",
+          limit: RUN_START_MAX_PER_DAY,
+          window: "24h",
+          message: `Daily run-start limit reached (${RUN_START_MAX_PER_DAY} per 24h). No run was created.`,
+        },
+        retryAfterSeconds: 3600,
+      };
+    }
+
+    // 6. Create a NEW run row (new unique id). Never upsert — historical runs
+    // for this project are preserved untouched.
+    const submission = {
+      ...stripCredentialFields(body),
+      started_via: RUN_STARTED_VIA,
+      run: { started_at: new Date().toISOString(), project },
+    };
+    const inserted = await sql<AnalysesEdgeRow[]>`
+      INSERT INTO analyses (user_identifier, project_identifier, status, submission)
+      VALUES (${principal}, ${project}, ${RUN_IN_PROGRESS_STATUS}, ${JSON.stringify(submission)}::jsonb)
+      RETURNING id, user_identifier, project_identifier, status, submission, created_at, updated_at
+    `;
+    const row = inserted[0];
+    if (!row) {
+      return {
+        status: 500,
+        body: { error: { code: "INTERNAL_ERROR", message: "Run insert returned no row." } },
+      };
+    }
+    return {
+      status: 201,
+      body: {
+        ok: true,
+        status: RUN_IN_PROGRESS_STATUS,
+        run_id: row.id,
+        project: row.project_identifier,
+        analysis: toAnalysesPublicEdge(row),
+      },
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred. Please try again later.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
+/**
+ * POST /api/readiness/complete — move the caller's in-progress run out of
+ * in-progress (default: completed) so the next same-project start succeeds.
+ * Identify the run by `run_id`, or by `project` (latest in-progress run there).
+ * Result/score payload fields are stored verbatim — no scoring changes.
+ */
+async function handleComplete(req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const contentType = contentTypeBase(req.headers);
+  if (contentType && contentType !== "application/json") {
+    return {
+      status: 415,
+      body: {
+        error: {
+          code: "UNSUPPORTED_MEDIA_TYPE",
+          message: "Content-Type must be application/json.",
+        },
+      },
+    };
+  }
+  const parsedBody = readJsonBody(req);
+  if (!parsedBody.ok) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Request body must be valid JSON." } },
+    };
+  }
+  const body = analysesPlainObject(parsedBody.value) ?? {};
+
+  const credential = extractRunCredential(req, body);
+  if (!credential) {
+    return unauthenticatedRunResult(
+      "A valid session credential is required. Obtain one from POST /api/readiness/token, then send it as `Authorization: Bearer <token>` or as `submission_token` in the JSON body.",
+    );
+  }
+  const url = resolveDatabaseUrl();
+  if (!url) {
+    return {
+      status: 503,
+      body: {
+        error: "unavailable",
+        code: "UNAVAILABLE",
+        message: "The run store is temporarily unavailable. Please try again later.",
+      },
+    };
+  }
+
+  try {
+    const sql = getSql(url);
+    await ensureSubmissionTables(sql);
+    await ensureAnalysesTablesEdge(sql);
+
+    const credCheck = await validateRunCredential(sql, credential);
+    if (!credCheck.ok) return credCheck.result;
+
+    const principal = resolveRunPrincipal(body, credential);
+    const runId = pickAnalysesField(body, ["run_id", "runId", "id", "analysis_id", "analysisId"]);
+
+    let row: AnalysesEdgeRow | null = null;
+    if (runId && UUID_RE.test(runId)) {
+      const rows = await sql<AnalysesEdgeRow[]>`
+        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+        FROM analyses WHERE id = ${runId} AND user_identifier = ${principal} LIMIT 1
+      `;
+      row = rows[0] ?? null;
+      if (!row) {
+        return {
+          status: 404,
+          body: {
+            error: "run_not_found",
+            code: "RUN_NOT_FOUND",
+            message: "No run with that id was found for this user.",
+          },
+        };
+      }
+    } else {
+      const project = resolveProjectIdentifierEdge(pickAnalysesField(body, ANALYSES_PROJECT_KEYS));
+      const rows = await sql<AnalysesEdgeRow[]>`
+        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+        FROM analyses
+        WHERE user_identifier = ${principal}
+          AND project_identifier = ${project}
+          AND status = ${RUN_IN_PROGRESS_STATUS}
+          AND submission->>'started_via' = ${RUN_STARTED_VIA}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      row = rows[0] ?? null;
+      if (!row) {
+        return {
+          status: 404,
+          body: {
+            error: "no_run_in_progress",
+            code: "NO_RUN_IN_PROGRESS",
+            project,
+            message: `No in-progress run found for project "${project}".`,
+          },
+        };
+      }
+    }
+
+    // Decide terminal status: completed by default; honor an explicit terminal
+    // failure status. An in-progress status is never accepted here.
+    let finalStatus = "completed";
+    const rawStatus = pickAnalysesField(body, ["status"]);
+    if (rawStatus) {
+      const norm = normalizeStatusToken(rawStatus);
+      if (RUN_FAILED_STATUSES_EDGE.has(norm)) finalStatus = "failed";
+      else if (isCompletedStatusEdge(rawStatus)) finalStatus = "completed";
+    }
+
+    const existingSubmission = analysesPlainObject(row.submission) ?? {};
+    const mergedSubmission = {
+      ...existingSubmission,
+      ...stripCredentialFields(body),
+      started_via: RUN_STARTED_VIA,
+      completed_at: new Date().toISOString(),
+    };
+
+    const updated = await sql<AnalysesEdgeRow[]>`
+      UPDATE analyses
+      SET status = ${finalStatus},
+          submission = ${JSON.stringify(mergedSubmission)}::jsonb,
+          updated_at = now()
+      WHERE id = ${row.id}
+      RETURNING id, user_identifier, project_identifier, status, submission, created_at, updated_at
+    `;
+    const done = updated[0] ?? row;
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        status: finalStatus,
+        run_id: done.id,
+        project: done.project_identifier,
+        analysis: toAnalysesPublicEdge(done),
+      },
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred. Please try again later.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
 /** POST create / GET list. Direct Postgres when the edge is wired; else proxy. */
 async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult> {
   const rl = checkEdgeRateLimit(req);
@@ -2492,7 +3077,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     "result",
     "demo",
   ]);
-  const getOrPostOps = new Set(["analyses"]);
+  // start/run accept GET (usage docs) or POST (start a run); analyses is create/list.
+  const getOrPostOps = new Set(["analyses", "start", "run"]);
   if (getOrPostOps.has(op)) {
     if (req.method !== "GET" && req.method !== "POST") {
       res.setHeader("Allow", "GET, POST, OPTIONS");
@@ -2555,6 +3141,10 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleAnalysisResult(req);
     } else if (op === "demo") {
       result = await handleAnalysesDemo(req);
+    } else if (op === "start" || op === "run") {
+      result = await handleStart(req);
+    } else if (op === "complete") {
+      result = await handleComplete(req);
     } else {
       result = await handleSubmissionGet(req);
     }
