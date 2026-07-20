@@ -44,6 +44,7 @@ import {
   type EdgeRequest,
   type EdgeResponse,
 } from "./_lib/http.js";
+import { verifyInternalBasicAuth } from "./_lib/ops-auth.js";
 
 type EdgeReqEx = EdgeRequest & {
   url?: string;
@@ -95,6 +96,19 @@ function badRequest(res: EdgeResponse, message: string): void {
 
 function conflict(res: EdgeResponse, message: string): void {
   res.status(409).json({ error: { code: "ROLE_CLOSED", message } });
+}
+
+function unauthorized(res: EdgeResponse): void {
+  res.setHeader("WWW-Authenticate", 'Basic realm="Vygo Ops", charset="UTF-8"');
+  res.setHeader("Cache-Control", "no-store");
+  res.status(401).json({
+    error: { code: "UNAUTHORIZED", message: "Admin authentication required." },
+  });
+}
+
+/** True for the mutating/admin `internal-*` resources that Basic Auth guards. */
+function isInternalResource(resource: string): boolean {
+  return resource.startsWith("internal-");
 }
 
 // --- Route handlers ---------------------------------------------------------
@@ -219,6 +233,13 @@ export default function handler(req: EdgeRequest, res: EdgeResponse): void {
   applyBaseHeaders(res, origin && allowed ? origin : null);
 
   const resource = queryParam(req as EdgeReqEx, "resource").trim();
+
+  // Guard the admin/internal resources with the shared ops Basic Auth
+  // credential. Fail-open when unconfigured (see api/_lib/ops-auth.ts); the
+  // public roles-list / role-detail / role-apply resources are never gated.
+  if (isInternalResource(resource) && !verifyInternalBasicAuth(req).ok) {
+    return unauthorized(res);
+  }
 
   try {
     switch (resource) {
