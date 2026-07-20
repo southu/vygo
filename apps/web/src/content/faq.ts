@@ -49,4 +49,9 @@ export const faqItems: FaqItem[] = [
     answer:
       "vygo is built for production risk, architecture, security, compliance readiness, and scale—not isolated low-cost patches. The audit may identify a smaller remediation path or determine that another provider is a better fit.",
   },
+  {
+    question: "Who tests the software before launch?",
+    answer:
+      "Every build is tested by a dedicated QA & UAT Lead — a separate role from the engineers who write the code, so the people verifying the work are never the people who built it. The QA & UAT Lead runs functional and user-acceptance testing before launch, and you, the client, review and approve what ships. Nothing goes live without your sign-off.",
+  },
 ];
