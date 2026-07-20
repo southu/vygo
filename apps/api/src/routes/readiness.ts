@@ -27,10 +27,12 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   ensureAnalysesTable,
   insertAnalysis,
+  finalizeMaturedRuns,
   toAnalysisPublic,
   resolveProjectIdentifier,
   isCompletedStatus,
   COMPLETED_ANALYSIS_STATUS,
+  RUN_PROCESSING_WINDOW_SECONDS_DEFAULT,
   type AnalysisRow,
   createReadinessSession,
   findReadinessSessionByToken,
@@ -207,6 +209,18 @@ const RUN_START_MAX_CONCURRENT = readinessRunEnvInt("READINESS_START_MAX_CONCURR
  * The explicit COMPLETE endpoint is the normal exit; this is the safety net.
  */
 const RUN_STALE_MINUTES = readinessRunEnvInt("READINESS_RUN_STALE_MINUTES", 15);
+
+/**
+ * Processing window (seconds) after which an accepted start-run is auto-finalized
+ * to `completed`. Short but non-zero: a same-project duplicate start within the
+ * window is still correctly rejected (409), while a run that has processed for at
+ * least this long is completed lazily on the next read/start — the replacement
+ * for a background worker on this serverless/Railway deploy.
+ */
+const RUN_PROCESSING_WINDOW_SECONDS = readinessRunEnvInt(
+  "READINESS_RUN_PROCESSING_SECONDS",
+  RUN_PROCESSING_WINDOW_SECONDS_DEFAULT,
+);
 
 /** Canonical status a freshly started run carries until it completes/fails. */
 const RUN_IN_PROGRESS_STATUS = "in_progress";
@@ -3941,6 +3955,13 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
 
       const principal = resolveRunPrincipal(body, credential);
       const project = resolveProjectIdentifier(pickRunField(body, RUN_PROJECT_KEYS));
+
+      // 2b. Auto-finalize the caller's prior accepted run for this project if it
+      // has matured past the processing window, so the duplicate-start guard
+      // rejects (409) ONLY while a run is genuinely still processing and a new
+      // start succeeds once the previous run has effectively completed — even
+      // when the caller never explicitly POSTed /complete.
+      await finalizeMaturedRuns(sql, { user: principal, project }, RUN_PROCESSING_WINDOW_SECONDS);
 
       // 3. Per-project in-progress guard — a fresh run for the SAME project blocks.
       const activeSameProject = await sql<{ id: string }[]>`

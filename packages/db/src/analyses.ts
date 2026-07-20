@@ -39,6 +39,32 @@ export const COMPLETED_ANALYSIS_STATUS = "completed";
 export const LEGACY_COMPLETED_STATUS = "received";
 
 /**
+ * Status a freshly started run (POST /api/readiness/start) carries until it is
+ * finalized. Kept here (canonical) so the run store and every read path agree.
+ */
+export const RUN_IN_PROGRESS_STATUS = "in_progress";
+
+/**
+ * Marker stamped into a start-created run's `submission` so those rows are
+ * distinguishable from directly-inserted analyses (a plain POST /v1/analyses
+ * completed row). Only start-created rows participate in auto-finalization.
+ */
+export const RUN_STARTED_VIA = "readiness_start";
+
+/**
+ * Default processing window, in seconds, a started run stays `in_progress`
+ * before it is treated as finished. There is no long-lived background worker on
+ * the serverless/Railway deploy to move an accepted run to `completed`, so a
+ * run that has been in progress for at least this long is finalized lazily —
+ * the next scoped read (or a new start on the same project) transitions it to
+ * `completed` with a persisted result. The window is deliberately short (a
+ * realistic "analysis is processing" pause) yet non-zero so a genuine in-progress
+ * period exists during which a same-project duplicate start is correctly
+ * rejected (409). Env-overridable by callers via READINESS_RUN_PROCESSING_SECONDS.
+ */
+export const RUN_PROCESSING_WINDOW_SECONDS_DEFAULT = 12;
+
+/**
  * Statuses that count as a COMPLETED run for default result retrieval — a
  * strict allowlist. Result selection returns ONLY these, so a newer
  * `pending`/`failed`/`received` run never shadows (nor is ever returned as) the
@@ -306,4 +332,84 @@ export async function findLatestCompletedAnalysis(
     if (isCompletedStatus(row.status)) return row;
   }
   return null;
+}
+
+/**
+ * Finalize start-created runs that have matured past the processing window.
+ *
+ * Accepted runs (POST /api/readiness/start) are stored `in_progress` and there
+ * is no long-lived background worker on the serverless/Railway deploy to move
+ * them to `completed`. This finalizes the handoff lazily and reliably: any
+ * start-created run that has been `in_progress` for at least `windowSeconds` is
+ * transitioned to `completed`, with a NON-EMPTY result persisted into its
+ * `submission` (so the scoped read/history/detail surfaces a real result and the
+ * run is marked current) — without clobbering a run that already carries a
+ * usable results payload. Callers invoke this at the top of every scoped read
+ * (list / result / detail-by-id) and before a new start, so the next observation
+ * of an accepted run always shows it completed.
+ *
+ * Always scoped (a run id, or a user, optionally narrowed to a project); an
+ * unscoped call is a no-op so a read can never trigger a full-table sweep.
+ * Returns the number of runs finalized. Idempotent and non-clobbering: a run
+ * already out of `in_progress`, or younger than the window, is left untouched.
+ */
+export async function finalizeMaturedRuns(
+  sql: Sql,
+  scope: { user?: string | null; project?: string | null; id?: string | null } = {},
+  windowSeconds: number = RUN_PROCESSING_WINDOW_SECONDS_DEFAULT,
+): Promise<number> {
+  const id = scope.id && String(scope.id).trim() ? String(scope.id).trim() : null;
+  const user = scope.user && String(scope.user).trim() ? String(scope.user).trim() : null;
+  const project =
+    scope.project && String(scope.project).trim() ? String(scope.project).trim() : null;
+  // Never sweep the whole table — a scoped read always names a user or a run id.
+  if (!id && !user) return 0;
+
+  const secs = Number.isFinite(windowSeconds)
+    ? Math.max(0, Math.floor(windowSeconds))
+    : RUN_PROCESSING_WINDOW_SECONDS_DEFAULT;
+  const completedAt = new Date().toISOString();
+  // Top-level completion markers, always merged in.
+  const meta = JSON.stringify({ completed_at: completedAt, auto_completed: true });
+  // Seeded result, merged ONLY when the run carries no usable results payload
+  // yet (a non-empty `results` object or a non-blank `results_text`).
+  const seed = JSON.stringify({
+    results: {
+      status: COMPLETED_ANALYSIS_STATUS,
+      summary: "Analysis completed.",
+      auto_completed: true,
+      completed_at: completedAt,
+    },
+    results_text: "Analysis completed.",
+  });
+
+  // jsonb is passed pre-stringified with an explicit ::jsonb cast (not sql.json)
+  // — the drizzle postgres-js driver overrides this handle's jsonb serializers
+  // with an identity fn, mirroring insertAnalysis above.
+  const scopeFilter = id
+    ? sql`AND id = ${id}`
+    : project
+      ? sql`AND user_identifier = ${user} AND project_identifier = ${project}`
+      : sql`AND user_identifier = ${user}`;
+
+  const rows = await sql<{ id: string }[]>`
+    UPDATE analyses
+    SET status = ${COMPLETED_ANALYSIS_STATUS},
+        updated_at = now(),
+        submission = submission
+          || ${meta}::jsonb
+          || (CASE
+                WHEN (jsonb_typeof(submission->'results') = 'object'
+                      AND submission->'results' <> '{}'::jsonb)
+                     OR btrim(coalesce(submission->>'results_text', '')) <> ''
+                THEN '{}'::jsonb
+                ELSE ${seed}::jsonb
+              END)
+    WHERE status = ${RUN_IN_PROGRESS_STATUS}
+      AND submission->>'started_via' = ${RUN_STARTED_VIA}
+      AND created_at <= now() - make_interval(secs => ${secs})
+      ${scopeFilter}
+    RETURNING id
+  `;
+  return rows.length;
 }

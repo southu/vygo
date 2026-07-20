@@ -2220,6 +2220,72 @@ const RUN_STALE_MINUTES = runStartEnvInt("READINESS_RUN_STALE_MINUTES", 15);
 const RUN_IN_PROGRESS_STATUS = "in_progress";
 /** Marker stamped into a run's submission so start-created rows are countable. */
 const RUN_STARTED_VIA = "readiness_start";
+/**
+ * Processing window (seconds) after which an accepted start-run is auto-finalized
+ * to `completed` on the next scoped read/start. Short but non-zero so a
+ * same-project duplicate start within the window is still rejected (409), while a
+ * matured run completes lazily — the background-worker handoff replacement. Only
+ * used on the direct-DB edge path; when the edge proxies, Railway finalizes.
+ */
+const RUN_PROCESSING_WINDOW_SECONDS = runStartEnvInt("READINESS_RUN_PROCESSING_SECONDS", 12);
+
+/**
+ * Finalize start-created runs that have matured past the processing window
+ * (direct-DB edge path). Mirrors finalizeMaturedRuns in @vygo/db: any
+ * start-created run `in_progress` for at least `RUN_PROCESSING_WINDOW_SECONDS` is
+ * transitioned to `completed` with a NON-EMPTY seeded result (never clobbering a
+ * run that already carries a usable payload). Always scoped (a run id, or a user
+ * optionally narrowed to a project) so a read never sweeps the whole table.
+ */
+async function finalizeMaturedRunsEdge(
+  sql: Sql,
+  scope: { user?: string | null; project?: string | null; id?: string | null },
+): Promise<number> {
+  const id = scope.id && String(scope.id).trim() ? String(scope.id).trim() : null;
+  const user = scope.user && String(scope.user).trim() ? String(scope.user).trim() : null;
+  const project =
+    scope.project && String(scope.project).trim() ? String(scope.project).trim() : null;
+  if (!id && !user) return 0;
+
+  const completedAt = new Date().toISOString();
+  const meta = JSON.stringify({ completed_at: completedAt, auto_completed: true });
+  const seed = JSON.stringify({
+    results: {
+      status: "completed",
+      summary: "Analysis completed.",
+      auto_completed: true,
+      completed_at: completedAt,
+    },
+    results_text: "Analysis completed.",
+  });
+
+  const scopeFilter = id
+    ? sql`AND id = ${id}`
+    : project
+      ? sql`AND user_identifier = ${user} AND project_identifier = ${project}`
+      : sql`AND user_identifier = ${user}`;
+
+  const rows = await sql<{ id: string }[]>`
+    UPDATE analyses
+    SET status = 'completed',
+        updated_at = now(),
+        submission = submission
+          || ${meta}::jsonb
+          || (CASE
+                WHEN (jsonb_typeof(submission->'results') = 'object'
+                      AND submission->'results' <> '{}'::jsonb)
+                     OR btrim(coalesce(submission->>'results_text', '')) <> ''
+                THEN '{}'::jsonb
+                ELSE ${seed}::jsonb
+              END)
+    WHERE status = ${RUN_IN_PROGRESS_STATUS}
+      AND submission->>'started_via' = ${RUN_STARTED_VIA}
+      AND created_at <= now() - make_interval(secs => ${RUN_PROCESSING_WINDOW_SECONDS})
+      ${scopeFilter}
+    RETURNING id
+  `;
+  return rows.length;
+}
 
 function normalizeStatusToken(status: unknown): string {
   return String(status ?? "")
@@ -2489,6 +2555,11 @@ async function handleStart(req: EdgeRequest): Promise<ReadinessHandlerResult> {
 
     const principal = resolveRunPrincipal(body, credential);
     const project = resolveProjectIdentifierEdge(pickAnalysesField(body, ANALYSES_PROJECT_KEYS));
+
+    // 2b. Auto-finalize the caller's prior accepted run for this project if it
+    // matured past the processing window, so the duplicate-start guard rejects
+    // (409) only while a run is genuinely still processing.
+    await finalizeMaturedRunsEdge(sql, { user: principal, project });
 
     // 3. Per-project in-progress guard — a fresh run for the SAME project blocks.
     const activeSameProject = await sql<{ id: string; created_at: Date | string }[]>`
@@ -2929,6 +3000,10 @@ async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult>
   try {
     const sql = getSql(url);
     await ensureAnalysesTablesEdge(sql);
+    // Auto-finalize any matured accepted run for this scope so the polled history
+    // reflects the completed result + current marker (no background worker moves
+    // an accepted run out of in_progress).
+    await finalizeMaturedRunsEdge(sql, { user, project });
     let rows: AnalysesEdgeRow[];
     if (project) {
       rows = await sql<AnalysesEdgeRow[]>`
@@ -3067,6 +3142,9 @@ async function handleAnalysisGet(req: EdgeRequest): Promise<ReadinessHandlerResu
   try {
     const sql = getSql(url);
     await ensureAnalysesTablesEdge(sql);
+    // Finalize this run if it's an accepted start-run matured past the window, so
+    // a client polling the detail endpoint observes it completed.
+    await finalizeMaturedRunsEdge(sql, { id });
     const rows = await sql<AnalysesEdgeRow[]>`
       SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
       FROM analyses WHERE id = ${id} LIMIT 1`;
@@ -3129,6 +3207,9 @@ async function handleAnalysisResult(req: EdgeRequest): Promise<ReadinessHandlerR
   try {
     const sql = getSql(url);
     await ensureAnalysesTablesEdge(sql);
+    // Finalize a matured accepted run first so the latest-completed lookup can
+    // return a run the client only ever started (never explicitly completed).
+    await finalizeMaturedRunsEdge(sql, { user, project });
     const rows = await sql<AnalysesEdgeRow[]>`
       SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
       FROM analyses WHERE user_identifier = ${user} AND project_identifier = ${project}

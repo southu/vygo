@@ -24,11 +24,13 @@ import {
   listAnalyses,
   findAnalysisById,
   findLatestCompletedAnalysis,
+  finalizeMaturedRuns,
   toAnalysisPublic,
   resolveProjectIdentifier,
   isCompletedStatus,
   DEFAULT_PROJECT_IDENTIFIER,
   COMPLETED_ANALYSIS_STATUS,
+  RUN_PROCESSING_WINDOW_SECONDS_DEFAULT,
   type DatabaseHandle,
 } from "@vygo/db";
 import type { ApiEnv } from "@vygo/config";
@@ -58,6 +60,20 @@ const ANALYSES_RL_WINDOW_SECONDS = 60;
 const ANALYSES_POLL_RL_LIMIT = 120;
 const ANALYSES_POLL_RL_WINDOW_SECONDS = 60;
 const MAX_FIELD_LEN = 512;
+
+/**
+ * Processing window (seconds) after which an accepted start-run is auto-finalized
+ * to `completed` on the next scoped read. Env-overridable so the handoff timing
+ * can be tuned without a code change; matches the readiness route's constant.
+ */
+const RUN_PROCESSING_WINDOW_SECONDS = (() => {
+  const raw = process.env.READINESS_RUN_PROCESSING_SECONDS;
+  if (typeof raw === "string" && raw.trim()) {
+    const n = Number.parseInt(raw.trim(), 10);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return RUN_PROCESSING_WINDOW_SECONDS_DEFAULT;
+})();
 
 function isJsonContentType(header: string | string[] | undefined): boolean {
   const raw = Array.isArray(header) ? header[0] : header;
@@ -415,6 +431,10 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
 
     try {
       await ensureAnalysesTable(dbHandle.sql);
+      // Auto-finalize any matured accepted run for this scope so the history a
+      // client polls reflects the completed result + current marker (there is no
+      // background worker to move an accepted run out of in_progress).
+      await finalizeMaturedRuns(dbHandle.sql, { user, project }, RUN_PROCESSING_WINDOW_SECONDS);
       const rows = await listAnalyses(dbHandle.sql, { user, project });
       const { analyses, currentByProject } = annotateCurrent(rows.map(toAnalysisPublic));
       return reply
@@ -462,6 +482,9 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
 
     try {
       await ensureAnalysesTable(dbHandle.sql);
+      // Finalize a matured accepted run first so the latest-completed lookup can
+      // return a run the client only ever started (never explicitly completed).
+      await finalizeMaturedRuns(dbHandle.sql, { user, project }, RUN_PROCESSING_WINDOW_SECONDS);
       const row = await findLatestCompletedAnalysis(dbHandle.sql, { user, project });
       if (!row) {
         return reply
@@ -703,6 +726,9 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
 
     try {
       await ensureAnalysesTable(dbHandle.sql);
+      // Finalize this run if it's an accepted start-run matured past the window,
+      // so a client polling the detail endpoint observes it completed.
+      await finalizeMaturedRuns(dbHandle.sql, { id }, RUN_PROCESSING_WINDOW_SECONDS);
       const row = await findAnalysisById(dbHandle.sql, id);
       if (!row) {
         return reply.status(404).send(safeError("NOT_FOUND", "Analysis not found."));

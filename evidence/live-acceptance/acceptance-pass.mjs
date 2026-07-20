@@ -351,6 +351,96 @@ async function main() {
     `sequence 201/${tdup.status}/200/${t2.status}`,
   );
 
+  // ---- Auto-completion handoff (the reported live failure) ------------------
+  // The core fix: a run that is only STARTED (never explicitly completed) must
+  // still reliably transition to `completed` with a persisted result and current
+  // marker — there is no background worker, so the run store finalizes an
+  // accepted run lazily once its processing window has elapsed. Reproduce the
+  // tester's exact scenario: mint a token, POST start, then POLL the scoped list
+  // WITHOUT ever POSTing /complete, and confirm the run auto-completes. Uses a
+  // dedicated fresh project so it never collides with the explicit-complete flows.
+  const AUTO_PROJECT = "auto-complete-" + Date.now().toString(36);
+  const autoStart = await startRun(
+    API_USER,
+    AUTO_PROJECT,
+    201,
+    "auto-complete: start run (201 in_progress) — no /complete will be sent",
+  );
+  const autoRunId = autoStart.json?.run_id;
+  // While the run is still within its processing window, a same-project duplicate
+  // start is rejected (409) — the guard holds ONLY while genuinely in progress.
+  const autoDup = await startRun(
+    API_USER,
+    AUTO_PROJECT,
+    409,
+    "auto-complete: duplicate start while still processing (409)",
+  );
+  // Poll the scoped list (the tester's endpoint) until the run auto-completes.
+  const AUTO_DEADLINE_MS = 45_000;
+  const AUTO_INTERVAL_MS = 3_000;
+  const autoDeadline = Date.now() + AUTO_DEADLINE_MS;
+  let autoRow = null;
+  let autoCurrentMap = {};
+  let autoPolls = 0;
+  while (Date.now() < autoDeadline) {
+    await new Promise((r) => setTimeout(r, AUTO_INTERVAL_MS));
+    autoPolls += 1;
+    const full = await fetch(
+      `${BASE}${EP.list}?user=${encodeURIComponent(API_USER)}&project=${encodeURIComponent(AUTO_PROJECT)}`,
+      { headers: { Accept: "application/json" } },
+    );
+    let body = null;
+    try {
+      body = JSON.parse(await full.text());
+    } catch {
+      body = null;
+    }
+    autoCurrentMap = body?.currentByProject || {};
+    autoRow = (body?.analyses || []).find((a) => a.id === autoRunId) || null;
+    if (autoRow && isCompleted(autoRow.status)) break;
+  }
+  // Record one representative exchange (the final, completed observation).
+  const autoFinal = await http(
+    `auto-complete: scoped list poll #${autoPolls} — run auto-completed WITHOUT /complete`,
+    "GET",
+    `${EP.list}?user=${encodeURIComponent(API_USER)}&project=${encodeURIComponent(AUTO_PROJECT)}`,
+  );
+  const autoFinalRow = (autoFinal.json?.analyses || []).find((a) => a.id === autoRunId) || autoRow;
+  const autoFinalCurrent = autoFinal.json?.currentByProject || autoCurrentMap;
+  // After completion, a fresh same-project start is accepted again (201).
+  const autoRestart = await startRun(
+    API_USER,
+    AUTO_PROJECT,
+    201,
+    "auto-complete: start again after auto-completion (201 accepted)",
+  );
+  record(
+    "auto-complete-handoff",
+    "an accepted run auto-transitions to completed with a persisted result and current marker WITHOUT an explicit /complete",
+    autoStart.status === 201 &&
+      autoStart.json?.status === "in_progress" &&
+      autoDup.status === 409 &&
+      !!autoFinalRow &&
+      isCompleted(autoFinalRow.status) &&
+      hasNonEmptyResult(autoFinalRow) &&
+      autoFinalRow.current === true &&
+      autoFinalCurrent[AUTO_PROJECT] === autoRunId &&
+      autoRestart.status === 201,
+    autoFinalRow
+      ? `polls=${autoPolls} final=${autoFinalRow.status} result=${hasNonEmptyResult(autoFinalRow)} current=${autoFinalRow.current} restart=${autoRestart.status}`
+      : `polls=${autoPolls} run not found`,
+  );
+  // Drain the restart's fresh in-progress run so this check leaves nothing wedged.
+  if (autoRestart.status === 201 && autoRestart.json?.run_id) {
+    await completeRun(
+      API_USER,
+      AUTO_PROJECT,
+      autoRestart.json.run_id,
+      SNAP.a2,
+      "auto-complete: drain the post-restart in-progress run",
+    );
+  }
+
   // ---- Detail-poll rate-limit reproduction (poll budget, not ops budget) ----
   // Reproduce the tester's scenario: obtain a token, POST start, then poll the
   // scoped detail endpoint until the run completes. The old shared 20/60s ops
