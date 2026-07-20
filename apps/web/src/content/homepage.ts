@@ -160,6 +160,8 @@ export const homepage = {
         body: "Keep the platform secure, observable, and moving—with compliance-readiness upkeep through vygo Ops.",
       },
     ],
+    closing:
+      "Every build ships with independent QA sign-off and structured UAT—a dedicated QA & UAT Lead from day one, on every engagement.",
     cta: { label: ctas.viewFullMethod, href: ctaHrefs.method },
   },
   auditOffer: {

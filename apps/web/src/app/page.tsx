@@ -216,6 +216,9 @@ export default function HomePage() {
           <div className="mt-10">
             <MethodTimeline steps={homepage.methodPreview.steps} />
           </div>
+          <p className="mt-8 max-w-3xl text-base font-medium text-ink-soft">
+            {homepage.methodPreview.closing}
+          </p>
           <div className="mt-8">
             <CtaLink href={homepage.methodPreview.cta.href} variant="secondary">
               {homepage.methodPreview.cta.label}
