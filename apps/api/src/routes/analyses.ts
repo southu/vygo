@@ -27,6 +27,7 @@ import {
   toAnalysisPublic,
   resolveProjectIdentifier,
   DEFAULT_PROJECT_IDENTIFIER,
+  COMPLETED_ANALYSIS_STATUS,
   type DatabaseHandle,
 } from "@vygo/db";
 import type { ApiEnv } from "@vygo/config";
@@ -168,7 +169,10 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
     // unprojected run is the legacy single-analysis case.
     const resolvedProject = resolveProjectIdentifier(project);
 
-    const status = pickString(record, ["status"]) ?? "received";
+    // A stored analysis is a completed run unless the caller says otherwise
+    // (e.g. an explicit pending/failed status); default result retrieval
+    // strictly returns the latest COMPLETED one.
+    const status = pickString(record, ["status"]) ?? COMPLETED_ANALYSIS_STATUS;
 
     const dbHandle = deps.getDb();
     if (!dbHandle) {
@@ -354,6 +358,11 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
             dimensions: { clarity: 90, evidence: 85, alignment: 89 },
           },
         };
+        // Seed the legacy row under the pre-migration 'unspecified' project
+        // with the legacy `received` status, then run the SAME migration a real
+        // legacy row goes through: re-home into 'Default project' AND rewrite
+        // the legacy completed status to the canonical `completed`. The
+        // submission payload is preserved byte-for-byte.
         await sql`
           INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
           VALUES (${user}, 'unspecified', 'received', ${JSON.stringify(legacy)}::jsonb,
@@ -366,6 +375,11 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
             AND (project_identifier IS NULL
                  OR btrim(project_identifier) = ''
                  OR project_identifier = 'unspecified')
+        `;
+        await sql`
+          UPDATE analyses
+          SET status = ${COMPLETED_ANALYSIS_STATUS}
+          WHERE user_identifier = ${user} AND status = 'received'
         `;
         await sql`
           INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)

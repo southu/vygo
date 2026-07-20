@@ -27,37 +27,34 @@ export const DEFAULT_PROJECT_IDENTIFIER = "Default project";
 export const LEGACY_UNSPECIFIED_PROJECTS = ["unspecified", ""] as const;
 
 /**
- * Statuses that are explicitly NOT completed (still in flight, or a terminal
- * failure). Any other status — including the legacy default `received` and an
- * explicit `completed` — counts as a completed run for default result
- * retrieval. Kept as a denylist so the legacy single analysis (status
- * `received`) still resolves as the completed result after migration, while a
- * newer `pending`/`failed` run does not shadow it.
+ * Canonical status for a finished analysis. A submitted readiness analysis
+ * carries its scored results, so it is a completed run; new analyses store this
+ * status, and the 0012 migration rewrites every legacy single analysis (which
+ * the pre-collection model stored under the default `received`) to `completed`
+ * so it resolves as the completed result byte-for-byte.
  */
-const NON_COMPLETED_STATUSES = new Set<string>([
-  "pending",
-  "processing",
-  "queued",
-  "running",
-  "in_progress",
-  "inprogress",
-  "started",
-  "starting",
-  "working",
-  "failed",
-  "failure",
-  "error",
-  "errored",
-  "cancelled",
-  "canceled",
-  "aborted",
-  "rejected",
-  "expired",
-  "timeout",
-  "timed_out",
-  "incomplete",
-  "draft",
-  "new",
+export const COMPLETED_ANALYSIS_STATUS = "completed";
+
+/** Legacy default status the pre-collection model wrote for a completed run. */
+export const LEGACY_COMPLETED_STATUS = "received";
+
+/**
+ * Statuses that count as a COMPLETED run for default result retrieval — a
+ * strict allowlist. Result selection returns ONLY these, so a newer
+ * `pending`/`failed`/`received` run never shadows (nor is ever returned as) the
+ * latest completed one. The legacy `received` status is intentionally excluded:
+ * such rows are rewritten to `completed` by the migration/backfill.
+ */
+const COMPLETED_STATUSES = new Set<string>([
+  "completed",
+  "complete",
+  "done",
+  "finished",
+  "success",
+  "succeeded",
+  "ready",
+  "scored",
+  "closed",
 ]);
 
 function normalizeStatus(status: unknown): string {
@@ -70,9 +67,7 @@ function normalizeStatus(status: unknown): string {
 
 /** True when a status denotes a finished (completed) run for result retrieval. */
 export function isCompletedStatus(status: unknown): boolean {
-  const normalized = normalizeStatus(status);
-  if (!normalized) return true;
-  return !NON_COMPLETED_STATUSES.has(normalized);
+  return COMPLETED_STATUSES.has(normalizeStatus(status));
 }
 
 /** Resolve the project a new analysis should be stored under. */
@@ -152,11 +147,15 @@ let defaultProjectBackfilled = false;
 /**
  * Data migration (mirrors migrations/0012_analyses_default_project.sql): re-home
  * every pre-existing analysis stored under the legacy `unspecified`/blank
- * project placeholder into the 'Default project' history, preserving the
- * `submission` content byte-for-byte (only the project label changes). Runs at
- * most once per process from the lazy bootstrap so the collection model takes
- * effect on serverless deploys even when the one-off `db:migrate` step has not
- * run. Idempotent: the WHERE clause matches nothing after the first pass.
+ * project placeholder into the 'Default project' history AND rewrite the legacy
+ * completed status `received` to the canonical `completed`, preserving the
+ * `submission` content byte-for-byte (only the project label and status marker
+ * change). A legacy single analysis represents an existing completed result, so
+ * marking it `completed` lets strict latest-completed retrieval return it while
+ * a newer non-completed run does not shadow it. Runs at most once per process
+ * from the lazy bootstrap so the collection model takes effect on serverless
+ * deploys even when the one-off `db:migrate` step has not run. Idempotent: the
+ * WHERE clauses match nothing after the first pass.
  */
 export async function backfillDefaultProject(sql: Sql): Promise<void> {
   if (defaultProjectBackfilled) return;
@@ -166,6 +165,14 @@ export async function backfillDefaultProject(sql: Sql): Promise<void> {
     WHERE project_identifier IS NULL
        OR btrim(project_identifier) = ''
        OR project_identifier = 'unspecified'
+  `;
+  // A legacy completed run was stored under the default `received`; rewrite it
+  // to the canonical `completed` so strict latest-completed retrieval resolves
+  // it. The submission payload is untouched (byte-for-byte identical).
+  await sql`
+    UPDATE analyses
+    SET status = ${COMPLETED_ANALYSIS_STATUS}
+    WHERE status = ${LEGACY_COMPLETED_STATUS}
   `;
   defaultProjectBackfilled = true;
 }
@@ -196,7 +203,9 @@ export function toAnalysisPublic(row: AnalysisRow): AnalysisPublic {
 
 export async function insertAnalysis(sql: Sql, input: InsertAnalysisInput): Promise<AnalysisRow> {
   const status =
-    input.status && input.status.trim() ? input.status.trim().slice(0, 64) : "received";
+    input.status && input.status.trim()
+      ? input.status.trim().slice(0, 64)
+      : COMPLETED_ANALYSIS_STATUS;
   // A missing/placeholder project lands in 'Default project' rather than
   // overwriting anything: every insert is a new history row.
   const project = resolveProjectIdentifier(input.project);

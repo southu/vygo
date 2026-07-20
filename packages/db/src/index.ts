@@ -53,6 +53,8 @@ export {
   resolveProjectIdentifier,
   DEFAULT_PROJECT_IDENTIFIER,
   LEGACY_UNSPECIFIED_PROJECTS,
+  COMPLETED_ANALYSIS_STATUS,
+  LEGACY_COMPLETED_STATUS,
   type AnalysisRow,
   type AnalysisPublic,
   type InsertAnalysisInput,

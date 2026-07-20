@@ -1754,31 +1754,22 @@ const ANALYSES_FIELD_MAX = 512;
 /** Canonical home for a legacy/unprojected single analysis (mirrors @vygo/db). */
 const DEFAULT_PROJECT_IDENTIFIER = "Default project";
 
-/** Statuses that are NOT completed; anything else (incl. legacy `received`). */
-const NON_COMPLETED_STATUSES_EDGE = new Set<string>([
-  "pending",
-  "processing",
-  "queued",
-  "running",
-  "in_progress",
-  "inprogress",
-  "started",
-  "starting",
-  "working",
-  "failed",
-  "failure",
-  "error",
-  "errored",
-  "cancelled",
-  "canceled",
-  "aborted",
-  "rejected",
-  "expired",
-  "timeout",
-  "timed_out",
-  "incomplete",
-  "draft",
-  "new",
+/**
+ * Statuses that count as a COMPLETED run — a strict allowlist. Result selection
+ * returns ONLY these, so a newer `pending`/`failed`/`received` run never shadows
+ * (nor is ever returned as) the latest completed one. Legacy `received` rows are
+ * rewritten to `completed` by the migration/backfill.
+ */
+const COMPLETED_STATUSES_EDGE = new Set<string>([
+  "completed",
+  "complete",
+  "done",
+  "finished",
+  "success",
+  "succeeded",
+  "ready",
+  "scored",
+  "closed",
 ]);
 
 function isCompletedStatusEdge(status: unknown): boolean {
@@ -1787,8 +1778,7 @@ function isCompletedStatusEdge(status: unknown): boolean {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
-  if (!normalized) return true;
-  return !NON_COMPLETED_STATUSES_EDGE.has(normalized);
+  return COMPLETED_STATUSES_EDGE.has(normalized);
 }
 
 /** Resolve the project a new analysis (or a lookup) should use. */
@@ -1914,7 +1904,10 @@ function deriveAnalysesIdentityEdge(body: Record<string, unknown>): {
     if (m?.[1]) project = m[1].trim().slice(0, ANALYSES_FIELD_MAX);
   }
 
-  const status = pick(["status", "bucket", "state"]) ?? "received";
+  // Lifecycle status only — NOT the readiness `bucket`/band (a score class, not
+  // a run status). A submitted analysis is a completed run unless it carries an
+  // explicit lifecycle status/state.
+  const status = pick(["status", "state"]) ?? "completed";
   return { user, project, status };
 }
 
@@ -1941,8 +1934,9 @@ async function ensureAnalysesTablesEdge(sql: Sql): Promise<void> {
   // Data migration (mirrors migrations/0012_analyses_default_project.sql):
   // re-home every pre-existing analysis stored under the legacy
   // `unspecified`/blank project into 'Default project' as its first history
-  // entry, preserving submission content byte-for-byte. Runs at most once per
-  // process; idempotent (matches nothing after the first pass).
+  // entry AND rewrite the legacy completed status `received` to the canonical
+  // `completed`, preserving submission content byte-for-byte. Runs at most once
+  // per process; idempotent (matches nothing after the first pass).
   if (!edgeDefaultProjectBackfilled) {
     await sql`
       UPDATE analyses
@@ -1950,6 +1944,11 @@ async function ensureAnalysesTablesEdge(sql: Sql): Promise<void> {
       WHERE project_identifier IS NULL
          OR btrim(project_identifier) = ''
          OR project_identifier = 'unspecified'
+    `;
+    await sql`
+      UPDATE analyses
+      SET status = 'completed'
+      WHERE status = 'received'
     `;
     edgeDefaultProjectBackfilled = true;
   }
@@ -2051,7 +2050,9 @@ async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult>
     try {
       const sql = getSql(url);
       await ensureAnalysesTablesEdge(sql);
-      const status = pickAnalysesField(record, ["status"]) ?? "received";
+      // A stored analysis is a completed run unless the caller says otherwise;
+      // default result retrieval strictly returns the latest COMPLETED one.
+      const status = pickAnalysesField(record, ["status"]) ?? "completed";
       const rows = await sql<AnalysesEdgeRow[]>`
         INSERT INTO analyses (user_identifier, project_identifier, status, submission)
         VALUES (${user}, ${resolvedProject}, ${status}, ${JSON.stringify(record)}::jsonb)
@@ -2318,8 +2319,10 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
 
     if (seeded) {
       // 1) Legacy single analysis — inserted under the PRE-migration
-      //    'unspecified' project with an old created_at, then re-homed into
-      //    'Default project' by the same 0012 migration (scoped to this user).
+      //    'unspecified' project with the legacy `received` status and an old
+      //    created_at, then run through the SAME 0012 migration a real legacy
+      //    row goes through (scoped to this user): re-homed into 'Default
+      //    project' AND its legacy completed status rewritten to `completed`.
       await sql`
         INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
         VALUES (
@@ -2335,6 +2338,11 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
           AND (project_identifier IS NULL
                OR btrim(project_identifier) = ''
                OR project_identifier = 'unspecified')
+      `;
+      await sql`
+        UPDATE analyses
+        SET status = 'completed'
+        WHERE user_identifier = ${user} AND status = 'received'
       `;
 
       // 2) A NEWER, non-completed run in the SAME 'Default project'. Default

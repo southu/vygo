@@ -269,7 +269,10 @@ const ANALYSIS_PROJECT_KEYS = [
   "projectSlug",
   "slug",
 ];
-const ANALYSIS_STATUS_KEYS = ["status", "bucket", "state"];
+// Lifecycle status only — NOT the readiness `bucket`/band (high/medium/low),
+// which is a score classification, not a run status. A submitted analysis is a
+// completed run unless it carries an explicit lifecycle status/state.
+const ANALYSIS_STATUS_KEYS = ["status", "state"];
 /** First email anywhere in a blob of text (global-safe, not anchored). */
 const ANALYSIS_EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 /** `project alpha`, `project: beta`, `project="gamma"` … capture the name. */
@@ -375,7 +378,7 @@ function deriveAnalysisIdentity(body: Record<string, unknown>): {
     if (projMatch?.[1]) project = projMatch[1].trim().slice(0, ANALYSIS_MAX_FIELD_LEN);
   }
 
-  const status = analysisPickStructured(objs, ANALYSIS_STATUS_KEYS) ?? "received";
+  const status = analysisPickStructured(objs, ANALYSIS_STATUS_KEYS) ?? "completed";
 
   return { user, project, status };
 }
