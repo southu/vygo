@@ -38,6 +38,12 @@ type AxisHotspot = {
   /** Percent left/top within the chart box for the axis point. */
   left: number;
   top: number;
+  /**
+   * Outward tooltip placement relative to the radar center, so the card never
+   * overlaps the chart's geometric center. Nodes above center open upward,
+   * nodes below center open downward.
+   */
+  placement: "top" | "bottom";
 };
 
 /**
@@ -132,6 +138,14 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
       const rect = wrap.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
 
+      // Geometric center of the radar (canvas pixels). The radial scale exposes
+      // the true center; fall back to the visual center of the box.
+      const rScale = chart.scales?.r as { yCenter?: number } | undefined;
+      const centerYPx =
+        typeof rScale?.yCenter === "number" && Number.isFinite(rScale.yCenter)
+          ? rScale.yCenter
+          : rect.height * 0.52;
+
       const next: AxisHotspot[] = [];
       meta.data.forEach((el, index) => {
         const dim = dimensions[index];
@@ -145,6 +159,10 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
           index,
           left: (x / rect.width) * 100,
           top: (y / rect.height) * 100,
+          // Open the tooltip away from the center: above-center nodes open up,
+          // below-center nodes open down. This keeps the card off the center so
+          // the radar polygon stays visible (AC5).
+          placement: y <= centerYPx ? "top" : "bottom",
         });
       });
 
@@ -158,11 +176,13 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
           const radius = 0.32; // fraction of box
           const cx = 0.5;
           const cy = 0.52;
+          const top = cy + radius * Math.sin(angle);
           next.push({
             dimension: dim,
             index: i,
             left: (cx + radius * Math.cos(angle)) * 100,
-            top: (cy + radius * Math.sin(angle)) * 100,
+            top: top * 100,
+            placement: top <= cy ? "top" : "bottom",
           });
         }
       }
@@ -234,7 +254,7 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   riskFactor={dim.riskFactor}
                   segmentKind="radar-axis"
                   testId={`radar-axis-${slugify(dim.dimension)}`}
-                  tooltipPlacement={h.top < 40 ? "bottom" : "top"}
+                  tooltipPlacement={h.placement}
                   controlClassName="flex h-10 w-10 items-center justify-center rounded-full"
                 >
                   <span
