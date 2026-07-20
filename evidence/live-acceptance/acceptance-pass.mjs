@@ -173,6 +173,16 @@ async function listHistory(user, project) {
   return Array.isArray(r.json?.analyses) ? r.json.analyses : [];
 }
 
+/** Full list response (analyses + explicit current marker) for a scoped user. */
+async function listHistoryFull(user, label) {
+  const r = await http(
+    label || `list history (with current marker) user=${user}`,
+    "GET",
+    `${EP.list}?user=${encodeURIComponent(user)}`,
+  );
+  return r.json || {};
+}
+
 async function startRun(user, project, expectStatus, label) {
   const r = await http(
     label || `start run project=${project}`,
@@ -318,6 +328,30 @@ async function main() {
     !!demoLegacy && isCompleted(demoLegacy.status) && demoLegacy.project === "Default project",
     demoLegacy ? `project=${demoLegacy.project} status=${demoLegacy.status}` : "not found",
   );
+  // The legacy pre-migration identity is directly viewable (seed-on-read) via
+  // the demo op — the same path the /analyses?fixture=legacy history UI uses —
+  // so its single original result is retrievable after this deploy without any
+  // credentials. Its one run must be a completed, current 'Default project' run.
+  const legacyFixture = await http(
+    "legacy: viewable fixture identity (demo op)",
+    "GET",
+    `${EP.demo}?user=${encodeURIComponent(LEGACY_USER)}`,
+  );
+  const lfAnalyses = Array.isArray(legacyFixture.json?.analyses) ? legacyFixture.json.analyses : [];
+  const lfCurrent = legacyFixture.json?.currentByProject || {};
+  const lfRow = lfAnalyses.find((a) => a?.submission?.fixture === "legacy_single_analysis");
+  record(
+    "legacy-fixture-viewable",
+    "legacy pre-migration identity is viewable via the history UI's demo op with its single result marked current",
+    legacyFixture.status === 200 &&
+      legacyFixture.json?.legacy === true &&
+      !!lfRow &&
+      isCompleted(lfRow.status) &&
+      lfRow.project === "Default project" &&
+      lfRow.current === true &&
+      lfCurrent["Default project"] === lfRow.id,
+    lfRow ? `user=${LEGACY_USER} project=${lfRow.project} status=${lfRow.status} current=${lfRow.current}` : "not found",
+  );
 
   // ---- Verify visible history: A (2 runs, current) + B (1 run, current) ----
   aRows = await listHistory(DEMO_USER, PROJECT_A);
@@ -347,6 +381,26 @@ async function main() {
     "history shows A run1 + A run2 + B run, each labeled, latest-per-project current",
     aCompleted.length >= 2 && bCompleted.length >= 1 && !!aCurrent && !!bCurrent,
     `A runs=${aRows.length} (current ${aCurrent?.id?.slice(0, 8)}), B runs=${bRows.length} (current ${bCurrent?.id?.slice(0, 8)})`,
+  );
+
+  // The list response now carries an EXPLICIT current marker (per-row `current`
+  // + a `currentByProject` map), so a consumer never re-derives which run is
+  // current. Confirm the marker names the newest completed run per project.
+  const demoFull = await listHistoryFull(DEMO_USER, "demo: list history with explicit current marker");
+  const cbp = demoFull?.currentByProject || {};
+  const rowById = new Map((demoFull?.analyses || []).map((a) => [a.id, a]));
+  const markerOk =
+    cbp[PROJECT_A] === aCurrent?.id &&
+    cbp[PROJECT_B] === bCurrent?.id &&
+    rowById.get(cbp[PROJECT_A])?.current === true &&
+    rowById.get(cbp[PROJECT_B])?.current === true &&
+    (demoFull?.analyses || []).filter((a) => a.current).length ===
+      new Set((demoFull?.analyses || []).filter((a) => a.current).map((a) => a.project)).size;
+  record(
+    "history-current-marker",
+    "list response includes an explicit current marker (per-row `current` + currentByProject) matching the newest completed run per project",
+    markerOk,
+    `currentByProject A=${String(cbp[PROJECT_A]).slice(0, 8)} B=${String(cbp[PROJECT_B]).slice(0, 8)}`,
   );
 
   // Confirm the current result endpoint returns the newest completed A run.

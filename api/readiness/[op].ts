@@ -1993,6 +1993,58 @@ function toAnalysesPublicEdge(row: AnalysesEdgeRow): Record<string, unknown> {
   };
 }
 
+/**
+ * Attach an EXPLICIT `current` marker to each public analysis so the history
+ * view (and any API consumer) never has to re-derive which run is current.
+ *
+ * Within each project the latest COMPLETED run (max created_at) is the current
+ * result; every other run — including a newer pending/failed run — gets
+ * `current: false`, so a non-completed re-run never shadows the completed
+ * result. The returned `currentByProject` maps each project to its current run
+ * id (only projects that have at least one completed run appear).
+ */
+function annotateCurrentEdge(analyses: Record<string, unknown>[]): {
+  analyses: Record<string, unknown>[];
+  currentByProject: Record<string, string>;
+} {
+  const bestByProject = new Map<string, { id: string; created_at: string }>();
+  for (const a of analyses) {
+    if (!isCompletedStatusEdge(a.status)) continue;
+    const project = String(a.project ?? "");
+    const created = String(a.created_at ?? "");
+    const id = String(a.id ?? "");
+    const best = bestByProject.get(project);
+    // ISO-8601 timestamps sort lexicographically, so a string compare picks the
+    // most recent completed run without parsing dates.
+    if (!best || created > best.created_at) {
+      bestByProject.set(project, { id, created_at: created });
+    }
+  }
+  const currentByProject: Record<string, string> = {};
+  for (const [project, best] of bestByProject) currentByProject[project] = best.id;
+  const annotated = analyses.map((a) => ({
+    ...a,
+    current: bestByProject.get(String(a.project ?? ""))?.id === String(a.id ?? ""),
+  }));
+  return { analyses: annotated, currentByProject };
+}
+
+/**
+ * Add the explicit current marker to a list/demo handler result whose body
+ * already carries an `analyses` array (used for the proxy fallback paths so the
+ * marker is present regardless of which backend served the list).
+ */
+function annotateListResult(result: ReadinessHandlerResult): ReadinessHandlerResult {
+  const body = result.body as Record<string, unknown> | undefined;
+  if (result.status === 200 && body && Array.isArray(body.analyses)) {
+    const { analyses, currentByProject } = annotateCurrentEdge(
+      body.analyses as Record<string, unknown>[],
+    );
+    return { ...result, body: { ...body, analyses, currentByProject } };
+  }
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // run START (per-project, status-aware) + COMPLETE
 //
@@ -2681,7 +2733,8 @@ async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult>
     };
   }
 
-  if (!url) return proxyListAnalyses({ user, project }, process.env, req.headers);
+  if (!url)
+    return annotateListResult(await proxyListAnalyses({ user, project }, process.env, req.headers));
 
   try {
     const sql = getSql(url);
@@ -2698,8 +2751,8 @@ async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult>
         FROM analyses WHERE user_identifier = ${user}
         ORDER BY created_at DESC LIMIT 200`;
     }
-    const analyses = rows.map(toAnalysesPublicEdge);
-    return { status: 200, body: { ok: true, count: analyses.length, analyses } };
+    const { analyses, currentByProject } = annotateCurrentEdge(rows.map(toAnalysesPublicEdge));
+    return { status: 200, body: { ok: true, count: analyses.length, analyses, currentByProject } };
   } catch (error) {
     return {
       status: 500,
@@ -3001,6 +3054,116 @@ function demoSecondProjectSubmission(): Record<string, unknown> {
 }
 
 /**
+ * A dedicated, documented legacy pre-migration identity: an account that had a
+ * SINGLE analysis before the multi-run migration. Seeded (idempotently) under
+ * the pre-migration 'unspecified' project with the legacy `received` status and
+ * an old created_at, then run through the SAME Default-project migration a real
+ * legacy row goes through, so an external tester can view — after this deploy —
+ * that its one original result is retained. Its namespace is separate from the
+ * multi-run demo user so the legacy single-analysis case is verifiable on its
+ * own at /analyses?fixture=legacy (→ GET /api/analyses/demo?user=…).
+ */
+const LEGACY_DEMO_USER = "legacy-single@vygo.ai";
+
+function legacyDemoUserSubmission(): Record<string, unknown> {
+  return {
+    source: "vygo_demo_fixture",
+    fixture: "legacy_single_analysis",
+    user: LEGACY_DEMO_USER,
+    snapshotId: DEMO_SNAPSHOT_IDS.legacy,
+    results_text:
+      "Original pre-migration analysis for a single-analysis account, preserved byte-for-byte after the multi-run migration into 'Default project'.",
+    results: {
+      overall_score: 69,
+      band: "developing",
+      dimensions: { clarity: 74, evidence: 63, alignment: 70 },
+    },
+  };
+}
+
+/**
+ * Seed + read back the legacy single-analysis fixture user. Idempotent: inserts
+ * the one pre-migration analysis only when the user has no rows yet, then always
+ * performs the Default-project migration and an additive snapshotId backfill so
+ * the single completed result opens in the existing results component. Only ever
+ * touches this dedicated fixture user's namespace.
+ */
+async function seedLegacyDemoUser(sql: Sql): Promise<ReadinessHandlerResult> {
+  const user = LEGACY_DEMO_USER;
+  const existing = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM analyses WHERE user_identifier = ${user}
+  `;
+  const seeded = (existing[0]?.n ?? 0) === 0;
+
+  if (seeded) {
+    await sql`
+      INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
+      VALUES (
+        ${user}, 'unspecified', 'received',
+        ${JSON.stringify(legacyDemoUserSubmission())}::jsonb,
+        '2023-11-01T00:00:00Z', '2023-11-01T00:00:00Z'
+      )
+    `;
+    await sql`
+      UPDATE analyses
+      SET project_identifier = ${DEFAULT_PROJECT_IDENTIFIER}
+      WHERE user_identifier = ${user}
+        AND (project_identifier IS NULL
+             OR btrim(project_identifier) = ''
+             OR project_identifier = 'unspecified')
+    `;
+    await sql`
+      UPDATE analyses
+      SET status = 'completed'
+      WHERE user_identifier = ${user} AND status = 'received'
+    `;
+  }
+
+  // Additive: ensure the migrated single run carries a resolvable snapshotId.
+  await sql`
+    UPDATE analyses
+    SET submission = submission || ${JSON.stringify({ snapshotId: DEMO_SNAPSHOT_IDS.legacy })}::jsonb
+    WHERE user_identifier = ${user}
+      AND submission->>'fixture' = 'legacy_single_analysis'
+      AND (submission->>'snapshotId') IS NULL
+  `;
+
+  const rows = await sql<AnalysesEdgeRow[]>`
+    SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+    FROM analyses WHERE user_identifier = ${user}
+    ORDER BY created_at ASC LIMIT 200
+  `;
+  const { analyses, currentByProject } = annotateCurrentEdge(rows.map(toAnalysesPublicEdge));
+  const projects = Array.from(new Set(rows.map((r) => r.project_identifier)));
+  const enc = (s: string) => encodeURIComponent(s);
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      seeded,
+      idempotent: true,
+      legacy: true,
+      user,
+      defaultProject: DEFAULT_PROJECT_IDENTIFIER,
+      projects,
+      count: analyses.length,
+      analyses,
+      currentByProject,
+      verify: {
+        currentDefaultResult: `/api/analyses/result?user=${enc(user)}`,
+        allHistory: `/api/analyses?user=${enc(user)}`,
+        history: `/analyses?fixture=legacy`,
+      },
+      notes: [
+        "This identity had a SINGLE analysis before the multi-run migration; the row was re-homed into 'Default project' and its legacy 'received' status rewritten to 'completed' with its submission payload preserved byte-for-byte.",
+        "currentDefaultResult returns that one original completed analysis — proof the pre-migration result is retained and viewable after this deploy.",
+        "It carries a snapshotId so opening it renders the same results component a fresh run produces.",
+      ],
+    },
+  };
+}
+
+/**
  * GET /api/analyses/demo (also /v1/analyses/demo)
  *
  * Idempotently seeds `demo@vygo.ai` and returns a self-describing verification
@@ -3022,13 +3185,21 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
   const rl = checkEdgeRateLimit(req);
   if (!rl.allowed) return rateLimitedResult(rl.retryAfterSeconds);
 
-  const user = DEMO_USER;
+  // A small allowlist of documented fixture identities: the multi-run demo user
+  // (default) and the legacy single-analysis user. Any other `user` value falls
+  // back to the demo user — this endpoint never seeds arbitrary namespaces.
+  const requestedUser = queryParam(req, "user").trim().toLowerCase();
+  const user = requestedUser === LEGACY_DEMO_USER ? LEGACY_DEMO_USER : DEMO_USER;
   const url = resolveDatabaseUrl();
-  if (!url) return proxyAnalysesDemo(user, process.env, req.headers);
+  if (!url) return annotateListResult(await proxyAnalysesDemo(user, process.env, req.headers));
 
   try {
     const sql = getSql(url);
     await ensureAnalysesTablesEdge(sql);
+
+    if (user === LEGACY_DEMO_USER) {
+      return await seedLegacyDemoUser(sql);
+    }
 
     // Idempotent: only seed when this demo user has no analyses yet.
     const existing = await sql<{ n: number }[]>`
@@ -3134,7 +3305,7 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
       FROM analyses WHERE user_identifier = ${user}
       ORDER BY created_at ASC LIMIT 200
     `;
-    const analyses = rows.map(toAnalysesPublicEdge);
+    const { analyses, currentByProject } = annotateCurrentEdge(rows.map(toAnalysesPublicEdge));
     const projects = Array.from(new Set(rows.map((r) => r.project_identifier)));
     const enc = (s: string) => encodeURIComponent(s);
 
@@ -3150,15 +3321,19 @@ async function handleAnalysesDemo(req: EdgeRequest): Promise<ReadinessHandlerRes
         projects,
         count: analyses.length,
         analyses,
+        currentByProject,
         verify: {
           currentDefaultResult: `/api/analyses/result?user=${enc(user)}`,
           defaultProjectHistory: `/api/analyses?user=${enc(user)}&project=${enc(DEFAULT_PROJECT_IDENTIFIER)}`,
           secondProjectHistory: `/api/analyses?user=${enc(user)}&project=${enc(DEMO_SECOND_PROJECT)}`,
           allHistory: `/api/analyses?user=${enc(user)}`,
+          legacyUserHistory: `/api/analyses/demo?user=${enc(LEGACY_DEMO_USER)}`,
           history: "/analyses",
+          legacyHistory: "/analyses?fixture=legacy",
           dashboard: "/dashboard",
         },
         notes: [
+          "Each analysis carries an explicit `current` boolean and the response includes `currentByProject` (project → current run id): within a project the latest COMPLETED run is current, and a newer pending run is never marked current.",
           "currentDefaultResult returns the latest COMPLETED analysis of 'Default project' — the newer re-run, NOT the older legacy run and never the pending run.",
           "defaultProjectHistory lists both completed runs (the migrated legacy analysis and the newer re-run) plus the newer pending run, each with its own status, created_at, and snapshotId.",
           "Each COMPLETED run carries a snapshotId; open /readiness/snapshot?id=<snapshotId> to render that run in the existing results component.",

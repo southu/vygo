@@ -18,6 +18,13 @@ endpoints and record the results.
 Reproduce: `node evidence/live-acceptance/acceptance-pass.mjs` then
 `bash evidence/live-acceptance/db-query.sh > evidence/live-acceptance/output/db-query.txt`.
 
+The end-user **history view** lives at `/analyses` and is discoverable from
+`/readiness` (the "View analysis history" entry). It groups every run by project,
+marks each project's latest completed run **current** (a per-row ★ Current badge,
+backed by the API's explicit `current` / `currentByProject` marker), keeps older
+runs openable, and scopes to one named identity (no cross-user listing). The
+legacy pre-migration identity is viewable at `/analyses?fixture=legacy`.
+
 ## Identities used (all public/demo namespaces — no real-user data touched)
 
 - `demo@vygo.ai` — the account rendered on the public **/analyses** history page.
@@ -35,8 +42,8 @@ Reproduce: `node evidence/live-acceptance/acceptance-pass.mjs` then
 | --- | --- | --- |
 | 1 | Complete an analysis end-to-end for project **A**; completed result appears | `api-transcript.json` (A start→complete); `GET /api/analysis/result?user=demo@vygo.ai&project=A`; renders on `/analyses` |
 | 2 | Start & complete a second analysis for project **B** | `api-transcript.json` (B start→complete); B group on `/analyses` |
-| 3 | Re-run A → history shows all three runs (A run1, B run, A run2), labeled per project, latest-per-project **current** | `summary.md` history table; `/analyses` groups A (2 runs) + B (1 run) with per-project "Current result"; `db-query.txt` per-project counts + current run |
-| 4 | Legacy pre-migration single-analysis user still retains original result | `legacy-single@vygo.ai` via `GET /api/analysis/result?user=legacy-single@vygo.ai`; migration-integrity fixture in `/api/analysis/demo` (`fixture=legacy_single_analysis`, byte-for-byte in `Default project`); `db-query.txt` |
+| 3 | Re-run A → history shows all three runs (A run1, B run, A run2), labeled per project, latest-per-project **current** | `summary.md` history table; `/analyses` groups A (2 runs) + B (1 run) with per-project "Current result" + a visible **★ Current** badge on the latest completed run; the list response carries an **explicit** `current` marker (per-row `current` boolean + a `currentByProject` map) — check `history-current-marker`; `db-query.txt` per-project counts + current run |
+| 4 | Legacy pre-migration single-analysis user still retains original result | `legacy-single@vygo.ai` via `GET /api/analysis/result?user=legacy-single@vygo.ai`; directly viewable in the history UI at **`/analyses?fixture=legacy`** (seed-on-read `GET /api/analysis/demo?user=legacy-single@vygo.ai`) — check `legacy-fixture-viewable`; migration-integrity fixture in `/api/analysis/demo` (`fixture=legacy_single_analysis`, byte-for-byte in `Default project`); `db-query.txt` |
 | 5 | Start endpoint (a) accepts a new run once the prior run completed, (b) rejects a duplicate start with an error status only while a run is in progress | `api-transcript.json`: **201** start → **409 `run_in_progress`** duplicate → **200** complete → **201** start-after-complete |
 | 6 | Submission + analysis records queryable in the provisioned Railway DB (project `composer`) | `db-query.txt` (analyses rows + submission payloads for all acceptance runs); also over HTTP via scope-required `GET /api/submissions?user=…` |
 

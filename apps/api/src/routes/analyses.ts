@@ -26,6 +26,7 @@ import {
   findLatestCompletedAnalysis,
   toAnalysisPublic,
   resolveProjectIdentifier,
+  isCompletedStatus,
   DEFAULT_PROJECT_IDENTIFIER,
   COMPLETED_ANALYSIS_STATUS,
   type DatabaseHandle,
@@ -51,6 +52,36 @@ function isJsonContentType(header: string | string[] | undefined): boolean {
   const raw = Array.isArray(header) ? header[0] : header;
   if (!raw) return true; // absent Content-Type is tolerated (defaults to JSON body)
   return raw.split(";")[0]?.trim().toLowerCase() === "application/json";
+}
+
+type PublicAnalysis = ReturnType<typeof toAnalysisPublic>;
+
+/**
+ * Attach an explicit `current` marker to each analysis so history consumers
+ * don't have to re-derive which run is current: within each project the latest
+ * COMPLETED run (max created_at) is current; a newer non-completed run is never
+ * current. Returns the per-project current run id map (`currentByProject`).
+ */
+function annotateCurrent(analyses: PublicAnalysis[]): {
+  analyses: (PublicAnalysis & { current: boolean })[];
+  currentByProject: Record<string, string>;
+} {
+  const bestByProject = new Map<string, { id: string; created_at: string }>();
+  for (const a of analyses) {
+    if (!isCompletedStatus(a.status)) continue;
+    const best = bestByProject.get(a.project);
+    // ISO-8601 timestamps sort lexicographically.
+    if (!best || a.created_at > best.created_at) {
+      bestByProject.set(a.project, { id: a.id, created_at: a.created_at });
+    }
+  }
+  const currentByProject: Record<string, string> = {};
+  for (const [project, best] of bestByProject) currentByProject[project] = best.id;
+  const annotated = analyses.map((a) => ({
+    ...a,
+    current: bestByProject.get(a.project)?.id === a.id,
+  }));
+  return { analyses: annotated, currentByProject };
 }
 
 /** First non-empty string among candidate keys, trimmed and length-capped. */
@@ -231,8 +262,10 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
     try {
       await ensureAnalysesTable(dbHandle.sql);
       const rows = await listAnalyses(dbHandle.sql, { user, project });
-      const analyses = rows.map(toAnalysisPublic);
-      return reply.status(200).send({ ok: true, count: analyses.length, analyses });
+      const { analyses, currentByProject } = annotateCurrent(rows.map(toAnalysisPublic));
+      return reply
+        .status(200)
+        .send({ ok: true, count: analyses.length, analyses, currentByProject });
     } catch (error) {
       request.log.error(
         { event: "analyses_list_failed" },
@@ -450,7 +483,7 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
       }
 
       const rows = await listAnalyses(dbHandle.sql, { user });
-      const analyses = rows.map(toAnalysisPublic);
+      const { analyses, currentByProject } = annotateCurrent(rows.map(toAnalysisPublic));
       const projects = Array.from(new Set(rows.map((r) => r.project_identifier)));
       const enc = (s: string) => encodeURIComponent(s);
       return reply.status(200).send({
@@ -463,6 +496,7 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
         projects,
         count: analyses.length,
         analyses,
+        currentByProject,
         verify: {
           currentDefaultResult: `/v1/analyses/result?user=${enc(user)}`,
           defaultProjectHistory: `/v1/analyses?user=${enc(user)}&project=${enc(DEFAULT_PROJECT_IDENTIFIER)}`,
