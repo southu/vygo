@@ -1,5 +1,5 @@
 import type { ChartDimension } from "@/components/charts/types";
-import { clampScore, SCORE_BAND_META, scoreBand } from "@/components/charts/scoreBands";
+import { clampScore, scoreSeverity } from "@/lib/readiness/severity";
 import { dimensionSectionId, dimensionSlug } from "@/lib/readiness/dimension-slug";
 import type { DimensionRisk } from "@/lib/readiness/report-chart-data";
 
@@ -35,7 +35,8 @@ export function ReadinessDeepDives({ dimensions, riskMap, className }: Readiness
 
         {dimensions.map((dim) => {
           const score = Math.round(clampScore(dim.score));
-          const meta = SCORE_BAND_META[scoreBand(score)];
+          const sev = scoreSeverity(score);
+          const SevIcon = sev.Icon;
           const risk = riskByDimension.get(dim.dimension);
           const slug = dimensionSlug(dim.dimension);
           const headingId = `deep-dive-heading-${slug}`;
@@ -46,6 +47,8 @@ export function ReadinessDeepDives({ dimensions, riskMap, className }: Readiness
               className="readiness-deep-dive scroll-mt-24 border-t border-border pt-8"
               aria-labelledby={headingId}
               data-dimension={dim.dimension}
+              data-severity-tier={sev.tier}
+              data-score={score}
               data-testid={`readiness-deep-dive-${slug}`}
             >
               <header className="flex flex-wrap items-start justify-between gap-4">
@@ -58,12 +61,13 @@ export function ReadinessDeepDives({ dimensions, riskMap, className }: Readiness
                     {dim.dimension}
                   </h3>
                   <span
-                    className={`mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-canvas px-2.5 py-0.5 text-[11px] font-semibold ${meta.textClass}`}
+                    className={`mt-2 inline-flex items-center gap-1.5 rounded-full border bg-canvas px-2.5 py-0.5 text-[11px] font-semibold ${sev.borderClass} ${sev.textClass}`}
                   >
-                    {meta.label}
+                    <SevIcon className="h-3.5 w-3.5" />
+                    {sev.label}
                   </span>
                 </div>
-                <p className="font-display text-3xl font-bold tabular-nums text-ink">
+                <p className={`font-display text-3xl font-bold tabular-nums ${sev.textClass}`}>
                   {score}
                   <span className="ml-1 text-base font-semibold text-muted">/100</span>
                 </p>
@@ -78,7 +82,7 @@ export function ReadinessDeepDives({ dimensions, riskMap, className }: Readiness
                 aria-label={`${dim.dimension} score`}
               >
                 <div
-                  className={`h-full rounded-full ${meta.barClass}`}
+                  className={`h-full rounded-full ${sev.barClass}`}
                   style={{ width: `${Math.max(score > 0 ? 4 : 0, score)}%` }}
                 />
               </div>
@@ -94,17 +98,26 @@ export function ReadinessDeepDives({ dimensions, riskMap, className }: Readiness
               ) : null}
 
               {dim.sub_metrics.length > 0 ? (
-                <ul className="mt-4 grid gap-2 sm:grid-cols-2" data-testid={`deep-dive-submetrics-${slug}`}>
+                <ul
+                  className="mt-4 grid gap-2 sm:grid-cols-2"
+                  data-testid={`deep-dive-submetrics-${slug}`}
+                >
                   {dim.sub_metrics.map((sm) => {
                     const smScore = Math.round(clampScore(sm.score));
-                    const smMeta = SCORE_BAND_META[scoreBand(smScore)];
+                    const smSev = scoreSeverity(smScore);
+                    const SmIcon = smSev.Icon;
                     return (
                       <li
                         key={`${slug}-${sm.name}`}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2 text-sm"
+                        className={`flex items-center justify-between gap-3 rounded-xl border bg-surface px-3 py-2 text-sm ${smSev.borderClass}`}
+                        data-severity-tier={smSev.tier}
+                        data-score={smScore}
                       >
                         <span className="min-w-0 truncate text-ink-soft">{sm.name}</span>
-                        <span className={`shrink-0 tabular-nums font-semibold ${smMeta.textClass}`}>
+                        <span
+                          className={`flex shrink-0 items-center gap-1 tabular-nums font-semibold ${smSev.textClass}`}
+                        >
+                          <SmIcon className="h-3.5 w-3.5" />
                           {smScore}
                         </span>
                       </li>
