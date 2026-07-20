@@ -1,5 +1,6 @@
 import type { ChartDimension } from "@/components/charts/types";
 import { clampScore, scoreSeverity } from "@/lib/readiness/severity";
+import { microCtaForPillar } from "@/lib/readiness/micro-cta";
 import { dimensionSectionId, dimensionSlug } from "@/lib/readiness/dimension-slug";
 import type { DimensionRisk } from "@/lib/readiness/report-chart-data";
 
@@ -106,20 +107,43 @@ export function ReadinessDeepDives({ dimensions, riskMap, className }: Readiness
                     const smScore = Math.round(clampScore(sm.score));
                     const smSev = scoreSeverity(smScore);
                     const SmIcon = smSev.Icon;
+                    // Reuse the SAME tier that styles this sub-metric to decide the
+                    // CTA — Good resolves to null, so no CTA renders there.
+                    const cta = microCtaForPillar(dim.dimension, smSev.tier);
                     return (
                       <li
                         key={`${slug}-${sm.name}`}
-                        className={`flex items-center justify-between gap-3 rounded-xl border bg-surface px-3 py-2 text-sm ${smSev.borderClass}`}
+                        className={`flex flex-col rounded-xl border bg-surface text-sm ${smSev.borderClass}`}
                         data-severity-tier={smSev.tier}
                         data-score={smScore}
                       >
-                        <span className="min-w-0 truncate text-ink-soft">{sm.name}</span>
-                        <span
-                          className={`flex shrink-0 items-center gap-1 tabular-nums font-semibold ${smSev.textClass}`}
-                        >
-                          <SmIcon className="h-3.5 w-3.5" />
-                          {smScore}
-                        </span>
+                        <div className="flex items-center justify-between gap-3 px-3 py-2">
+                          <span className="min-w-0 truncate text-ink-soft">{sm.name}</span>
+                          <span
+                            className={`flex shrink-0 items-center gap-1 tabular-nums font-semibold ${smSev.textClass}`}
+                          >
+                            <SmIcon className="h-3.5 w-3.5" />
+                            {smScore}
+                          </span>
+                        </div>
+                        {cta ? (
+                          <div
+                            className={`flex flex-col items-start gap-1.5 rounded-b-xl border-t px-3 py-2 ${smSev.borderClass} ${smSev.softBgClass}`}
+                            data-testid="submetric-micro-cta"
+                            data-pillar={dim.dimension}
+                            data-package={cta.packageName}
+                          >
+                            <p className={`text-[11px] leading-snug ${smSev.textClass}`}>
+                              {cta.painPoint}
+                            </p>
+                            <a
+                              href={cta.href}
+                              className={`inline-flex w-fit items-center rounded-md border bg-canvas px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-surface ${smSev.borderClass} ${smSev.textClass}`}
+                            >
+                              {cta.ctaLabel}
+                            </a>
+                          </div>
+                        ) : null}
                       </li>
                     );
                   })}
