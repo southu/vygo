@@ -45,6 +45,91 @@ commits or this log.
 - Provisioner non-secret summary reused existing Railway project `vygo` (Postgres/Redis).
 - Ready for independent tester confirmation of the same ten items.
 
+## Verify-human cold-start re-verification (2026-07-20)
+
+Mission `vygo-verify-human-cold-start`: after the deploy gate confirms the live
+`/version` SHA matches the deployed commit, re-run the verify-human path under
+cold-start conditions and confirm the original first-attempt-fail bug is gone.
+
+**Product change this iteration:** none. The cold-start fix already shipped
+(`489cbfc`→`ea40bd9`): the waitlist verify-human submit degrades a cold
+"Turnstile callback never fires" attempt to a genuine token-less POST that the
+authoritative server (`/v1/waitlist`) accepts, so the first attempt succeeds
+without a silent retry. Live re-verification below confirms the bug stays gone,
+so working code is left untouched. No `version.txt`/deploy-SHA edits; no secrets
+in commits or this log.
+
+**Deploy SHA:** cold-start evidence was captured against the then-live
+`a3a9ee74893341bfc871741b3718b5c62a89e9ae` (`GET /version` == `origin/main`
+HEAD at check time). This commit is docs-only, so `WaitlistForm`,
+`ScoreGateForm`, and the server verifier are byte-identical; the verify-human
+behavior at the SHA this commit deploys to is unchanged, and `/version` advances
+to this commit's HEAD after redeploy.
+
+### What "verify-human" is
+
+Cloudflare Turnstile ("verify you are human") gating two surfaces: the waitlist
+apply modal (`WaitlistForm`) and the readiness score gate (`ScoreGateForm`).
+The reported bug: a cold first submit failed client-side ("complete the
+verification challenge") because the widget's token arrives only via an async
+callback that can be late — or, in the production cold hang, never fires at all.
+
+### Cold-start protocol + result (live)
+
+New Playwright Chromium **browser process and fresh context per attempt** (no
+cookies / storage / prior verify-human state), driving the real live waitlist
+modal to step 2 against the **real managed Turnstile widget**, which does not
+issue a token to a headless bot — i.e. the exact "callback never fires" cold
+condition. One first-attempt submit per context, **no retry**. The final
+`/v1/waitlist` POST is intercepted and answered `accepted:true` so no real
+production row is written, while asserting the client actually completed a
+**genuine token-less POST** (the degraded path) rather than stranding.
+
+| attempt | first-attempt outcome                     | verdict  |
+| ------- | ----------------------------------------- | -------- |
+| 1       | success card via token-less degraded POST | **PASS** |
+| 2       | success card via token-less degraded POST | **PASS** |
+| 3       | success card via token-less degraded POST | **PASS** |
+
+Sequence: **PASS PASS PASS** — first attempt succeeds every time; no
+first-fail/retry-pass flake reintroduced. The original cold-start bug is gone on
+the live waitlist verify-human path.
+
+### Per-criterion results (live)
+
+| #   | Criterion                                                        | Result   | Evidence                                                                                                           |
+| --- | ---------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| 1   | `GET /version` → 200, body = deployed SHA                        | **PASS** | Body `a3a9ee74893341bfc871741b3718b5c62a89e9ae`; matches `origin/main` HEAD at check time                          |
+| 2   | Cold-start verify-human, first attempt succeeds, no silent retry | **PASS** | 3 fresh cold contexts, single submit each → `waitlist-success-card` via degraded token-less POST (see table above) |
+| 3   | Evidence captured (ordered pass/fail sequence + `/version` SHA)  | **PASS** | Sequence `PASS PASS PASS` at SHA `a3a9ee7…`; no residual findings to file                                          |
+| 4   | Optional extra cold attempts also pass (no reintroduced flake)   | **PASS** | Attempts 2 and 3 both PASS on first submit                                                                         |
+| 5   | Home page HTTPS 200 (regression)                                 | **PASS** | `GET https://www.vygo.ai/` → **200**, non-empty HTML                                                               |
+| 6   | Core public/legal paths still load (regression)                  | **PASS** | `GET` `/apply` `/waitlist` `/readiness` `/privacy` `/terms` `/release-evidence.json` → all **200**                 |
+
+### Corroborating (server contract + suite)
+
+- Server is the authoritative verify-human gate; Turnstile is a best-effort
+  client speed-bump. `/v1/waitlist` accepting a token-less/empty-token
+  application is pinned by the edge cold-start contract tests
+  (`api/_lib/waitlist.test.ts`), and a token-less-but-otherwise-invalid body is
+  still rejected 400 (degraded path is not a blanket accept). Edge suite **76/76
+  pass** locally; `pnpm lint` and `pnpm typecheck` clean.
+- Deployed `/release-evidence.json` reports `ready:true` with the build suite
+  (cleanInstall/lint/formatCheck/typecheck/baselineBuild/secretScan) passed and
+  `detectedSecrets:0`.
+- DB-backed API integration tests are not exercised here (no local Postgres) and
+  are outside the deploy gate; they are unchanged by this docs-only commit.
+
+### Notes
+
+- `ScoreGateForm` (readiness gate) is intentionally left unchanged: its server
+  path requires a valid Turnstile token (fail-closed), so a token-less degrade
+  is not safe there; its correct cold terminal state is the actionable fallback,
+  and automation uses the `?e2e=1` always-pass mode. No product code touched.
+- The final POST was mocked only to avoid writing a real production application;
+  the live server's token-less acceptance is established independently (above).
+  The separate read-only tester performs the authoritative end-to-end run.
+
 ## Homepage copy deploy (2026-07-18)
 
 Mission `vygo-homepage-deploy`: ship the STEP 1 "Get set up first" homepage copy
