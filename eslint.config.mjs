@@ -11,6 +11,7 @@ export default tseslint.config(
       "**/.next/**",
       "**/coverage/**",
       "**/build/**",
+      "evidence/**",
       "apps/web/out/**",
       "apps/web/src/generated/**",
       "apps/web/public/api/readiness.json",

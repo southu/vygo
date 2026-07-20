@@ -1,0 +1,116 @@
+# vygo-live-acceptance-pass — provisioned Railway DB evidence
+# Generated 2026-07-20T17:52:31Z via vault-provisioner-query (read-only SELECT; no secrets in output).
+# project_id=1b8abe52-f665-4e07-9a99-f6aa36a62610 environment_id=39b57aef-2574-4d8e-bbd2-673e91eb9768 postgres_service_id=7e3b44d3-f9d4-4afd-a367-2fde98bd510f
+
+## Provisioner status (armed/unlocked; no secrets)
+{
+  "ok": true,
+  "vault_url_configured": true,
+  "consumer_key_present": true,
+  "armed": true,
+  "vault_unlocked": true,
+  "lease_api": true,
+  "tool_child_api": true,
+  "broker_api": true,
+  "interface": "vault-provisioner-query",
+  "connection_method": "register_run(folder) -> POST /api/consumer/lease (RAILWAY_TOKEN) -> Railway GraphQL variables for Postgres service -> psql DATABASE_PUBLIC_URL -> release"
+}
+
+## Analysis records for the acceptance runs (analyses table)
+----- SQL: SELECT left(id::text,8) AS run_id, user_identifier AS "user", project_identifier AS project, status, created_at, (submission->>'snapshotId') AS snapshot_id FROM analyses WHERE user_identifier IN ('demo@vygo.ai','acceptance-api@vygo.ai','legacy-single@vygo.ai') ORDER BY user_identifier, created_at
+# vault-provisioner-query result (no secrets)
+# ok: True
+# interface: vault-provisioner-query
+# folder: vygo
+# run_id: vault-provisioner-query-3181250
+# project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
+# environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
+# postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f
+# sql: SELECT left(id::text,8) AS run_id, user_identifier AS "user", project_identifier AS project, status, created_at, (submission->>'snapshotId') AS snapshot_id FROM analyses WHERE user_identifier IN ('demo@vygo.ai','acceptance-api@vygo.ai','legacy-single@vygo.ai') ORDER BY user_identifier, created_at
+# connection_method: vault-provisioner-lease-psql
+# secrets_in_output: False
+run_id|user|project|status|created_at|snapshot_id
+59bc77f3|acceptance-api@vygo.ai|A|completed|2026-07-20 17:51:30.978009+00|00000000-0000-4000-a000-0000000000e3
+c79e4a05|acceptance-api@vygo.ai|A|completed|2026-07-20 17:51:31.565399+00|00000000-0000-4000-a000-0000000000e2
+0a890833|demo@vygo.ai|Default project|completed|2024-01-01 00:00:00+00|00000000-0000-4000-a000-0000000000e3
+c9991e35|demo@vygo.ai|Project Beta|completed|2024-03-01 00:00:00+00|00000000-0000-4000-a000-0000000000e1
+643ace03|demo@vygo.ai|Default project|pending|2024-06-01 00:00:00+00|
+0c662432|demo@vygo.ai|Default project|completed|2024-08-01 00:00:00+00|00000000-0000-4000-a000-0000000000e2
+8ae6ff19|demo@vygo.ai|A|completed|2026-07-20 17:51:28.987899+00|00000000-0000-4000-a000-0000000000e3
+cc6812af|demo@vygo.ai|A|completed|2026-07-20 17:51:29.566322+00|00000000-0000-4000-a000-0000000000e2
+90030bc9|demo@vygo.ai|B|completed|2026-07-20 17:51:30.267244+00|00000000-0000-4000-a000-0000000000e1
+43af2020|legacy-single@vygo.ai|Default project|completed|2026-07-20 17:51:32.100673+00|00000000-0000-4000-a000-0000000000e3
+(10 rows)
+
+## Submission payloads stored with each analysis record (demo A & B)
+----- SQL: SELECT left(id::text,8) AS run_id, project_identifier AS project, status, left(submission::text,180) AS submission_preview FROM analyses WHERE user_identifier='demo@vygo.ai' AND project_identifier IN ('A','B') ORDER BY project_identifier, created_at
+# vault-provisioner-query result (no secrets)
+# ok: True
+# interface: vault-provisioner-query
+# folder: vygo
+# run_id: vault-provisioner-query-3181272
+# project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
+# environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
+# postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f
+# sql: SELECT left(id::text,8) AS run_id, project_identifier AS project, status, left(submission::text,180) AS submission_preview FROM analyses WHERE user_identifier='demo@vygo.ai' AND project_identifier IN ('A','B') ORDER BY project_identifier, created_at
+# connection_method: vault-provisioner-lease-psql
+# secrets_in_output: False
+run_id|project|status|submission_preview
+8ae6ff19|A|completed|{"run": {"project": "A", "started_at": "2026-07-20T17:51:28.988Z"}, "user": "demo@vygo.ai", "run_id": "8ae6ff19-bb09-48ea-ac6d-21e4de413a44", "status": "completed", "project": "A",
+cc6812af|A|completed|{"run": {"project": "A", "started_at": "2026-07-20T17:51:29.566Z"}, "user": "demo@vygo.ai", "run_id": "cc6812af-2a8c-4407-9ec9-060f646f3fcb", "status": "completed", "project": "A",
+90030bc9|B|completed|{"run": {"project": "B", "started_at": "2026-07-20T17:51:30.267Z"}, "user": "demo@vygo.ai", "run_id": "90030bc9-068c-43f4-bde5-4b7bfbbaec5e", "status": "completed", "project": "B",
+(3 rows)
+
+## Legacy single-analysis user — original result retained
+----- SQL: SELECT left(id::text,8) AS run_id, project_identifier AS project, status, (submission->>'results_text') AS results_text FROM analyses WHERE user_identifier='legacy-single@vygo.ai' ORDER BY created_at
+# vault-provisioner-query result (no secrets)
+# ok: True
+# interface: vault-provisioner-query
+# folder: vygo
+# run_id: vault-provisioner-query-3181282
+# project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
+# environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
+# postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f
+# sql: SELECT left(id::text,8) AS run_id, project_identifier AS project, status, (submission->>'results_text') AS results_text FROM analyses WHERE user_identifier='legacy-single@vygo.ai' ORDER BY created_at
+# connection_method: vault-provisioner-lease-psql
+# secrets_in_output: False
+run_id|project|status|results_text
+43af2020|Default project|completed|Original pre-migration analysis for a single-analysis account, preserved after the multi-run migration.
+(1 row)
+
+## Per-project run counts + current (latest completed) run
+----- SQL: SELECT project_identifier AS project, count(*) FILTER (WHERE status='completed') AS completed_runs, count(*) AS total_runs, left((array_agg(id::text ORDER BY created_at DESC) FILTER (WHERE status='completed'))[1],8) AS current_run FROM analyses WHERE user_identifier='demo@vygo.ai' AND project_identifier IN ('A','B') GROUP BY project_identifier ORDER BY project_identifier
+# vault-provisioner-query result (no secrets)
+# ok: True
+# interface: vault-provisioner-query
+# folder: vygo
+# run_id: vault-provisioner-query-3181308
+# project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
+# environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
+# postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f
+# sql: SELECT project_identifier AS project, count(*) FILTER (WHERE status='completed') AS completed_runs, count(*) AS total_runs, left((array_agg(id::text ORDER BY created_at DESC) FILTER (WHERE status='completed'))[1],8) AS current_run FROM analyses WHERE user_identifier='demo@vygo.ai' AND project_identifier IN ('A','B') GROUP BY project_identifier ORDER BY project_identifier
+# connection_method: vault-provisioner-lease-psql
+# secrets_in_output: False
+project|completed_runs|total_runs|current_run
+A|2|2|cc6812af
+B|1|1|90030bc9
+(2 rows)
+
+## Related submission records (readiness ingest submissions table exists)
+----- SQL: SELECT count(*) AS ingest_submission_rows FROM readiness_ingest_submissions
+# vault-provisioner-query result (no secrets)
+# ok: True
+# interface: vault-provisioner-query
+# folder: vygo
+# run_id: vault-provisioner-query-3181320
+# project_id: 1b8abe52-f665-4e07-9a99-f6aa36a62610
+# environment_id: 39b57aef-2574-4d8e-bbd2-673e91eb9768
+# postgres_service_id: 7e3b44d3-f9d4-4afd-a367-2fde98bd510f
+# sql: SELECT count(*) AS ingest_submission_rows FROM readiness_ingest_submissions
+# connection_method: vault-provisioner-lease-psql
+# secrets_in_output: False
+ingest_submission_rows
+90
+(1 row)
+
+# End of DB evidence.
