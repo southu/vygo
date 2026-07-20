@@ -320,6 +320,12 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
       const seeded = (existing[0]?.n ?? 0) === 0;
 
       if (seeded) {
+        // jsonb is passed as a pre-stringified parameter with an explicit
+        // ::jsonb cast — NOT sql.json(). The drizzle postgres-js driver
+        // overrides this handle's jsonb serializers with an identity fn, so
+        // sql.json() parameters reach the wire unserialized and throw. This
+        // mirrors insertAnalysis() in @vygo/db (which is why the create route
+        // works while this demo seed previously 500'd on the same handle).
         const legacy = {
           source: "vygo_demo_fixture",
           fixture: "legacy_single_analysis",
@@ -332,9 +338,25 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
             dimensions: { clarity: 80, evidence: 65, alignment: 71 },
           },
         };
+        const newerPending = {
+          source: "vygo_demo_fixture",
+          fixture: "newer_pending_run",
+          results_text:
+            "A newer run that is still pending; it must NOT shadow the completed legacy result.",
+        };
+        const secondProjectAnalysis = {
+          source: "vygo_demo_fixture",
+          fixture: "second_project_analysis",
+          results_text: "A completed analysis stored under a distinct second project.",
+          results: {
+            overall_score: 88,
+            band: "strong",
+            dimensions: { clarity: 90, evidence: 85, alignment: 89 },
+          },
+        };
         await sql`
           INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
-          VALUES (${user}, 'unspecified', 'received', ${sql.json(legacy)},
+          VALUES (${user}, 'unspecified', 'received', ${JSON.stringify(legacy)}::jsonb,
                   '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')
         `;
         await sql`
@@ -347,25 +369,13 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
         `;
         await sql`
           INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
-          VALUES (${user}, ${DEFAULT_PROJECT_IDENTIFIER}, 'pending', ${sql.json({
-            source: "vygo_demo_fixture",
-            fixture: "newer_pending_run",
-            results_text:
-              "A newer run that is still pending; it must NOT shadow the completed legacy result.",
-          })}, '2024-06-01T00:00:00Z', '2024-06-01T00:00:00Z')
+          VALUES (${user}, ${DEFAULT_PROJECT_IDENTIFIER}, 'pending', ${JSON.stringify(newerPending)}::jsonb,
+                  '2024-06-01T00:00:00Z', '2024-06-01T00:00:00Z')
         `;
         await sql`
           INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
-          VALUES (${user}, ${secondProject}, 'completed', ${sql.json({
-            source: "vygo_demo_fixture",
-            fixture: "second_project_analysis",
-            results_text: "A completed analysis stored under a distinct second project.",
-            results: {
-              overall_score: 88,
-              band: "strong",
-              dimensions: { clarity: 90, evidence: 85, alignment: 89 },
-            },
-          })}, '2024-03-01T00:00:00Z', '2024-03-01T00:00:00Z')
+          VALUES (${user}, ${secondProject}, 'completed', ${JSON.stringify(secondProjectAnalysis)}::jsonb,
+                  '2024-03-01T00:00:00Z', '2024-03-01T00:00:00Z')
         `;
       }
 
