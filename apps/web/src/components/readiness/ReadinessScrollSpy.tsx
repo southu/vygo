@@ -3,14 +3,20 @@
 import { useEffect } from "react";
 
 /**
- * Scroll-spy for the readiness pillar sidebar. Watches every deep-dive pillar
+ * Scroll-spy for the readiness pillar navigation. Watches every deep-dive pillar
  * section with an IntersectionObserver and toggles the `.active` class on the
- * matching quick-jump link in {@link ReadinessPillarNav}, so exactly one link
+ * matching quick-jump link in {@link ReadinessPillarNav}, so exactly one section
  * is highlighted as the reader scrolls.
  *
- * Renders nothing: it wires behaviour onto the already server-rendered sidebar
- * and sections (resolved by the sidebar links' `#hash` -> section `id`), so the
- * sidebar's markup and its no-JS anchor navigation stay unchanged.
+ * Both nav variants (the desktop sidebar and the mobile top bar) carry
+ * `data-readiness-pillar-nav`; their links share the same section ids, so the
+ * active section is computed once and applied to the matching link in whichever
+ * variant is visible. Multiple links can point at the same section, so `.active`
+ * is toggled per section id rather than per single link.
+ *
+ * Renders nothing: it wires behaviour onto the already server-rendered navs and
+ * sections (resolved by each link's `#hash` -> section `id`), so the navs'
+ * markup and their no-JS anchor navigation stay unchanged.
  *
  * IntersectionObserver is the core mechanism (acceptance criterion 2). Which
  * link is active is derived from live section positions each time the observer
@@ -22,24 +28,36 @@ import { useEffect } from "react";
  */
 export function ReadinessScrollSpy() {
   useEffect(() => {
-    const nav = document.querySelector<HTMLElement>('[data-testid="readiness-pillar-nav"]');
-    if (!nav) return;
+    const navs = Array.from(document.querySelectorAll<HTMLElement>("[data-readiness-pillar-nav]"));
+    if (navs.length === 0) return;
 
-    const links = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'));
-    const items = links
+    // Every anchor across every nav variant, each resolved to its target section.
+    const linkItems = navs
+      .flatMap((nav) => Array.from(nav.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')))
       .map((link) => {
         const id = decodeURIComponent(link.hash.slice(1));
         const section = id ? document.getElementById(id) : null;
-        return section ? { link, section } : null;
+        return section ? { link, section, id } : null;
       })
-      .filter((item): item is { link: HTMLAnchorElement; section: HTMLElement } => item !== null);
+      .filter(
+        (item): item is { link: HTMLAnchorElement; section: HTMLElement; id: string } =>
+          item !== null,
+      );
+
+    // Unique sections in document order — the set the active-section math walks.
+    const seen = new Set<string>();
+    const items = linkItems.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
 
     const lastItem = items[items.length - 1];
     if (!lastItem) return;
 
-    const setActive = (activeLink: HTMLAnchorElement) => {
-      for (const { link } of items) {
-        link.classList.toggle("active", link === activeLink);
+    const setActive = (activeItem: { id: string }) => {
+      for (const { link, id } of linkItems) {
+        link.classList.toggle("active", id === activeItem.id);
       }
     };
 
@@ -51,7 +69,7 @@ export function ReadinessScrollSpy() {
       // dominate intersection ratios (acceptance criterion 6).
       const atBottom = Math.ceil(window.scrollY + window.innerHeight) >= doc.scrollHeight - 2;
       if (atBottom) {
-        setActive(lastItem.link);
+        setActive(lastItem);
         return;
       }
 
@@ -68,7 +86,7 @@ export function ReadinessScrollSpy() {
           break;
         }
       }
-      setActive((active ?? lastItem).link);
+      setActive(active ?? lastItem);
     };
 
     let frame = 0;
