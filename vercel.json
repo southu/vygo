@@ -180,6 +180,19 @@
       ]
     },
     {
+      "source": "/release-evidence.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
       "source": "/healthz",
       "headers": [
         {

@@ -1,0 +1,18 @@
+{
+  "app": "vygo",
+  "service": "vygo-web",
+  "commit": "ea40bd98a0ac371bbd8c2d079ad3568bb05436ad",
+  "sha": "ea40bd98a0ac371bbd8c2d079ad3568bb05436ad",
+  "version": "ea40bd98a0ac371bbd8c2d079ad3568bb05436ad",
+  "ready": false,
+  "generatedAt": "2026-07-20T00:42:43.542Z",
+  "suite": {
+    "cleanInstall": "passed",
+    "lint": "passed",
+    "formatCheck": "passed",
+    "typecheck": "passed",
+    "baselineBuild": "passed",
+    "secretScan": "passed",
+    "detectedSecrets": 0
+  }
+}

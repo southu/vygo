@@ -626,6 +626,36 @@ function main() {
     "utf8",
   );
 
+  // Non-secret release evidence, served as /release-evidence.json (static
+  // export). It records the deployed commit SHA — the same build-time SHA that
+  // /version and /api/readiness report — alongside the focused build-suite
+  // results. Only pass/fail statuses (and the secret-scan count) are recorded:
+  // no scan findings, file paths, tokens, or keys, so the artifact is safe to
+  // serve publicly and to include in deploy evidence.
+  const releaseEvidence = {
+    app: report.app,
+    service: report.service,
+    commit: sha,
+    sha,
+    version: sha,
+    ready: report.ready,
+    generatedAt: report.generatedAt,
+    suite: {
+      cleanInstall: report.checks.cleanInstall.status,
+      lint: report.checks.lint.status,
+      formatCheck: report.checks.formatCheck.status,
+      typecheck: report.checks.typecheck.status,
+      baselineBuild: report.checks.baselineBuild.status,
+      secretScan: report.checks.secretScan.status,
+      detectedSecrets: report.checks.secretScan.detectedSecrets,
+    },
+  };
+  writeFileSync(
+    path.join(publicDir, "release-evidence.json"),
+    `${JSON.stringify(releaseEvidence, null, 2)}\n`,
+    "utf8",
+  );
+
   // Liveness + readiness for the deployed edge site (static export).
   //
   // The Fastify API (apps/api) owns the dependency-aware /healthz and /readyz
@@ -658,7 +688,7 @@ function main() {
 
   console.log(`Wrote ${path.relative(root, outFile)} (ready=${report.ready})`);
   console.log(
-    `Wrote apps/web/public/version, apps/web/public/version.txt, apps/web/public/healthz, and apps/web/public/api/readiness.json (/readyz is served by the api/readyz.ts edge function)`,
+    `Wrote apps/web/public/version, apps/web/public/version.txt, apps/web/public/release-evidence.json, apps/web/public/healthz, and apps/web/public/api/readiness.json (/readyz is served by the api/readyz.ts edge function)`,
   );
   if (!report.ready) {
     console.error("Readiness report is not ready=true; inspect checks above.");
