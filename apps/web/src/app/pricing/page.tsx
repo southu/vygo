@@ -6,6 +6,7 @@ import { CtaLink } from "@/components/CtaLink";
 import { SectionHeading } from "@/components/SectionHeading";
 import { EngagementCard } from "@/components/EngagementCard";
 import { OpsPlanCard } from "@/components/OpsPlanCard";
+import { PricingHighlight } from "@/components/PricingHighlight";
 
 export const metadata: Metadata = {
   title: site.metadata.pricingTitle,
@@ -17,6 +18,7 @@ export default function PricingPage() {
 
   return (
     <main id="main-content">
+      <PricingHighlight />
       <section className="section-pad">
         <div className="container-page max-w-3xl">
           <p className="eyebrow">{pricingContent.page.eyebrow}</p>
@@ -48,7 +50,10 @@ export default function PricingPage() {
             <p className="mt-4 text-sm font-medium text-ink-soft">{harden.qualificationNote}</p>
           </div>
 
-          <div className="mt-8 flex flex-col gap-6 rounded-card border border-border bg-canvas p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+          <div
+            data-highlight-target="harden"
+            className="mt-8 flex scroll-mt-28 flex-col gap-6 rounded-card border border-border bg-canvas p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8"
+          >
             <div>
               <p className="font-display text-sm font-semibold uppercase tracking-[0.06em] text-purple">
                 {harden.name}
@@ -153,7 +158,10 @@ export default function PricingPage() {
             data-section="audit"
           >
             <div className="container-page">
-              <article className="overflow-hidden rounded-card bg-trust p-6 text-white shadow-card sm:p-8">
+              <article
+                data-highlight-target="production-readiness-audit"
+                className="overflow-hidden rounded-card bg-trust p-6 text-white shadow-card sm:p-8"
+              >
                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-green">
                   Start here
                 </p>
@@ -190,6 +198,7 @@ export default function PricingPage() {
                 {pricingContent.tiers.map((tier) => (
                   <EngagementCard
                     key={tier.id}
+                    id={tier.id}
                     name={tier.name}
                     price={tier.price}
                     duration={tier.duration}

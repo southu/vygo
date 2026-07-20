@@ -6,6 +6,11 @@ type EngagementCardProps = {
   summary: string;
   outcomes: readonly string[];
   featured?: boolean;
+  /**
+   * Stable tier id used as the scroll anchor and the `data-highlight-target`
+   * the readiness micro-CTAs ring on arrival (see PricingHighlight).
+   */
+  id?: string;
 };
 
 export function EngagementCard({
@@ -16,10 +21,13 @@ export function EngagementCard({
   summary,
   outcomes,
   featured = false,
+  id,
 }: EngagementCardProps) {
   return (
     <article
-      className={`card flex h-full flex-col ${featured ? "border-purple ring-2 ring-purple/20" : ""}`}
+      id={id}
+      data-highlight-target={id}
+      className={`card scroll-mt-28 flex h-full flex-col ${featured ? "border-purple ring-2 ring-purple/20" : ""}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>

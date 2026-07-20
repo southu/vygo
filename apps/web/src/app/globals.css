@@ -900,6 +900,47 @@
   }
 }
 
+/* ── Pricing card highlight (readiness micro-CTA arrival) ────────────────────
+ *
+ * A readiness micro-CTA links to /pricing?highlight=<tier-id>#<tier-id>; on load
+ * PricingHighlight adds `.pricing-card-highlight` to the matching card
+ * ([data-highlight-target="<tier-id>"]). The ring + glow + entry pulse make it
+ * unmistakable which engagement the clicked CTA maps to. Persisted as a selected
+ * state so the correspondence stays visible while the visitor reads the card.
+ */
+.pricing-card-highlight {
+  position: relative;
+  border-color: var(--color-purple) !important;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--color-purple) 55%, transparent),
+    0 12px 32px rgba(91, 71, 224, 0.22) !important;
+  animation: pricing-card-highlight-pulse 1.1s ease-out 1;
+}
+
+@keyframes pricing-card-highlight-pulse {
+  0% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--color-purple) 55%, transparent),
+      0 12px 32px rgba(91, 71, 224, 0.22);
+  }
+  45% {
+    box-shadow:
+      0 0 0 8px color-mix(in srgb, var(--color-purple) 30%, transparent),
+      0 12px 32px rgba(91, 71, 224, 0.28);
+  }
+  100% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--color-purple) 55%, transparent),
+      0 12px 32px rgba(91, 71, 224, 0.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-card-highlight {
+    animation: none;
+  }
+}
+
 /* ── Readiness pillar sidebar (desktop-only sticky quick-jump nav) ─────────── */
 
 /*

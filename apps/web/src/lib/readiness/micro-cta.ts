@@ -18,11 +18,30 @@ export type MicroCta = {
   painPoint: string;
   /** Name of the existing service package this pillar maps to. */
   packageName: string;
+  /**
+   * Stable id of the matching pricing card. Doubles as the scroll anchor
+   * (`#<packageId>`) and the `highlight` query value the /pricing page reads on
+   * load to ring the correct card. Must match a `data-highlight-target` on
+   * /pricing (see src/components/PricingHighlight.tsx and src/app/pricing/page.tsx).
+   */
+  packageId: string;
   /** Explore-CTA button label, arrow-terminated. */
   ctaLabel: string;
   /** Destination on the pricing page for the mapped package. */
   href: string;
 };
+
+/** Base path of the engagements/pricing page that hosts the tier cards. */
+const PRICING_PATH = "/pricing";
+
+/**
+ * Build the cross-page destination for a mapped package: an anchor that lands
+ * the viewport on the matching card plus a `highlight` query param the pricing
+ * page reads on load to apply the temporary ring/glow (acceptance criteria 3–5).
+ */
+function pricingHref(packageId: string): string {
+  return `${PRICING_PATH}?highlight=${packageId}#${packageId}`;
+}
 
 /**
  * Pillar → most-relevant existing package. Keyed by the exact dimension name
@@ -34,32 +53,37 @@ const PILLAR_CTAS: Record<string, MicroCta> = {
   Security: {
     painPoint: "Access and isolation gaps like this are exactly what attackers probe first.",
     packageName: "Scale",
+    packageId: "scale",
     ctaLabel: "Explore the Scale Package →",
-    href: "/pricing",
+    href: pricingHref("scale"),
   },
   Reliability: {
     painPoint: "Single points of failure like this turn small errors into customer-facing outages.",
     packageName: "Launch",
+    packageId: "launch",
     ctaLabel: "Explore the Launch Package →",
-    href: "/pricing",
+    href: pricingHref("launch"),
   },
   Operability: {
     painPoint: "Thin deploy and observability coverage here means incidents surface late.",
     packageName: "vygo Harden",
+    packageId: "harden",
     ctaLabel: "Explore the vygo Harden Package →",
-    href: "/pricing#harden",
+    href: pricingHref("harden"),
   },
   Maintainability: {
     painPoint: "Structural gaps like this compound into slower, riskier changes over time.",
     packageName: "Production Readiness Audit",
+    packageId: "production-readiness-audit",
     ctaLabel: "Explore the Production Readiness Audit →",
-    href: "/pricing#production-readiness-audit",
+    href: pricingHref("production-readiness-audit"),
   },
   "Compliance posture": {
     painPoint: "Compliance gaps like this stall security reviews and enterprise deals.",
     packageName: "Enterprise",
+    packageId: "enterprise",
     ctaLabel: "Explore the Enterprise Package →",
-    href: "/pricing",
+    href: pricingHref("enterprise"),
   },
 };
 
@@ -71,8 +95,9 @@ const PILLAR_CTAS: Record<string, MicroCta> = {
 const FALLBACK_CTA: MicroCta = {
   painPoint: "Gaps like this are what a focused vygo engagement is built to close.",
   packageName: "Production Readiness Audit",
+  packageId: "production-readiness-audit",
   ctaLabel: "Explore the Production Readiness Audit →",
-  href: "/pricing#production-readiness-audit",
+  href: pricingHref("production-readiness-audit"),
 };
 
 /**

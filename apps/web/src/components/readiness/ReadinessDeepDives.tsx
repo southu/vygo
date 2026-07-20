@@ -138,6 +138,8 @@ export function ReadinessDeepDives({ dimensions, riskMap, className }: Readiness
                             </p>
                             <a
                               href={cta.href}
+                              data-testid="submetric-micro-cta-link"
+                              data-cta-tier={cta.packageId}
                               className={`inline-flex w-fit items-center rounded-md border bg-canvas px-2 py-1 text-[11px] font-semibold transition-colors hover:bg-surface ${smSev.borderClass} ${smSev.textClass}`}
                             >
                               {cta.ctaLabel}
