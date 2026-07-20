@@ -899,3 +899,38 @@
     overflow: visible !important;
   }
 }
+
+/* ── Readiness pillar sidebar (desktop-only sticky quick-jump nav) ─────────── */
+
+/*
+ * Hidden by default (mobile/tablet). The report's reading column is a centered
+ * `max-w-2xl` (42rem) block; on desktop this nav lives in the left gutter beside
+ * it. The <nav> is absolutely positioned inside the readiness <main> (which is
+ * `relative`) so it never reflows or squeezes the content, and its inner box is
+ * `position: sticky` so the links stay in view while the report scrolls.
+ */
+.readiness-pillar-nav {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .readiness-pillar-nav {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: 100%;
+    width: 0;
+    pointer-events: none;
+  }
+
+  .readiness-pillar-nav__inner {
+    position: sticky;
+    top: 6rem;
+    width: 9rem;
+    /* Sit just left of the centered 42rem column: half the column (21rem) + a
+       1.5rem gap + the nav's own width, mirrored to the left of centre. */
+    margin-left: calc(-1 * (21rem + 1.5rem + 9rem));
+    pointer-events: auto;
+  }
+}

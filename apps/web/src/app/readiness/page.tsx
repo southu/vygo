@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { readinessContent } from "@/content/readiness";
 import { ReadinessFlow } from "@/components/readiness/ReadinessFlow";
 import { ReadinessDeepDives } from "@/components/readiness/ReadinessDeepDives";
+import { ReadinessPillarNav } from "@/components/readiness/ReadinessPillarNav";
 import { ReadinessRadarChart } from "@/components/charts";
 import {
   getReadinessReportChartData,
@@ -25,9 +26,12 @@ export default function ReadinessPage() {
   return (
     <main
       id="main-content"
-      className="readiness-assessment-page"
+      className="readiness-assessment-page relative"
       data-visual-system="results-shared"
     >
+      {chartData.dimensions.length > 0 ? (
+        <ReadinessPillarNav dimensions={chartData.dimensions} />
+      ) : null}
       <section className="section-pad">
         <div className="container-page max-w-2xl">
           <p className="eyebrow">{c.eyebrow}</p>
