@@ -129,6 +129,113 @@ async function enforceAnalysesRateLimit(
   return true;
 }
 
+/**
+ * A dedicated, documented legacy pre-migration identity: an account that had a
+ * SINGLE analysis before the multi-run migration. Kept in its own namespace,
+ * separate from the multi-run demo user, so the legacy single-analysis case is
+ * viewable on its own at /analyses?fixture=legacy (→ GET /v1/analyses/demo?user=…).
+ */
+const LEGACY_DEMO_USER = "legacy-single@vygo.ai";
+
+type AnalysesSql = DatabaseHandle["sql"];
+
+function legacyDemoUserSubmission(snapshotLegacy: string): Record<string, unknown> {
+  return {
+    source: "vygo_demo_fixture",
+    fixture: "legacy_single_analysis",
+    user: LEGACY_DEMO_USER,
+    snapshotId: snapshotLegacy,
+    results_text:
+      "Original pre-migration analysis for a single-analysis account, preserved byte-for-byte after the multi-run migration into 'Default project'.",
+    results: {
+      overall_score: 69,
+      band: "developing",
+      dimensions: { clarity: 74, evidence: 63, alignment: 70 },
+    },
+  };
+}
+
+/**
+ * Seed + read back the legacy single-analysis fixture user. Idempotent: inserts
+ * the one pre-migration analysis only when the user has no rows yet, then always
+ * runs the SAME Default-project migration a real legacy row goes through (re-home
+ * 'unspecified' → 'Default project', rewrite legacy `received` → `completed`) and
+ * an additive snapshotId backfill so the single completed result opens in the
+ * existing results component. Only ever touches this fixture user's namespace.
+ */
+async function seedLegacyDemoUser(
+  sql: AnalysesSql,
+  snapshotLegacy: string,
+): Promise<Record<string, unknown>> {
+  const user = LEGACY_DEMO_USER;
+  const existing = await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM analyses WHERE user_identifier = ${user}
+  `;
+  const seeded = (existing[0]?.n ?? 0) === 0;
+
+  if (seeded) {
+    await sql`
+      INSERT INTO analyses (user_identifier, project_identifier, status, submission, created_at, updated_at)
+      VALUES (
+        ${user}, 'unspecified', 'received',
+        ${JSON.stringify(legacyDemoUserSubmission(snapshotLegacy))}::jsonb,
+        '2023-11-01T00:00:00Z', '2023-11-01T00:00:00Z'
+      )
+    `;
+  }
+
+  // Always run the migration + backfill so a row seeded by an earlier path (or
+  // the acceptance recorder's POST) is normalised into the completed
+  // 'Default project' shape and carries a resolvable snapshotId.
+  await sql`
+    UPDATE analyses
+    SET project_identifier = ${DEFAULT_PROJECT_IDENTIFIER}
+    WHERE user_identifier = ${user}
+      AND (project_identifier IS NULL
+           OR btrim(project_identifier) = ''
+           OR project_identifier = 'unspecified')
+  `;
+  await sql`
+    UPDATE analyses
+    SET status = ${COMPLETED_ANALYSIS_STATUS}
+    WHERE user_identifier = ${user} AND status = 'received'
+  `;
+  await sql`
+    UPDATE analyses
+    SET submission = submission || ${JSON.stringify({ snapshotId: snapshotLegacy })}::jsonb
+    WHERE user_identifier = ${user}
+      AND submission->>'fixture' = 'legacy_single_analysis'
+      AND (submission->>'snapshotId') IS NULL
+  `;
+
+  const rows = await listAnalyses(sql, { user });
+  const { analyses, currentByProject } = annotateCurrent(rows.map(toAnalysisPublic));
+  const projects = Array.from(new Set(rows.map((r) => r.project_identifier)));
+  const enc = (s: string) => encodeURIComponent(s);
+  return {
+    ok: true,
+    seeded,
+    idempotent: true,
+    legacy: true,
+    user,
+    defaultProject: DEFAULT_PROJECT_IDENTIFIER,
+    projects,
+    count: analyses.length,
+    analyses,
+    currentByProject,
+    verify: {
+      currentDefaultResult: `/v1/analyses/result?user=${enc(user)}`,
+      allHistory: `/v1/analyses?user=${enc(user)}`,
+      history: `/analyses?fixture=legacy`,
+    },
+    notes: [
+      "This identity had a SINGLE analysis before the multi-run migration; the row was re-homed into 'Default project' and its legacy 'received' status rewritten to 'completed' with its submission payload preserved byte-for-byte.",
+      "currentDefaultResult returns that one original completed analysis — proof the pre-migration result is retained and viewable after this deploy.",
+      "It carries a snapshotId so opening it renders the same results component a fresh run produces.",
+    ],
+  };
+}
+
 export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRouteDeps): void {
   // Lightweight analyses-scoped DB health — no auth, no secrets.
   app.get("/v1/analyses/health", async (_request, reply) => {
@@ -339,7 +446,18 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
   app.get("/v1/analyses/demo", async (request, reply) => {
     if (!(await enforceAnalysesRateLimit(request, reply, deps))) return;
 
-    const user = "demo@vygo.ai";
+    // A small allowlist of documented fixture identities: the multi-run demo
+    // user (default) and the legacy single-analysis user. Any other `user`
+    // value falls back to the demo user — this endpoint never seeds arbitrary
+    // namespaces.
+    const requestedUser = (
+      pickString((request.query ?? {}) as Record<string, unknown>, [
+        "user",
+        "user_identifier",
+        "email",
+      ]) ?? ""
+    ).toLowerCase();
+    const user = requestedUser === LEGACY_DEMO_USER ? LEGACY_DEMO_USER : "demo@vygo.ai";
     const secondProject = "Project Beta";
     // Stable seeded readiness-snapshot fixture ids (served publicly by
     // GET /v1/readiness/snapshot/:id). Each demo COMPLETED run carries one so a
@@ -359,6 +477,12 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
     try {
       const sql = dbHandle.sql;
       await ensureAnalysesTable(sql);
+
+      // The legacy single-analysis identity has its own dedicated fixture path
+      // so its one pre-migration result is viewable on its own.
+      if (user === LEGACY_DEMO_USER) {
+        return reply.status(200).send(await seedLegacyDemoUser(sql, snapshotIds.legacy));
+      }
 
       const existing = await sql<{ n: number }[]>`
         SELECT count(*)::int AS n FROM analyses WHERE user_identifier = ${user}
