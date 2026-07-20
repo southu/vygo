@@ -11,8 +11,12 @@ export function RoleCard({ role }: RoleCardProps) {
     <article className="card h-full" data-testid="role-card" data-role-id={role.id}>
       <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.06em] text-muted">
         <span data-role-location>{role.location}</span>
-        <span aria-hidden="true">·</span>
-        <span data-role-type>{formatEmploymentType(role.type)}</span>
+        {role.type ? (
+          <>
+            <span aria-hidden="true">·</span>
+            <span data-role-type>{formatEmploymentType(role.type)}</span>
+          </>
+        ) : null}
       </div>
       <h3 className="mt-2 font-display text-lg font-semibold text-ink">
         <Link href={`/careers/${role.id}`} className="hover:text-purple" data-role-title>

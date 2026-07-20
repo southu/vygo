@@ -65,6 +65,19 @@ const SEED_ROLES: readonly Role[] = [
     updated_at: "2026-01-06T09:00:00.000Z",
   },
   {
+    id: "qa-uat-lead",
+    title: "QA & UAT Lead",
+    location: "Day one · shared resource",
+    type: "",
+    summary:
+      "Quality is part of every Vygo engagement by default from day one — never billed separately. The QA & UAT Lead owns test planning, builds and runs both automated and manual QA, coordinates user acceptance testing (UAT) with your team, and holds release sign-off before each launch.",
+    description:
+      "Quality is part of every Vygo engagement by default from day one — included as a shared resource across the delivery team, never billed separately or handed to anyone less experienced. The QA & UAT Lead owns the test plan for the rebuild, builds and maintains automated test coverage alongside targeted manual QA, and coordinates user acceptance testing (UAT) with your stakeholders so the people who will live with the product confirm it works. Before anything reaches production, the QA & UAT Lead holds release sign-off — the final quality gate on every launch.",
+    status: "open",
+    created_at: "2026-01-08T09:00:00.000Z",
+    updated_at: "2026-01-08T09:00:00.000Z",
+  },
+  {
     id: "product-designer",
     title: "Product Designer",
     location: "Remote (US/EU)",

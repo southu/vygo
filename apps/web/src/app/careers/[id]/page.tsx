@@ -105,8 +105,12 @@ export default async function RoleDetailPage({ params }: PageProps) {
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm font-medium text-ink-soft">
             <span data-role-location>{role.location}</span>
-            <span aria-hidden="true">·</span>
-            <span data-role-type>{formatEmploymentType(role.type)}</span>
+            {role.type ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span data-role-type>{formatEmploymentType(role.type)}</span>
+              </>
+            ) : null}
           </div>
 
           <div className="prose-page mt-8" data-testid="role-detail-description">
