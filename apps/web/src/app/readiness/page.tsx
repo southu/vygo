@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 
 export default function ReadinessPage() {
   const c = readinessContent.page;
+  const na = readinessContent.newAnalysis;
   const s3 = readinessContent.stage3;
   const radar = readinessContent.radar;
   // Real report data (build-time self-assessment) drives the radar + its tooltips.
@@ -43,6 +44,27 @@ export default function ReadinessPage() {
             {c.title}
           </h1>
           <p className="mt-4 text-base text-muted sm:text-lg">{c.body}</p>
+          {/*
+            Landing entry point for a fresh run. A completed prior analysis never
+            blocks a new one: this links to /readiness?new=1, which forces the
+            project-label start step (choose an existing project or enter a new
+            one) even when a prior session would otherwise resume or redirect to
+            its scored snapshot. Rendered server-side so the 'New analysis' entry
+            point is always present in the landing page source.
+          */}
+          <div
+            className="mt-6 flex flex-col gap-3 rounded-xl border border-border bg-canvas px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            data-testid="readiness-new-analysis-entry"
+          >
+            <p className="text-sm text-muted">{na.landingHint}</p>
+            <a
+              href="/readiness?new=1"
+              className="btn-secondary shrink-0 text-sm"
+              data-testid="readiness-landing-new-analysis"
+            >
+              {na.label}
+            </a>
+          </div>
           {/*
             Token issuance flow: POST /api/readiness/token (see ReadinessFlow).
             Status poll flow: GET /api/readiness/status?token=... (see lib/readiness/api.ts).

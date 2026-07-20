@@ -50,7 +50,9 @@ import {
   type ScoreResponse,
 } from "@/lib/readiness/api";
 import {
+  loadKnownProjects,
   loadReadinessLocal,
+  rememberProjectLabel,
   saveReadinessLocal,
   type ReadinessLocalState,
 } from "@/lib/readiness/storage";
@@ -74,6 +76,7 @@ void readinessAnalyticsEventCatalog();
 
 type View =
   | "loading"
+  | "project"
   | "stage1"
   | "off_ramp_not_built"
   | "off_ramp_features"
@@ -124,6 +127,51 @@ function resumeTokenFromUrl(): string | null {
     return t && t.length >= 16 ? t : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * True when the page was opened via a "New analysis" / "Run again" entry point
+ * (?new=1 or ?new=analysis). Those force a fresh project-label start step even
+ * when a prior session would otherwise resume straight into a later stage or the
+ * scored snapshot — a completed analysis must never block starting a new one.
+ */
+function newAnalysisRequestedFromUrl(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const u = new URL(window.location.href);
+    const v = (u.searchParams.get("new") ?? "").trim().toLowerCase();
+    return v === "1" || v === "true" || v === "analysis" || v === "yes";
+  } catch {
+    return false;
+  }
+}
+
+/** Outcome of a run-start attempt against POST /api/readiness/start. */
+type RunStartOutcome = "started" | "conflict" | "error";
+
+/**
+ * Start a fresh, non-destructive readiness run for `project`. Creates a new,
+ * distinct run row server-side (never upserts) so prior completed analyses are
+ * preserved. A 409 means the same project already has a fresh in-progress run —
+ * still non-blocking, we continue with it. Best-effort: any transport failure
+ * degrades to "error" and the caller still lets the user proceed.
+ */
+async function startReadinessRun(project: string, credential: string): Promise<RunStartOutcome> {
+  try {
+    const res = await fetch("/api/readiness/start", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${credential}`,
+      },
+      body: JSON.stringify({ project, submission_token: credential }),
+    });
+    if (res.ok) return "started";
+    if (res.status === 409) return "conflict";
+    return "error";
+  } catch {
+    return "error";
   }
 }
 
@@ -188,6 +236,14 @@ export function ReadinessFlow() {
   const [submissionToken, setSubmissionToken] = useState<string | null>(null);
   const [stage1, setStage1] = useState<ReadinessStage1Answers>(EMPTY_STAGE1);
   const [stepIndex, setStepIndex] = useState(0);
+
+  // Project-label start step (choose an existing project or name a new one).
+  const [projectLabel, setProjectLabel] = useState("");
+  const [knownProjects, setKnownProjects] = useState<string[]>([]);
+  const [projectMode, setProjectMode] = useState<"existing" | "new">("new");
+  const [newProjectInput, setNewProjectInput] = useState("");
+  const [startStatus, setStartStatus] = useState<"idle" | "starting" | RunStartOutcome>("idle");
+  const [runProject, setRunProject] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const [email, setEmail] = useState("");
@@ -266,11 +322,57 @@ export function ReadinessFlow() {
       try {
         const fromUrl = resumeTokenFromUrl();
         const local = loadReadinessLocal();
+
+        // Project-label picker seed: labels this browser has started runs under.
+        const knownList = loadKnownProjects();
+        if (!cancelled && knownList[0]) {
+          setKnownProjects(knownList);
+          setProjectMode("existing");
+          setProjectLabel(knownList[0]);
+        }
+
+        // "New analysis" / "Run again" entry point (?new=1): always land on the
+        // fresh project-label start step, bypassing any resume-to-later-stage or
+        // scored-snapshot redirect. A completed prior analysis never blocks this.
+        if (newAnalysisRequestedFromUrl()) {
+          let t = fromUrl || local?.token || null;
+          if (t) {
+            try {
+              const remote = await getReadinessSession(t);
+              t = remote.token;
+            } catch {
+              t = null;
+            }
+          }
+          if (!t) {
+            const created = await createReadinessSession({
+              stage: "intake",
+              draft: draftFromStage1(EMPTY_STAGE1),
+            });
+            t = created.token;
+          }
+          if (cancelled) return;
+          setToken(t);
+          setStage1(EMPTY_STAGE1);
+          setStepIndex(0);
+          setPasteText("");
+          setConfirm(null);
+          setStartStatus("idle");
+          // Mint the run-start credential up front so "Start analysis" is instant.
+          void mintSubmissionToken().then((st) => {
+            if (!cancelled && st) setSubmissionToken(st);
+          });
+          trackAnalytics("stage_started", { stage: "project", via: "new_analysis" });
+          setView("project");
+          return;
+        }
+
         let sessionToken = fromUrl || local?.token || null;
         let restoredStage1 = mergeStage1(local?.stage1 ?? {});
         let restoredStage = local?.stage || "intake";
         let restoredEmail = local?.email || "";
         let restoredPaste = local?.pasteText || "";
+        let restoredProjectLabel = local?.projectLabel || "";
         const didResume = Boolean(fromUrl || local?.token);
         // Tracks whether we had to mint a fresh submission token this load (vs.
         // reusing one already embedded in a previously generated prompt) so a
@@ -295,6 +397,9 @@ export function ReadinessFlow() {
             }
             const remotePaste = pasteTextFromDraft(remote.draft || {});
             if (remotePaste) restoredPaste = remotePaste;
+            const remoteProject =
+              typeof remote.draft?.project === "string" ? remote.draft.project.trim() : "";
+            if (remoteProject) restoredProjectLabel = remoteProject;
             if (didResume) {
               trackAnalytics("session_resumed", { stage: restoredStage });
             }
@@ -419,12 +524,14 @@ export function ReadinessFlow() {
         setStage1(restoredStage1);
         setEmail(restoredEmail);
         setPasteText(restoredPaste);
+        if (restoredProjectLabel) setProjectLabel(restoredProjectLabel);
         saveReadinessLocal({
           token: sessionToken,
           stage: restoredStage,
           stage1: restoredStage1,
           email: restoredEmail || undefined,
           pasteText: restoredPaste,
+          projectLabel: restoredProjectLabel || undefined,
           updatedAt: new Date().toISOString(),
         });
 
@@ -481,6 +588,14 @@ export function ReadinessFlow() {
             setView("stage2");
             return;
           }
+        }
+        // Fresh intake with no project chosen yet → the project-label start step
+        // first (choose an existing label or enter a new one). A resumed intake
+        // that already has a project skips straight to the questions.
+        if (!restoredProjectLabel) {
+          trackAnalytics("stage_started", { stage: "project" });
+          setView("project");
+          return;
         }
         trackAnalytics("stage_started", { stage: "stage1" });
         setView("stage1");
@@ -1024,6 +1139,74 @@ export function ReadinessFlow() {
     setView("stage1");
   };
 
+  /** The label the project step will start a run under (existing pick vs. new input). */
+  const chosenProject = projectMode === "new" ? newProjectInput.trim() : projectLabel.trim();
+
+  /**
+   * Start a fresh readiness run for the chosen project. Creates a new, distinct
+   * run server-side (non-destructive — prior completed analyses are preserved),
+   * records the project on the session, and reveals the confirmation + continue
+   * control. Never blocks: a store hiccup still lets the user proceed to intake.
+   */
+  const startRun = async () => {
+    const project = chosenProject.slice(0, 120);
+    if (!project || startStatus === "starting") return;
+    setStartStatus("starting");
+    trackAnalytics("run_start_attempted", { mode: projectMode });
+    let credential = submissionToken;
+    if (!credential) {
+      credential = await mintSubmissionToken();
+      if (credential) setSubmissionToken(credential);
+    }
+    const outcome: RunStartOutcome = credential
+      ? await startReadinessRun(project, credential)
+      : "error";
+    // Remember the label for the choose-existing list and file it on the session.
+    setKnownProjects(rememberProjectLabel(project));
+    setProjectLabel(project);
+    setRunProject(project);
+    await persist(stage1, "intake", { project }, undefined, { projectLabel: project });
+    setStartStatus(outcome);
+    trackAnalytics("run_started", { via: "readiness_start", outcome });
+  };
+
+  /** Advance from the project step into the existing intake questions. */
+  const goToIntakeFromProject = () => {
+    trackAnalytics("stage_started", { stage: "stage1", from: "project" });
+    setView("stage1");
+  };
+
+  /**
+   * "New analysis" / "Run again" affordance inside the flow: reset the in-page
+   * state to the fresh project-label start step without a navigation. Keeps the
+   * session token/credential so the new run is attributed to the same principal.
+   */
+  const startNewAnalysis = () => {
+    trackAnalytics("new_analysis_clicked", { from: view });
+    setStartStatus("idle");
+    setStage1(EMPTY_STAGE1);
+    setStepIndex(0);
+    setPasteText("");
+    setConfirm(null);
+    setSecretLines([]);
+    setSecretMessage("");
+    setNewProjectInput("");
+    const known = loadKnownProjects();
+    setKnownProjects(known);
+    if (known[0]) {
+      setProjectMode("existing");
+      setProjectLabel(known[0]);
+    } else {
+      setProjectMode("new");
+    }
+    if (!submissionToken) {
+      void mintSubmissionToken().then((t) => {
+        if (t) setSubmissionToken(t);
+      });
+    }
+    setView("project");
+  };
+
   // Highlight helper: line numbers for secret scan overlay
   const pasteLines = useMemo(() => pasteText.replace(/\r\n/g, "\n").split("\n"), [pasteText]);
 
@@ -1328,6 +1511,164 @@ export function ReadinessFlow() {
     return stage3Panel;
   }
 
+  // "New analysis" / "Run again" control reused across the flow's later views so
+  // a signed-in user with a completed analysis can always start a fresh run.
+  const newAnalysisControl = (
+    <div className="mb-4 flex justify-end" data-testid="readiness-new-analysis-bar">
+      <button
+        type="button"
+        className="btn-secondary text-sm"
+        onClick={startNewAnalysis}
+        data-testid="readiness-new-analysis"
+      >
+        {c.newAnalysis.label}
+      </button>
+    </div>
+  );
+
+  if (view === "project") {
+    const existing = knownProjects.length > 0 ? knownProjects : [c.project.defaultProject];
+    const started =
+      startStatus === "started" || startStatus === "conflict" || startStatus === "error";
+    const startedNote =
+      startStatus === "conflict"
+        ? c.project.runningNote
+        : startStatus === "error"
+          ? c.project.errorNote
+          : c.project.started;
+    const canStart = chosenProject.length > 0 && startStatus !== "starting";
+    const optionBase =
+      "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm transition-colors";
+    const optionSelected = "border-purple bg-purple-soft/40";
+    const optionIdle = "border-border bg-canvas hover:border-purple/40";
+    return (
+      <div
+        className="readiness-assessment mt-8"
+        data-testid="readiness-project"
+        data-visual-system="results-shared"
+      >
+        <AssessmentProgress current={1} total={FLOW_TOTAL_STEPS} label="Project" />
+        <p className="eyebrow mt-4">{c.project.progressLabel}</p>
+        <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+          {c.project.title}
+        </h2>
+        <p className="mt-3 text-base text-muted">{c.project.body}</p>
+
+        <div className="readiness-step-panel mt-6">
+          {started ? (
+            <div data-testid="readiness-project-started" role="status" aria-live="polite">
+              <p className="font-semibold text-ink" data-testid="readiness-run-started-message">
+                {startedNote}
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                {c.project.projectPrefix}:{" "}
+                <span className="font-semibold text-ink" data-testid="readiness-run-project">
+                  {runProject}
+                </span>
+              </p>
+              <button
+                type="button"
+                className="btn-primary mt-6"
+                onClick={goToIntakeFromProject}
+                data-testid="readiness-project-continue"
+              >
+                {c.project.continue}
+              </button>
+            </div>
+          ) : (
+            <fieldset>
+              <legend className="text-sm font-medium text-ink-soft">
+                {c.project.existingGroupLabel}
+              </legend>
+              <p className="mt-1 text-sm text-muted">{c.project.existingHelper}</p>
+              <div
+                className="mt-4 flex flex-col gap-2"
+                role="radiogroup"
+                aria-label={c.project.title}
+                data-testid="readiness-project-options"
+              >
+                {existing.map((opt) => {
+                  const selected = projectMode === "existing" && projectLabel === opt;
+                  return (
+                    <label
+                      key={opt}
+                      className={`${optionBase} ${selected ? optionSelected : optionIdle}`}
+                    >
+                      <input
+                        type="radio"
+                        name="projectLabel"
+                        value={opt}
+                        checked={selected}
+                        onChange={() => {
+                          setProjectMode("existing");
+                          setProjectLabel(opt);
+                        }}
+                        className="mt-0.5"
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  );
+                })}
+                <label
+                  className={`${optionBase} ${projectMode === "new" ? optionSelected : optionIdle}`}
+                >
+                  <input
+                    type="radio"
+                    name="projectLabel"
+                    value="__new__"
+                    checked={projectMode === "new"}
+                    onChange={() => setProjectMode("new")}
+                    className="mt-0.5"
+                    data-testid="readiness-project-new-option"
+                  />
+                  <span>{c.project.newOptionLabel}</span>
+                </label>
+              </div>
+
+              {projectMode === "new" ? (
+                <div className="mt-4" data-testid="readiness-project-new-field">
+                  <label
+                    htmlFor="readiness-new-project"
+                    className="text-sm font-medium text-ink-soft"
+                  >
+                    {c.project.newInputLabel}
+                  </label>
+                  <input
+                    id="readiness-new-project"
+                    type="text"
+                    name="newProject"
+                    value={newProjectInput}
+                    maxLength={120}
+                    onChange={(ev) => setNewProjectInput(ev.target.value.slice(0, 120))}
+                    placeholder={c.project.newPlaceholder}
+                    className="mt-2 w-full rounded-xl border border-border bg-canvas px-3 py-2 text-sm text-ink"
+                    data-testid="readiness-project-new-input"
+                    autoComplete="off"
+                  />
+                </div>
+              ) : null}
+
+              <div className="mt-6">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!canStart}
+                  aria-disabled={!canStart}
+                  onClick={() => void startRun()}
+                  data-testid="readiness-project-start"
+                >
+                  {startStatus === "starting" ? c.project.starting : c.project.start}
+                </button>
+              </div>
+            </fieldset>
+          )}
+        </div>
+
+        {stage3Panel}
+      </div>
+    );
+  }
+
   if (view === "stage2" && promptBundle && howTo) {
     const stage2Callout: AnswerCalloutPayload = {
       id: "stage2-tool",
@@ -1339,6 +1680,7 @@ export function ReadinessFlow() {
         data-testid="readiness-stage2"
         data-variant={promptBundle.variant}
       >
+        {newAnalysisControl}
         <AssessmentProgress
           current={FLOW_STEP_STAGE2}
           total={FLOW_TOTAL_STEPS}
@@ -1513,6 +1855,7 @@ export function ReadinessFlow() {
       data-step={step}
       data-visual-system="results-shared"
     >
+      {newAnalysisControl}
       <AssessmentProgress current={stepIndex + 1} total={FLOW_TOTAL_STEPS} label="Intake" />
       <p className="eyebrow mt-4">
         {c.stage1.progressLabel} · {stepIndex + 1}/{STAGE1_STEPS.length}

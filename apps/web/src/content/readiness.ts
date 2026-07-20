@@ -12,6 +12,33 @@ export const readinessContent = {
     body: "Five assessment dimensions on one radial view — scored from a live self-assessment. Hover or tab to any dimension to see its top critical risk factor.",
     hint: "Hover, tap, or tab to a dimension node to reveal its top critical risk — click a node to jump to its deep dive.",
   },
+  project: {
+    progressLabel: "Start — choose a project",
+    title: "Which project is this analysis for?",
+    body: "Pick a project you've analysed before, or name a new one. Every run is saved under its project, so you can start a fresh analysis anytime without touching earlier results.",
+    existingGroupLabel: "Existing project",
+    existingHelper: "Continue an existing project's history.",
+    newOptionLabel: "New project label",
+    newInputLabel: "New project name",
+    newPlaceholder: "e.g. Acme production app",
+    defaultProject: "Default project",
+    start: "Start analysis",
+    starting: "Starting…",
+    continue: "Continue to intake",
+    started:
+      "New analysis run started — it's in progress. Your earlier completed results stay available.",
+    runningNote:
+      "A run is already in progress for this project — continuing with it. Earlier results are untouched.",
+    errorNote:
+      "We couldn't record the run just now, but you can still continue this analysis — nothing earlier was changed.",
+    projectPrefix: "Project",
+  },
+  newAnalysis: {
+    label: "New analysis",
+    runAgain: "Run again",
+    landingHint:
+      "Already have a completed analysis? Start a new one for any project — your earlier results stay available.",
+  },
   stage1: {
     progressLabel: "Stage 1 of 3 — intake",
     questions: {

@@ -166,10 +166,24 @@ export function AnalysesConsole() {
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
+          {/*
+            Results-page entry point for a fresh run. Non-destructive: every
+            prior analysis below stays accessible; this opens the readiness start
+            flow at its project-label step (/readiness?new=1) so the user
+            picks/enters a project before the new run begins. A completed prior
+            analysis never blocks starting a new one.
+          */}
+          <a
+            href="/readiness?new=1"
+            className="btn inline-flex bg-purple text-white"
+            data-testid="analyses-new-analysis"
+          >
+            New analysis
+          </a>
           <button
             type="button"
             onClick={() => void load()}
-            className="btn inline-flex bg-purple text-white"
+            className="btn inline-flex border border-border"
           >
             Refresh
           </button>

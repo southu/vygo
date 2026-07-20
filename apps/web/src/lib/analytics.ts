@@ -24,6 +24,9 @@ export const READINESS_ANALYTICS_EVENTS = [
   "ingest_landed",
   "ingest_expired",
   "start_over",
+  "run_start_attempted",
+  "run_started",
+  "new_analysis_clicked",
 ] as const;
 
 export type ReadinessAnalyticsEventName = (typeof READINESS_ANALYTICS_EVENTS)[number];

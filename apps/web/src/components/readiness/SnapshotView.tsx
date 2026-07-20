@@ -535,6 +535,7 @@ function DimensionSection({
 
 export function SnapshotView({ snapshotId }: SnapshotViewProps) {
   const c = readinessContent.snapshot;
+  const na = readinessContent.newAnalysis;
   const [data, setData] = useState<SnapshotResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -849,6 +850,27 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
             >
               {verdict}
             </p>
+            {/*
+              Results-page entry point for a fresh run. Non-destructive: this
+              snapshot (a prior completed analysis) stays accessible; the link
+              opens the readiness start flow at its project-label step
+              (/readiness?new=1) so the user picks/enters a project before the
+              new run begins — a completed analysis never blocks a new one.
+            */}
+            <div
+              className="mt-5 flex flex-wrap items-center justify-center gap-3 lg:justify-start"
+              data-testid="snapshot-new-analysis-bar"
+            >
+              <Link
+                href="/readiness?new=1"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-purple/40 bg-purple-soft/40 px-4 py-2 text-sm font-semibold text-purple-dark transition-colors hover:border-purple"
+                data-testid="snapshot-new-analysis"
+                onClick={() => trackAnalytics("new_analysis_clicked", { from: "snapshot" })}
+              >
+                {na.label}
+              </Link>
+              <span className="text-xs text-muted">{na.landingHint}</span>
+            </div>
             {data.bucket ? (
               <p
                 className="mt-4 min-w-0 break-words text-sm text-ink-soft"
