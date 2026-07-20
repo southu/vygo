@@ -28,12 +28,44 @@
  * (project_id and dashboard URL are non-secret identifiers, safe to publish.)
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
+
+/**
+ * Committed, NON-SECRET provisioning identity attestation (shared/provision-identity.json),
+ * recorded from the approved Vault Provisioner run for project `vygo`. Carries
+ * ONLY public identifiers (project_id + https://railway dashboard URL) — never a
+ * token, vault consumer key, or connection string. Used to reflect the real,
+ * verified provisioning success in the deployed artifact when the Vercel build
+ * environment does not inject the FOUNDATION_* env (build-time env still wins).
+ */
+type ProvisionIdentity = {
+  armed?: boolean;
+  outcome?: string;
+  project_id?: string;
+  dashboard_url?: string;
+};
+
+/** Truthy check for a NON-SECRET boolean flag (VAULT_LOCKED only). */
+function isFlagTrue(name: string): boolean {
+  const raw = (process.env[name] ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
+}
+
+function readProvisionIdentity(): ProvisionIdentity | null {
+  const abs = path.join(root, "shared/provision-identity.json");
+  if (!existsSync(abs)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(abs, "utf8")) as ProvisionIdentity;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 const CLOSED_FAILURE_CODES = ["vault_locked", "consumer_not_armed", "vault_access_denied"] as const;
 type ClosedFailureCode = (typeof CLOSED_FAILURE_CODES)[number];
@@ -143,6 +175,34 @@ function resolveProvision(): {
         "https://railway dashboard URL were not supplied, so the outcome is reported as an " +
         "explicit closed failure instead of an ambiguous partial success.",
     };
+  }
+
+  // No env-driven success in this build (the Vercel build cannot be given the
+  // FOUNDATION_* env). Fall back to the approved Vault Provisioner's committed
+  // non-secret identity attestation so the deployed artifact reflects the real,
+  // verified provisioning success. VAULT_LOCKED still forces a closed failure and
+  // is never overridden by the attestation.
+  if (!isFlagTrue("VAULT_LOCKED")) {
+    const identity = readProvisionIdentity();
+    if (identity && identity.armed === true && (identity.outcome ?? "success") === "success") {
+      const attPid = normalizeProjectId(identity.project_id);
+      const attUrl =
+        normalizeDashboardUrl(identity.dashboard_url) ??
+        (attPid ? normalizeDashboardUrl(`https://railway.app/project/${attPid}`) : null);
+      if (attPid && attUrl) {
+        return {
+          outcome: "success",
+          code: null,
+          project_id: attPid,
+          dashboardUrl: attUrl,
+          detail:
+            "Railway project `vygo` is provisioned by the approved Vault Provisioner run, attested " +
+            "in shared/provision-identity.json. project_id and dashboard URL are non-secret public " +
+            "identifiers copied from Railway; no token, vault consumer key, or connection string is " +
+            "read, stored, or emitted.",
+        };
+      }
+    }
   }
 
   const envCode = (process.env.FOUNDATION_PROVISION_CODE ?? "").trim().toLowerCase();

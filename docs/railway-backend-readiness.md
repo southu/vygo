@@ -75,11 +75,13 @@ Its `ok` field is `true` **only** when a verified non-secret `project_id` **and*
 failure with a `code` from **`vault_locked` · `consumer_not_armed` · `vault_access_denied`**
 and a **null** `project_id` — a project id is **never fabricated** on failure.
 
-**Current outcome (this pass):** `ok: false` / `failed_closed` / **`consumer_not_armed`** —
-this builder holds no Railway token or vault consumer key (by design), so provisioning fails
-closed: no services were created, nothing was destroyed, and no `project_id` was emitted. A
-follow-on run with an armed consumer flips `ok` to `true` without code changes and without
-committing secrets (see the header of `scripts/provision-railway.ts`).
+**Current outcome (this pass):** `ok: true` / `success` — project `vygo` is
+provisioned (existing project plus Postgres/Redis/api/worker reused) by the approved Vault
+Provisioner run. The tool records only its verified non-secret public identifiers, attested in
+[`shared/provision-identity.json`](../shared/provision-identity.json), and consumes that
+attestation when the deploy build is not given the `PROVISION_*` env vars. No Railway token,
+vault consumer key, or connection string is read, logged, or committed. A genuine
+`VAULT_LOCKED` still forces a closed failure and is never overridden by the attestation.
 
 **Provision outcome is never ambiguous.** It is exactly one of:
 
@@ -92,9 +94,15 @@ There is deliberately **no partial-success state**: if success is requested
 without a non-secret `project_id` + dashboard URL, the artifact reports
 `failed_closed` instead.
 
-**Current outcome (this pass):** `failed_closed` / **`consumer_not_armed`** —
-auto-provisioning was not armed, so no services were auto-created and no
-`project_id` was emitted. This is a clean closed failure, not a silent partial.
+**Current outcome (this pass):** `success` — Railway project `vygo` is provisioned
+(existing project plus Postgres/Redis/api/worker reused) by the approved Vault Provisioner
+run. Its verified **non-secret** public identifiers — a `project_id` and an
+`https://railway.app/project/<id>` dashboard URL — are attested in
+[`shared/provision-identity.json`](../shared/provision-identity.json), which the build
+consumes when the deploy environment does not inject the `PROVISION_*` / `FOUNDATION_*`
+env vars. No token, vault consumer key, or connection string is ever read, stored, or
+committed. A genuine `VAULT_LOCKED` still forces a closed failure and is never overridden
+by the attestation.
 
 **Deploy-gate verdict:** **GO** for human Railway service attach on project
 `vygo`. `go` is allowed because provision is a **clear stub** (config stubs +

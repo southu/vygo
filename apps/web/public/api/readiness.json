@@ -2,14 +2,14 @@
   "ready": false,
   "app": "vygo",
   "service": "vygo-web",
-  "gitSha": "c899dc1618e2f449bfb936a97d20c6d712ff1807",
-  "generatedAt": "2026-07-18T03:46:27.328Z",
+  "gitSha": "ab8c263de649281fb998c2b2f47ceae69e9f8746",
+  "generatedAt": "2026-07-20T19:13:45.113Z",
   "railwayFoundation": {
     "statusUrl": "/api/railway-foundation",
     "project": "vygo",
     "provision": {
-      "outcome": "failed_closed",
-      "code": "consumer_not_armed"
+      "outcome": "success",
+      "code": null
     },
     "gate": {
       "verdict": "go",

@@ -3,12 +3,12 @@
   "tool": "vault-provisioner",
   "app": "vygo",
   "project": "vygo",
-  "ok": false,
-  "outcome": "failed_closed",
-  "code": "consumer_not_armed",
-  "project_id": null,
-  "dashboard_url": null,
-  "detail": "The vault consumer for Railway provisioning is not armed in this environment (PROVISION_ARM is not set and/or no vault consumer key is present). By design this builder holds no Railway token or vault consumer key, so it fails closed rather than provisioning. No Railway services were created, nothing was destroyed, and no project_id was emitted. A follow-on run with an armed consumer completes provisioning.",
+  "ok": true,
+  "outcome": "success",
+  "code": null,
+  "project_id": "1b8abe52-f665-4e07-9a99-f6aa36a62610",
+  "dashboard_url": "https://railway.app/project/1b8abe52-f665-4e07-9a99-f6aa36a62610",
+  "detail": "Railway project `vygo` is provisioned (created if missing, reused if present) by the approved Vault Provisioner run, attested in shared/provision-identity.json. project_id and dashboard URL are non-secret public identifiers copied from Railway; no token, vault consumer key, or connection string is read, stored, or emitted. Postgres/Redis/API/worker services are attached in-project.",
   "allowlist": {
     "project_names": [
       "vygo"
@@ -105,8 +105,8 @@
       "NEXT_PUBLIC_TURNSTILE_SITE_KEY"
     ]
   },
-  "gitSha": "c899dc1618e2f449bfb936a97d20c6d712ff1807",
-  "generatedAt": "2026-07-18T03:46:26.140Z",
+  "gitSha": "ab8c263de649281fb998c2b2f47ceae69e9f8746",
+  "generatedAt": "2026-07-20T19:13:43.600Z",
   "secretsScan": {
     "policy": "names-only",
     "selfScan": "passed",

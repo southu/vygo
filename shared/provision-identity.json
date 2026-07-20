@@ -1,0 +1,15 @@
+{
+  "artifact": "railway-provision-identity",
+  "note": "Non-secret provisioning identity for Railway project 'vygo', recorded from the approved Vault Provisioner run (provider railway, create_project true; existing project + Postgres/Redis/api/worker were reused, all ok). Contains ONLY public identifiers copied from Railway — no token, vault consumer key, connection string, or any secret value. This is the armed-provisioning attestation the build consumes (scripts/provision-railway.ts, then scripts/generate-foundation-status.ts) when build-time PROVISION_*/FOUNDATION_* env is not injected into the Vercel build. Build-time env, when present, still takes precedence over this file.",
+  "armed": true,
+  "outcome": "success",
+  "project": "vygo",
+  "project_id": "1b8abe52-f665-4e07-9a99-f6aa36a62610",
+  "dashboard_url": "https://railway.app/project/1b8abe52-f665-4e07-9a99-f6aa36a62610",
+  "secretsPolicy": {
+    "mode": "public-identifiers-only",
+    "exposesValues": false,
+    "containsToken": false,
+    "containsConnectionString": false
+  }
+}

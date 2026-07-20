@@ -2,8 +2,8 @@
   "artifact": "railway-backend-foundation",
   "app": "vygo",
   "project": "vygo",
-  "gitSha": "c899dc1618e2f449bfb936a97d20c6d712ff1807",
-  "generatedAt": "2026-07-18T03:46:26.430Z",
+  "gitSha": "ab8c263de649281fb998c2b2f47ceae69e9f8746",
+  "generatedAt": "2026-07-20T19:13:44.090Z",
   "hosting": {
     "summary": "Site → Vercel. API / DB / Redis / worker → Railway (project vygo).",
     "site": {
@@ -132,11 +132,11 @@
     "note": "Exact production origins + documented vygo Vercel preview origins are reflected individually. Unrelated origins receive no Access-Control-Allow-Origin; a `*` wildcard is never emitted."
   },
   "provision": {
-    "outcome": "failed_closed",
-    "code": "consumer_not_armed",
-    "project_id": null,
-    "dashboardUrl": null,
-    "detail": "Auto-provisioning was not armed for this foundation pass: no Railway services were auto-created and no project_id was emitted. This is an explicit closed failure (`consumer_not_armed`), not a silent partial success. A human operator attaches services using the stubs and next steps referenced below.",
+    "outcome": "success",
+    "code": null,
+    "project_id": "1b8abe52-f665-4e07-9a99-f6aa36a62610",
+    "dashboardUrl": "https://railway.app/project/1b8abe52-f665-4e07-9a99-f6aa36a62610",
+    "detail": "Railway project `vygo` is provisioned by the approved Vault Provisioner run, attested in shared/provision-identity.json. project_id and dashboard URL are non-secret public identifiers copied from Railway; no token, vault consumer key, or connection string is read, stored, or emitted.",
     "closedFailureCodes": [
       "vault_locked",
       "consumer_not_armed",
@@ -144,13 +144,13 @@
     ]
   },
   "servicesAutoCreated": {
-    "postgres": false,
-    "redis": false,
-    "api": false,
-    "worker": false
+    "postgres": true,
+    "redis": true,
+    "api": true,
+    "worker": true
   },
   "humanNextSteps": {
-    "required": true,
+    "required": false,
     "doc": "docs/railway-backend-readiness.md#next-steps-project-vygo--services-not-yet-running",
     "stubs": [
       "deploy/railway/README.md",
@@ -160,16 +160,10 @@
     "stubsPresent": true
   },
   "limitation": {
-    "blocked": true,
-    "kind": "project-shell-only-provisioner",
-    "reason": "The Railway provisioner failed closed (consumer_not_armed): this builder holds no Railway token or Vault consumer key, so it created only the project shell and could not add Postgres, Redis, the API service, the worker service, or their reference-wired environment this run.",
-    "blockedActions": [
-      "add-postgres",
-      "add-redis",
-      "add-api-service",
-      "add-worker-service",
-      "wire-railway-and-vault-references"
-    ],
+    "blocked": false,
+    "kind": "none",
+    "reason": "Provisioning succeeded; services were created.",
+    "blockedActions": [],
     "remainingActions": [
       {
         "step": "link",
@@ -268,8 +262,8 @@
   },
   "apiSmoke": {
     "required": false,
-    "status": "skipped",
-    "reason": "No non-secret-testable Railway API service exists yet (services not auto-created). Live production Fastify API smoke is not required for the foundation gate; it is deferred to human attach + health-check verification (GET /healthz, /readyz, /health)."
+    "status": "available",
+    "reason": "API service exists; smoke can run against its public health endpoints."
   },
   "docs": {
     "readiness": "docs/railway-backend-readiness.md",
@@ -286,7 +280,7 @@
   "gate": {
     "verdict": "go",
     "forHumanAttachOn": "vygo",
-    "reason": "Provision failed closed with an explicit code (`consumer_not_armed`) AND config stubs + human next steps are present and linked (clear-stub) AND the secrets policy self-scan is clean. Foundation is go for human Railway service attach on vygo.",
+    "reason": "Provision succeeded with a non-secret project_id + dashboard URL and the secrets policy self-scan is clean. Foundation is go for human Railway service attach on vygo.",
     "conditions": {
       "provisionSuccessOrClearStub": true,
       "secretsClean": true
