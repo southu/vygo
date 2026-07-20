@@ -936,3 +936,15 @@
     left: calc(50% - (21rem + 1.5rem + 9rem));
   }
 }
+
+/*
+ * Scroll-spy highlight: the pillar link whose section is currently in view gets
+ * `.active` (toggled by ReadinessScrollSpy). Distinct from :hover so the reader
+ * can always see which pillar they're in, and marked with an inset accent bar.
+ */
+.readiness-pillar-nav__inner a.active {
+  background: var(--color-purple-soft);
+  color: var(--color-purple);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 0 var(--color-purple);
+}

@@ -3,6 +3,7 @@ import { readinessContent } from "@/content/readiness";
 import { ReadinessFlow } from "@/components/readiness/ReadinessFlow";
 import { ReadinessDeepDives } from "@/components/readiness/ReadinessDeepDives";
 import { ReadinessPillarNav } from "@/components/readiness/ReadinessPillarNav";
+import { ReadinessScrollSpy } from "@/components/readiness/ReadinessScrollSpy";
 import { ReadinessRadarChart } from "@/components/charts";
 import {
   getReadinessReportChartData,
@@ -30,7 +31,10 @@ export default function ReadinessPage() {
       data-visual-system="results-shared"
     >
       {chartData.dimensions.length > 0 ? (
-        <ReadinessPillarNav dimensions={chartData.dimensions} />
+        <>
+          <ReadinessPillarNav dimensions={chartData.dimensions} />
+          <ReadinessScrollSpy />
+        </>
       ) : null}
       <section className="section-pad">
         <div className="container-page max-w-2xl">
