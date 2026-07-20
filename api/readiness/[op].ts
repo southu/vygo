@@ -2012,9 +2012,28 @@ async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult>
     }
   }
 
-  // GET list (optionally filtered by user/project).
-  const user = queryParam(req, "user").trim() || null;
+  // GET list — scoped read only. A caller MUST name the exact user whose
+  // analyses they are retrieving; an omitted/blank/oversized `user` scope is
+  // rejected with no data. This closes the disclosure where an unscoped GET
+  // returned every stored record (all users' identifiers + full payloads) and
+  // makes cross-user enumeration impossible: one request only ever yields the
+  // single named user's rows, and there is no unscoped / project-only path that
+  // would span users.
+  const user = queryParam(req, "user").trim();
   const project = queryParam(req, "project").trim() || null;
+
+  if (!user || user.length > ANALYSES_FIELD_MAX) {
+    return {
+      status: 400,
+      body: {
+        error: {
+          code: "SCOPE_REQUIRED",
+          message:
+            "A user scope query parameter is required to list analyses; unscoped listing is not permitted.",
+        },
+      },
+    };
+  }
 
   if (!url) return proxyListAnalyses({ user, project }, process.env, req.headers);
 
@@ -2022,25 +2041,16 @@ async function handleAnalyses(req: EdgeRequest): Promise<ReadinessHandlerResult>
     const sql = getSql(url);
     await ensureAnalysesTablesEdge(sql);
     let rows: AnalysesEdgeRow[];
-    if (user && project) {
+    if (project) {
       rows = await sql<AnalysesEdgeRow[]>`
         SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
         FROM analyses WHERE user_identifier = ${user} AND project_identifier = ${project}
         ORDER BY created_at DESC LIMIT 200`;
-    } else if (user) {
+    } else {
       rows = await sql<AnalysesEdgeRow[]>`
         SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
         FROM analyses WHERE user_identifier = ${user}
         ORDER BY created_at DESC LIMIT 200`;
-    } else if (project) {
-      rows = await sql<AnalysesEdgeRow[]>`
-        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
-        FROM analyses WHERE project_identifier = ${project}
-        ORDER BY created_at DESC LIMIT 200`;
-    } else {
-      rows = await sql<AnalysesEdgeRow[]>`
-        SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
-        FROM analyses ORDER BY created_at DESC LIMIT 200`;
     }
     const analyses = rows.map(toAnalysesPublicEdge);
     return { status: 200, body: { ok: true, count: analyses.length, analyses } };

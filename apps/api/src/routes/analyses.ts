@@ -201,6 +201,22 @@ export function registerAnalysesRoutes(app: FastifyInstance, deps: AnalysesRoute
     const user = pickString(query, ["user", "user_identifier", "email"]);
     const project = pickString(query, ["project", "project_identifier", "project_name"]);
 
+    // Scoped read only: a caller must name the exact user whose analyses they
+    // are retrieving. An omitted/invalid `user` scope is rejected with no data
+    // so an unscoped request can never dump every stored record (all users'
+    // identifiers + full payloads), and a single request can only ever return
+    // the one named user's rows (no cross-user enumeration).
+    if (!user) {
+      return reply
+        .status(400)
+        .send(
+          safeError(
+            "SCOPE_REQUIRED",
+            "A user scope query parameter is required to list analyses; unscoped listing is not permitted.",
+          ),
+        );
+    }
+
     const dbHandle = deps.getDb();
     if (!dbHandle) {
       return reply.status(503).send(safeError("UNAVAILABLE", "Database is not available."));
