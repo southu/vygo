@@ -7,6 +7,42 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/roles/:id/applications",
+      "destination": "/api/jobs?resource=role-apply&id=:id"
+    },
+    {
+      "source": "/api/roles/:id",
+      "destination": "/api/jobs?resource=role-detail&id=:id"
+    },
+    {
+      "source": "/api/roles",
+      "destination": "/api/jobs?resource=roles-list"
+    },
+    {
+      "source": "/api/internal/roles/:id/close",
+      "destination": "/api/jobs?resource=internal-role-close&id=:id"
+    },
+    {
+      "source": "/api/internal/roles/:id",
+      "destination": "/api/jobs?resource=internal-role&id=:id"
+    },
+    {
+      "source": "/api/internal/roles",
+      "destination": "/api/jobs?resource=internal-roles"
+    },
+    {
+      "source": "/api/internal/applications/:id",
+      "destination": "/api/jobs?resource=internal-application&id=:id"
+    },
+    {
+      "source": "/api/internal/applications",
+      "destination": "/api/jobs?resource=internal-applications"
+    },
+    {
+      "source": "/api/apply/:id",
+      "destination": "/api/apply?applyId=:id"
+    },
+    {
       "source": "/v1/analytics",
       "destination": "/api/analytics"
     },

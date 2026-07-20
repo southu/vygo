@@ -20,12 +20,15 @@
 import postgres from "postgres";
 import type { Sql } from "postgres";
 import {
+  findApplicationRow,
   GUIDE_UPDATES_FULL_NAME,
   GUIDE_UPDATES_SOURCE,
   guideUpdatesSuccessBody,
   handleApplyIntake,
   insertApplicationRow,
+  isUuid,
   parseApplyBody,
+  proxyApplyGet,
   proxyApplyPost,
   resolveDatabaseUrl,
   scrubGuideUpdatesResponse,
@@ -194,6 +197,49 @@ async function handlePost(req: EdgeRequest): Promise<ApplyHandlerResult> {
   }
 }
 
+/**
+ * GET /api/apply/:id read-back (rewritten to /api/apply?applyId=:id in
+ * vercel.json). Consolidated into this function so the apply resource stays a
+ * single serverless function under the 12-function Hobby budget.
+ */
+async function handleGet(idRaw: string): Promise<ApplyHandlerResult> {
+  const id = idRaw.trim();
+  if (!id || !isUuid(id)) {
+    return {
+      status: 400,
+      body: { error: { code: "BAD_REQUEST", message: "Invalid application id." } },
+    };
+  }
+
+  const url = resolveDatabaseUrl();
+  if (!url) {
+    return proxyApplyGet(id);
+  }
+
+  try {
+    const sql = getSql(url);
+    const row = await findApplicationRow(sql, id);
+    if (!row) {
+      return {
+        status: 404,
+        body: { error: { code: "NOT_FOUND", message: "Application not found." } },
+      };
+    }
+    return { status: 200, body: row };
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred. Please try again later.",
+        },
+      },
+      logError: error,
+    };
+  }
+}
+
 export default async function handler(req: EdgeRequest, res: EdgeResponse): Promise<void> {
   const allowedOrigins = resolveAllowedOrigins();
   const { allowed, origin } = evaluateOrigin(req.headers, allowedOrigins);
@@ -201,7 +247,7 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
   if (req.method === "OPTIONS") {
     if (origin && allowed) {
       applyBaseHeaders(res, origin);
-      res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
       res.setHeader("Access-Control-Max-Age", "600");
     }
@@ -211,8 +257,40 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
 
   applyBaseHeaders(res, origin && allowed ? origin : null);
 
+  // GET/HEAD read-back for /api/apply/:id (via rewrite). No origin gate — parity
+  // with the former dedicated read function (served regardless of Origin).
+  if (req.method === "GET" || req.method === "HEAD") {
+    const query = (req as EdgeRequest & { query?: Record<string, string | string[] | undefined> })
+      .query;
+    const raw = query?.applyId ?? query?.id;
+    const id = Array.isArray(raw) ? raw[0] : raw;
+    if (!id || typeof id !== "string") {
+      res.status(400).json({ error: { code: "BAD_REQUEST", message: "Invalid application id." } });
+      return;
+    }
+    try {
+      const result = await handleGet(id);
+      if (result.logError) {
+        const message =
+          result.logError instanceof Error ? result.logError.message : "apply get failed";
+        console.error(JSON.stringify({ event: "apply_edge_get_error", message }));
+      }
+      res.status(result.status).json(result.body);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "apply get fatal";
+      console.error(JSON.stringify({ event: "apply_edge_get_fatal", message }));
+      res.status(500).json({
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred. Please try again later.",
+        },
+      });
+    }
+    return;
+  }
+
   if (req.method !== "POST") {
-    res.setHeader("Allow", "POST, OPTIONS");
+    res.setHeader("Allow", "GET, HEAD, POST, OPTIONS");
     res.status(405).json({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." } });
     return;
   }
