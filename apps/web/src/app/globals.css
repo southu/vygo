@@ -278,6 +278,23 @@
   }
 }
 
+/* Brief acknowledgment flash when a radar node is clicked (AC5). The temporary
+   .radar-node-activated class is added on click and removed shortly after. */
+.radar-node-marker {
+  transition:
+    transform 0.15s ease-out,
+    box-shadow 0.15s ease-out,
+    background-color 0.15s ease-out;
+}
+
+.radar-node-activated {
+  transform: scale(1.6);
+  background-color: var(--color-purple);
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 6px rgba(91, 71, 224, 0.55);
+}
+
 .chart-evidence-tooltip-anchor {
   position: absolute;
   left: 50%;

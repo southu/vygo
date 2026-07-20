@@ -106,6 +106,12 @@ type InteractiveChartSegmentProps = {
   segmentKind?: "radar-axis" | "gauge-segment" | "sub-metric-bar";
   /** Optional test id on the interactive control. */
   testId?: string;
+  /**
+   * Optional side-effect fired on click/tap of the control (e.g. smooth-scroll
+   * to a deep-dive section). Runs in addition to — never instead of — the
+   * hover/focus/tap tooltip behavior, so tooltips keep working unchanged.
+   */
+  onActivate?: () => void;
 };
 
 function useFineHover(): boolean {
@@ -145,6 +151,7 @@ export function InteractiveChartSegment({
   tooltipPlacement = "top",
   segmentKind,
   testId,
+  onActivate,
 }: InteractiveChartSegmentProps) {
   const tipId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -199,6 +206,7 @@ export function InteractiveChartSegment({
     }
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
+      onActivate?.();
       if (hasEvidence) setOpen((v) => !v);
     }
   };
@@ -253,6 +261,9 @@ export function InteractiveChartSegment({
         }}
         onClick={(e) => {
           e.stopPropagation();
+          // Fire the activation side-effect (e.g. smooth-scroll) on every real
+          // click/tap, independent of the tooltip open/close bookkeeping below.
+          onActivate?.();
           // Desktop hover already shows the card; click keeps it open.
           if (fineHover) {
             openTip();

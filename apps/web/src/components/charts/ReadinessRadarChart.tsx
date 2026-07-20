@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   Chart,
   Filler,
@@ -16,6 +16,7 @@ import { CHART_BRAND, clampScore } from "./scoreBands";
 import type { ChartDimension } from "./types";
 import { hasChartEvidence } from "./types";
 import { InteractiveChartSegment } from "./EvidenceTooltip";
+import { dimensionSectionId, dimensionSlug } from "@/lib/readiness/dimension-slug";
 
 Chart.register(
   RadarController,
@@ -57,6 +58,34 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
   const chartRef = useRef<Chart<"radar"> | null>(null);
   const uid = useId();
   const [hotspots, setHotspots] = useState<AxisHotspot[]>([]);
+  // Slug of the node most recently clicked — drives a brief visual acknowledgment
+  // (a temporary CSS class) that clears shortly after the click (AC5).
+  const [activatedSlug, setActivatedSlug] = useState<string | null>(null);
+  const ackTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (ackTimerRef.current != null) window.clearTimeout(ackTimerRef.current);
+    };
+  }, []);
+
+  /**
+   * Smooth-scroll to a dimension's deep-dive section and flash the clicked node.
+   * scroll-margin-top on the target section keeps its heading clear of the
+   * sticky header, so a plain scrollIntoView lands in the right place.
+   */
+  const activateDimension = useCallback((dimensionName: string) => {
+    const slug = dimensionSlug(dimensionName);
+    setActivatedSlug(slug);
+    if (ackTimerRef.current != null) window.clearTimeout(ackTimerRef.current);
+    ackTimerRef.current = window.setTimeout(() => setActivatedSlug(null), 700);
+
+    if (typeof document === "undefined") return;
+    const target = document.getElementById(dimensionSectionId(dimensionName));
+    if (target && typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -241,6 +270,8 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                 />
               );
             }
+            const slug = dimensionSlug(dim.dimension);
+            const activated = activatedSlug === slug;
             return (
               <div
                 key={`axis-${dim.dimension}`}
@@ -253,14 +284,18 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   label={dim.dimension}
                   riskFactor={dim.riskFactor}
                   segmentKind="radar-axis"
-                  testId={`radar-axis-${slugify(dim.dimension)}`}
+                  testId={`radar-axis-${slug}`}
                   tooltipPlacement={h.placement}
                   controlClassName="flex h-10 w-10 items-center justify-center rounded-full"
+                  onActivate={() => activateDimension(dim.dimension)}
                 >
                   <span
-                    className="inline-block h-3.5 w-3.5 rounded-full bg-purple-dark ring-2 ring-white"
+                    className={`radar-node-marker inline-block h-3.5 w-3.5 rounded-full bg-purple-dark ring-2 ring-white${
+                      activated ? " radar-node-activated" : ""
+                    }`}
                     data-radar-axis={dim.dimension}
                     data-score={Math.round(score)}
+                    data-activated={activated ? "true" : undefined}
                   />
                 </InteractiveChartSegment>
               </div>
@@ -286,9 +321,10 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   label={dim.dimension}
                   riskFactor={dim.riskFactor}
                   segmentKind="radar-axis"
-                  testId={`radar-axis-chip-${slugify(dim.dimension)}`}
+                  testId={`radar-axis-chip-${dimensionSlug(dim.dimension)}`}
                   tooltipPlacement="top"
                   controlClassName="inline-flex items-center gap-1.5 rounded-full border border-border bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft"
+                  onActivate={() => activateDimension(dim.dimension)}
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-purple" aria-hidden />
                   {dim.dimension}
@@ -303,11 +339,4 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
       ) : null}
     </div>
   );
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 }

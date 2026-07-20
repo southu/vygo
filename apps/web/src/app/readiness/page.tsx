@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { readinessContent } from "@/content/readiness";
 import { ReadinessFlow } from "@/components/readiness/ReadinessFlow";
+import { ReadinessDeepDives } from "@/components/readiness/ReadinessDeepDives";
 import { ReadinessRadarChart } from "@/components/charts";
 import {
   getReadinessReportChartData,
@@ -109,6 +110,10 @@ export default function ReadinessPage() {
             />
           </div>
         </section>
+      ) : null}
+
+      {chartData.dimensions.length > 0 ? (
+        <ReadinessDeepDives dimensions={chartData.dimensions} riskMap={riskMap} />
       ) : null}
     </main>
   );

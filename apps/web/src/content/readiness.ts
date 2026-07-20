@@ -10,7 +10,7 @@ export const readinessContent = {
     eyebrow: "Readiness Radar",
     title: "What a readiness report looks like",
     body: "Five assessment dimensions on one radial view — scored from a live self-assessment. Hover or tab to any dimension to see its top critical risk factor.",
-    hint: "Hover, tap, or tab to a dimension node to reveal its top critical risk.",
+    hint: "Hover, tap, or tab to a dimension node to reveal its top critical risk — click a node to jump to its deep dive.",
   },
   stage1: {
     progressLabel: "Stage 1 of 3 — intake",
