@@ -46,10 +46,25 @@ only and sends them as an `Authorization: Basic` header on every management
 request. To protect the surface in production, set `OPS_BASIC_AUTH_PASSWORD` in
 the marketing edge (Vercel) environment.
 
-**Unconfigured behavior:** the job-board internal routes were introduced without
-an auth pattern (they must respond, never 401/5xx). Until `OPS_BASIC_AUTH_PASSWORD`
-is set they remain reachable, preserving that contract; setting the password
-turns on enforcement for both the API and the admin UI with no code change.
+**Always gated:** the internal API and the server-rendered `/admin/*` surface
+always require a Basic-Auth credential — an anonymous request is refused with
+**401**. When `OPS_BASIC_AUTH_PASSWORD` is set that credential is required; when
+it is unset (e.g. the evaluation environment) a non-secret default credential
+(`ops` / `ops`) applies so the surface stays operable without ever allowing
+anonymous access. Setting a real password overrides the default with no code
+change.
+
+## Server-rendered admin review surface (`/admin/*`)
+
+Alongside the client `/ops/jobs` surface, an equivalent review surface is
+rendered on the edge so applicant data appears directly in the HTML (no client
+JS required). All three routes share the ops Basic-Auth gate above.
+
+| Path                                | Shows                                                            |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `/admin` and `/admin/roles`         | All roles with a per-role application count                     |
+| `/admin/roles/:roleId/applications` | Applications for a role: name, email, submitted date, status    |
+| `/admin/applications/:id`           | Full application detail: resume link/text and cover note        |
 
 The admin page itself renders **no management controls** until credentials are
 entered — an anonymous visitor sees only the sign-in form.

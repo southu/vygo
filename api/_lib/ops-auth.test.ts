@@ -1,10 +1,15 @@
 /**
- * Edge job-board Basic Auth tests: fail-open when unconfigured, enforce when a
- * password is set, timing-safe credential match.
+ * Edge job-board Basic Auth tests: always gated (eval default when unconfigured,
+ * configured password when set), timing-safe credential match.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { verifyInternalBasicAuth, internalAuthConfigured } from "./ops-auth.js";
+import {
+  verifyInternalBasicAuth,
+  internalAuthConfigured,
+  EVAL_DEFAULT_USER,
+  EVAL_DEFAULT_PASSWORD,
+} from "./ops-auth.js";
 import type { EdgeRequest } from "./http.js";
 
 function req(authorization?: string): EdgeRequest {
@@ -16,10 +21,19 @@ function basic(user: string, pass: string): string {
 }
 
 describe("verifyInternalBasicAuth", () => {
-  it("fails open when no password is configured", () => {
+  it("requires the eval default credential when no password is configured", () => {
     assert.equal(internalAuthConfigured({}), false);
-    assert.deepEqual(verifyInternalBasicAuth(req(), {}), { ok: true });
-    assert.deepEqual(verifyInternalBasicAuth(req(basic("ops", "x")), {}), { ok: true });
+    // Anonymous / wrong requests are refused even without a configured password.
+    assert.deepEqual(verifyInternalBasicAuth(req(), {}), { ok: false, reason: "missing" });
+    assert.deepEqual(verifyInternalBasicAuth(req(basic("ops", "x")), {}), {
+      ok: false,
+      reason: "invalid",
+    });
+    // The non-secret eval default authenticates.
+    assert.deepEqual(
+      verifyInternalBasicAuth(req(basic(EVAL_DEFAULT_USER, EVAL_DEFAULT_PASSWORD)), {}),
+      { ok: true },
+    );
   });
 
   it("rejects a missing header when configured", () => {

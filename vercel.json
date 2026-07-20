@@ -39,6 +39,22 @@
       "destination": "/api/jobs?resource=internal-applications"
     },
     {
+      "source": "/admin/roles/:id/applications",
+      "destination": "/api/jobs?resource=admin-role-apps&id=:id"
+    },
+    {
+      "source": "/admin/applications/:id",
+      "destination": "/api/jobs?resource=admin-application&id=:id"
+    },
+    {
+      "source": "/admin/roles",
+      "destination": "/api/jobs?resource=admin-roles"
+    },
+    {
+      "source": "/admin",
+      "destination": "/api/jobs?resource=admin-roles"
+    },
+    {
       "source": "/api/apply/:id",
       "destination": "/api/apply?applyId=:id"
     },

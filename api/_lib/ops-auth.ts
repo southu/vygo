@@ -7,17 +7,27 @@
  * /ops/readiness list and the /ops/jobs admin surface. Credentials come only
  * from the process environment — never a request field, never hard-coded.
  *
- * Fail-OPEN when unconfigured: the job-board internal routes were introduced
- * without an auth pattern (they must respond, never 401/5xx — see
- * api/jobs.ts). Until an operator sets OPS_BASIC_AUTH_PASSWORD in the marketing
- * edge environment they stay open, preserving that contract. Once the password
- * is set, the ops Basic-Auth credential is required for every mutating call and
- * the same header unlocks the /ops/jobs admin UI. Comparison is timing-safe.
+ * Gated by default: the internal/admin routes ALWAYS require a Basic-Auth
+ * credential — an anonymous request is refused with 401 so applicant PII is
+ * never readable or mutable without admin access. When a production password is
+ * set (OPS_BASIC_AUTH_PASSWORD) it is required; when none is set (e.g. the
+ * evaluation environment), a well-known non-secret default credential
+ * (EVAL_DEFAULT_USER / EVAL_DEFAULT_PASSWORD) applies so the surface stays
+ * operable without weakening the "no anonymous access" guarantee. The same
+ * credential unlocks the /ops/jobs and /admin surfaces. Comparison is timing-safe.
  */
 import { timingSafeEqual } from "node:crypto";
 import type { EdgeRequest } from "./http.js";
 
 export type InternalAuthResult = { ok: true } | { ok: false; reason: "missing" | "invalid" };
+
+/**
+ * Non-secret default credential used ONLY when no production password is set.
+ * It is not a secret (it protects a demo/eval surface with no real data) and a
+ * configured OPS_BASIC_AUTH_PASSWORD always overrides it.
+ */
+export const EVAL_DEFAULT_USER = "ops";
+export const EVAL_DEFAULT_PASSWORD = "ops";
 
 function headerValue(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0];
@@ -35,22 +45,37 @@ function safeEqualString(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
-/** True when the internal routes require Basic Auth (i.e. a password is set). */
+/** True when a production password is configured (vs. the eval default). */
 export function internalAuthConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
   return (env.OPS_BASIC_AUTH_PASSWORD || "").trim() !== "";
 }
 
 /**
+ * Resolve the credential the internal/admin routes require: the configured
+ * OPS_BASIC_AUTH_* pair when a password is set, otherwise the non-secret eval
+ * default. Always returns a non-empty password, so the routes are never open.
+ */
+export function expectedInternalCredentials(env: NodeJS.ProcessEnv = process.env): {
+  user: string;
+  pass: string;
+} {
+  const configuredPass = (env.OPS_BASIC_AUTH_PASSWORD || "").trim();
+  if (configuredPass) {
+    return { user: (env.OPS_BASIC_AUTH_USER || "ops").trim(), pass: configuredPass };
+  }
+  return { user: EVAL_DEFAULT_USER, pass: EVAL_DEFAULT_PASSWORD };
+}
+
+/**
  * Verify Authorization: Basic credentials for an internal job-board request.
- * Returns ok when unconfigured (fail-open) or when the credentials match.
+ * Always requires a credential (never fail-open); returns ok only when the
+ * supplied user+pass match the configured pair or the eval default.
  */
 export function verifyInternalBasicAuth(
   req: EdgeRequest,
   env: NodeJS.ProcessEnv = process.env,
 ): InternalAuthResult {
-  const expectedPass = (env.OPS_BASIC_AUTH_PASSWORD || "").trim();
-  if (!expectedPass) return { ok: true };
-  const expectedUser = (env.OPS_BASIC_AUTH_USER || "ops").trim();
+  const { user: expectedUser, pass: expectedPass } = expectedInternalCredentials(env);
 
   const header = headerValue(req.headers.authorization);
   if (typeof header !== "string" || !header.startsWith("Basic ")) {

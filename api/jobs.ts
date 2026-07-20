@@ -6,8 +6,8 @@
  *   GET  /api/roles/:id                     one role (description + timestamps); 404 if unknown
  *   POST /api/roles/:id/applications        create an application (status 'new')
  *
- * Internal/admin routes (namespaced under /api/internal/, no auth pattern exists
- * for this new resource — they respond, never 404/5xx):
+ * Internal/admin routes (namespaced under /api/internal/, gated by ops Basic
+ * Auth — anonymous requests are refused with 401, see api/_lib/ops-auth.ts):
  *   GET   /api/internal/roles               list all roles
  *   POST  /api/internal/roles               create a role
  *   GET   /api/internal/roles/:id           read a role
@@ -16,6 +16,11 @@
  *   GET   /api/internal/applications        list applications (optional ?role_id=)
  *   GET   /api/internal/applications/:id    read one application (full detail)
  *   PATCH /api/internal/applications/:id    update an application's status
+ *
+ * Admin HTML surfaces (server-rendered, same ops Basic Auth gate):
+ *   GET   /admin (/admin/roles)                 roles list + per-role app counts
+ *   GET   /admin/roles/:id/applications         applications for one role
+ *   GET   /admin/applications/:id               full application detail
  *
  * All paths land here via vercel.json rewrites carrying an explicit `resource`
  * discriminator so one function covers the whole board under the 12-function cap.
@@ -48,7 +53,17 @@ import {
   type EdgeRequest,
   type EdgeResponse,
 } from "./_lib/http.js";
-import { verifyInternalBasicAuth } from "./_lib/ops-auth.js";
+import {
+  expectedInternalCredentials,
+  internalAuthConfigured,
+  verifyInternalBasicAuth,
+} from "./_lib/ops-auth.js";
+import {
+  renderAdminUnauthorizedPage,
+  renderApplicationDetailPage,
+  renderRoleApplicationsPage,
+  renderRolesListPage,
+} from "./_lib/jobs-admin-html.js";
 
 type EdgeReqEx = EdgeRequest & {
   url?: string;
@@ -110,9 +125,28 @@ function unauthorized(res: EdgeResponse): void {
   });
 }
 
+/** 401 for the admin HTML surface — an ops sign-in gate rather than a JSON error. */
+function unauthorizedHtml(res: EdgeResponse): void {
+  res.setHeader("WWW-Authenticate", 'Basic realm="Vygo Ops", charset="UTF-8"');
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  const { user, pass } = expectedInternalCredentials();
+  res.status(401).send(renderAdminUnauthorizedPage(!internalAuthConfigured(), user, pass));
+}
+
+function htmlPage(res: EdgeResponse, status: number, html: string): void {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.status(status).send(html);
+}
+
 /** True for the mutating/admin `internal-*` resources that Basic Auth guards. */
 function isInternalResource(resource: string): boolean {
   return resource.startsWith("internal-");
+}
+
+/** True for the server-rendered `admin-*` HTML surfaces that Basic Auth guards. */
+function isAdminPageResource(resource: string): boolean {
+  return resource.startsWith("admin-");
 }
 
 // --- Route handlers ---------------------------------------------------------
@@ -229,6 +263,43 @@ function handleInternalApplication(req: EdgeReqEx, res: EdgeResponse): void {
   res.status(200).json(toApplicationPublic(app));
 }
 
+// --- Admin HTML surfaces (/admin/*) -----------------------------------------
+
+/** GET /admin (and /admin/roles): roles list with per-role application counts. */
+function handleAdminRoles(req: EdgeRequest, res: EdgeResponse): void {
+  if (methodOf(req) !== "GET" && methodOf(req) !== "HEAD")
+    return methodNotAllowed(res, "GET, HEAD, OPTIONS");
+  const counts = countApplicationsByRole();
+  const rows = listAllRoles().map((r) => ({
+    id: r.id,
+    title: r.title,
+    location: r.location,
+    type: r.type,
+    status: r.status,
+    application_count: counts[r.id] ?? 0,
+  }));
+  htmlPage(res, 200, renderRolesListPage(rows));
+}
+
+/** GET /admin/roles/:id/applications: applications for one role. */
+function handleAdminRoleApplications(req: EdgeReqEx, res: EdgeResponse): void {
+  if (methodOf(req) !== "GET" && methodOf(req) !== "HEAD")
+    return methodNotAllowed(res, "GET, HEAD, OPTIONS");
+  const id = queryParam(req, "id").trim();
+  const role = id ? getRole(id) : null;
+  const apps = role ? listApplications(role.id) : [];
+  htmlPage(res, role ? 200 : 404, renderRoleApplicationsPage(role, apps));
+}
+
+/** GET /admin/applications/:id: full application detail. */
+function handleAdminApplication(req: EdgeReqEx, res: EdgeResponse): void {
+  if (methodOf(req) !== "GET" && methodOf(req) !== "HEAD")
+    return methodNotAllowed(res, "GET, HEAD, OPTIONS");
+  const id = queryParam(req, "id").trim();
+  const app = id ? getApplication(id) : null;
+  htmlPage(res, app ? 200 : 404, renderApplicationDetailPage(app));
+}
+
 export default function handler(req: EdgeRequest, res: EdgeResponse): void {
   const { allowed, origin } = evaluateOrigin(req.headers, resolveAllowedOrigins());
 
@@ -248,10 +319,14 @@ export default function handler(req: EdgeRequest, res: EdgeResponse): void {
   const resource = queryParam(req as EdgeReqEx, "resource").trim();
 
   // Guard the admin/internal resources with the shared ops Basic Auth
-  // credential. Fail-open when unconfigured (see api/_lib/ops-auth.ts); the
-  // public roles-list / role-detail / role-apply resources are never gated.
-  if (isInternalResource(resource) && !verifyInternalBasicAuth(req).ok) {
-    return unauthorized(res);
+  // credential — always required, never fail-open (see api/_lib/ops-auth.ts).
+  // The public roles-list / role-detail / role-apply resources are never gated.
+  // The admin HTML surfaces render a sign-in gate; the JSON API returns 401 JSON.
+  if (
+    (isInternalResource(resource) || isAdminPageResource(resource)) &&
+    !verifyInternalBasicAuth(req).ok
+  ) {
+    return isAdminPageResource(resource) ? unauthorizedHtml(res) : unauthorized(res);
   }
 
   try {
@@ -272,6 +347,12 @@ export default function handler(req: EdgeRequest, res: EdgeResponse): void {
         return handleInternalApplications(req as EdgeReqEx, res);
       case "internal-application":
         return handleInternalApplication(req as EdgeReqEx, res);
+      case "admin-roles":
+        return handleAdminRoles(req, res);
+      case "admin-role-apps":
+        return handleAdminRoleApplications(req as EdgeReqEx, res);
+      case "admin-application":
+        return handleAdminApplication(req as EdgeReqEx, res);
       default:
         return notFound(res, "Unknown job-board route.");
     }
