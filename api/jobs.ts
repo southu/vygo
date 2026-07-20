@@ -93,6 +93,10 @@ function badRequest(res: EdgeResponse, message: string): void {
   res.status(400).json({ error: { code: "BAD_REQUEST", message } });
 }
 
+function conflict(res: EdgeResponse, message: string): void {
+  res.status(409).json({ error: { code: "ROLE_CLOSED", message } });
+}
+
 // --- Route handlers ---------------------------------------------------------
 
 function handleRolesList(req: EdgeRequest, res: EdgeResponse): void {
@@ -115,6 +119,8 @@ function handleRoleApply(req: EdgeReqEx, res: EdgeResponse): void {
   const id = queryParam(req, "id").trim();
   const role = id ? getRole(id) : null;
   if (!role) return notFound(res, "Role not found.");
+  if (role.status !== "open")
+    return conflict(res, "This role is no longer accepting applications.");
 
   const parsed = readJsonBody(req);
   if (!parsed.ok) return badRequest(res, "Request body must be valid JSON.");

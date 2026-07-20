@@ -238,24 +238,33 @@ export type ApplicationInput = {
 };
 
 export type ApplicationValidation =
-  | { ok: true; name: string; email: string; resume: string | null; coverNote: string | null }
+  | { ok: true; name: string; email: string; resume: string; coverNote: string | null }
   | { ok: false; message: string };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Validate a public application submission. name + email are required. */
+/**
+ * Validate a public application submission. name, email, and resume are required;
+ * resume accepts either a link URL or pasted resume text (any non-empty string).
+ */
 export function validateApplication(body: ApplicationInput): ApplicationValidation {
   const name = nullIfEmpty(body.name);
   const email = nullIfEmpty(body.email);
+  const resume = nullIfEmpty(body.resume);
   if (!name) return { ok: false, message: "Field 'name' is required." };
   if (!email) return { ok: false, message: "Field 'email' is required." };
   if (!EMAIL_RE.test(email))
     return { ok: false, message: "Field 'email' must be a valid email address." };
+  if (!resume)
+    return {
+      ok: false,
+      message: "Field 'resume' is required — add a resume link or paste your resume text.",
+    };
   return {
     ok: true,
     name,
     email,
-    resume: nullIfEmpty(body.resume),
+    resume,
     coverNote: nullIfEmpty(body.cover_note) ?? nullIfEmpty(body.coverNote),
   };
 }
