@@ -418,6 +418,80 @@ function ingestTokenLogId(token: string): string {
 }
 
 /**
+ * Bridge the per-submission status poll (GET /v1/readiness/status?token=…) to a
+ * run created by POST /v1/readiness/start.
+ *
+ * The waiting page and the acceptance harness poll `/status` with the SAME
+ * token they used as the start credential. A started run lands in the durable
+ * `analyses` store — NOT the `readiness_ingest_submissions` store the poll
+ * historically read (that store is only written by the AI-ingest `/submit`
+ * path). Without this bridge a started run's completion is never observed by the
+ * poll, so it stays "pending" forever: there is no long-lived background worker
+ * on this deploy to move the run to `completed`, and nothing was linking the two
+ * stores.
+ *
+ * Given the token, resolve the same session principal the start used
+ * (`sess:<hash(token)>` when the start body named no explicit user — the exact
+ * flow the acceptance harness drives), lazily finalize any run that has matured
+ * past the processing window (the worker replacement), then surface the latest
+ * start-created run for that principal:
+ *   - completed   → { state: "ready", results, resultsText, run }
+ *   - in_progress → { state: "pending", run } (still within the processing window)
+ *   - none        → null (no started run for this token; caller keeps prior behavior)
+ */
+async function resolveStartedRunStatus(
+  sql: DatabaseHandle["sql"],
+  token: string,
+): Promise<
+  | {
+      state: "ready";
+      results: Record<string, unknown> | null;
+      resultsText: string | null;
+      run: AnalysisRow;
+    }
+  | { state: "pending"; run: AnalysisRow }
+  | null
+> {
+  // Empty body → principal is `sess:<hash(token)>`, matching a start that named
+  // no explicit user. This is the deterministic token→run linkage.
+  const principal = resolveRunPrincipal({}, token);
+  await ensureAnalysesTable(sql);
+  // Worker replacement: complete any of this principal's runs that have
+  // processed past the window so the poll observes completion even when the
+  // caller never explicitly POSTed /complete.
+  await finalizeMaturedRuns(sql, { user: principal }, RUN_PROCESSING_WINDOW_SECONDS);
+
+  const rows = await sql<AnalysisRow[]>`
+    SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
+    FROM analyses
+    WHERE user_identifier = ${principal}
+      AND submission->>'started_via' = ${RUN_STARTED_VIA}
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  const run = rows[0];
+  if (!run) return null;
+
+  if (!isCompletedStatus(run.status)) {
+    return { state: "pending", run };
+  }
+
+  const submission = runPlainObject(run.submission) ?? {};
+  const results =
+    submission.results &&
+    typeof submission.results === "object" &&
+    !Array.isArray(submission.results)
+      ? (submission.results as Record<string, unknown>)
+      : null;
+  // Re-redact free-text on read-back so a planted secret never echoes to the page.
+  const resultsText =
+    typeof submission.results_text === "string"
+      ? redactPasteSecrets(submission.results_text).redacted
+      : null;
+  return { state: "ready", results, resultsText, run };
+}
+
+/**
  * Strip `<script>...</script>` blocks (and orphan opening tags) from every
  * string leaf of a submitted ingest payload before it is stored. Defense in
  * depth: the results view already renders through React text nodes (which
@@ -4486,6 +4560,38 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       const submission = submissionRows[0];
 
       if (!submission) {
+        // No AI-ingest submission landed for this token. Bridge to a run created
+        // by POST /v1/readiness/start (durable `analyses` store): that is where a
+        // started run actually completes, so this is what transitions an accepted
+        // /start run to a viewable "ready" for the waiting page / acceptance poll.
+        const started = await resolveStartedRunStatus(dbHandle.sql, token);
+        if (started?.state === "ready") {
+          const receivedAt =
+            started.run.updated_at instanceof Date
+              ? started.run.updated_at.toISOString()
+              : String(started.run.updated_at);
+          return reply.status(200).send({
+            token,
+            status: "ready",
+            expires_at: expiresAtIso,
+            received_at: receivedAt,
+            results: started.results,
+            results_text: started.resultsText,
+            run_id: started.run.id,
+            project: started.run.project_identifier,
+            run_status: started.run.status,
+          });
+        }
+        if (started?.state === "pending") {
+          return reply.status(200).send({
+            token,
+            status: "pending",
+            expires_at: expiresAtIso,
+            run_id: started.run.id,
+            project: started.run.project_identifier,
+          });
+        }
+
         if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
           return reply.status(410).send({
             status: "expired",
