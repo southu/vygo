@@ -3,7 +3,7 @@
   "base": "https://www.vygo.ai",
   "users": {
     "demo": "demo@vygo.ai",
-    "api": "acceptance-api+mrtnrp28@vygo.ai",
+    "api": "acceptance-api+mrtnw5vy@vygo.ai",
     "legacy": "legacy-single@vygo.ai"
   },
   "projects": {
@@ -22,7 +22,7 @@
         "status": 200,
         "body": {
           "token": "<redacted-session-token>",
-          "expires_at": "2026-07-21T20:09:36.172Z",
+          "expires_at": "2026-07-21T20:13:04.443Z",
           "ttl": 86400,
           "max_uses": 5
         }
@@ -42,6 +42,12 @@
           "count": 2,
           "analyses": [
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "cc6812af-2a8c-4407-9ec9-060f646f3fcb",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -69,6 +75,12 @@
               "current": true
             },
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "8ae6ff19-bb09-48ea-ac6d-21e4de413a44",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -116,6 +128,12 @@
           "count": 2,
           "analyses": [
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "cc6812af-2a8c-4407-9ec9-060f646f3fcb",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -143,6 +161,12 @@
               "current": true
             },
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "8ae6ff19-bb09-48ea-ac6d-21e4de413a44",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -190,6 +214,12 @@
           "count": 1,
           "analyses": [
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project B."
+              },
+              "result_text": "Acceptance-pass completed run for project B.",
               "id": "90030bc9-068c-43f4-bde5-4b7bfbbaec5e",
               "user": "demo@vygo.ai",
               "project": "B",
@@ -237,6 +267,12 @@
           "count": 1,
           "analyses": [
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project B."
+              },
+              "result_text": "Acceptance-pass completed run for project B.",
               "id": "90030bc9-068c-43f4-bde5-4b7bfbbaec5e",
               "user": "demo@vygo.ai",
               "project": "B",
@@ -271,10 +307,10 @@
       }
     },
     {
-      "step": "list history user=acceptance-api+mrtnrp28@vygo.ai project=A",
+      "step": "list history user=acceptance-api+mrtnw5vy@vygo.ai project=A",
       "request": {
         "method": "GET",
-        "url": "/api/analysis?user=acceptance-api%2Bmrtnrp28%40vygo.ai&project=A",
+        "url": "/api/analysis?user=acceptance-api%2Bmrtnw5vy%40vygo.ai&project=A",
         "body": null
       },
       "response": {
@@ -294,7 +330,7 @@
         "url": "/api/analysis/start",
         "body": {
           "submission_token": "<redacted-session-token>",
-          "user": "acceptance-api+mrtnrp28@vygo.ai",
+          "user": "acceptance-api+mrtnw5vy@vygo.ai",
           "project": "A"
         }
       },
@@ -303,24 +339,24 @@
         "body": {
           "ok": true,
           "status": "in_progress",
-          "run_id": "696d9ce0-34e4-4354-969e-b52adb01d535",
+          "run_id": "9c8e191a-7052-4c8c-a4ff-05af4cce40e3",
           "project": "A",
           "analysis": {
-            "id": "696d9ce0-34e4-4354-969e-b52adb01d535",
-            "user": "acceptance-api+mrtnrp28@vygo.ai",
+            "id": "9c8e191a-7052-4c8c-a4ff-05af4cce40e3",
+            "user": "acceptance-api+mrtnw5vy@vygo.ai",
             "project": "A",
             "status": "in_progress",
             "submission": {
               "run": {
                 "project": "A",
-                "started_at": "2026-07-20T20:09:37.504Z"
+                "started_at": "2026-07-20T20:13:05.555Z"
               },
-              "user": "acceptance-api+mrtnrp28@vygo.ai",
+              "user": "acceptance-api+mrtnw5vy@vygo.ai",
               "project": "A",
               "started_via": "readiness_start"
             },
-            "created_at": "2026-07-20 20:09:37.501878+00",
-            "updated_at": "2026-07-20 20:09:37.501878+00"
+            "created_at": "2026-07-20 20:13:05.553913+00",
+            "updated_at": "2026-07-20 20:13:05.553913+00"
           }
         }
       }
@@ -332,7 +368,7 @@
         "url": "/api/analysis/start",
         "body": {
           "submission_token": "<redacted-session-token>",
-          "user": "acceptance-api+mrtnrp28@vygo.ai",
+          "user": "acceptance-api+mrtnw5vy@vygo.ai",
           "project": "A"
         }
       },
@@ -342,7 +378,7 @@
           "error": "run_in_progress",
           "code": "RUN_IN_PROGRESS",
           "project": "A",
-          "run_id": "696d9ce0-34e4-4354-969e-b52adb01d535",
+          "run_id": "9c8e191a-7052-4c8c-a4ff-05af4cce40e3",
           "message": "A run is already in progress for project \"A\". Wait for it to complete (or POST /api/readiness/complete) before starting another."
         }
       }
@@ -354,7 +390,7 @@
         "url": "/api/analysis/complete",
         "body": {
           "submission_token": "<redacted-session-token>",
-          "user": "acceptance-api+mrtnrp28@vygo.ai",
+          "user": "acceptance-api+mrtnw5vy@vygo.ai",
           "project": "A",
           "status": "completed",
           "snapshotId": "00000000-0000-4000-a000-0000000000e3",
@@ -363,7 +399,7 @@
             "overall_score": 82,
             "band": "strong"
           },
-          "run_id": "696d9ce0-34e4-4354-969e-b52adb01d535"
+          "run_id": "9c8e191a-7052-4c8c-a4ff-05af4cce40e3"
         }
       },
       "response": {
@@ -371,20 +407,20 @@
         "body": {
           "ok": true,
           "status": "completed",
-          "run_id": "696d9ce0-34e4-4354-969e-b52adb01d535",
+          "run_id": "9c8e191a-7052-4c8c-a4ff-05af4cce40e3",
           "project": "A",
           "analysis": {
-            "id": "696d9ce0-34e4-4354-969e-b52adb01d535",
-            "user": "acceptance-api+mrtnrp28@vygo.ai",
+            "id": "9c8e191a-7052-4c8c-a4ff-05af4cce40e3",
+            "user": "acceptance-api+mrtnw5vy@vygo.ai",
             "project": "A",
             "status": "completed",
             "submission": {
               "run": {
                 "project": "A",
-                "started_at": "2026-07-20T20:09:37.504Z"
+                "started_at": "2026-07-20T20:13:05.555Z"
               },
-              "user": "acceptance-api+mrtnrp28@vygo.ai",
-              "run_id": "696d9ce0-34e4-4354-969e-b52adb01d535",
+              "user": "acceptance-api+mrtnw5vy@vygo.ai",
+              "run_id": "9c8e191a-7052-4c8c-a4ff-05af4cce40e3",
               "status": "completed",
               "project": "A",
               "results": {
@@ -393,11 +429,11 @@
               },
               "snapshotId": "00000000-0000-4000-a000-0000000000e3",
               "started_via": "readiness_start",
-              "completed_at": "2026-07-20T20:09:38.302Z",
+              "completed_at": "2026-07-20T20:13:05.987Z",
               "results_text": "Acceptance-pass completed run for project A."
             },
-            "created_at": "2026-07-20 20:09:37.501878+00",
-            "updated_at": "2026-07-20 20:09:38.300417+00"
+            "created_at": "2026-07-20 20:13:05.553913+00",
+            "updated_at": "2026-07-20 20:13:05.985666+00"
           }
         }
       }
@@ -409,7 +445,7 @@
         "url": "/api/analysis/start",
         "body": {
           "submission_token": "<redacted-session-token>",
-          "user": "acceptance-api+mrtnrp28@vygo.ai",
+          "user": "acceptance-api+mrtnw5vy@vygo.ai",
           "project": "A"
         }
       },
@@ -418,24 +454,24 @@
         "body": {
           "ok": true,
           "status": "in_progress",
-          "run_id": "c4fc4bd8-fe28-46d7-a001-262f3b12bd63",
+          "run_id": "08629047-fbe2-42aa-ba06-dad239077f6e",
           "project": "A",
           "analysis": {
-            "id": "c4fc4bd8-fe28-46d7-a001-262f3b12bd63",
-            "user": "acceptance-api+mrtnrp28@vygo.ai",
+            "id": "08629047-fbe2-42aa-ba06-dad239077f6e",
+            "user": "acceptance-api+mrtnw5vy@vygo.ai",
             "project": "A",
             "status": "in_progress",
             "submission": {
               "run": {
                 "project": "A",
-                "started_at": "2026-07-20T20:09:38.699Z"
+                "started_at": "2026-07-20T20:13:06.211Z"
               },
-              "user": "acceptance-api+mrtnrp28@vygo.ai",
+              "user": "acceptance-api+mrtnw5vy@vygo.ai",
               "project": "A",
               "started_via": "readiness_start"
             },
-            "created_at": "2026-07-20 20:09:38.697424+00",
-            "updated_at": "2026-07-20 20:09:38.697424+00"
+            "created_at": "2026-07-20 20:13:06.209555+00",
+            "updated_at": "2026-07-20 20:13:06.209555+00"
           }
         }
       }
@@ -447,7 +483,7 @@
         "url": "/api/analysis/complete",
         "body": {
           "submission_token": "<redacted-session-token>",
-          "user": "acceptance-api+mrtnrp28@vygo.ai",
+          "user": "acceptance-api+mrtnw5vy@vygo.ai",
           "project": "A",
           "status": "completed",
           "snapshotId": "00000000-0000-4000-a000-0000000000e2",
@@ -456,7 +492,7 @@
             "overall_score": 82,
             "band": "strong"
           },
-          "run_id": "c4fc4bd8-fe28-46d7-a001-262f3b12bd63"
+          "run_id": "08629047-fbe2-42aa-ba06-dad239077f6e"
         }
       },
       "response": {
@@ -464,20 +500,20 @@
         "body": {
           "ok": true,
           "status": "completed",
-          "run_id": "c4fc4bd8-fe28-46d7-a001-262f3b12bd63",
+          "run_id": "08629047-fbe2-42aa-ba06-dad239077f6e",
           "project": "A",
           "analysis": {
-            "id": "c4fc4bd8-fe28-46d7-a001-262f3b12bd63",
-            "user": "acceptance-api+mrtnrp28@vygo.ai",
+            "id": "08629047-fbe2-42aa-ba06-dad239077f6e",
+            "user": "acceptance-api+mrtnw5vy@vygo.ai",
             "project": "A",
             "status": "completed",
             "submission": {
               "run": {
                 "project": "A",
-                "started_at": "2026-07-20T20:09:38.699Z"
+                "started_at": "2026-07-20T20:13:06.211Z"
               },
-              "user": "acceptance-api+mrtnrp28@vygo.ai",
-              "run_id": "c4fc4bd8-fe28-46d7-a001-262f3b12bd63",
+              "user": "acceptance-api+mrtnw5vy@vygo.ai",
+              "run_id": "08629047-fbe2-42aa-ba06-dad239077f6e",
               "status": "completed",
               "project": "A",
               "results": {
@@ -486,11 +522,11 @@
               },
               "snapshotId": "00000000-0000-4000-a000-0000000000e2",
               "started_via": "readiness_start",
-              "completed_at": "2026-07-20T20:09:39.112Z",
+              "completed_at": "2026-07-20T20:13:06.420Z",
               "results_text": "Acceptance-pass completed run for project A."
             },
-            "created_at": "2026-07-20 20:09:38.697424+00",
-            "updated_at": "2026-07-20 20:09:39.109706+00"
+            "created_at": "2026-07-20 20:13:06.209555+00",
+            "updated_at": "2026-07-20 20:13:06.418255+00"
           }
         }
       }
@@ -506,7 +542,7 @@
         "status": 200,
         "body": {
           "token": "<redacted-session-token>",
-          "expires_at": "2026-07-21T20:09:39.510Z",
+          "expires_at": "2026-07-21T20:13:06.616Z",
           "ttl": 86400,
           "max_uses": 5
         }
@@ -519,7 +555,7 @@
         "url": "/api/analysis/start",
         "body": {
           "submission_token": "<redacted-session-token>",
-          "project": "cap-runid-mrtnrrsg"
+          "project": "cap-runid-mrtnw7qv"
         }
       },
       "response": {
@@ -527,23 +563,23 @@
         "body": {
           "ok": true,
           "status": "in_progress",
-          "run_id": "91e039af-698a-4dcd-9db0-602a8ad153c6",
-          "project": "cap-runid-mrtnrrsg",
+          "run_id": "2efffa35-1945-47a5-8585-04423ea275f6",
+          "project": "cap-runid-mrtnw7qv",
           "analysis": {
-            "id": "91e039af-698a-4dcd-9db0-602a8ad153c6",
-            "user": "sess:818ca35978058d9a98ec5ecb",
-            "project": "cap-runid-mrtnrrsg",
+            "id": "2efffa35-1945-47a5-8585-04423ea275f6",
+            "user": "sess:5858d3916260360d314a071b",
+            "project": "cap-runid-mrtnw7qv",
             "status": "in_progress",
             "submission": {
               "run": {
-                "project": "cap-runid-mrtnrrsg",
-                "started_at": "2026-07-20T20:09:39.901Z"
+                "project": "cap-runid-mrtnw7qv",
+                "started_at": "2026-07-20T20:13:06.824Z"
               },
-              "project": "cap-runid-mrtnrrsg",
+              "project": "cap-runid-mrtnw7qv",
               "started_via": "readiness_start"
             },
-            "created_at": "2026-07-20 20:09:39.899145+00",
-            "updated_at": "2026-07-20 20:09:39.899145+00"
+            "created_at": "2026-07-20 20:13:06.822456+00",
+            "updated_at": "2026-07-20 20:13:06.822456+00"
           }
         }
       }
@@ -559,7 +595,7 @@
         "status": 200,
         "body": {
           "token": "<redacted-session-token>",
-          "expires_at": "2026-07-21T20:09:40.272Z",
+          "expires_at": "2026-07-21T20:13:07.037Z",
           "ttl": 86400,
           "max_uses": 5
         }
@@ -572,9 +608,9 @@
         "url": "/api/analysis/complete",
         "body": {
           "submission_token": "<redacted-session-token>",
-          "run_id": "91e039af-698a-4dcd-9db0-602a8ad153c6",
+          "run_id": "2efffa35-1945-47a5-8585-04423ea275f6",
           "status": "completed",
-          "results_text": "run_id-capability check for cap-runid-mrtnrrsg: completed with a different session token than started it.",
+          "results_text": "run_id-capability check for cap-runid-mrtnw7qv: completed with a different session token than started it.",
           "results": {
             "overall_score": 80,
             "band": "strong"
@@ -586,31 +622,31 @@
         "body": {
           "ok": true,
           "status": "completed",
-          "run_id": "91e039af-698a-4dcd-9db0-602a8ad153c6",
-          "project": "cap-runid-mrtnrrsg",
+          "run_id": "2efffa35-1945-47a5-8585-04423ea275f6",
+          "project": "cap-runid-mrtnw7qv",
           "analysis": {
-            "id": "91e039af-698a-4dcd-9db0-602a8ad153c6",
-            "user": "sess:818ca35978058d9a98ec5ecb",
-            "project": "cap-runid-mrtnrrsg",
+            "id": "2efffa35-1945-47a5-8585-04423ea275f6",
+            "user": "sess:5858d3916260360d314a071b",
+            "project": "cap-runid-mrtnw7qv",
             "status": "completed",
             "submission": {
               "run": {
-                "project": "cap-runid-mrtnrrsg",
-                "started_at": "2026-07-20T20:09:39.901Z"
+                "project": "cap-runid-mrtnw7qv",
+                "started_at": "2026-07-20T20:13:06.824Z"
               },
-              "run_id": "91e039af-698a-4dcd-9db0-602a8ad153c6",
+              "run_id": "2efffa35-1945-47a5-8585-04423ea275f6",
               "status": "completed",
-              "project": "cap-runid-mrtnrrsg",
+              "project": "cap-runid-mrtnw7qv",
               "results": {
                 "band": "strong",
                 "overall_score": 80
               },
               "started_via": "readiness_start",
-              "completed_at": "2026-07-20T20:09:40.686Z",
-              "results_text": "run_id-capability check for cap-runid-mrtnrrsg: completed with a different session token than started it."
+              "completed_at": "2026-07-20T20:13:07.229Z",
+              "results_text": "run_id-capability check for cap-runid-mrtnw7qv: completed with a different session token than started it."
             },
-            "created_at": "2026-07-20 20:09:39.899145+00",
-            "updated_at": "2026-07-20 20:09:40.684058+00"
+            "created_at": "2026-07-20 20:13:06.822456+00",
+            "updated_at": "2026-07-20 20:13:07.227808+00"
           }
         }
       }
@@ -622,7 +658,7 @@
         "url": "/api/analysis/start",
         "body": {
           "submission_token": "<redacted-session-token>",
-          "project": "cap-runid-mrtnrrsg"
+          "project": "cap-runid-mrtnw7qv"
         }
       },
       "response": {
@@ -630,23 +666,23 @@
         "body": {
           "ok": true,
           "status": "in_progress",
-          "run_id": "d363d0a7-4317-49a9-a0f7-288baa41caab",
-          "project": "cap-runid-mrtnrrsg",
+          "run_id": "dbef4317-d24f-4cae-b47f-9aed9f53d30b",
+          "project": "cap-runid-mrtnw7qv",
           "analysis": {
-            "id": "d363d0a7-4317-49a9-a0f7-288baa41caab",
-            "user": "sess:818ca35978058d9a98ec5ecb",
-            "project": "cap-runid-mrtnrrsg",
+            "id": "dbef4317-d24f-4cae-b47f-9aed9f53d30b",
+            "user": "sess:5858d3916260360d314a071b",
+            "project": "cap-runid-mrtnw7qv",
             "status": "in_progress",
             "submission": {
               "run": {
-                "project": "cap-runid-mrtnrrsg",
-                "started_at": "2026-07-20T20:09:41.083Z"
+                "project": "cap-runid-mrtnw7qv",
+                "started_at": "2026-07-20T20:13:07.425Z"
               },
-              "project": "cap-runid-mrtnrrsg",
+              "project": "cap-runid-mrtnw7qv",
               "started_via": "readiness_start"
             },
-            "created_at": "2026-07-20 20:09:41.081972+00",
-            "updated_at": "2026-07-20 20:09:41.081972+00"
+            "created_at": "2026-07-20 20:13:07.423289+00",
+            "updated_at": "2026-07-20 20:13:07.423289+00"
           }
         }
       }
@@ -658,7 +694,7 @@
         "url": "/api/analysis/complete",
         "body": {
           "submission_token": "<redacted-session-token>",
-          "run_id": "d363d0a7-4317-49a9-a0f7-288baa41caab",
+          "run_id": "dbef4317-d24f-4cae-b47f-9aed9f53d30b",
           "status": "completed",
           "results_text": "drain"
         }
@@ -668,27 +704,27 @@
         "body": {
           "ok": true,
           "status": "completed",
-          "run_id": "d363d0a7-4317-49a9-a0f7-288baa41caab",
-          "project": "cap-runid-mrtnrrsg",
+          "run_id": "dbef4317-d24f-4cae-b47f-9aed9f53d30b",
+          "project": "cap-runid-mrtnw7qv",
           "analysis": {
-            "id": "d363d0a7-4317-49a9-a0f7-288baa41caab",
-            "user": "sess:818ca35978058d9a98ec5ecb",
-            "project": "cap-runid-mrtnrrsg",
+            "id": "dbef4317-d24f-4cae-b47f-9aed9f53d30b",
+            "user": "sess:5858d3916260360d314a071b",
+            "project": "cap-runid-mrtnw7qv",
             "status": "completed",
             "submission": {
               "run": {
-                "project": "cap-runid-mrtnrrsg",
-                "started_at": "2026-07-20T20:09:41.083Z"
+                "project": "cap-runid-mrtnw7qv",
+                "started_at": "2026-07-20T20:13:07.425Z"
               },
-              "run_id": "d363d0a7-4317-49a9-a0f7-288baa41caab",
+              "run_id": "dbef4317-d24f-4cae-b47f-9aed9f53d30b",
               "status": "completed",
-              "project": "cap-runid-mrtnrrsg",
+              "project": "cap-runid-mrtnw7qv",
               "started_via": "readiness_start",
-              "completed_at": "2026-07-20T20:09:41.479Z",
+              "completed_at": "2026-07-20T20:13:07.619Z",
               "results_text": "drain"
             },
-            "created_at": "2026-07-20 20:09:41.081972+00",
-            "updated_at": "2026-07-20 20:09:41.477684+00"
+            "created_at": "2026-07-20 20:13:07.423289+00",
+            "updated_at": "2026-07-20 20:13:07.617621+00"
           }
         }
       }
@@ -707,6 +743,12 @@
           "count": 1,
           "analyses": [
             {
+              "result": {
+                "band": "developing",
+                "overall_score": 72,
+                "summary": "Original pre-migration analysis for a single-analysis account, preserved after the multi-run migration."
+              },
+              "result_text": "Original pre-migration analysis for a single-analysis account, preserved after the multi-run migration.",
               "id": "43af2020-2ef3-41d1-891f-de438aad3911",
               "user": "legacy-single@vygo.ai",
               "project": "Default project",
@@ -748,6 +790,12 @@
           "project": "Default project",
           "defaultProject": "Default project",
           "analysis": {
+            "result": {
+              "band": "developing",
+              "overall_score": 72,
+              "summary": "Original pre-migration analysis for a single-analysis account, preserved after the multi-run migration."
+            },
+            "result_text": "Original pre-migration analysis for a single-analysis account, preserved after the multi-run migration.",
             "id": "43af2020-2ef3-41d1-891f-de438aad3911",
             "user": "legacy-single@vygo.ai",
             "project": "Default project",
@@ -795,6 +843,12 @@
           "count": 7,
           "analyses": [
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project B."
+              },
+              "result_text": "Acceptance-pass completed run for project B.",
               "id": "90030bc9-068c-43f4-bde5-4b7bfbbaec5e",
               "user": "demo@vygo.ai",
               "project": "B",
@@ -822,6 +876,12 @@
               "current": true
             },
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "cc6812af-2a8c-4407-9ec9-060f646f3fcb",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -849,6 +909,12 @@
               "current": true
             },
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "8ae6ff19-bb09-48ea-ac6d-21e4de413a44",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -876,6 +942,17 @@
               "current": false
             },
             {
+              "result": {
+                "band": "strong",
+                "dimensions": {
+                  "clarity": 88,
+                  "evidence": 80,
+                  "alignment": 85
+                },
+                "overall_score": 84,
+                "summary": "A re-run of the Default project analysis. This newer completed run is the project's current result; the earlier completed run stays in history and remains openable."
+              },
+              "result_text": "A re-run of the Default project analysis. This newer completed run is the project's current result; the earlier completed run stays in history and remains openable.",
               "id": "0c662432-fdda-4e41-a3e4-883af85ececc",
               "user": "demo@vygo.ai",
               "project": "Default project",
@@ -901,6 +978,8 @@
               "current": true
             },
             {
+              "result": null,
+              "result_text": "",
               "id": "643ace03-699a-4d08-a3f2-4e2d9c63e931",
               "user": "demo@vygo.ai",
               "project": "Default project",
@@ -915,6 +994,17 @@
               "current": false
             },
             {
+              "result": {
+                "band": "strong",
+                "dimensions": {
+                  "clarity": 90,
+                  "evidence": 85,
+                  "alignment": 89
+                },
+                "overall_score": 88,
+                "summary": "A completed analysis stored under a distinct second project."
+              },
+              "result_text": "A completed analysis stored under a distinct second project.",
               "id": "c9991e35-b4bf-4216-95e8-048f8b1fa39d",
               "user": "demo@vygo.ai",
               "project": "Project Beta",
@@ -939,6 +1029,17 @@
               "current": true
             },
             {
+              "result": {
+                "band": "developing",
+                "dimensions": {
+                  "clarity": 80,
+                  "evidence": 65,
+                  "alignment": 71
+                },
+                "overall_score": 72,
+                "summary": "Legacy readiness analysis for demo@vygo.ai — the single pre-migration analysis, preserved byte-for-byte as the first entry of 'Default project'."
+              },
+              "result_text": "Legacy readiness analysis for demo@vygo.ai — the single pre-migration analysis, preserved byte-for-byte as the first entry of 'Default project'.",
               "id": "0a890833-f4e9-4e2f-9a9c-a7676b1e4df3",
               "user": "demo@vygo.ai",
               "project": "Default project",
@@ -1001,6 +1102,12 @@
           "count": 1,
           "analyses": [
             {
+              "result": {
+                "band": "developing",
+                "overall_score": 72,
+                "summary": "Original pre-migration analysis for a single-analysis account, preserved after the multi-run migration."
+              },
+              "result_text": "Original pre-migration analysis for a single-analysis account, preserved after the multi-run migration.",
               "id": "43af2020-2ef3-41d1-891f-de438aad3911",
               "user": "legacy-single@vygo.ai",
               "project": "Default project",
@@ -1052,6 +1159,12 @@
           "count": 2,
           "analyses": [
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "cc6812af-2a8c-4407-9ec9-060f646f3fcb",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -1079,6 +1192,12 @@
               "current": true
             },
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "8ae6ff19-bb09-48ea-ac6d-21e4de413a44",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -1126,6 +1245,12 @@
           "count": 1,
           "analyses": [
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project B."
+              },
+              "result_text": "Acceptance-pass completed run for project B.",
               "id": "90030bc9-068c-43f4-bde5-4b7bfbbaec5e",
               "user": "demo@vygo.ai",
               "project": "B",
@@ -1173,6 +1298,12 @@
           "count": 7,
           "analyses": [
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project B."
+              },
+              "result_text": "Acceptance-pass completed run for project B.",
               "id": "90030bc9-068c-43f4-bde5-4b7bfbbaec5e",
               "user": "demo@vygo.ai",
               "project": "B",
@@ -1200,6 +1331,12 @@
               "current": true
             },
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "cc6812af-2a8c-4407-9ec9-060f646f3fcb",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -1227,6 +1364,12 @@
               "current": true
             },
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "8ae6ff19-bb09-48ea-ac6d-21e4de413a44",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -1254,6 +1397,17 @@
               "current": false
             },
             {
+              "result": {
+                "band": "strong",
+                "dimensions": {
+                  "clarity": 88,
+                  "evidence": 80,
+                  "alignment": 85
+                },
+                "overall_score": 84,
+                "summary": "A re-run of the Default project analysis. This newer completed run is the project's current result; the earlier completed run stays in history and remains openable."
+              },
+              "result_text": "A re-run of the Default project analysis. This newer completed run is the project's current result; the earlier completed run stays in history and remains openable.",
               "id": "0c662432-fdda-4e41-a3e4-883af85ececc",
               "user": "demo@vygo.ai",
               "project": "Default project",
@@ -1279,6 +1433,8 @@
               "current": true
             },
             {
+              "result": null,
+              "result_text": "",
               "id": "643ace03-699a-4d08-a3f2-4e2d9c63e931",
               "user": "demo@vygo.ai",
               "project": "Default project",
@@ -1293,6 +1449,17 @@
               "current": false
             },
             {
+              "result": {
+                "band": "strong",
+                "dimensions": {
+                  "clarity": 90,
+                  "evidence": 85,
+                  "alignment": 89
+                },
+                "overall_score": 88,
+                "summary": "A completed analysis stored under a distinct second project."
+              },
+              "result_text": "A completed analysis stored under a distinct second project.",
               "id": "c9991e35-b4bf-4216-95e8-048f8b1fa39d",
               "user": "demo@vygo.ai",
               "project": "Project Beta",
@@ -1317,6 +1484,17 @@
               "current": true
             },
             {
+              "result": {
+                "band": "developing",
+                "dimensions": {
+                  "clarity": 80,
+                  "evidence": 65,
+                  "alignment": 71
+                },
+                "overall_score": 72,
+                "summary": "Legacy readiness analysis for demo@vygo.ai — the single pre-migration analysis, preserved byte-for-byte as the first entry of 'Default project'."
+              },
+              "result_text": "Legacy readiness analysis for demo@vygo.ai — the single pre-migration analysis, preserved byte-for-byte as the first entry of 'Default project'.",
               "id": "0a890833-f4e9-4e2f-9a9c-a7676b1e4df3",
               "user": "demo@vygo.ai",
               "project": "Default project",
@@ -1365,6 +1543,12 @@
           "count": 7,
           "analyses": [
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project B."
+              },
+              "result_text": "Acceptance-pass completed run for project B.",
               "id": "90030bc9-068c-43f4-bde5-4b7bfbbaec5e",
               "user": "demo@vygo.ai",
               "project": "B",
@@ -1392,6 +1576,12 @@
               "current": true
             },
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "cc6812af-2a8c-4407-9ec9-060f646f3fcb",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -1419,6 +1609,12 @@
               "current": true
             },
             {
+              "result": {
+                "band": "strong",
+                "overall_score": 82,
+                "summary": "Acceptance-pass completed run for project A."
+              },
+              "result_text": "Acceptance-pass completed run for project A.",
               "id": "8ae6ff19-bb09-48ea-ac6d-21e4de413a44",
               "user": "demo@vygo.ai",
               "project": "A",
@@ -1446,6 +1642,17 @@
               "current": false
             },
             {
+              "result": {
+                "band": "strong",
+                "dimensions": {
+                  "clarity": 88,
+                  "evidence": 80,
+                  "alignment": 85
+                },
+                "overall_score": 84,
+                "summary": "A re-run of the Default project analysis. This newer completed run is the project's current result; the earlier completed run stays in history and remains openable."
+              },
+              "result_text": "A re-run of the Default project analysis. This newer completed run is the project's current result; the earlier completed run stays in history and remains openable.",
               "id": "0c662432-fdda-4e41-a3e4-883af85ececc",
               "user": "demo@vygo.ai",
               "project": "Default project",
@@ -1471,6 +1678,8 @@
               "current": true
             },
             {
+              "result": null,
+              "result_text": "",
               "id": "643ace03-699a-4d08-a3f2-4e2d9c63e931",
               "user": "demo@vygo.ai",
               "project": "Default project",
@@ -1485,6 +1694,17 @@
               "current": false
             },
             {
+              "result": {
+                "band": "strong",
+                "dimensions": {
+                  "clarity": 90,
+                  "evidence": 85,
+                  "alignment": 89
+                },
+                "overall_score": 88,
+                "summary": "A completed analysis stored under a distinct second project."
+              },
+              "result_text": "A completed analysis stored under a distinct second project.",
               "id": "c9991e35-b4bf-4216-95e8-048f8b1fa39d",
               "user": "demo@vygo.ai",
               "project": "Project Beta",
@@ -1509,6 +1729,17 @@
               "current": true
             },
             {
+              "result": {
+                "band": "developing",
+                "dimensions": {
+                  "clarity": 80,
+                  "evidence": 65,
+                  "alignment": 71
+                },
+                "overall_score": 72,
+                "summary": "Legacy readiness analysis for demo@vygo.ai — the single pre-migration analysis, preserved byte-for-byte as the first entry of 'Default project'."
+              },
+              "result_text": "Legacy readiness analysis for demo@vygo.ai — the single pre-migration analysis, preserved byte-for-byte as the first entry of 'Default project'.",
               "id": "0a890833-f4e9-4e2f-9a9c-a7676b1e4df3",
               "user": "demo@vygo.ai",
               "project": "Default project",
@@ -1557,6 +1788,12 @@
           "project": "A",
           "defaultProject": "Default project",
           "analysis": {
+            "result": {
+              "band": "strong",
+              "overall_score": 82,
+              "summary": "Acceptance-pass completed run for project A."
+            },
+            "result_text": "Acceptance-pass completed run for project A.",
             "id": "cc6812af-2a8c-4407-9ec9-060f646f3fcb",
             "user": "demo@vygo.ai",
             "project": "A",
@@ -1597,6 +1834,12 @@
         "body": {
           "ok": true,
           "analysis": {
+            "result": {
+              "band": "strong",
+              "overall_score": 82,
+              "summary": "Acceptance-pass completed run for project A."
+            },
+            "result_text": "Acceptance-pass completed run for project A.",
             "id": "cc6812af-2a8c-4407-9ec9-060f646f3fcb",
             "user": "demo@vygo.ai",
             "project": "A",
