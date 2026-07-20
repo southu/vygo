@@ -267,12 +267,6 @@ function InsightCard({ insight }: { insight: SnapshotInsight }) {
             {quoteText(insight.detail, 480)}
           </p>
         ) : null}
-        <blockquote
-          className="mt-3 break-words border-l-2 border-border pl-3 text-sm italic leading-relaxed text-ink"
-          data-testid="snapshot-insight-quote"
-        >
-          “{quote}”
-        </blockquote>
       </div>
     </article>
   );
@@ -442,6 +436,9 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
   const [loading, setLoading] = useState(true);
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [emailFeedback, setEmailFeedback] = useState("");
+  // Evidence strip: raw survey quotes stay collapsed behind a disclosure so the
+  // section leads with synthesized takeaways; the trigger reveals the full text.
+  const [submittedContextOpen, setSubmittedContextOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -817,19 +814,68 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
             What we learned from your data
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            Strengths, risks, and opportunities ranked from your own inputs — each card quotes what
-            you actually entered.
+            Strengths, risks, and opportunities ranked from your own inputs — each card distills
+            what you entered into a takeaway; expand the context below to read the exact text you
+            submitted.
           </p>
         </div>
         {insights.length > 0 ? (
-          <div
-            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-            data-testid="snapshot-insight-cards"
-          >
-            {insights.map((insight, idx) => (
-              <InsightCard key={`${insight.type}-${insight.headline}-${idx}`} insight={insight} />
-            ))}
-          </div>
+          <>
+            <div
+              className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              data-testid="snapshot-insight-cards"
+            >
+              {insights.map((insight, idx) => (
+                <InsightCard key={`${insight.type}-${insight.headline}-${idx}`} insight={insight} />
+              ))}
+            </div>
+            <div
+              className="overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-card"
+              data-testid="snapshot-evidence-context"
+            >
+              <button
+                type="button"
+                onClick={() => setSubmittedContextOpen((open) => !open)}
+                aria-expanded={submittedContextOpen}
+                aria-controls="snapshot-submitted-context"
+                data-testid="snapshot-evidence-toggle"
+                data-state={submittedContextOpen ? "open" : "closed"}
+                className="inline-flex min-h-11 items-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:border-purple hover:text-purple"
+              >
+                ↓ View Submitted Context
+              </button>
+              <div
+                id="snapshot-submitted-context"
+                hidden={!submittedContextOpen}
+                data-state={submittedContextOpen ? "open" : "closed"}
+                className="mt-4 space-y-4"
+              >
+                <p className="text-xs leading-relaxed text-muted">
+                  The exact survey answers these takeaways were drawn from, quoted verbatim.
+                </p>
+                {insights.map((insight, idx) => {
+                  const quote = quoteText(insight.source_answer, 180);
+                  if (!quote) return null;
+                  return (
+                    <figure
+                      key={`quote-${insight.type}-${insight.headline}-${idx}`}
+                      className="min-w-0"
+                    >
+                      <figcaption className="break-words text-xs font-semibold uppercase tracking-[0.06em] text-muted">
+                        {quoteText(insight.headline, 160) || insight.headline}
+                      </figcaption>
+                      <blockquote
+                        className="mt-1 break-words border-l-2 border-border pl-3 text-sm italic leading-relaxed text-ink"
+                        data-testid="snapshot-insight-quote"
+                      >
+                        “{quote}”
+                      </blockquote>
+                    </figure>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         ) : (
           <p className="text-sm text-muted">
             No structured insights were available for this snapshot.
