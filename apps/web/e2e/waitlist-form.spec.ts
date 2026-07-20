@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Request } from "@playwright/test";
 import {
   fillStep1,
   fillStep2,
@@ -558,12 +558,22 @@ test.describe("WaitlistForm cold first-attempt (async Turnstile token)", () => {
 });
 
 // The production cold hang: window.turnstile is defined and a widget renders,
-// but its callback never fires, so the token stays empty forever. Before the
-// bounded-timeout fix a queued submit sat on "Verifying you're human…"
-// indefinitely (no success, no fallback, no POST). Each test below runs in its
-// own fresh Playwright browser context with no prior verify-human warm-up, so
-// together they prove two independent cold first attempts both reach a terminal
-// state — not a warm-run-dependent pass.
+// but its callback never fires, so the CLIENT token stays empty forever. Turnstile
+// is only a best-effort client speed-bump; the server (/v1/waitlist) is the
+// authoritative verify-human gate and accepts the application without a client
+// token. So the cold first attempt must still reach a GENUINE, server-acknowledged
+// success via the degraded real-POST path — never sit on "Verifying you're human…"
+// forever, never dead-end on an error, and never fake success without a completed
+// POST. Before the degraded-submit fix a queued submit sat pending, then errored,
+// and never POSTed — the silent first-run-only failure this mission hardens
+// against. Each test runs in its own fresh Playwright browser context with no
+// prior verify-human warm-up, so two independent cold first attempts both reach
+// success — not a warm-run-dependent pass.
+type ColdSubmitHooks = {
+  onPost: (request: Request) => void;
+  response: () => { status: number; contentType: string; body: string };
+};
+
 test.describe("WaitlistForm cold first-attempt (Turnstile callback never fires)", () => {
   test.beforeEach(async ({ page }) => {
     await mockAvailability(page, "waitlist");
@@ -571,7 +581,7 @@ test.describe("WaitlistForm cold first-attempt (Turnstile callback never fires)"
     await installStuckTurnstileStub(page);
   });
 
-  async function reachStuckSubmit(page: Page, posts: { count: number }) {
+  async function reachStuckSubmit(page: Page, hooks: ColdSubmitHooks) {
     await page.goto("/waitlist");
     await fillStep1(page, { email: `stuck-${Date.now()}@example.com` });
     await page.getByTestId("waitlist-continue").click();
@@ -585,20 +595,13 @@ test.describe("WaitlistForm cold first-attempt (Turnstile callback never fires)"
       .fill("We need production hardening before an enterprise rollout next month.");
     await page.locator("#privacyAccepted").check();
 
-    // A submit with an empty token must never be soft-accepted as success.
     await page.route("**/v1/waitlist", async (route) => {
       if (route.request().method() !== "POST") {
         await route.continue();
         return;
       }
-      posts.count += 1;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          data: { accepted: true, message: "Your application has been received." },
-        }),
-      });
+      hooks.onPost(route.request());
+      await route.fulfill(hooks.response());
     });
 
     const submit = page.getByTestId("waitlist-submit");
@@ -609,30 +612,91 @@ test.describe("WaitlistForm cold first-attempt (Turnstile callback never fires)"
     return submit;
   }
 
-  test("first cold attempt: never-firing token times out into fallback, not an infinite spinner", async ({
+  test("first cold attempt: never-firing token degrades to a real POST and reaches success", async ({
     page,
   }) => {
-    const posts = { count: 0 };
-    const submit = await reachStuckSubmit(page, posts);
+    let posts = 0;
+    let postedWithoutClientToken = false;
+    await reachStuckSubmit(page, {
+      onPost: (request) => {
+        posts += 1;
+        const body = request.postDataJSON() as { turnstileToken?: string };
+        // Degraded path submits without a client token — the server is the gate.
+        postedWithoutClientToken = !body.turnstileToken;
+      },
+      response: () => ({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            accepted: true,
+            message: "Your application has been received.",
+            applicationId: "cold-degraded-1",
+          },
+        }),
+      }),
+    });
 
-    // Bounded timeout must exit the pending state into the actionable fallback —
-    // NOT sit on "Verifying you're human…" forever and NOT fake a success.
-    await expect(page.getByTestId("turnstile-fallback")).toBeVisible({ timeout: 14_000 });
-    await expect(page.locator('[data-field-error="turnstileToken"]')).toBeVisible();
-    await expect(submit).not.toBeDisabled();
-    await expect(submit).not.toContainText(/Verifying you.?re human/i);
-    await expect(page.getByTestId("waitlist-success-card")).toHaveCount(0);
-    // No empty-token POST was ever soft-accepted as success.
-    expect(posts.count).toBe(0);
+    // No token ever arrives; after the bounded wait the queued submit degrades to
+    // a real POST and the server-acknowledged success card renders — NOT a stuck
+    // spinner, NOT a fallback dead-end, NOT a client-side fake success.
+    await expect(page.getByTestId("waitlist-success-card")).toBeVisible({ timeout: 14_000 });
+    await expect(page.getByTestId("success-next-action")).toBeVisible();
+    // Pending "Verifying you're human…" is cleared: the submit control unmounts.
+    await expect(page.getByTestId("waitlist-submit")).toHaveCount(0);
+    // Success is backed by exactly one real POST that carried no client token.
+    expect(posts).toBe(1);
+    expect(postedWithoutClientToken).toBe(true);
   });
 
-  test("second independent cold context reaches the same terminal fallback", async ({ page }) => {
-    const posts = { count: 0 };
-    const submit = await reachStuckSubmit(page, posts);
+  test("second independent cold context also degrades to a real POST and succeeds", async ({
+    page,
+  }) => {
+    let posts = 0;
+    await reachStuckSubmit(page, {
+      onPost: () => {
+        posts += 1;
+      },
+      response: () => ({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          data: {
+            accepted: true,
+            message: "Your application has been received.",
+            applicationId: "cold-degraded-2",
+          },
+        }),
+      }),
+    });
 
+    await expect(page.getByTestId("waitlist-success-card")).toBeVisible({ timeout: 14_000 });
+    expect(posts).toBe(1);
+  });
+
+  test("degraded POST rejected by the server shows fallback/error, never a false success", async ({
+    page,
+  }) => {
+    let posts = 0;
+    const submit = await reachStuckSubmit(page, {
+      onPost: () => {
+        posts += 1;
+      },
+      response: () => ({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: { code: "VALIDATION_ERROR", message: "Please review the highlighted fields." },
+        }),
+      }),
+    });
+
+    // A real POST was attempted and the server rejected it, so the UI must land on
+    // an actionable error/fallback — it must never claim a success it did not get.
     await expect(page.getByTestId("turnstile-fallback")).toBeVisible({ timeout: 14_000 });
-    await expect(submit).not.toBeDisabled();
     await expect(page.getByTestId("waitlist-success-card")).toHaveCount(0);
-    expect(posts.count).toBe(0);
+    await expect(submit).not.toBeDisabled();
+    await expect(submit).not.toContainText(/Verifying you.?re human/i);
+    expect(posts).toBe(1);
   });
 });

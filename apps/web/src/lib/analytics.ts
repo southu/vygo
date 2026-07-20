@@ -36,6 +36,7 @@ export type AnalyticsEventName =
   | "waitlist_success"
   | "waitlist_duplicate"
   | "waitlist_failure"
+  | "waitlist_turnstile_degraded"
   | "availability_view"
   | "availability_retry"
   | ReadinessAnalyticsEventName;

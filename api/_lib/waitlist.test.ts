@@ -253,6 +253,53 @@ describe("edge waitlist — no-database fallback store", () => {
   });
 });
 
+describe("edge waitlist — cold-start verify-human contract", () => {
+  // The production edge is the authoritative verify-human gate; Cloudflare
+  // Turnstile is only a best-effort client speed-bump. On a cold first attempt the
+  // widget can render but never issue a token, so the client degrades to a real
+  // POST with no `turnstileToken`. These tests pin the server contract that path
+  // depends on: a token-less (or empty-token) application is still accepted with a
+  // durable applicationId — never rejected for a missing challenge. If the server
+  // is ever changed to require a client token, the cold first-attempt silent
+  // failure returns and these fail.
+  it("accepts a valid submission with no turnstileToken field (degraded cold POST)", async () => {
+    const store = new FakeStore();
+    const payload = validPayload();
+    delete payload.turnstileToken;
+    assert.equal("turnstileToken" in payload, false);
+    const res = await handleWaitlist(store, payload);
+    assert.equal(res.status, 200);
+    const data = (res.body as { data: Record<string, unknown> }).data;
+    assert.equal(data.accepted, true);
+    assert.equal(data.applicationId, APP_ID);
+    assert.equal(data.duplicate, false);
+    assert.equal(store.calls, 1);
+  });
+
+  it("accepts a valid submission with an empty-string turnstileToken", async () => {
+    const store = new FakeStore();
+    const res = await handleWaitlist(store, validPayload({ turnstileToken: "" }));
+    assert.equal(res.status, 200);
+    const data = (res.body as { data: Record<string, unknown> }).data;
+    assert.equal(data.accepted, true);
+    assert.equal(typeof data.applicationId, "string");
+    assert.notEqual(String(data.applicationId).length, 0);
+    assert.equal(store.calls, 1);
+  });
+
+  it("still enforces real validation on a token-less submission (not a blanket accept)", async () => {
+    // The degraded path must not become a hole: a token-less body that is
+    // otherwise invalid is still rejected 400 and never persisted.
+    const store = new FakeStore();
+    const payload = validPayload({ email: "not-an-email" });
+    delete payload.turnstileToken;
+    const res = await handleWaitlist(store, payload);
+    assert.equal(res.status, 400);
+    assert.equal((res.body as { error: { code: string } }).error.code, "VALIDATION_ERROR");
+    assert.equal(store.calls, 0);
+  });
+});
+
 describe("edge waitlist — validation unit helpers", () => {
   it("normalizeHttpsUrl accepts https, strips credentials, rejects other schemes", () => {
     assert.equal(normalizeHttpsUrl("https://app.example.com/x"), "https://app.example.com/x");

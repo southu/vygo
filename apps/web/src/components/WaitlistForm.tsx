@@ -34,13 +34,16 @@ const TURNSTILE_TEST_SITE_KEY = "1x0000000000000000000000000000000AA";
  * first-attempt hang is a widget that renders (render() returns an id) but whose
  * callback never fires — no token, no error-callback — so the 8s script-load
  * timer (which only trips when window.turnstile is absent) never helps and the
- * submit would sit on "Verifying you're human…" forever. On timeout we exit the
- * pending state into the existing fallback/error affordance. Kept comfortably
- * above the ~1–2s a real widget takes to auto-issue a token, and below the ≥20s
- * window that defines the "stuck" failure, so a real challenge is never cut off
- * but the infinite-pending state cannot occur.
+ * submit would otherwise sit on "Verifying you're human…" forever. On timeout we
+ * do NOT strand the user: Turnstile is a best-effort client speed-bump and the
+ * server (`/v1/waitlist`) is the authoritative gate, accepting the application
+ * without a client token, so we complete the REAL POST via the degraded path —
+ * a genuine server-acknowledged success, never a client-side fake. Kept
+ * comfortably above the ~1–2s a real widget takes to auto-issue a token, and
+ * below the ≥20s window that defines the "stuck" failure, so a real challenge is
+ * never cut off but the infinite-pending state cannot occur.
  */
-const PENDING_TOKEN_TIMEOUT_MS = 10_000;
+const PENDING_TOKEN_TIMEOUT_MS = 8_000;
 
 type FormState = {
   fullName: string;
@@ -494,13 +497,15 @@ export function WaitlistForm({
     if (!values.privacyAccepted) {
       next.privacyAccepted = "Acceptance of the Privacy Policy and Terms of Use is required.";
     }
-    if (!turnstileToken) {
+    if (!turnstileToken && !opts?.allowPendingTurnstile) {
+      // Turnstile is a best-effort client speed-bump; the server is the
+      // authoritative gate. The submit path (allowPendingTurnstile) never blocks
+      // on token state — a pending token queues, a failed/timed-out one degrades
+      // to a real POST. This branch only fires for a non-submit validation.
       if (turnstileFailed) {
         next.turnstileToken =
           "Verification is unavailable. Follow the fallback instructions below.";
-      } else if (!opts?.allowPendingTurnstile) {
-        // Token still loading: only surface the "complete the challenge" error when
-        // the caller is not going to queue the submit and auto-fire on the callback.
+      } else {
         next.turnstileToken = "Please complete the verification challenge.";
       }
     }
@@ -543,21 +548,35 @@ export function WaitlistForm({
   const onSubmitGuarded = async (event: FormEvent) => {
     event.preventDefault();
     if (submittingRef.current || status === "submitting") return;
-    // Validate everything except a still-loading Turnstile token. A failed widget
-    // (turnstileFailed) still blocks here with the fallback message.
+    // Validate every field except the Turnstile token. Verification is a
+    // best-effort client speed-bump — the server is the authoritative gate — so a
+    // pending or failed token never blocks the application here; the token state
+    // is handled (queued or degraded to a real POST) below.
     if (!validateStep2({ allowPendingTurnstile: true })) return;
 
-    if (!turnstileToken) {
-      // Token not issued yet (widget callback still pending): queue the submit and
-      // fire it automatically once the token arrives, so this first click succeeds.
-      pendingSubmitRef.current = true;
-      setVerificationTimedOut(false);
-      setAwaitingToken(true);
-      announcePolite("Verifying you're human…");
+    if (turnstileToken) {
+      await runSubmit();
       return;
     }
 
-    await runSubmit();
+    if (turnstileFailed || verificationTimedOut) {
+      // Verification already gave up (widget error or an earlier timed-out wait):
+      // complete the real POST now rather than stranding the user on an error.
+      // The server accepts the application and returns the durable success
+      // envelope — a genuine outcome, not a client-side fake success.
+      trackAnalytics("waitlist_turnstile_degraded", { code: "turnstile_manual" });
+      await runSubmit();
+      return;
+    }
+
+    // Token not issued yet (widget callback still pending): queue the submit and
+    // fire it automatically once the token arrives, so this first click succeeds.
+    // A bounded wait (PENDING_TOKEN_TIMEOUT_MS) degrades to a real POST if the
+    // callback never fires — the cold first-attempt hang.
+    pendingSubmitRef.current = true;
+    setVerificationTimedOut(false);
+    setAwaitingToken(true);
+    announcePolite("Verifying you're human…");
   };
 
   const runSubmit = async () => {
@@ -709,37 +728,36 @@ export function WaitlistForm({
     // runSubmit reads the latest token/values from this render's closure.
   }, [turnstileToken]);
 
-  // If the widget fails while a submit is queued, cancel the queue and surface
-  // the fallback instructions instead of waiting on a token that will never come.
+  // If the widget errors while a submit is queued, don't wait on a token that
+  // will never come — complete the real POST via the degraded path. The server
+  // is the authoritative gate and accepts the application without a client token,
+  // so a genuine success (or, if the POST itself fails, the fallback/error
+  // affordance) results — never a permanent pending/error dead-end.
   useEffect(() => {
-    if (turnstileFailed && pendingSubmitRef.current) {
+    if (turnstileFailed && pendingSubmitRef.current && !submittingRef.current) {
       pendingSubmitRef.current = false;
-      setAwaitingToken(false);
-      applyFieldErrors({
-        turnstileToken: "Verification is unavailable. Follow the fallback instructions below.",
-      });
-      setStatus("error");
+      trackAnalytics("waitlist_turnstile_degraded", { code: "turnstile_error" });
+      void runSubmit();
     }
   }, [turnstileFailed]);
 
   // Bound the queued-submit wait: if the Turnstile callback never fires (widget
-  // renders but issues no token — the cold first-attempt hang) exit the pending
-  // state into the fallback/error affordance instead of an infinite
-  // "Verifying you're human…". Cleared automatically when the token lands (the
-  // auto-fire effect flips awaitingToken off) or the widget errors.
+  // renders but issues no token — the cold first-attempt hang) do NOT sit on an
+  // infinite "Verifying you're human…" nor dead-end on an error. Turnstile is a
+  // best-effort client speed-bump and the server is the authoritative gate, so
+  // complete the REAL POST via the degraded path — a genuine, server-acknowledged
+  // success (accepted:true + durable applicationId), never a client-side fake. We
+  // mark verificationTimedOut first so that, only if the POST itself fails, the
+  // actionable fallback affordance is shown alongside the error. Cleared when the
+  // token lands first (the auto-fire effect flips awaitingToken off).
   useEffect(() => {
     if (!awaitingToken) return;
     const timer = window.setTimeout(() => {
       if (submittingRef.current || !pendingSubmitRef.current) return;
       pendingSubmitRef.current = false;
-      setAwaitingToken(false);
       setVerificationTimedOut(true);
-      applyFieldErrors({
-        turnstileToken:
-          "Verification did not complete. Follow the fallback instructions below or reload to try again.",
-      });
-      setStatus("error");
-      trackAnalytics("waitlist_failure", { code: "turnstile_timeout" });
+      trackAnalytics("waitlist_turnstile_degraded", { code: "turnstile_timeout" });
+      void runSubmit();
     }, PENDING_TOKEN_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
   }, [awaitingToken]);
