@@ -50,8 +50,12 @@ legacy pre-migration identity is viewable at `/analyses?fixture=legacy`.
   Its projects **A** (2 completed runs) and **B** (1 completed run) are the
   mission's visible history, alongside the pre-existing `Default project` /
   `Project Beta` demo fixtures.
-- `acceptance-api@vygo.ai` — isolated namespace for the always-fresh
-  start/duplicate/accept API transcript.
+- `acceptance-api+<run>@vygo.ai` — isolated, **per-run uniquified** namespace for
+  the always-fresh start/duplicate/accept API transcript. The unique suffix
+  guarantees each reproduction gets its own rolling-24h run-start budget, so the
+  201→409→200→201 sequence is always recordable and a fresh tester never hits the
+  per-user daily rate limit. (`acceptance-api@vygo.ai` remains an allowlisted
+  scope on `/api/railway/query` for backward compatibility.)
 - `legacy-single@vygo.ai` — a single-analysis account whose one migrated result
   lives in `Default project`.
 

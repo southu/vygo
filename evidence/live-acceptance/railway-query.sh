@@ -2,7 +2,7 @@
 #
 # Credential-free HTTP read-only DB evidence for the vygo-live-acceptance-pass
 # mission. Records the acceptance runs' analysis + submission rows from the
-# provisioned Railway database (project 'composer') via the live, authenticated
+# provisioned Railway database (project 'vygo') via the live, authenticated
 # (allowlist-scoped) read-only endpoint GET /api/railway/query on www.vygo.ai.
 #
 # The endpoint serves rows from the same Railway Postgres the app reads through

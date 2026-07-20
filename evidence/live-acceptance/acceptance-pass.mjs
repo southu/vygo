@@ -55,7 +55,12 @@ const BASE = (argBase || process.env.VYGO_BASE || "https://www.vygo.ai").replace
 // projects are the mission's visible history. The legacy user models a
 // pre-migration single-analysis account.
 const DEMO_USER = "demo@vygo.ai";
-const API_USER = "acceptance-api@vygo.ai"; // isolated namespace for the start/duplicate transcript
+// Isolated namespace for the always-fresh start/duplicate/accept transcript.
+// Uniquified per run (like capProject below) so re-recording never accumulates
+// against the per-user rolling-24h run-start ceiling — every reproduction gets
+// its own fresh budget and the 201→409→200→201 sequence is always recordable.
+// The stable prefix keeps the identity self-documenting in the transcript.
+const API_USER = `acceptance-api+${Date.now().toString(36)}@vygo.ai`;
 const LEGACY_USER = "legacy-single@vygo.ai";
 const PROJECT_A = "A";
 const PROJECT_B = "B";
