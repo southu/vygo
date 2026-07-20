@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { readinessContent } from "@/content/readiness";
 import { trackAnalytics } from "@/lib/analytics";
@@ -272,6 +272,94 @@ function InsightCard({ insight }: { insight: SnapshotInsight }) {
   );
 }
 
+// Shared trigger styling for every disclosure on the snapshot report so the
+// Evidence Strip and Written Analysis toggles stay visually identical.
+const DISCLOSURE_TRIGGER_CLASS =
+  "inline-flex min-h-11 items-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:border-purple hover:text-purple";
+
+/**
+ * Progressive-disclosure primitive reused across the snapshot report (Evidence
+ * Strip "View Submitted Context" and the per-dimension Written Analysis). The
+ * trigger button and content wrapper share the same markup, classes, and
+ * aria/data-state attributes at every call site.
+ *
+ * Two collapse modes:
+ *  - default (`clamp` false): collapsed content is fully hidden.
+ *  - `clamp` true: collapsed content stays rendered but is truncated at whole
+ *    line boundaries via `collapsedContentClassName` (a line-clamp utility), so
+ *    text is cut cleanly with an ellipsis and never mid-word.
+ */
+function Disclosure({
+  id,
+  open,
+  onToggle,
+  label,
+  clamp = false,
+  triggerPlacement = "before",
+  triggerTestId,
+  triggerClassName,
+  containerClassName,
+  containerTestId,
+  contentClassName,
+  collapsedContentClassName,
+  children,
+}: {
+  id: string;
+  open: boolean;
+  onToggle: () => void;
+  label: ReactNode;
+  clamp?: boolean;
+  triggerPlacement?: "before" | "after";
+  triggerTestId?: string;
+  triggerClassName?: string;
+  containerClassName?: string;
+  containerTestId?: string;
+  contentClassName?: string;
+  collapsedContentClassName?: string;
+  children: ReactNode;
+}) {
+  const trigger = (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={id}
+      data-testid={triggerTestId}
+      data-state={open ? "open" : "closed"}
+      className={[DISCLOSURE_TRIGGER_CLASS, triggerClassName].filter(Boolean).join(" ")}
+    >
+      {label}
+    </button>
+  );
+  const content = (
+    <div
+      id={id}
+      hidden={!clamp && !open}
+      data-state={open ? "open" : "closed"}
+      className={[contentClassName, clamp && !open ? collapsedContentClassName : null]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {children}
+    </div>
+  );
+  return (
+    <div className={containerClassName} data-testid={containerTestId}>
+      {triggerPlacement === "before" ? (
+        <>
+          {trigger}
+          {content}
+        </>
+      ) : (
+        <>
+          {content}
+          {trigger}
+        </>
+      )}
+    </div>
+  );
+}
+
 /** Per-dimension report section: score, sub-metric bars, written analysis. */
 function DimensionSection({
   dimension,
@@ -288,6 +376,9 @@ function DimensionSection({
   chartDim?: ChartDimension | null;
   analysis?: SnapshotDimensionAnalysis | null;
 }) {
+  // Written analysis is a dense block; keep it clamped by default behind the
+  // shared disclosure so each dimension section leads with the scores/bars.
+  const [analysisOpen, setAnalysisOpen] = useState(false);
   const rawHeadline = showRange && range && Number.isFinite(range.mid) ? range.mid : point;
   const headline = Number.isFinite(rawHeadline) ? clampScore(rawHeadline) : null;
   const status = headline == null ? "unknown" : statusForScore(headline);
@@ -415,15 +506,28 @@ function DimensionSection({
         <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-muted">
           Written analysis
         </h3>
-        {paragraphs.map((para, idx) => (
-          <p
-            key={`${dimension}-analysis-${idx}`}
-            className="text-sm leading-relaxed text-ink-soft sm:text-[0.95rem]"
-            data-testid={`snapshot-dim-analysis-p-${dimension}-${idx}`}
-          >
-            {para}
-          </p>
-        ))}
+        <Disclosure
+          id={`snapshot-dim-analysis-content-${dimSlug(dimension)}`}
+          open={analysisOpen}
+          onToggle={() => setAnalysisOpen((open) => !open)}
+          label={analysisOpen ? "Show less" : "Show full analysis"}
+          clamp
+          triggerPlacement="after"
+          triggerTestId={`snapshot-dim-analysis-toggle-${dimension}`}
+          triggerClassName="mt-3"
+          contentClassName="space-y-4"
+          collapsedContentClassName="line-clamp-4"
+        >
+          {paragraphs.map((para, idx) => (
+            <p
+              key={`${dimension}-analysis-${idx}`}
+              className="text-sm leading-relaxed text-ink-soft sm:text-[0.95rem]"
+              data-testid={`snapshot-dim-analysis-p-${dimension}-${idx}`}
+            >
+              {para}
+            </p>
+          ))}
+        </Disclosure>
       </div>
     </section>
   );
@@ -829,52 +933,41 @@ export function SnapshotView({ snapshotId }: SnapshotViewProps) {
                 <InsightCard key={`${insight.type}-${insight.headline}-${idx}`} insight={insight} />
               ))}
             </div>
-            <div
-              className="overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-card"
-              data-testid="snapshot-evidence-context"
+            <Disclosure
+              id="snapshot-submitted-context"
+              open={submittedContextOpen}
+              onToggle={() => setSubmittedContextOpen((open) => !open)}
+              label="↓ View Submitted Context"
+              triggerPlacement="before"
+              triggerTestId="snapshot-evidence-toggle"
+              containerClassName="overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-card"
+              containerTestId="snapshot-evidence-context"
+              contentClassName="mt-4 space-y-4"
             >
-              <button
-                type="button"
-                onClick={() => setSubmittedContextOpen((open) => !open)}
-                aria-expanded={submittedContextOpen}
-                aria-controls="snapshot-submitted-context"
-                data-testid="snapshot-evidence-toggle"
-                data-state={submittedContextOpen ? "open" : "closed"}
-                className="inline-flex min-h-11 items-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink-soft transition-colors hover:border-purple hover:text-purple"
-              >
-                ↓ View Submitted Context
-              </button>
-              <div
-                id="snapshot-submitted-context"
-                hidden={!submittedContextOpen}
-                data-state={submittedContextOpen ? "open" : "closed"}
-                className="mt-4 space-y-4"
-              >
-                <p className="text-xs leading-relaxed text-muted">
-                  The exact survey answers these takeaways were drawn from, quoted verbatim.
-                </p>
-                {insights.map((insight, idx) => {
-                  const quote = quoteText(insight.source_answer, 180);
-                  if (!quote) return null;
-                  return (
-                    <figure
-                      key={`quote-${insight.type}-${insight.headline}-${idx}`}
-                      className="min-w-0"
+              <p className="text-xs leading-relaxed text-muted">
+                The exact survey answers these takeaways were drawn from, quoted verbatim.
+              </p>
+              {insights.map((insight, idx) => {
+                const quote = quoteText(insight.source_answer, 180);
+                if (!quote) return null;
+                return (
+                  <figure
+                    key={`quote-${insight.type}-${insight.headline}-${idx}`}
+                    className="min-w-0"
+                  >
+                    <figcaption className="break-words text-xs font-semibold uppercase tracking-[0.06em] text-muted">
+                      {quoteText(insight.headline, 160) || insight.headline}
+                    </figcaption>
+                    <blockquote
+                      className="mt-1 break-words border-l-2 border-border pl-3 text-sm italic leading-relaxed text-ink"
+                      data-testid="snapshot-insight-quote"
                     >
-                      <figcaption className="break-words text-xs font-semibold uppercase tracking-[0.06em] text-muted">
-                        {quoteText(insight.headline, 160) || insight.headline}
-                      </figcaption>
-                      <blockquote
-                        className="mt-1 break-words border-l-2 border-border pl-3 text-sm italic leading-relaxed text-ink"
-                        data-testid="snapshot-insight-quote"
-                      >
-                        “{quote}”
-                      </blockquote>
-                    </figure>
-                  );
-                })}
-              </div>
-            </div>
+                      “{quote}”
+                    </blockquote>
+                  </figure>
+                );
+              })}
+            </Disclosure>
           </>
         ) : (
           <p className="text-sm text-muted">
