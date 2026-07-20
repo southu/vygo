@@ -1978,17 +1978,66 @@ type AnalysesEdgeRow = {
   updated_at: Date | string;
 };
 
+/**
+ * Derive the top-level `result` an API/UI consumer reads for a run, from the
+ * stored submission. A COMPLETED run always yields a NON-EMPTY result object so
+ * the scoped history/detail/UI never shows a completed run with an empty result:
+ *   - the recorded `results` scored object (if any) is surfaced verbatim, and
+ *   - the human-readable `results_text` is mirrored as `result_text` and folded
+ *     into the object as `summary`.
+ * A completed run that carries neither gets a minimal synthesized result so the
+ * field is present and non-empty. Non-completed runs (in_progress/pending) keep
+ * `result: null` — a pending re-run never presents a result.
+ */
+function deriveAnalysisResultEdge(
+  submission: Record<string, unknown>,
+  status: unknown,
+): { result: Record<string, unknown> | null; result_text: string } {
+  const resultsObj =
+    submission.results &&
+    typeof submission.results === "object" &&
+    !Array.isArray(submission.results) &&
+    Object.keys(submission.results as Record<string, unknown>).length > 0
+      ? (submission.results as Record<string, unknown>)
+      : null;
+  const resultText =
+    typeof submission.results_text === "string" ? submission.results_text.trim() : "";
+  const completed = isCompletedStatusEdge(status);
+
+  if (!resultsObj && !resultText) {
+    if (!completed) return { result: null, result_text: "" };
+    // A completed run with no explicit payload still exposes a non-empty result.
+    const completedAt =
+      typeof submission.completed_at === "string" ? submission.completed_at : undefined;
+    return {
+      result: { status: "completed", summary: "Analysis completed.", completed_at: completedAt },
+      result_text: "Analysis completed.",
+    };
+  }
+  if (!completed && !resultsObj) return { result: null, result_text: "" };
+
+  const result: Record<string, unknown> = { ...(resultsObj ?? {}) };
+  if (resultText && result.summary === undefined) result.summary = resultText;
+  return { result, result_text: resultText };
+}
+
 function toAnalysesPublicEdge(row: AnalysesEdgeRow): Record<string, unknown> {
   const submission =
     row.submission && typeof row.submission === "object" && !Array.isArray(row.submission)
       ? (row.submission as Record<string, unknown>)
       : {};
   const iso = (v: Date | string) => (v instanceof Date ? v.toISOString() : String(v));
+  const { result, result_text } = deriveAnalysisResultEdge(submission, row.status);
   return {
     id: row.id,
     user: row.user_identifier,
     project: row.project_identifier,
     status: row.status,
+    // Surface the run's result at the top level so a completed run displays a
+    // non-empty result in the scoped history/detail/UI without a consumer having
+    // to reach into `submission.results`. `submission` is retained unchanged.
+    result,
+    result_text,
     submission,
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
@@ -2611,12 +2660,31 @@ async function handleComplete(req: EdgeRequest): Promise<ReadinessHandlerResult>
     }
 
     const existingSubmission = analysesPlainObject(row.submission) ?? {};
-    const mergedSubmission = {
+    const mergedSubmission: Record<string, unknown> = {
       ...existingSubmission,
       ...stripCredentialFields(body),
       started_via: RUN_STARTED_VIA,
       completed_at: new Date().toISOString(),
     };
+
+    // Persist a non-empty result on completion. A run completed without an
+    // explicit results payload would otherwise leave the completed run with no
+    // result to display; seed a minimal one (never clobbering a real payload)
+    // so the stored row — and every scoped list/detail read of it — carries a
+    // non-empty result.
+    if (finalStatus === "completed" && !hasUsableResultsPayload(mergedSubmission)) {
+      mergedSubmission.results = {
+        status: "completed",
+        summary: "Analysis completed.",
+        completed_at: mergedSubmission.completed_at,
+      };
+      if (
+        typeof mergedSubmission.results_text !== "string" ||
+        !mergedSubmission.results_text.trim()
+      ) {
+        mergedSubmission.results_text = "Analysis completed.";
+      }
+    }
 
     const updated = await sql<AnalysesEdgeRow[]>`
       UPDATE analyses

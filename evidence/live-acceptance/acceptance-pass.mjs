@@ -76,7 +76,19 @@ const EP = {
   result: "/api/analysis/result",
   demo: "/api/analysis/demo",
   submissions: "/api/submissions",
+  // GET one analysis by id — /api/analysis/<run-id> → the scoped run detail.
+  detail: "/api/analysis",
 };
+
+/** A run's top-level result is present and non-empty (object or result_text). */
+function hasNonEmptyResult(analysis) {
+  if (!analysis || typeof analysis !== "object") return false;
+  const result = analysis.result;
+  const resultObjNonEmpty =
+    !!result && typeof result === "object" && !Array.isArray(result) && Object.keys(result).length > 0;
+  const resultText = typeof analysis.result_text === "string" ? analysis.result_text.trim() : "";
+  return resultObjNonEmpty || resultText.length > 0;
+}
 
 // Public, already-seeded readiness snapshot fixtures — attached to completed
 // runs so each history entry opens the existing results component.
@@ -495,6 +507,39 @@ async function main() {
     "result endpoint returns the latest completed A run as current",
     aResult.status === 200 && aResult.json?.analysis?.id === aCurrent?.id,
     `returned ${aResult.json?.analysis?.id?.slice(0, 8)} expected ${aCurrent?.id?.slice(0, 8)}`,
+  );
+
+  // A completed run must DISPLAY a non-empty result — the fix for the reported
+  // "status completed but no result" failure. Verify it at both the scoped
+  // by-id detail (GET /api/analysis/<run-id>) and in the scoped list rows.
+  const aDetail = await http(
+    "A: current run detail (GET /api/analysis/<run-id>) — non-empty result",
+    "GET",
+    `${EP.detail}/${encodeURIComponent(aCurrent?.id || "")}?user=${encodeURIComponent(DEMO_USER)}`,
+  );
+  record(
+    "completed-result-visible",
+    "a completed run's scoped detail exposes a non-empty result (result / result_text)",
+    aDetail.status === 200 &&
+      isCompleted(aDetail.json?.analysis?.status) &&
+      hasNonEmptyResult(aDetail.json?.analysis),
+    `HTTP ${aDetail.status} status=${aDetail.json?.analysis?.status} result_text="${String(
+      aDetail.json?.analysis?.result_text || "",
+    ).slice(0, 40)}"`,
+  );
+  const aCompletedRows = aRows.filter((r) => isCompleted(r.status));
+  record(
+    "history-result-populated",
+    "every completed run in the scoped history list carries a non-empty result",
+    aCompletedRows.length >= 1 && aCompletedRows.every(hasNonEmptyResult),
+    `A completed rows=${aCompletedRows.length} all-have-result=${aCompletedRows.every(hasNonEmptyResult)}`,
+  );
+  // Also confirm it holds for the result endpoint's returned analysis.
+  record(
+    "result-endpoint-result-populated",
+    "result endpoint's returned analysis carries a non-empty result",
+    aResult.status === 200 && hasNonEmptyResult(aResult.json?.analysis),
+    `has-result=${hasNonEmptyResult(aResult.json?.analysis)}`,
   );
 
   // ---- Submission records queryable over HTTP (companion to the DB query) ----
