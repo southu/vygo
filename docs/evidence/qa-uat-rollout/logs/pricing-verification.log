@@ -1,0 +1,29 @@
+# Pricing / tier verification — QA & UAT rollout
+Rendered LIVE /pricing source. Mission date: 2026-07-20
+
+## New QA/UAT deliverable bullets (criterion 5 — present + word-for-word identical)
+Bullet 1: "Structured UAT program — your team validates every feature before cutover"
+Bullet 2: "Independent QA sign-off on every release"
+  Occurrences of Bullet 1 on /pricing : 9
+  Occurrences of Bullet 2 on /pricing : 9
+  (3 build tiers Launch/Scale/Enterprise; both strings appear once per tier, byte-identical.)
+  Per-tier element screenshots: screenshots/tier-launch-card.png, tier-scale-card.png, tier-enterprise-card.png
+
+## Pre-existing tier names present & unchanged (criterion 10)
+  'Launch' : 9 occurrence(s)
+  'Scale' : 6 occurrence(s)
+  'Enterprise' : 12 occurrence(s)
+  'vygo Harden' : 21 occurrence(s)
+  'Production Readiness Audit' : 6 occurrence(s)
+
+## Pre-existing pricing figures still present & unchanged (criterion 10)
+  'From $75K' : 2 occurrence(s)
+  '$275K+' : 2 occurrence(s)
+  '$15K' : 4 occurrence(s)
+  '$9,500' : 2 occurrence(s)
+  '$8K/month' : 2 occurrence(s)
+  '$15K/month' : 2 occurrence(s)
+  '$25K/month' : 2 occurrence(s)
+
+NOTE: the rollout's pricing.ts diff only APPENDED the two bullets above to each tier's
+deliverables array (verified via 'git show ec21635'). No price string or tier name was altered.

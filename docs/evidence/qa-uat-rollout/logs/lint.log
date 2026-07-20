@@ -1,0 +1,5 @@
+ WARN  Unsupported engine: wanted: {"node":"24.x"} (current: {"node":"v22.22.1","pnpm":"9.15.9"})
+
+> vygo@0.0.0 lint <repo>
+> eslint .
+

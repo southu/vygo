@@ -1,0 +1,93 @@
+[
+  {
+    "label": "team-desktop-1440 @1440",
+    "scrollW": 1440,
+    "clientW": 1440,
+    "innerW": 1440,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "team-mobile-375 @375",
+    "scrollW": 375,
+    "clientW": 375,
+    "innerW": 375,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "howwework-desktop-1440 @1440",
+    "scrollW": 1440,
+    "clientW": 1440,
+    "innerW": 1440,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "howwework-mobile-375 @375",
+    "scrollW": 375,
+    "clientW": 375,
+    "innerW": 375,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "pricing-desktop-1440 @1440",
+    "scrollW": 1440,
+    "clientW": 1440,
+    "innerW": 1440,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "pricing-mobile-375 @375",
+    "scrollW": 375,
+    "clientW": 375,
+    "innerW": 375,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "tier-launch @1440",
+    "scrollW": 1440,
+    "clientW": 1440,
+    "innerW": 1440,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "tier-scale @1440",
+    "scrollW": 1440,
+    "clientW": 1440,
+    "innerW": 1440,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "tier-enterprise @1440",
+    "scrollW": 1440,
+    "clientW": 1440,
+    "innerW": 1440,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "faq-expanded @1440",
+    "scrollW": 1440,
+    "clientW": 1440,
+    "innerW": 1440,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "home-qa-blurb @1440",
+    "scrollW": 1440,
+    "clientW": 1440,
+    "innerW": 1440,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "home-desktop-1440 @1440",
+    "scrollW": 1440,
+    "clientW": 1440,
+    "innerW": 1440,
+    "horizontalOverflow": false
+  },
+  {
+    "label": "home-mobile-375 @375",
+    "scrollW": 375,
+    "clientW": 375,
+    "innerW": 375,
+    "horizontalOverflow": false
+  }
+]

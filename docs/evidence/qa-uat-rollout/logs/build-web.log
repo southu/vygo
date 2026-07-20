@@ -1,0 +1,107 @@
+ WARN  Unsupported engine: wanted: {"node":"24.x"} (current: {"node":"v22.22.1","pnpm":"9.15.9"})
+
+> vygo@0.0.0 build:web <repo>
+> pnpm --filter @vygo/web build
+
+.                                        |  WARN  Unsupported engine: wanted: {"node":"24.x"} (current: {"node":"v22.22.1","pnpm":"9.15.9"})
+
+> @vygo/web@0.0.0 prebuild <repo>/apps/web
+> node ./scripts/guard-equity-pricing.mjs && node ./scripts/guard-consumer-entity-copy.mjs && tsx ../../scripts/build-guide-zip.ts && tsx ../../scripts/provision-railway.ts && tsx ../../scripts/generate-foundation-status.ts && tsx ../../scripts/generate-readiness.ts --assume-passed
+
+guard-equity-pricing: OK (no equity-pricing copy in user-facing source)
+guard-consumer-entity-copy: OK (no prohibited entity/handoff copy in consumer-facing source)
+build-guide-zip: wrote apps/web/public/content/vibe-coding/ratchet-guide-v1.2.zip (21 entries, 83013 bytes, sha256 44d8466e9c7ba50814a954406b72bbebafc557d7b2aaf88f045b65068a52217e)
+Wrote shared/provision.json (ok=true, outcome=success, project=vygo)
+Wrote apps/web/public/api/railway-foundation.json (provision=success, gate=go)
+Wrote apps/web/src/generated/readiness.json (ready=false)
+Wrote apps/web/public/version, apps/web/public/version.txt, apps/web/public/release-evidence.json, apps/web/public/healthz, and apps/web/public/api/readiness.json (/readyz is served by the api/readyz.ts edge function)
+Readiness report is not ready=true; inspect checks above.
+
+> @vygo/web@0.0.0 build <repo>/apps/web
+> next build
+
+   ▲ Next.js 15.5.20
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 9.9s
+   Linting and checking validity of types ...
+
+ ⚠ The Next.js plugin was not detected in your ESLint configuration. See https://nextjs.org/docs/app/api-reference/config/eslint#migrating-existing-config
+   Collecting page data ...
+   Generating static pages (0/48) ...
+   Generating static pages (12/48) 
+   Generating static pages (24/48) 
+   Generating static pages (36/48) 
+ ✓ Generating static pages (48/48)
+   Finalizing page optimization ...
+   Collecting build traces ...
+   Exporting (0/2) ...
+ ✓ Exporting (2/2)
+
+Route (app)                                                Size  First Load JS
+┌ ○ /                                                   3.72 kB         121 kB
+├ ○ /_not-found                                           157 B         103 kB
+├ ○ /analyses                                             122 B         106 kB
+├ ○ /apply                                              4.58 kB         111 kB
+├ ○ /audit                                              2.27 kB         120 kB
+├ ○ /careers                                            2.33 kB         120 kB
+├ ○ /careers-role                                       3.23 kB         124 kB
+├ ● /careers/[id]                                         187 B         121 kB
+├   ├ /careers/founding-full-stack-engineer
+├   ├ /careers/qa-uat-lead
+├   ├ /careers/product-designer
+├   └ [+2 more paths]
+├ ○ /dashboard                                            122 B         106 kB
+├ ○ /guide                                              2.08 kB         105 kB
+├ ○ /insights                                           1.38 kB         119 kB
+├ ● /insights/[slug]                                    1.39 kB         119 kB
+├   ├ /insights/production-readiness-checklist-lovable
+├   ├ /insights/enterprise-buyers-after-demo
+├   └ /insights/open-row-level-security
+├ ○ /login                                              1.39 kB         119 kB
+├ ○ /method                                             1.39 kB         119 kB
+├ ○ /ops/jobs                                           4.29 kB         107 kB
+├ ○ /ops/readiness                                      3.55 kB         106 kB
+├ ○ /pricing                                            1.65 kB         119 kB
+├ ○ /privacy                                              169 B         106 kB
+├ ○ /readiness                                          15.1 kB         238 kB
+├ ○ /readiness/fallback                                 2.96 kB         151 kB
+├ ○ /readiness/snapshot                                 13.4 kB         198 kB
+├ ○ /result                                               121 B         106 kB
+├ ○ /security                                           1.39 kB         119 kB
+├ ○ /staging/charts                                     3.38 kB         185 kB
+├ ○ /terms                                                169 B         106 kB
+├ ○ /thank-you                                          1.39 kB         119 kB
+├ ○ /vibe-coding                                        3.28 kB         121 kB
+├ ○ /vibe-coding/case-studies                             157 B         103 kB
+├ ○ /vibe-coding/live-verify-testing                      157 B         103 kB
+├ ○ /vibe-coding/models-and-costs                         157 B         103 kB
+├ ○ /vibe-coding/ratchet-guide                          2.71 kB         105 kB
+├ ○ /vibe-coding/ratchet-guide/ai-prompts                 157 B         103 kB
+├ ○ /vibe-coding/ratchet-guide/architecture               157 B         103 kB
+├ ○ /vibe-coding/ratchet-guide/footguns                   157 B         103 kB
+├ ○ /vibe-coding/ratchet-guide/one-pager                  157 B         103 kB
+├ ○ /vibe-coding/ratchet-guide/overview                   157 B         103 kB
+├ ○ /vibe-coding/ratchet-guide/rebuild                    157 B         103 kB
+├ ○ /vibe-coding/writing-missions                         157 B         103 kB
+├ ○ /waitlist                                           1.38 kB         119 kB
+└ ○ /why-vygo                                           1.39 kB         119 kB
++ First Load JS shared by all                            103 kB
+  ├ chunks/2449-660e0d5790baad84.js                     46.6 kB
+  ├ chunks/b87ffe50-4fd5c4a93e98f6fb.js                 54.2 kB
+  └ other shared chunks (total)                         1.93 kB
+
+
+○  (Static)  prerendered as static content
+●  (SSG)     prerendered as static HTML (uses generateStaticParams)
+
+
+> @vygo/web@0.0.0 postbuild <repo>/apps/web
+> node ./scripts/prune-draft-insights.mjs
+
+pruned draft export: insights/production-readiness-checklist-lovable.html
+pruned draft export: insights/production-readiness-checklist-lovable.txt
+pruned draft export: insights/enterprise-buyers-after-demo.html
+pruned draft export: insights/enterprise-buyers-after-demo.txt
+pruned draft export: insights/open-row-level-security.html
+pruned draft export: insights/open-row-level-security.txt

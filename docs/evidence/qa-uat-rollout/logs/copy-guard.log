@@ -1,0 +1,32 @@
+# Copy-guard verification — QA & UAT rollout
+Case-insensitive scans of rendered LIVE page source (home '/', /careers, /method, /pricing).
+Mission date: 2026-07-20
+
+## 1. Prohibited 'paid/optional add-on' framing for QA (criterion 8)
+  add-on           : 0 + 0 + 0 + 0  hit(s)
+  add on           : 0 + 0 + 0 + 0  hit(s)
+  optional extra   : 0 + 0 + 0 + 0  hit(s)
+  paid upgrade     : 0 + 0 + 0 + 0  hit(s)
+  upsell           : 0 + 0 + 0 + 0  hit(s)
+  paid add         : 0 + 0 + 0 + 0  hit(s)
+  RESULT: no QA/UAT copy frames quality as an add-on, optional extra, paid upgrade, or upsell.
+
+## 2. Bare word 'optional' — audit each occurrence for QA context
+  /home: appears only in unrelated ratchet-guide doc copy ('Optional updates', 'Optional infra ensure').
+  /method: appears only in the pre-existing 'What changes by tier' comparison table — the 'Ops continuity'
+           capability is 'Optional' for the Launch tier (<dt>Launch</dt><dd>Optional</dd>). This describes
+           ongoing Ops for the Launch tier — it is NOT applied to QA/UAT. The new QA & UAT stage's
+           involvement reads 'Confirm acceptance criteria... take part in structured UAT before launch'
+           (never 'optional'). Confirmed pre-existing: present in method.ts at commit 2584bc2 (pre-rollout).
+  RESULT: no instance of 'optional' is connected to QA/UAT being optional.
+
+## 3. Offshore / junior staffing language (criterion 9)
+  offshore : 0 hit(s) across all four pages
+  junior   : 2 hit(s)
+  The two 'junior' hits are BOTH the pre-existing home 'Why us' reassurance:
+    "Senior-only delivery — No junior bench learning on the product."
+  This is a POSITIVE senior-staffing claim (asserts the ABSENCE of junior staff), predates the rollout
+  (introduced in commit 35b6229; unchanged by any rollout commit), and is not connected to the QA/UAT copy.
+  The new QA & UAT Lead copy frames quality as a shared senior resource 'never billed separately or handed
+  to anyone less experienced' — no offshore/junior framing introduced.
+  RESULT: no offshore/junior staffing language was introduced by the rollout.
