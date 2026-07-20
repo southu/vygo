@@ -2521,9 +2521,16 @@ async function handleComplete(req: EdgeRequest): Promise<ReadinessHandlerResult>
 
     let row: AnalysesEdgeRow | null = null;
     if (runId && UUID_RE.test(runId)) {
+      // The run_id (an unguessable UUIDv4 returned only in the start 201) is the
+      // stable completion capability. Locate the run by id ALONE — do NOT scope
+      // to the session principal. Readiness session tokens are minted per call,
+      // so the completer legitimately presents a DIFFERENT token than the starter;
+      // scoping by `sess:<hash(token)>` made the documented run_id un-completable
+      // (404 RUN_NOT_FOUND, run wedged in_progress). Authentication (a valid,
+      // unexpired ingest token) is already enforced above.
       const rows = await sql<AnalysesEdgeRow[]>`
         SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
-        FROM analyses WHERE id = ${runId} AND user_identifier = ${principal} LIMIT 1
+        FROM analyses WHERE id = ${runId} LIMIT 1
       `;
       row = rows[0] ?? null;
       if (!row) {
@@ -2532,7 +2539,22 @@ async function handleComplete(req: EdgeRequest): Promise<ReadinessHandlerResult>
           body: {
             error: "run_not_found",
             code: "RUN_NOT_FOUND",
-            message: "No run with that id was found for this user.",
+            message: "No run with that id was found.",
+          },
+        };
+      }
+      // Idempotent + non-clobbering: a run that already left in_progress is
+      // returned as-is (never overwrites a finished run's stored results).
+      if (row.status !== RUN_IN_PROGRESS_STATUS) {
+        return {
+          status: 200,
+          body: {
+            ok: true,
+            status: row.status,
+            run_id: row.id,
+            project: row.project_identifier,
+            analysis: toAnalysesPublicEdge(row),
+            idempotent: true,
           },
         };
       }

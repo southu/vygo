@@ -4105,16 +4105,37 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
 
       let row: AnalysisRow | null = null;
       if (runId && UUID_RE.test(runId)) {
+        // The run_id (an unguessable UUIDv4 returned only in the start 201) is
+        // the stable completion capability. Locate the run by id ALONE — do NOT
+        // additionally scope to the session principal. Session tokens are minted
+        // per call (POST /api/readiness/token), so the caller completing a run
+        // legitimately presents a DIFFERENT token than the one that started it;
+        // scoping by `sess:<hash(token)>` made the documented run_id un-completable
+        // (404 RUN_NOT_FOUND, run wedged in_progress). Authentication is already
+        // enforced above (a valid, unexpired ingest token is required).
         const rows = await sql<AnalysisRow[]>`
           SELECT id, user_identifier, project_identifier, status, submission, created_at, updated_at
-          FROM analyses WHERE id = ${runId} AND user_identifier = ${principal} LIMIT 1
+          FROM analyses WHERE id = ${runId} LIMIT 1
         `;
         row = rows[0] ?? null;
         if (!row) {
           return reply.status(404).send({
             error: "run_not_found",
             code: "RUN_NOT_FOUND",
-            message: "No run with that id was found for this user.",
+            message: "No run with that id was found.",
+          });
+        }
+        // Idempotent + non-clobbering: a run that already left in_progress is
+        // returned as-is (never overwrites a finished run's stored results), so
+        // a retried completion is always safe.
+        if (row.status !== RUN_IN_PROGRESS_STATUS) {
+          return reply.status(200).send({
+            ok: true,
+            status: row.status,
+            run_id: row.id,
+            project: row.project_identifier,
+            analysis: toAnalysisPublic(row),
+            idempotent: true,
           });
         }
       } else {

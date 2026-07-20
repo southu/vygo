@@ -99,11 +99,18 @@ const isCompleted = (s) => COMPLETED.has(String(s || "").trim().toLowerCase());
 const transcript = [];
 const checks = [];
 let currentToken = null;
+// Every session token ever minted this run — redacted from ALL recorded output,
+// so a second, freshly-minted token (used by the run_id-capability check) is
+// never persisted either.
+const seenTokens = new Set();
 
 function redact(text) {
   if (typeof text !== "string") return text;
   let out = text;
   if (currentToken) out = out.split(currentToken).join("<redacted-session-token>");
+  for (const t of seenTokens) {
+    if (t) out = out.split(t).join("<redacted-session-token>");
+  }
   return out;
 }
 function redactDeep(value) {
@@ -159,10 +166,27 @@ async function mintToken() {
     throw new Error(`token mint failed (status ${r.status})`);
   }
   currentToken = r.json.token;
+  seenTokens.add(currentToken);
   // Rewrite the just-recorded token response so the raw token never persists.
   const last = transcript[transcript.length - 1];
   if (last?.response?.body?.token) last.response.body.token = "<redacted-session-token>";
   return currentToken;
+}
+
+/**
+ * Mint an extra session token WITHOUT changing the active `currentToken`, so a
+ * second, distinct token can be presented to a later call. Registered in
+ * `seenTokens` so it is redacted from all recorded output.
+ */
+async function mintExtraToken(label) {
+  const before = currentToken;
+  const r = await http(label || "mint a second, distinct session token", "POST", EP.token, { body: {} });
+  const tok = r.json?.token || null;
+  if (tok) seenTokens.add(tok);
+  const last = transcript[transcript.length - 1];
+  if (last?.response?.body?.token) last.response.body.token = "<redacted-session-token>";
+  currentToken = before; // keep the primary token active for redaction context
+  return tok;
 }
 
 async function listHistory(user, project) {
@@ -282,6 +306,58 @@ async function main() {
     t1.status === 201 && tdup.status === 409 && t2.status === 201,
     `sequence 201/${tdup.status}/200/${t2.status}`,
   );
+
+  // ---- run_id capability: complete succeeds with a DIFFERENT session token ----
+  // Regression guard for the fixed lifecycle bug. The documented flow mints an
+  // ephemeral token per call (POST /api/readiness/token), so the token that
+  // COMPLETES a run is generally NOT the one that STARTED it. The run_id
+  // returned in the start 201 is the stable completion capability — completion
+  // must succeed on run_id alone (authenticated), regardless of which token
+  // presents it. Previously this returned 404 RUN_NOT_FOUND (run scoped to the
+  // starting token's `sess:<hash>` principal) and wedged the run in_progress.
+  const capProject = "cap-runid-" + Date.now().toString(36);
+  const capTokenStart = await mintExtraToken("run_id cap: mint starting token");
+  const capStart = await http("run_id cap: start with token #1 (201 in_progress)", "POST", EP.start, {
+    body: { submission_token: capTokenStart, project: capProject },
+  });
+  const capRunId = capStart.json?.run_id;
+  const capTokenComplete = await mintExtraToken("run_id cap: mint a DIFFERENT completing token #2");
+  const capComplete = await http(
+    "run_id cap: complete with token #2 using the start's run_id (expect 200, NOT 404)",
+    "POST",
+    EP.complete,
+    {
+      body: {
+        submission_token: capTokenComplete,
+        run_id: capRunId,
+        status: "completed",
+        results_text: `run_id-capability check for ${capProject}: completed with a different session token than started it.`,
+        results: { overall_score: 80, band: "strong" },
+      },
+    },
+  );
+  const capRestart = await http(
+    "run_id cap: same-project start after completion (expect 201, not 409)",
+    "POST",
+    EP.start,
+    { body: { submission_token: capTokenStart, project: capProject } },
+  );
+  record(
+    "runid-completion-capability",
+    "a run started under one session token is completed by its run_id with a DIFFERENT token (200), then the same project starts again (201)",
+    capStart.status === 201 &&
+      capComplete.status === 200 &&
+      isCompleted(capComplete.json?.status) &&
+      capComplete.json?.run_id === capRunId &&
+      capRestart.status === 201,
+    `start=${capStart.status} complete=${capComplete.status}(${capComplete.json?.status}) restart=${capRestart.status}`,
+  );
+  // Drain the restart's fresh in-progress run so the check leaves no wedged run.
+  if (capRestart.status === 201 && capRestart.json?.run_id) {
+    await http("run_id cap: drain the post-restart in-progress run", "POST", EP.complete, {
+      body: { submission_token: capTokenStart, run_id: capRestart.json.run_id, status: "completed", results_text: "drain" },
+    });
+  }
 
   // ---- Legacy pre-migration single-analysis user (check 4) ----
   const legacyRows = await listHistory(LEGACY_USER, null);

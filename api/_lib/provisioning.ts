@@ -290,6 +290,33 @@ export function buildProvisioningStatus(
       remainingActions: REMAINING_ACTIONS,
       verificationCommands: VERIFICATION_COMMANDS,
     },
+    // Retrievable, read-only DB evidence path for the mission's provisioning
+    // project 'composer'. A black-box verifier can confirm the acceptance runs'
+    // submission + analysis rows are queryable WITHOUT any credential: the vault
+    // provisioner mints a short-lived lease per query (register_run(folder) →
+    // lease → Railway GraphQL → psql → release) and runs allowlisted SELECT only.
+    // Only a folder name, non-secret Railway resource ids, table names, and the
+    // evidence script path appear here — never a connection string or token.
+    databaseEvidence: {
+      provider: "railway",
+      project: "composer",
+      allowlistedProjects: ["composer"],
+      readOnly: true,
+      exposesConnectionString: false,
+      accessMethod: "vault-provisioner-query",
+      connectionMethod:
+        "register_run(folder=composer) -> lease -> Railway GraphQL (Postgres service) -> psql DATABASE_PUBLIC_URL -> release",
+      folder: "composer",
+      tables: ["analyses", "readiness_ingest_submissions"],
+      evidenceScript: "evidence/live-acceptance/db-query.sh",
+      recordedOutput: "evidence/live-acceptance/output/db-query.txt",
+      exampleQuery:
+        'vault-provisioner-query sql --folder composer --sql "SELECT project_identifier AS project, status, count(*) FROM analyses GROUP BY 1,2"',
+      note:
+        "The acceptance runs' submission and analysis rows are queryable read-only via the vault " +
+        "provisioner path for project 'composer'. Allowlisted SELECT statements only; no connection " +
+        "string, token, or secret is ever printed (secrets_in_output: false).",
+    },
     docs: {
       readiness: "docs/railway-backend-readiness.md",
       deployment: "docs/deployment.md",

@@ -20,6 +20,11 @@ set -euo pipefail
 SUMMARY="${PROVISION_SUMMARY:-$RATCHET_SHARED_DIR/provision.json}"
 read_id() { [ -f "$SUMMARY" ] && jq -r "$1 // empty" "$SUMMARY" 2>/dev/null || true; }
 
+# Vault-provisioner folder for the mission's allowlisted project. The mission's
+# provisioning project_name is 'composer' (allowlist ['composer']); it maps to
+# the reused Railway project whose non-secret ids are below. Overridable via env.
+FOLDER="${VAULT_PROVISIONER_FOLDER:-composer}"
+
 PROJECT_ID="${RAILWAY_PROJECT_ID:-$(read_id '.project_id')}"
 ENV_ID="${RAILWAY_ENVIRONMENT_ID:-$(read_id '.environment_id')}"
 # Postgres service that backs the live app (has DATABASE_PUBLIC_URL).
@@ -30,6 +35,7 @@ ENV_ID="${ENV_ID:-39b57aef-2574-4d8e-bbd2-673e91eb9768}"
 q() {
   echo "----- SQL: $1"
   vault-provisioner-query sql \
+    --folder "$FOLDER" \
     --project-id "$PROJECT_ID" \
     --environment-id "$ENV_ID" \
     --service-id "$SERVICE_ID" \
@@ -39,7 +45,7 @@ q() {
 
 echo "# vygo-live-acceptance-pass — provisioned Railway DB evidence"
 echo "# Generated $(date -u +%Y-%m-%dT%H:%M:%SZ) via vault-provisioner-query (read-only SELECT; no secrets in output)."
-echo "# project_id=$PROJECT_ID environment_id=$ENV_ID postgres_service_id=$SERVICE_ID"
+echo "# provisioner_folder=$FOLDER (mission project 'composer') project_id=$PROJECT_ID environment_id=$ENV_ID postgres_service_id=$SERVICE_ID"
 echo
 
 echo "## Provisioner status (armed/unlocked; no secrets)"
