@@ -155,24 +155,24 @@ session tokens are redacted and the provisioner read-path prints no credentials.
 
 Recorded live (all PASS — see `evidence/live-acceptance/output/`):
 
-| #   | Criterion                                                                 | Result   | Evidence                                                                                                                                              |
-| --- | ------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Home `GET /` → 200 (HTTPS)                                                 | **PASS** | `curl https://www.vygo.ai/` → 200                                                                                                                     |
-| 2   | `GET /version` = pushed HEAD SHA                                           | **PASS** | Confirmed post-deploy by the tester; this commit becomes the new HEAD                                                                                 |
-| 3   | Completed run for project **A** visible in history, labeled A             | **PASS** | `start`→`complete` transcript; `/analyses` renders group **A**; `result?project=A` returns latest completed                                          |
-| 4   | Second analysis for project **B** started & completed, visible labeled B  | **PASS** | `start`→`complete` transcript; `/analyses` renders group **B** (1 run)                                                                                |
-| 5   | Re-run A → 3 runs (A1, B, A2) labeled per project, latest-per-project current | **PASS** | `summary.md` + `db-query.txt`: A has 2 completed (current `cc6812af`), B has 1 (current `90030bc9`)                                                    |
-| 6   | Legacy pre-migration single-analysis user retains original result         | **PASS** | `result?user=legacy-single@vygo.ai` → 200 completed; demo `fixture=legacy_single_analysis` byte-for-byte in `Default project`                          |
-| 7   | Start accepts a new run once the project's previous run completed          | **PASS** | Transcript: complete → **201** in_progress on next start                                                                                              |
-| 8   | Start rejects a duplicate only while a run is in progress; accepts after   | **PASS** | Transcript sequence **201 → 409 `run_in_progress` → 200 → 201**                                                                                       |
-| 9   | Submission + analysis rows queryable in provisioned Railway DB (`composer`)| **PASS** | `db-query.txt` via `vault-provisioner-query sql` (read-only): analyses rows + submission payloads for all acceptance runs                              |
-| 10  | Regression: home + primary nav 200, content unchanged apart from evidence  | **PASS** | No product code touched; only `evidence/**` added (+ lint/format ignores for it)                                                                       |
+| #   | Criterion                                                                     | Result   | Evidence                                                                                                                      |
+| --- | ----------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Home `GET /` → 200 (HTTPS)                                                    | **PASS** | `curl https://www.vygo.ai/` → 200                                                                                             |
+| 2   | `GET /version` = pushed HEAD SHA                                              | **PASS** | Confirmed post-deploy by the tester; this commit becomes the new HEAD                                                         |
+| 3   | Completed run for project **A** visible in history, labeled A                 | **PASS** | `start`→`complete` transcript; `/analyses` renders group **A**; `result?project=A` returns latest completed                   |
+| 4   | Second analysis for project **B** started & completed, visible labeled B      | **PASS** | `start`→`complete` transcript; `/analyses` renders group **B** (1 run)                                                        |
+| 5   | Re-run A → 3 runs (A1, B, A2) labeled per project, latest-per-project current | **PASS** | `summary.md` + `db-query.txt`: A has 2 completed (current `cc6812af`), B has 1 (current `90030bc9`)                           |
+| 6   | Legacy pre-migration single-analysis user retains original result             | **PASS** | `result?user=legacy-single@vygo.ai` → 200 completed; demo `fixture=legacy_single_analysis` byte-for-byte in `Default project` |
+| 7   | Start accepts a new run once the project's previous run completed             | **PASS** | Transcript: complete → **201** in_progress on next start                                                                      |
+| 8   | Start rejects a duplicate only while a run is in progress; accepts after      | **PASS** | Transcript sequence **201 → 409 `run_in_progress` → 200 → 201**                                                               |
+| 9   | Submission + analysis rows queryable in provisioned Railway DB (`composer`)   | **PASS** | `db-query.txt` via `vault-provisioner-query sql` (read-only): analyses rows + submission payloads for all acceptance runs     |
+| 10  | Regression: home + primary nav 200, content unchanged apart from evidence     | **PASS** | No product code touched; only `evidence/**` added (+ lint/format ignores for it)                                              |
 
 Notes:
 
 - `composer` is the mission's allowlisted project label; provisioning **reused**
   the existing Railway project (`shared/provision_summary.json`: `created:false,
-  reused:true`, dashboard `…/project/1b8abe52…`, folder `vygo`) — the Postgres
+reused:true`, dashboard `…/project/1b8abe52…`, folder `vygo`) — the Postgres
   backing the live app. Consumer armed + vault unlocked at query time (did not
   fail closed).
 - Idempotent: the demo A/B display fixture is only built to reach its target

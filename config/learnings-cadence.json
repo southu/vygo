@@ -1,0 +1,4 @@
+{
+  "staleness_threshold": 5,
+  "refresh_window_days": 30
+}

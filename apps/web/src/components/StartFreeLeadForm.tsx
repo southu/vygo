@@ -198,7 +198,10 @@ export function StartFreeLeadForm() {
                   noValidate
                 >
                   <div>
-                    <label htmlFor="start-free-email" className="block text-sm font-medium text-ink">
+                    <label
+                      htmlFor="start-free-email"
+                      className="block text-sm font-medium text-ink"
+                    >
                       Email
                     </label>
                     <input

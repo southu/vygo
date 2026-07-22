@@ -240,6 +240,33 @@ export {
   type AdoptionSignals,
 } from "./detailed-analysis.js";
 
+export {
+  DEFAULT_CADENCE_CONFIG_PATH,
+  DEFAULT_LEARNINGS_LOG_PATH,
+  IMMUTABLE_ENTRY_FIELDS,
+  LEARNING_STATUSES,
+  LearningsLogError,
+  REPO_ROOT,
+  appendEntry,
+  assertAdditive,
+  cadenceConfigSchema,
+  countPending,
+  isGuideRefreshDue,
+  isRefreshWindowElapsed,
+  learningEntrySchema,
+  learningsLogSchema,
+  markIncorporated,
+  readCadenceConfig,
+  readLog,
+  writeLog,
+  type CadenceConfig,
+  type LearningEntry,
+  type LearningStatus,
+  type LearningsLog,
+  type NewLearningInput,
+  type WriteOptions,
+} from "./learnings-log.js";
+
 export const availabilityStatusSchema = z.enum(["open", "waitlist", "paused"]);
 
 export type AvailabilityStatus = z.infer<typeof availabilityStatusSchema>;

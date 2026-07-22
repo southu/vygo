@@ -60,11 +60,11 @@ Alongside the client `/ops/jobs` surface, an equivalent review surface is
 rendered on the edge so applicant data appears directly in the HTML (no client
 JS required). All three routes share the ops Basic-Auth gate above.
 
-| Path                                | Shows                                                            |
-| ----------------------------------- | --------------------------------------------------------------- |
-| `/admin` and `/admin/roles`         | All roles with a per-role application count                     |
-| `/admin/roles/:roleId/applications` | Applications for a role: name, email, submitted date, status    |
-| `/admin/applications/:id`           | Full application detail: resume link/text and cover note        |
+| Path                                | Shows                                                        |
+| ----------------------------------- | ------------------------------------------------------------ |
+| `/admin` and `/admin/roles`         | All roles with a per-role application count                  |
+| `/admin/roles/:roleId/applications` | Applications for a role: name, email, submitted date, status |
+| `/admin/applications/:id`           | Full application detail: resume link/text and cover note     |
 
 The admin page itself renders **no management controls** until credentials are
 entered — an anonymous visitor sees only the sign-in form.

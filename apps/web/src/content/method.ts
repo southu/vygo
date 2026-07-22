@@ -74,7 +74,10 @@ export const methodContent = {
         "Automated and manual test suites with results",
         "Signed-off UAT and release readiness",
       ],
-      risks: ["Requirements that shift after test plans are agreed", "Limited customer availability for UAT"],
+      risks: [
+        "Requirements that shift after test plans are agreed",
+        "Limited customer availability for UAT",
+      ],
       gate: "Structured UAT is passed and accepted before the launch and handoff step.",
     },
     {

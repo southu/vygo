@@ -16,7 +16,7 @@ Exercised end to end against the deployed edge function before making changes:
   serverless instance keeps the in-memory store between invocations).
 - `POST /api/roles/:id/applications` creates an application; it is listed by
   `GET /api/internal/applications?role_id=…`, and `PATCH
-  /api/internal/applications/:id` persists a status change.
+/api/internal/applications/:id` persists a status change.
 
 ## Gap found and fixed (small)
 
