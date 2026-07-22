@@ -50,7 +50,7 @@ export type ImageSlot = {
 export const imageInventory: ImageSlot[] = [
   {
     slot: "fig-01-product-shell-setup",
-    currentAsset: "ratchet-guide-composer-product-shell-setup.png",
+    currentAsset: "ratchet-guide-composer-product-shell-setup-opt.webp",
     dashRoute: "https://dash.saniorem.com/composer",
     uiState:
       "Composer › Target project + Deploy fieldset: the repo field (Git remote), the live_url field (Live URL), and the version_endpoint field (Version endpoint) — all three fields confirmed present on the live composer.",
@@ -60,7 +60,7 @@ export const imageInventory: ImageSlot[] = [
   },
   {
     slot: "fig-02-goal-capture",
-    currentAsset: "ratchet-guide-composer-goal-capture.png",
+    currentAsset: "ratchet-guide-composer-goal-capture-opt.webp",
     dashRoute: "https://dash.saniorem.com/composer",
     uiState:
       'Composer › Goal section: the mission field captures the goal. No distinct Constraints field exists on the live composer — constraints are expressed via the acceptance criteria list (the + Add criterion and Skip buttons), so the guide\'s separate "Constraints field" no longer maps 1:1.',
@@ -70,7 +70,7 @@ export const imageInventory: ImageSlot[] = [
   },
   {
     slot: "fig-03-draft-queue",
-    currentAsset: "ratchet-guide-composer-draft-queue.png",
+    currentAsset: "ratchet-guide-composer-draft-queue-opt.webp",
     dashRoute: "https://dash.saniorem.com/composer",
     uiState:
       "Composer › Draft form / Mission queue panel: the server-rendered queue list with the Enqueue button and Priority order label. No Accept draft button is present — the live composer drafts via AI assist and commits with Inject into mission / Enqueue (queued items are also listed at /queue).",
@@ -80,7 +80,7 @@ export const imageInventory: ImageSlot[] = [
   },
   {
     slot: "fig-04-run-limits",
-    currentAsset: "ratchet-guide-composer-run-limits.png",
+    currentAsset: "ratchet-guide-composer-run-limits-opt.webp",
     dashRoute: "https://dash.saniorem.com/composer",
     uiState:
       "Composer › Limits section: the max_iterations field (Max iterations), the consecutive_passes_required field (Pass streak), and the max_budget_usd field (Spend cap) — all three limit fields confirmed present on the live composer.",

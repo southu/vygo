@@ -13,16 +13,16 @@
     {
       "slot": "fig-01-product-shell-setup",
       "route": "https://dash.saniorem.com/composer",
-      "file": "ratchet-guide-composer-product-shell-setup.png",
-      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup.png",
+      "file": "ratchet-guide-composer-product-shell-setup-opt.webp",
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup-opt.webp",
       "dimensions": "1440x900",
       "status": "captured"
     },
     {
       "slot": "fig-02-goal-capture",
       "route": "https://dash.saniorem.com/composer",
-      "file": "ratchet-guide-composer-goal-capture.png",
-      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture.png",
+      "file": "ratchet-guide-composer-goal-capture-opt.webp",
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture-opt.webp",
       "dimensions": "1440x900",
       "status": "captured",
       "note": "Guide names a separate 'Constraints' field; on the live composer constraints are expressed via the acceptance-criteria list (+ Add criterion / Skip). The Goal capture region (mission field + acceptance list) is present and was captured."
@@ -30,8 +30,8 @@
     {
       "slot": "fig-03-draft-queue",
       "route": "https://dash.saniorem.com/composer",
-      "file": "ratchet-guide-composer-draft-queue.png",
-      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue.png",
+      "file": "ratchet-guide-composer-draft-queue-opt.webp",
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue-opt.webp",
       "dimensions": "1440x900",
       "status": "captured",
       "note": "Guide names an 'Accept draft' button; the live composer drafts via AI assist and commits with Inject into mission / Enqueue. The Mission queue panel (Enqueue, Priority order) is present and was captured."
@@ -39,8 +39,8 @@
     {
       "slot": "fig-04-run-limits",
       "route": "https://dash.saniorem.com/composer",
-      "file": "ratchet-guide-composer-run-limits.png",
-      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-run-limits.png",
+      "file": "ratchet-guide-composer-run-limits-opt.webp",
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-run-limits-opt.webp",
       "dimensions": "1440x900",
       "status": "captured"
     },

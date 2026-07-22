@@ -1,8 +1,8 @@
 [
   {
     "slot": "fig-01-product-shell-setup",
-    "screenshot_file": "apps/web/public/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup.png",
-    "screenshot_url": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup.png",
+    "screenshot_file": "apps/web/public/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup-opt.webp",
+    "screenshot_url": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup-opt.webp",
     "dash_route": "https://dash.saniorem.com/composer",
     "guide_step": "Run your first mission › Step 1: Create a product shell",
     "guide_step_url": "https://www.vygo.ai/vibe-coding/ratchet-guide#quick-start",
@@ -15,8 +15,8 @@
   },
   {
     "slot": "fig-02-goal-capture",
-    "screenshot_file": "apps/web/public/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture.png",
-    "screenshot_url": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture.png",
+    "screenshot_file": "apps/web/public/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture-opt.webp",
+    "screenshot_url": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture-opt.webp",
     "dash_route": "https://dash.saniorem.com/composer",
     "guide_step": "Run your first mission › Step 3: Describe your goal",
     "guide_step_url": "https://www.vygo.ai/vibe-coding/ratchet-guide#quick-start",
@@ -29,8 +29,8 @@
   },
   {
     "slot": "fig-03-draft-queue",
-    "screenshot_file": "apps/web/public/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue.png",
-    "screenshot_url": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue.png",
+    "screenshot_file": "apps/web/public/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue-opt.webp",
+    "screenshot_url": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue-opt.webp",
     "dash_route": "https://dash.saniorem.com/composer",
     "guide_step": "Run your first mission › Step 4: Accept the draft queue",
     "guide_step_url": "https://www.vygo.ai/vibe-coding/ratchet-guide#quick-start",
@@ -43,8 +43,8 @@
   },
   {
     "slot": "fig-04-run-limits",
-    "screenshot_file": "apps/web/public/content/ratchet-guide-assets/ratchet-guide-composer-run-limits.png",
-    "screenshot_url": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-run-limits.png",
+    "screenshot_file": "apps/web/public/content/ratchet-guide-assets/ratchet-guide-composer-run-limits-opt.webp",
+    "screenshot_url": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-run-limits-opt.webp",
     "dash_route": "https://dash.saniorem.com/composer",
     "guide_step": "Run your first mission › Step 5: Set your limits",
     "guide_step_url": "https://www.vygo.ai/vibe-coding/ratchet-guide#quick-start",
