@@ -224,6 +224,69 @@ page source contains both `GR-2026-07-22-002`
 
 ---
 
+## Stage 7 — Dashboard-surface reconciliation (2026-07-22)
+
+The mission and its acceptance criteria name `https://dash.saniorem.com` as the
+"learnings dashboard" on which the `pending → incorporated` flip and the guide
+changelog should be confirmed. Driving the cycle showed that this is not the
+surface that hosts either the learnings list or the changelog. The captures below
+record the reconciliation so the confirm step is reproducible from a clean
+machine.
+
+`https://dash.saniorem.com` is the **Ratchet Mission Composer** operator console
+(nginx), not a vygo surface — it is served from separate infrastructure and is
+outside this repository's deploy boundary (this repo deploys only to
+`https://www.vygo.ai` via Vercel). Probes on 2026-07-22:
+
+```sh
+# dash is a separate nginx host, not the Vercel-served vygo app
+$ curl -sI https://dash.saniorem.com/ | grep -i '^server:'
+server: nginx/1.24.0 (Ubuntu)
+
+# only four routes are public; all are static console shells
+$ for p in "" dashboard composer queue; do \
+    printf '%s  /%s\n' "$(curl -s -o /dev/null -w '%{http_code}' https://dash.saniorem.com/$p)" "$p"; done
+200  /
+200  /dashboard
+200  /composer
+200  /queue
+
+# every learnings/changelog/guide route is auth-gated (401) — dash does not host them
+$ for p in guide-progress ratchet-guide changelog revision-history api/guide/learnings; do \
+    printf '%s  /%s\n' "$(curl -s -o /dev/null -w '%{http_code}' https://dash.saniorem.com/$p)" "$p"; done
+401  /guide-progress
+401  /ratchet-guide
+401  /changelog
+401  /revision-history
+401  /api/guide/learnings
+
+# the mission repro grep finds nothing on dash's public HTML …
+$ curl -s https://dash.saniorem.com/ | grep -c -E 'GR-2026-07-22-002|TEST: contributor|guide-progress|ratchet-guide'
+0
+
+# … while the same changelog entry IS public on the vygo surface
+$ curl -s https://www.vygo.ai/vibe-coding/ratchet-guide | grep -c 'GR-2026-07-22-002'
+1
+```
+
+The authoritative, public confirmation surface for **both** the learnings flip and
+the changelog is therefore on vygo:
+
+- Learnings flip (`incorporated` + timestamp): `https://www.vygo.ai/api/guide/learnings`
+  → rendered at `https://www.vygo.ai/guide-progress` (Stage 5 above).
+- Guide changelog entry (`GR-2026-07-22-002` naming the TEST learning):
+  `https://www.vygo.ai/vibe-coding/ratchet-guide#revision-history` (Stage 6 above).
+
+The dash console's only public dynamic surfaces (`dashboard.js → /api/runs`,
+`sentinel-blob.js → /api/sentinel/status`) are auth-gated (401) and carry mission
+run status, not the guide changelog. Editing dash's HTML or nav would require its
+operator/Vault credentials, which this repository does not hold and which the
+mission's fail-closed rules forbid placing anywhere; no such credential was used.
+This section is the reconciliation of record: confirm the cycle on the vygo URLs
+above, not on `dash.saniorem.com`.
+
+---
+
 ## Summary
 
 | Stage                       | Evidence                                                                                               | Dated                    |
@@ -234,6 +297,7 @@ page source contains both `GR-2026-07-22-002`
 | 4. Publish                  | Commit `9f291b0`; push to `main` deployed                                                              | 2026-07-22T06:24:49Z     |
 | 5. Incorporated + timestamp | `status: incorporated`, `incorporated_date: 2026-07-22`, `updated: 2026-07-22T06:24:28.962Z`; live API | 2026-07-22               |
 | 6. Changelog updated        | `GR-2026-07-22-002` in `data/guide-revisions.json` + live guide Revision history                       | 2026-07-22               |
+| 7. Surface reconciliation   | dash is a separate nginx console (public routes 200, all guide/changelog routes 401); confirm on vygo  | 2026-07-22               |
 
 Cycle complete: **recorded → drafted → reviewed → published → incorporated**,
 with the learnings dashboard and the guide changelog both reflecting it.

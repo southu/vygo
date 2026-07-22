@@ -212,11 +212,17 @@ You should see `"status":"incorporated"` and an `"incorporated_date"` for your
 > <https://www.vygo.ai/guide-progress>, backed by
 > <https://www.vygo.ai/api/guide/learnings> — that is where you confirm the
 > `pending → incorporated` flip. <https://dash.saniorem.com> is the **Ratchet
-> Mission Composer** operator console (it queues and tracks builds); it is
-> reachable but does not itself render the learnings list, so confirm on the
-> `guide-progress` dashboard above. Earlier drafts of this runbook called
-> `dash.saniorem.com` the learnings dashboard; the accurate surface is
-> `www.vygo.ai/guide-progress`.
+> Mission Composer** operator console (nginx; it queues and tracks builds). Its
+> public routes are only `/`, `/dashboard`, `/composer`, and `/queue` (static
+> console shells); every learnings/changelog route on it — `/guide-progress`,
+> `/ratchet-guide`, `/changelog`, `/api/guide/learnings` — returns **401** and
+> hosts no learnings list or changelog. So the console does **not** render this
+> data; confirm on the vygo surfaces below. Earlier drafts of this runbook called
+> `dash.saniorem.com` the learnings dashboard; the accurate confirm surfaces are
+> `www.vygo.ai/guide-progress` (learnings) and
+> `www.vygo.ai/vibe-coding/ratchet-guide#revision-history` (changelog). A
+> reproducible probe of both surfaces is recorded in
+> [`docs/learning-cycle-evidence.md`](./learning-cycle-evidence.md) Stage 7.
 
 Finally, confirm the **guide changelog** gained a matching entry — the Revision
 history lists your revision id, its date, and every learning it incorporated:
