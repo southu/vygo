@@ -7,9 +7,11 @@
  *
  * Invariants (enforced by {@link assertAdditive}):
  *  - entries are NEVER deleted;
- *  - immutable fields (id, summary, date, source_link, affected_sections,
- *    created, and incorporated_date once set) are NEVER rewritten;
- *  - status only moves forward: pending-in-guide -> incorporated, never back.
+ *  - immutable fields (id, summary, title, date, source_link,
+ *    affected_sections, created, and incorporated_date once set) are NEVER
+ *    rewritten;
+ *  - status only moves forward: pending-in-guide -> draft -> incorporated,
+ *    never back.
  *
  * Any write that would violate these is rejected with {@link LearningsLogError}.
  */
@@ -29,9 +31,21 @@ export const DEFAULT_LEARNINGS_LOG_PATH = resolve(REPO_ROOT, "data", "ratchet-le
 /** Default on-disk location of the single cadence config file. */
 export const DEFAULT_CADENCE_CONFIG_PATH = resolve(REPO_ROOT, "config", "learnings-cadence.json");
 
-/** Allowed lifecycle states for a learning entry. */
-export const LEARNING_STATUSES = ["pending-in-guide", "incorporated"] as const;
+/**
+ * Allowed lifecycle states for a learning entry, in forward order. A learning
+ * starts `pending-in-guide`, is proposed into a held revision as `draft`, and
+ * becomes `incorporated` only when that revision is published. Status only ever
+ * moves forward through this list (see {@link assertAdditive}).
+ */
+export const LEARNING_STATUSES = ["pending-in-guide", "draft", "incorporated"] as const;
 export type LearningStatus = (typeof LEARNING_STATUSES)[number];
+
+/** Forward rank of each status; a write may never lower an entry's rank. */
+export const STATUS_RANK: Record<LearningStatus, number> = {
+  "pending-in-guide": 0,
+  draft: 1,
+  incorporated: 2,
+};
 
 /**
  * Fields that are immutable once an entry exists. Rewriting any of them is a
@@ -42,6 +56,7 @@ export type LearningStatus = (typeof LEARNING_STATUSES)[number];
 export const IMMUTABLE_ENTRY_FIELDS = [
   "id",
   "summary",
+  "title",
   "date",
   "source_link",
   "affected_sections",
@@ -63,6 +78,12 @@ export const learningEntrySchema = z
     id: z.string().min(1),
     /** Human-readable summary of the learning. */
     summary: z.string().min(1),
+    /**
+     * Short human-readable name for the learning, used to name it in guide
+     * changelog / revision entries. Optional for backward compatibility;
+     * {@link learningDisplayName} falls back to the summary or id when absent.
+     */
+    title: z.string().min(1).optional(),
     /** Calendar date the learning was captured (YYYY-MM-DD or ISO). */
     date: z.string().min(1),
     /** Source link: commit / PR / experiment URL. */
@@ -86,10 +107,10 @@ export const learningEntrySchema = z
         message: "incorporated entries require an incorporated_date",
       });
     }
-    if (entry.status === "pending-in-guide" && entry.incorporated_date) {
+    if (entry.status !== "incorporated" && entry.incorporated_date) {
       ctx.addIssue({
         code: "custom",
-        message: "pending-in-guide entries must not have an incorporated_date",
+        message: `${entry.status} entries must not have an incorporated_date`,
       });
     }
   });
@@ -116,6 +137,8 @@ export interface NewLearningInput {
   date: string;
   source_link: string;
   affected_sections: string[];
+  /** Optional short human-readable name (used in changelog/revision entries). */
+  title?: string;
 }
 
 /** Options accepted by the write helpers. */
@@ -124,6 +147,29 @@ export interface WriteOptions {
   path?: string;
   /** Override the timestamp used for created/updated/incorporated_date stamps. */
   now?: string;
+  /**
+   * Override the calendar date (ISO YYYY-MM-DD) stamped as `incorporated_date`
+   * when an entry is marked incorporated. Defaults to `now`. Kept separate so
+   * the log can carry a clean YYYY-MM-DD incorporation date while `updated`
+   * keeps its full ISO timestamp.
+   */
+  incorporatedDate?: string;
+}
+
+/**
+ * Short, human-readable name for a learning, used when naming it in a guide
+ * changelog / revision entry. Prefers the explicit `title`; otherwise the first
+ * sentence of the summary (before any "Pending:" reason); otherwise the id.
+ */
+export function learningDisplayName(entry: {
+  id: string;
+  title?: string;
+  summary: string;
+}): string {
+  if (entry.title && entry.title.trim()) return entry.title.trim();
+  const head = entry.summary.split(/Pending:/i)[0] ?? entry.summary;
+  const firstSentence = head.split(/(?<=[.!?])\s/)[0]?.trim();
+  return firstSentence && firstSentence.length > 0 ? firstSentence : entry.id;
 }
 
 function readJsonFile(path: string): unknown {
@@ -190,9 +236,9 @@ export function assertAdditive(previous: LearningsLog, next: LearningsLog): void
         );
       }
     }
-    if (prev.status === "incorporated" && updated.status !== "incorporated") {
+    if (STATUS_RANK[updated.status] < STATUS_RANK[prev.status]) {
       throw new LearningsLogError(
-        `destructive edit rejected: entry "${prev.id}" reverted from incorporated to ${updated.status}`,
+        `destructive edit rejected: entry "${prev.id}" reverted from ${prev.status} to ${updated.status}`,
       );
     }
     if (prev.incorporated_date && prev.incorporated_date !== updated.incorporated_date) {
@@ -227,6 +273,7 @@ export function appendEntry(input: NewLearningInput, options: WriteOptions = {})
   const entry: LearningEntry = {
     id: input.id,
     summary: input.summary,
+    ...(input.title ? { title: input.title } : {}),
     date: input.date,
     source_link: input.source_link,
     affected_sections: [...input.affected_sections],
@@ -239,7 +286,38 @@ export function appendEntry(input: NewLearningInput, options: WriteOptions = {})
 }
 
 /**
- * Flip an entry from pending-in-guide to incorporated, stamping
+ * Flip an entry from pending-in-guide to draft (proposed into a held guide
+ * revision), stamping `updated`. Idempotent for entries already in draft.
+ * Throws if the id is unknown or the entry is already incorporated (status
+ * only moves forward). This write is meant to live in the review area (an
+ * uncommitted working-tree change) until the revision is approved.
+ */
+export function markDraft(id: string, options: WriteOptions = {}): LearningEntry {
+  const path = options.path ?? DEFAULT_LEARNINGS_LOG_PATH;
+  const now = options.now ?? new Date().toISOString();
+  const log = readLog(path);
+  const index = log.entries.findIndex((entry) => entry.id === id);
+  if (index === -1) {
+    throw new LearningsLogError(`entry id "${id}" not found`);
+  }
+  const current = log.entries[index]!;
+  if (current.status === "draft") {
+    return current;
+  }
+  if (current.status === "incorporated") {
+    throw new LearningsLogError(
+      `entry id "${id}" is already incorporated and cannot return to draft`,
+    );
+  }
+  const updated: LearningEntry = { ...current, status: "draft", updated: now };
+  const entries = [...log.entries];
+  entries[index] = updated;
+  writeLog({ entries }, { path });
+  return updated;
+}
+
+/**
+ * Flip an entry (pending-in-guide or draft) to incorporated, stamping
  * incorporated_date and updated. Idempotent for already-incorporated entries.
  * Throws if the id is unknown.
  */
@@ -258,7 +336,7 @@ export function markIncorporated(id: string, options: WriteOptions = {}): Learni
   const updated: LearningEntry = {
     ...current,
     status: "incorporated",
-    incorporated_date: now,
+    incorporated_date: options.incorporatedDate ?? now,
     updated: now,
   };
   const entries = [...log.entries];

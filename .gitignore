@@ -1,6 +1,9 @@
 # Private planning / agent brief (never commit)
 external-docs/
 
+# guide-update workflow review area (drafts held for approval, never deployed)
+guide-drafts/
+
 # Dependencies
 node_modules/
 .pnpm-store/

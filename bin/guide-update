@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Thin launcher for the guide-update workflow CLI (scripts/guide-update.ts).
+# Runs via tsx so no build step is required. All args are passed through.
+DIR="$(cd "$(dirname "$0")/.." && pwd)"
+exec "$DIR/node_modules/.bin/tsx" "$DIR/scripts/guide-update.ts" "$@"

@@ -1,0 +1,19 @@
+{
+  "revisions": [
+    {
+      "id": "GR-2026-07-22-001",
+      "date": "2026-07-22",
+      "title": "Pass streak resets to zero on a FAIL",
+      "summary": "Clarify that only consecutive live passes count toward finishing a mission — a FAIL resets the streak.",
+      "published_via": "git",
+      "learnings": [
+        {
+          "id": "L-2026-07-22-streak-reset",
+          "name": "A FAIL resets the pass streak to zero",
+          "incorporated_date": "2026-07-22"
+        }
+      ],
+      "created": "2026-07-22T05:12:34.697Z"
+    }
+  ]
+}

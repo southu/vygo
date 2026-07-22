@@ -74,6 +74,18 @@
       "status": "pending-in-guide",
       "created": "2026-07-22T00:00:00.000Z",
       "updated": "2026-07-22T00:00:00.000Z"
+    },
+    {
+      "id": "L-2026-07-22-streak-reset",
+      "summary": "Only consecutive live passes count toward finishing a mission: a single FAIL resets the pass-streak counter to zero, so the required streak must be reached with no failing iteration in between.",
+      "title": "A FAIL resets the pass streak to zero",
+      "date": "2026-07-22",
+      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#pass-streak",
+      "affected_sections": ["core-workflow", "test-only-the-live-deployed-app"],
+      "status": "incorporated",
+      "created": "2026-07-22T05:30:00.000Z",
+      "updated": "2026-07-22T05:12:34.697Z",
+      "incorporated_date": "2026-07-22"
     }
   ]
 }

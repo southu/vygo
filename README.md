@@ -232,6 +232,43 @@ pnpm secret-scan
 pnpm readiness
 ```
 
+## Guide-update workflow
+
+Turn pending entries in the learnings log into published revisions of the
+[`/vibe-coding/ratchet-guide`](apps/web/src/app/vibe-coding/ratchet-guide) page,
+with a human review gate. The learnings log lives at
+`data/ratchet-learnings.json`; published revisions are recorded in
+`data/guide-revisions.json` and rendered as the guide's **Revision history**.
+
+```bash
+# 1. SELECT + DRAFT — propose a held revision for one or more pending learnings.
+#    Flips them pending-in-guide -> draft (uncommitted review area) and writes a
+#    review file under guide-drafts/ (gitignored). Nothing is published.
+./bin/guide-update draft --learning L-2026-07-22-streak-reset \
+  --title "Pass streak resets to zero on a FAIL" \
+  --summary "Only consecutive live passes count toward finishing a mission."
+
+# Review guide-drafts/<revision-id>.md and the working-tree diff, then:
+
+# 2. PUBLISH (approval gate) — flips the learnings to incorporated, stamps the
+#    incorporation date, records the revision id + named learnings, and (with
+#    --commit --push) ships it via the normal deploy pipeline.
+./bin/guide-update approve <revision-id> --commit --push
+
+# Or, if the page is edited/pasted manually (CMS), record the publish instead:
+./bin/guide-update record-publish <revision-id>
+
+# Inspect state at any time:
+./bin/guide-update status
+```
+
+No publish/deploy credentials are read, embedded, or echoed by the workflow;
+any `git push` relies on the ambient credential helper configured outside the
+repo. Generated draft/revision copy is scrubbed for credential material before
+it is written anywhere. State-flow and bookkeeping tests live in
+`packages/validation/src/guide-update.test.ts` and `guide-revisions.test.ts`
+(run with `pnpm test:validation`).
+
 ## Documentation
 
 | Doc                                                                    | Contents                                                       |

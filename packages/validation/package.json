@@ -11,6 +11,14 @@
     "./learnings-log": {
       "types": "./src/learnings-log.ts",
       "default": "./src/learnings-log.ts"
+    },
+    "./guide-revisions": {
+      "types": "./src/guide-revisions.ts",
+      "default": "./src/guide-revisions.ts"
+    },
+    "./guide-update": {
+      "types": "./src/guide-update.ts",
+      "default": "./src/guide-update.ts"
     }
   },
   "scripts": {

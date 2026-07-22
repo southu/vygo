@@ -10,8 +10,10 @@ import {
   DEFAULT_CADENCE_CONFIG_PATH,
   DEFAULT_LEARNINGS_LOG_PATH,
   isGuideRefreshDue,
+  learningDisplayName,
   learningsLogSchema,
   LearningsLogError,
+  markDraft,
   markIncorporated,
   readCadenceConfig,
   readLog,
@@ -92,6 +94,55 @@ describe("learnings-log module", () => {
     // Marking again is idempotent and preserves the original incorporated_date.
     const again = markIncorporated("L-001", { path: logPath, now: "2026-08-01T00:00:00.000Z" });
     assert.equal(again.incorporated_date, "2026-07-25T09:30:00.000Z");
+  });
+
+  it("transitions pending-in-guide -> draft -> incorporated and is forward-only", () => {
+    appendEntry(SAMPLE, { path: logPath, now: "2026-07-22T10:00:00.000Z" });
+
+    const drafted = markDraft("L-001", { path: logPath, now: "2026-07-23T10:00:00.000Z" });
+    assert.equal(drafted.status, "draft");
+    assert.equal(drafted.updated, "2026-07-23T10:00:00.000Z");
+    assert.equal(drafted.incorporated_date, undefined);
+
+    // Idempotent while still draft.
+    assert.equal(markDraft("L-001", { path: logPath }).status, "draft");
+
+    // draft -> incorporated with an explicit YYYY-MM-DD stamp.
+    const done = markIncorporated("L-001", {
+      path: logPath,
+      now: "2026-07-24T10:00:00.000Z",
+      incorporatedDate: "2026-07-24",
+    });
+    assert.equal(done.status, "incorporated");
+    assert.equal(done.incorporated_date, "2026-07-24");
+
+    // Cannot return an incorporated entry to draft.
+    assert.throws(() => markDraft("L-001", { path: logPath }), LearningsLogError);
+  });
+
+  it("rejects a draft -> pending-in-guide regression", () => {
+    appendEntry(SAMPLE, { path: logPath, now: "2026-07-22T10:00:00.000Z" });
+    markDraft("L-001", { path: logPath, now: "2026-07-23T10:00:00.000Z" });
+    const [entry] = readLog(logPath).entries;
+    assert.ok(entry);
+    const reverted = { entries: [{ ...entry, status: "pending-in-guide" } as LearningEntry] };
+    assert.throws(
+      () => writeLog(reverted, { path: logPath }),
+      (err: unknown) => {
+        assert.ok(err instanceof LearningsLogError);
+        assert.match(err.message, /reverted from draft/);
+        return true;
+      },
+    );
+  });
+
+  it("learningDisplayName prefers title, then first sentence, then id", () => {
+    assert.equal(learningDisplayName({ id: "L-1", title: "Nice Name", summary: "x" }), "Nice Name");
+    assert.equal(
+      learningDisplayName({ id: "L-1", summary: "First sentence. Pending: reason." }),
+      "First sentence.",
+    );
+    assert.equal(learningDisplayName({ id: "L-1", summary: "" }), "L-1");
   });
 
   it("rejects deleting an entry", () => {

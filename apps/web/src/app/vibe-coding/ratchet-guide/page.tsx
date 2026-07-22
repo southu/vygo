@@ -19,9 +19,11 @@ import {
 import { setupSteps } from "@/content/guide-setup";
 import { readGuidePackManifest } from "@/lib/guide-source";
 import { GUIDE_MODE_STORAGE_KEY } from "@/lib/guide-mode";
+import { readGuideRevisions, revisionsNewestFirst } from "@/lib/guide-revisions-source";
 
 const module = getVibeModulePage("ratchet-guide");
 const manifest = readGuidePackManifest();
+const guideRevisions = revisionsNewestFirst(readGuideRevisions());
 
 export const metadata: Metadata = {
   title: `${module.title} — Vibe coding`,
@@ -94,6 +96,7 @@ const guideToc: GuideTocEntry[] = [
     level: 3,
   },
   { id: "changelog", title: "Changelog", level: 2 },
+  { id: "revision-history", title: "Revision history", level: 3 },
 ];
 
 /**
@@ -459,8 +462,10 @@ export default function RatchetGuidePage() {
               Once the gate confirms the deploy, a read-only tester exercises the live app only,
               never the builder's own claims about what changed. The tester returns a structured
               PASS or FAIL: FAIL carries actionable feedback into the next build iteration, and PASS
-              advances a streak counter. The loop keeps repeating build &rarr; deploy gate &rarr;
-              test until the required streak of consecutive passes is reached.
+              advances a streak counter. Only <strong>consecutive</strong> live passes count &mdash;
+              a single FAIL resets the pass streak to zero, so the required streak has to be reached
+              with no failing iteration in between. The loop keeps repeating build &rarr; deploy
+              gate &rarr; test until the required streak of consecutive passes is reached.
             </p>
             <p className="mt-3 text-muted">
               The tester is <strong>structurally sandboxed</strong>: it runs with no repo clone at
@@ -907,7 +912,75 @@ export default function RatchetGuidePage() {
               </a>
               .
             </p>
-            <div className="mt-6 overflow-x-auto">
+
+            {guideRevisions.length > 0 ? (
+              <div className="mt-8" data-section="revision-history">
+                <h3
+                  id="revision-history"
+                  className="group scroll-mt-24 font-display text-xl font-semibold"
+                >
+                  Revision history
+                  <HeadingAnchor id="revision-history" />
+                </h3>
+                <p className="mt-3 text-muted">
+                  Each published revision of this guide has a stable revision id and names exactly
+                  which learnings it incorporated, with the date each was folded in. This is
+                  produced by the repeatable <code>guide-update</code> workflow.
+                </p>
+                <ul className="mt-6 space-y-4">
+                  {guideRevisions.map((revision) => (
+                    <li
+                      key={revision.id}
+                      className="card"
+                      data-revision-id={revision.id}
+                      data-revision-history-entry
+                    >
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span
+                          className="chip border-purple/40 bg-purple/10 font-mono font-semibold text-purple"
+                          data-revision-id-badge
+                        >
+                          {revision.id}
+                        </span>
+                        <span className="text-sm text-muted">
+                          Published <time dateTime={revision.date}>{revision.date}</time>
+                        </span>
+                      </div>
+                      <p className="mt-3 font-display font-semibold text-ink">{revision.title}</p>
+                      <p className="mt-1 text-sm text-muted">{revision.summary}</p>
+                      <p className="mt-3 text-sm font-medium text-ink">
+                        Learnings incorporated in {revision.id}:
+                      </p>
+                      <ul className="mt-2 space-y-2">
+                        {revision.learnings.map((learning) => (
+                          <li
+                            key={learning.id}
+                            className="text-sm text-ink-soft"
+                            data-revision-learning={learning.id}
+                          >
+                            <a
+                              href="/vibe-coding/ratchet-guide/learnings-log"
+                              className="font-medium text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
+                            >
+                              {learning.name}
+                            </a>{" "}
+                            <span className="font-mono text-xs text-muted">({learning.id})</span> —
+                            incorporated{" "}
+                            <time dateTime={learning.incorporated_date}>
+                              {learning.incorporated_date}
+                            </time>{" "}
+                            in revision <span className="font-mono text-xs">{revision.id}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <h3 className="mt-8 font-display text-xl font-semibold">Incorporated improvements</h3>
+            <div className="mt-4 overflow-x-auto">
               <table className="w-full border-collapse text-sm text-ink-soft">
                 <thead>
                   <tr>

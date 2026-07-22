@@ -16,7 +16,7 @@ import path from "node:path";
 
 const LOG_PATH = path.join(process.cwd(), "../../data/ratchet-learnings.json");
 
-export type LearningStatus = "pending-in-guide" | "incorporated";
+export type LearningStatus = "pending-in-guide" | "draft" | "incorporated";
 
 export type LearningEntry = {
   id: string;
