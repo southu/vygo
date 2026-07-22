@@ -14,6 +14,21 @@
         }
       ],
       "created": "2026-07-22T05:12:34.697Z"
+    },
+    {
+      "id": "GR-2026-07-22-002",
+      "date": "2026-07-22",
+      "title": "TEST: contributor doc end-to-end cycle",
+      "summary": "Verify the docs/learning-cycle.md contributor runbook by driving one learning end to end.",
+      "published_via": "git",
+      "learnings": [
+        {
+          "id": "L-2026-07-22-contributor-doc-e2e",
+          "name": "TEST: contributor doc end-to-end cycle",
+          "incorporated_date": "2026-07-22"
+        }
+      ],
+      "created": "2026-07-22T06:24:28.962Z"
     }
   ]
 }

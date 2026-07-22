@@ -94,9 +94,10 @@
       "date": "2026-07-22",
       "source_link": "https://github.com/southu/vygo/blob/main/docs/learning-cycle.md",
       "affected_sections": ["overview"],
-      "status": "pending-in-guide",
+      "status": "incorporated",
       "created": "2026-07-22T06:10:00.000Z",
-      "updated": "2026-07-22T06:10:00.000Z"
+      "updated": "2026-07-22T06:24:28.962Z",
+      "incorporated_date": "2026-07-22"
     }
   ]
 }
