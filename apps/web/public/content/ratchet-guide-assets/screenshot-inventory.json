@@ -19,7 +19,10 @@
       "status": "present",
       "asset": "ratchet-guide-composer-product-shell-setup-opt.webp",
       "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup-opt.webp",
-      "blockedReason": null
+      "blockedReason": null,
+      "staleCheckOutcome": "confirmed-current",
+      "staleCheckDate": "2026-07-22",
+      "staleCheckNote": "Live composer still renders the IDENTITY / TARGET PROJECT / DEPLOY sections (name, repo, live_url, version_endpoint, branch, strategy, templates / snippets) exactly as captured."
     },
     {
       "slot": "quick-start-step-3-goal-capture",
@@ -29,7 +32,10 @@
       "status": "present",
       "asset": "ratchet-guide-composer-goal-capture-opt.webp",
       "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture-opt.webp",
-      "blockedReason": null
+      "blockedReason": null,
+      "staleCheckOutcome": "confirmed-current",
+      "staleCheckDate": "2026-07-22",
+      "staleCheckNote": "Live composer still renders the GOAL section (mission field, acceptance-criteria list, Skip, + Add criterion) and BUILDER section exactly as captured."
     },
     {
       "slot": "quick-start-step-4-draft-queue",
@@ -39,7 +45,10 @@
       "status": "present",
       "asset": "ratchet-guide-composer-draft-queue-opt.webp",
       "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue-opt.webp",
-      "blockedReason": null
+      "blockedReason": null,
+      "staleCheckOutcome": "confirmed-current",
+      "staleCheckDate": "2026-07-22",
+      "staleCheckNote": "Live composer still renders the Mission queue panel (request, Enqueue, Priority order with SKIPLINE items first), AI assist panel, and mission.yaml preview exactly as captured."
     },
     {
       "slot": "quick-start-step-5-run-limits",
@@ -49,7 +58,10 @@
       "status": "present",
       "asset": "ratchet-guide-composer-run-limits-opt.webp",
       "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-run-limits-opt.webp",
-      "blockedReason": null
+      "blockedReason": null,
+      "staleCheckOutcome": "confirmed-current",
+      "staleCheckDate": "2026-07-22",
+      "staleCheckNote": "Live composer still renders the TESTER, HARNESS, and LIMITS sections (max_iterations, consecutive_passes_required, max_budget_usd) exactly as captured."
     },
     {
       "slot": "quick-start-step-6-mission-control",
@@ -60,7 +72,10 @@
       "asset": "ratchet-guide-composer-mission-control.png",
       "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-mission-control.png",
       "blockedReason": null,
-      "note": "Real 1440x900 capture (2026-07-22) of the live composer's mission.yaml preview pane with the Save & Launch button. Demo form values only (demo-app folder, demo-mission, github.com/acme/demo-app, demo.example.com); the queue panel shows its empty state and the server-rendered demo priority items. No credentials, tokens, session identifiers, real emails, or operator data in frame. The guide step now names Save & Launch, the control that replaced the retired 'Start run' button."
+      "note": "Real 1440x900 capture (2026-07-22) of the live composer's mission.yaml preview pane with the Save & Launch button. Demo form values only (demo-app folder, demo-mission, github.com/acme/demo-app, demo.example.com); the queue panel shows its empty state and the server-rendered demo priority items. No credentials, tokens, session identifiers, real emails, or operator data in frame. The guide step now names Save & Launch, the control that replaced the retired 'Start run' button.",
+      "staleCheckOutcome": "confirmed-current",
+      "staleCheckDate": "2026-07-22",
+      "staleCheckNote": "Live composer still renders the mission.yaml preview pane with Copy, Download .md, Download .yaml, Run in Lazy Mode, and Save & Launch exactly as captured."
     },
     {
       "slot": "quick-start-step-7-mission-timeline",
@@ -71,7 +86,19 @@
       "asset": "ratchet-guide-dashboard-mission-timeline-opt.webp",
       "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-dashboard-mission-timeline-opt.webp",
       "blockedReason": null,
-      "note": "Real 1440x900 capture (2026-07-22) of the live dash.saniorem.com/dashboard runs view: the deployed dashboard HTML/CSS/JS rendered as-is, with only its /api/runs data call stubbed to sanitized demo-mission values (demo-homepage-cta, demo-pricing-copy, demo-contact-form, demo-signup-flow, demo-footer-links) \u2014 the same demo-value sanitization convention as the composer captures. Three active run cards show the loop phases building / deploying / testing with per-run iteration and streak, above the Finished & aborted table. This clears the earlier blocker: no authenticated fetch was made, no operator run data, credentials, or PII appear in frame, and no error banner is visible."
+      "note": "Real 1440x900 capture (2026-07-22) of the live dash.saniorem.com/dashboard runs view: the deployed dashboard HTML/CSS/JS rendered as-is, with only its /api/runs data call stubbed to sanitized demo-mission values (demo-homepage-cta, demo-pricing-copy, demo-contact-form, demo-signup-flow, demo-footer-links) \u2014 the same demo-value sanitization convention as the composer captures. Three active run cards show the loop phases building / deploying / testing with per-run iteration and streak, above the Finished & aborted table. This clears the earlier blocker: no authenticated fetch was made, no operator run data, credentials, or PII appear in frame, and no error banner is visible.",
+      "staleCheckOutcome": "confirmed-current",
+      "staleCheckDate": "2026-07-22",
+      "staleCheckNote": "Live dashboard still renders the header nav, ACTIVE RUNS panel, and Finished & aborted table (Mission / Status / Iter / Streak / Cost / Started / Updated) exactly as captured."
     }
-  ]
+  ],
+  "staleCheck": {
+    "date": "2026-07-22",
+    "method": "Every slot asset compared against its live view on https://dash.saniorem.com (headless Chromium via Playwright, 1440x900 @ 100%, same viewport convention as the capture set).",
+    "outcomeVocabulary": {
+      "confirmed-current": "the committed asset still accurately reflects the live app; file left byte-for-byte untouched",
+      "refreshed": "the committed asset was out of date and was recaptured in place under its existing section-slug filename"
+    },
+    "summary": "6 confirmed-current, 0 refreshed; zero slots marked suspect-stale; no asset modified or renamed"
+  }
 }
