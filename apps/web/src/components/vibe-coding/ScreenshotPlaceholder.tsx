@@ -12,10 +12,13 @@ const ASSET_BASE = "/content/ratchet-guide-assets";
 export function ScreenshotPlaceholder({
   caption,
   asset,
+  alt,
   label = "Screenshot placeholder",
 }: {
   caption: string;
   asset?: string;
+  /** Descriptive alt text naming the depicted UI state and its key controls. */
+  alt?: string;
   label?: string;
 }) {
   return (
@@ -24,7 +27,7 @@ export function ScreenshotPlaceholder({
         <img
           className="screenshot-placeholder-img"
           src={`${ASSET_BASE}/${asset}`}
-          alt={caption}
+          alt={alt ?? caption}
           width={1440}
           height={900}
           loading="lazy"

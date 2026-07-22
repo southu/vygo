@@ -189,7 +189,8 @@ const quickStartSteps: Step[] = [
           deployed git SHA.
         </p>
         <ScreenshotPlaceholder
-          asset="ratchet-guide-composer-product-shell-setup.png"
+          asset="ratchet-guide-composer-product-shell-setup-opt.webp"
+          alt="Composer product shell setup page showing the Git remote, Live URL, and Version endpoint fields"
           caption="Composer's product shell setup screen, showing the Git remote, Live URL, and Version endpoint fields."
         />
       </>
@@ -219,7 +220,8 @@ const quickStartSteps: Step[] = [
           <strong>Constraints</strong> field.
         </p>
         <ScreenshotPlaceholder
-          asset="ratchet-guide-composer-goal-capture.png"
+          asset="ratchet-guide-composer-goal-capture-opt.webp"
+          alt="Composer goal capture page showing the Goal and Constraints input fields"
           caption="The goal capture screen, with the Goal and Constraints fields."
         />
       </>
@@ -235,7 +237,8 @@ const quickStartSteps: Step[] = [
           as-is for a first run.
         </p>
         <ScreenshotPlaceholder
-          asset="ratchet-guide-composer-draft-queue.png"
+          asset="ratchet-guide-composer-draft-queue-opt.webp"
+          alt="Composer draft queue page showing the proposed step list and the Accept draft button"
           caption="The draft queue screen, showing the proposed steps and the Accept draft button."
         />
         <AdvancedExpander title="Editing draft steps before accepting">
@@ -257,7 +260,8 @@ const quickStartSteps: Step[] = [
           value) &mdash; and an optional <strong>Spend cap</strong> field.
         </p>
         <ScreenshotPlaceholder
-          asset="ratchet-guide-composer-run-limits.png"
+          asset="ratchet-guide-composer-run-limits-opt.webp"
+          alt="Composer run limits page showing the Max iterations, Pass streak, and Spend cap fields"
           caption="The run limits screen, with Max iterations, Pass streak, and Spend cap fields."
         />
       </>
