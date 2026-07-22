@@ -1,0 +1,13 @@
+# Live verification probe — 2026-07-22T12:17:59Z
+
+## Endpoints
+guide      https://www.vygo.ai/vibe-coding/ratchet-guide  -> HTTP 200
+home       https://www.vygo.ai/ -> HTTP 200
+version    https://www.vygo.ai/version -> HTTP 200  SHA=e4691432f7b14f71da90f2d3b57cec3c7467fefa
+deployed-HEAD (local) = e4691432f7b14f71da90f2d3b57cec3c7467fefa
+
+## Figure images (captured slots)
+ratchet-guide-composer-product-shell-setup-opt.webp  HTTP=200 CT=image/webp  LastMod=[Wed, 22 Jul 2026 12:14:17 GMT] ETag="c2b4346de78b355df29b3f74a60bec41"  
+ratchet-guide-composer-goal-capture-opt.webp         HTTP=200 CT=image/webp  LastMod=[Wed, 22 Jul 2026 12:02:46 GMT] ETag="f182460be90d4c1f184ade344e2c7d4d"  
+ratchet-guide-composer-draft-queue-opt.webp          HTTP=200 CT=image/webp  LastMod=[Wed, 22 Jul 2026 12:02:46 GMT] ETag="4ef5b34ce2fa58536e00236de3b88850"  
+ratchet-guide-composer-run-limits-opt.webp           HTTP=200 CT=image/webp  LastMod=[Wed, 22 Jul 2026 12:02:47 GMT] ETag="b1f4844b552daf819da44a19ac5167ab"  

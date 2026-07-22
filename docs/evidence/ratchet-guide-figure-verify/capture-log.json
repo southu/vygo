@@ -1,0 +1,40 @@
+{
+  "mission": "vygo-ratchet-guide-figure-verify",
+  "generatedAt": "2026-07-22",
+  "deployedSha": "e4691432f7b14f71da90f2d3b57cec3c7467fefa",
+  "tool": "headless Chromium via Playwright (Chrome MCP unavailable in this environment — documented fallback; same tooling as the original figure capture log)",
+  "viewport": { "width": 1440, "height": 900, "deviceScaleFactor": 1, "renderWait": "networkidle + settle" },
+  "figureRecapture": {
+    "performed": false,
+    "reason": "All 6 figure slots passed live verification (4 captured <img> return 200/image-webp/1440x900/fresh Last-Modified 2026-07-22 with non-empty alt; 2 are frame-only flagged slots). No figure failed, so none was re-captured or replaced. The original figure-source capture log (dash.saniorem.com routes) is committed at apps/web/public/content/ratchet-guide-assets/capture-log.json."
+  },
+  "routesVisited": [
+    {
+      "route": "https://www.vygo.ai/vibe-coding/ratchet-guide",
+      "purpose": "Full-page render of the published guide for the before/after evidence renders (and to enumerate figure slots).",
+      "httpStatus": 200,
+      "renderedPageSize": "1440x14250",
+      "filesWritten": [
+        "docs/evidence/ratchet-guide-figure-verify/renders/guide-page.before.webp",
+        "docs/evidence/ratchet-guide-figure-verify/renders/guide-page.after.webp"
+      ],
+      "note": "before and after are byte-identical because no figure was replaced (verification-only outcome)."
+    }
+  ],
+  "assetsProbed": [
+    { "route": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup-opt.webp", "http": 200, "contentType": "image/webp", "lastModified": "Wed, 22 Jul 2026 12:14:17 GMT", "etag": "c2b4346de78b355df29b3f74a60bec41", "dimensions": "1440x900", "fileWritten": null },
+    { "route": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture-opt.webp", "http": 200, "contentType": "image/webp", "lastModified": "Wed, 22 Jul 2026 12:02:46 GMT", "etag": "f182460be90d4c1f184ade344e2c7d4d", "dimensions": "1440x900", "fileWritten": null },
+    { "route": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue-opt.webp", "http": 200, "contentType": "image/webp", "lastModified": "Wed, 22 Jul 2026 12:02:46 GMT", "etag": "4ef5b34ce2fa58536e00236de3b88850", "dimensions": "1440x900", "fileWritten": null },
+    { "route": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-run-limits-opt.webp", "http": 200, "contentType": "image/webp", "lastModified": "Wed, 22 Jul 2026 12:02:47 GMT", "etag": "b1f4844b552daf819da44a19ac5167ab", "dimensions": "1440x900", "fileWritten": null }
+  ],
+  "regressionProbed": [
+    { "route": "https://www.vygo.ai/", "http": 200 },
+    { "route": "https://www.vygo.ai/version", "http": 200, "body": "e4691432f7b14f71da90f2d3b57cec3c7467fefa" }
+  ],
+  "filesWrittenSummary": [
+    "docs/evidence/ratchet-guide-figure-verify/renders/guide-page.before.webp",
+    "docs/evidence/ratchet-guide-figure-verify/renders/guide-page.after.webp",
+    "docs/evidence/ratchet-guide-figure-verify/guide-page-source.pre-mission.html",
+    "docs/evidence/ratchet-guide-figure-verify/live-verification-probe.txt"
+  ]
+}
