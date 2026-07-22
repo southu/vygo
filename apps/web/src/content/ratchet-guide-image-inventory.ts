@@ -93,12 +93,10 @@ export const imageInventory: ImageSlot[] = [
     currentAsset: "ratchet-guide-composer-mission-control.png",
     dashRoute: "https://dash.saniorem.com/composer",
     uiState:
-      "Composer commit control: the guide's Start run button is not present on the live composer. A mission is committed with the Enqueue button and started by the queue runner; the /queue page carries the Pause and Resume run controls.",
+      "Composer › mission.yaml preview pane: the Save & Launch button (save mission YAML and launch immediately) beside Copy / Download controls, with the composed demo mission YAML in view. The guide step was reworded from the retired 'Start run' control to Save & Launch, so the described UI is confirmed present on the live composer.",
     plannedAsset: "ratchet-guide-composer-mission-control.png",
-    status: "NEEDS-REVIEW",
-    capture: "flagged",
-    captureReason:
-      "The guide depicts a 'Start run' button on a mission-control screen. The live composer has no such control — a mission is committed with Enqueue / Save & Launch and started by the queue runner (Pause/Resume live on /queue). No 1:1 UI exists to capture, so no image was written.",
+    status: "OK",
+    capture: "captured",
   },
   {
     slot: "fig-06-mission-timeline",

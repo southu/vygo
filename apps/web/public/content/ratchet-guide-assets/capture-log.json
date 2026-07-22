@@ -4,11 +4,20 @@
   "servedFrom": "https://www.vygo.ai/content/ratchet-guide-assets",
   "assetDir": "apps/web/public/content/ratchet-guide-assets",
   "inventorySource": "apps/web/src/content/ratchet-guide-image-inventory.ts",
-  "viewport": { "width": 1440, "height": 900, "zoom": "100%", "deviceScaleFactor": 1 },
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "zoom": "100%",
+    "deviceScaleFactor": 1
+  },
   "renderWait": "network-idle + no spinner/skeleton/aria-busy before capture",
   "tool": "headless Chromium via Playwright (Chrome MCP unavailable — documented fallback)",
   "sanitization": "Composer form pre-filled with fake demo values (name demo-mission, repo github.com/acme/demo-app, live_url demo.example.com); no real operator data, email addresses, session tokens, or other PII appear in any frame.",
-  "summary": { "slots": 6, "captured": 4, "flagged": 2 },
+  "summary": {
+    "slots": 6,
+    "captured": 5,
+    "flagged": 1
+  },
   "entries": [
     {
       "slot": "fig-01-product-shell-setup",
@@ -47,9 +56,12 @@
     {
       "slot": "fig-05-mission-control",
       "route": "https://dash.saniorem.com/composer",
-      "file": null,
-      "status": "flagged",
-      "reason": "The guide depicts a 'Start run' button on a mission-control screen. The live composer has no such control - a mission is committed with Enqueue / Save & Launch and started by the queue runner (Pause/Resume live on /queue). No 1:1 UI exists to capture, so no image was written."
+      "file": "ratchet-guide-composer-mission-control.png",
+      "status": "captured",
+      "reason": null,
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-mission-control.png",
+      "dimensions": "1440x900",
+      "note": "Captured 2026-07-22 (gap-fill pass): the composer's mission.yaml preview pane with the Save & Launch button, demo form values only (demo-app folder, demo-mission, github.com/acme/demo-app). The guide step was reworded from the retired 'Start run' control to Save & Launch."
     },
     {
       "slot": "fig-06-mission-timeline",

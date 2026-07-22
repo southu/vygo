@@ -11,7 +11,8 @@ This is a section-by-section checklist of every image slot on the published
 Ratchet guide page: every `<img>` tag plus every frame-only screenshot
 placeholder the page renders. Slots are keyed by the heading anchor id (section
 slug) they appear under. Each slot carries exactly one status from:
-`present` | `missing` | `placeholder-only` | `broken-URL` | `suspect-stale`.
+`present` | `missing` | `placeholder-only` | `broken-URL` | `suspect-stale`
+| `resolved` | `blocked`.
 
 - `present` — the referenced image URL returns HTTP 200 with valid,
   renderable image content, and the capture is current.
@@ -19,6 +20,11 @@ slug) they appear under. Each slot carries exactly one status from:
   text, no `<img>`, no served asset).
 - `missing` / `broken-URL` / `suspect-stale` — no slot currently qualifies
   (see verification below).
+- `resolved` — a former gap slot now backed by a committed, section-named
+  real capture (gap-fill pass of 2026-07-22).
+- `blocked` — a former gap slot that cannot be captured from the live
+  product; the slot entry records the concrete reason and no asset was
+  fabricated for it.
 
 ## Section `quick-start` — "Run your first mission"
 
@@ -39,14 +45,21 @@ Checked boxes are verified-good slots; unchecked boxes are the capture targets.
 - [x] slot `quick-start` / step 5 "Set your limits" — asset
       `/content/ratchet-guide-assets/ratchet-guide-composer-run-limits-opt.webp`
       — status: present
-- [ ] slot `quick-start` / step 6 "Start the run" — no asset; frame-only
-      placeholder captioned "The mission control screen, showing the Start run
-      button." (planned asset name
-      `ratchet-guide-composer-mission-control.png`) — status: placeholder-only
+- [x] slot `quick-start` / step 6 "Start the run" — asset
+      `/content/ratchet-guide-assets/ratchet-guide-composer-mission-control.png`
+      — status: resolved (2026-07-22: real 1440×900 capture of the live
+      composer's mission.yaml preview pane with the Save & Launch button, demo
+      form values only; the step caption/prose now names Save & Launch, the
+      control that replaced the retired "Start run" button)
 - [ ] slot `quick-start` / step 7 "Watch it iterate" — no asset; frame-only
       placeholder captioned "The mission timeline panel, showing build, deploy
-      gate, and test status per iteration." (planned asset name
-      `ratchet-guide-dashboard-mission-timeline.png`) — status: placeholder-only
+      gate, and test status per iteration." — status: blocked (2026-07-22: the
+      live product has no per-iteration mission-timeline panel — /dashboard
+      surfaces only an Active runs table — and its runs data is
+      control-plane-gated: /api/runs returns 401 unauthenticated so the page
+      renders a data-load error, while an authenticated render would expose
+      real operator run data. No clean, representative capture is possible, so
+      no asset was fabricated.)
 
 ## Live verification (2026-07-22)
 
@@ -75,7 +88,16 @@ screenshot problem.
 ## Summary
 
 - Total image slots on the published guide page: **6**
-- Slots with status `missing`, `placeholder-only`, or `broken-URL`
-  (capture targets for the later capture step): **2**
-- Target slots' section slugs (one line): `quick-start` (step 6, mission
-  control), `quick-start` (step 7, mission timeline)
+- Slots with status `missing`, `placeholder-only`, or `broken-URL`: **0**
+  (gap-fill pass of 2026-07-22: step 6 resolved with
+  `ratchet-guide-composer-mission-control.png`; step 7 blocked — no
+  capturable UI, see the slot entry for the concrete reason)
+
+## Machine-readable inventory (2026-07-22)
+
+The slot states above are also published as JSON at the stable public path
+<https://www.vygo.ai/content/ratchet-guide-assets/screenshot-inventory.json>
+(committed at `apps/web/public/content/ratchet-guide-assets/screenshot-inventory.json`,
+alongside the guide screenshot assets). Every former gap slot there carries
+either `"status": "resolved"` plus its committed asset filename, or
+`"status": "blocked"` plus a non-empty concrete reason.

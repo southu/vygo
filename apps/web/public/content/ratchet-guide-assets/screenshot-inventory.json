@@ -1,0 +1,76 @@
+{
+  "updatedAt": "2026-07-22",
+  "guidePage": "https://www.vygo.ai/vibe-coding/ratchet-guide",
+  "humanReadableInventory": "https://www.vygo.ai/vibe-coding/ratchet-guide/screenshot-inventory.md",
+  "assetBase": "https://www.vygo.ai/content/ratchet-guide-assets",
+  "captureSource": "https://dash.saniorem.com",
+  "viewport": "1440x900 @ 100%, deviceScaleFactor 1, headless Chromium (Playwright)",
+  "statusVocabulary": {
+    "present": "slot was already backed by a current, verified capture before the 2026-07-22 gap-fill pass",
+    "resolved": "former gap slot (was placeholder-only) now backed by a committed, section-named real capture of the live dash.saniorem.com UI",
+    "blocked": "former gap slot that cannot be captured from the live product; blockedReason records the concrete cause and no asset was fabricated"
+  },
+  "slots": [
+    {
+      "slot": "quick-start-step-1-product-shell",
+      "sectionSlug": "quick-start",
+      "guideStep": "Run your first mission › Step 1: Create a product shell",
+      "previousStatus": "present",
+      "status": "present",
+      "asset": "ratchet-guide-composer-product-shell-setup-opt.webp",
+      "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup-opt.webp",
+      "blockedReason": null
+    },
+    {
+      "slot": "quick-start-step-3-goal-capture",
+      "sectionSlug": "quick-start",
+      "guideStep": "Run your first mission › Step 3: Describe your goal",
+      "previousStatus": "present",
+      "status": "present",
+      "asset": "ratchet-guide-composer-goal-capture-opt.webp",
+      "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture-opt.webp",
+      "blockedReason": null
+    },
+    {
+      "slot": "quick-start-step-4-draft-queue",
+      "sectionSlug": "quick-start",
+      "guideStep": "Run your first mission › Step 4: Accept the draft queue",
+      "previousStatus": "present",
+      "status": "present",
+      "asset": "ratchet-guide-composer-draft-queue-opt.webp",
+      "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue-opt.webp",
+      "blockedReason": null
+    },
+    {
+      "slot": "quick-start-step-5-run-limits",
+      "sectionSlug": "quick-start",
+      "guideStep": "Run your first mission › Step 5: Set your limits",
+      "previousStatus": "present",
+      "status": "present",
+      "asset": "ratchet-guide-composer-run-limits-opt.webp",
+      "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-run-limits-opt.webp",
+      "blockedReason": null
+    },
+    {
+      "slot": "quick-start-step-6-mission-control",
+      "sectionSlug": "quick-start",
+      "guideStep": "Run your first mission › Step 6: Start the run",
+      "previousStatus": "placeholder-only",
+      "status": "resolved",
+      "asset": "ratchet-guide-composer-mission-control.png",
+      "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-mission-control.png",
+      "blockedReason": null,
+      "note": "Real 1440x900 capture (2026-07-22) of the live composer's mission.yaml preview pane with the Save & Launch button. Demo form values only (demo-app folder, demo-mission, github.com/acme/demo-app, demo.example.com); the queue panel shows its empty state and the server-rendered demo priority items. No credentials, tokens, session identifiers, real emails, or operator data in frame. The guide step now names Save & Launch, the control that replaced the retired 'Start run' button."
+    },
+    {
+      "slot": "quick-start-step-7-mission-timeline",
+      "sectionSlug": "quick-start",
+      "guideStep": "Run your first mission › Step 7: Watch it iterate",
+      "previousStatus": "placeholder-only",
+      "status": "blocked",
+      "asset": null,
+      "assetUrl": null,
+      "blockedReason": "The live product has no per-iteration mission-timeline panel (no build / deploy-gate / test breakdown anywhere in the UI): dash.saniorem.com/dashboard surfaces only an Active runs table, and its runs data is control-plane-gated — /api/runs returns HTTP 401 unauthenticated, so an unauthenticated render shows a data-load error banner, while an authenticated render would expose real operator run data (folder names, mission titles, costs). No clean, representative capture is possible, so no asset was committed and none was fabricated."
+    }
+  ]
+}

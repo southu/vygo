@@ -272,11 +272,15 @@ const quickStartSteps: Step[] = [
     body: (
       <>
         <p>
-          Click <strong>Start run</strong>. Each iteration is automatic: the builder pushes real
-          commits, the deploy gate waits until your version endpoint matches the new SHA, and a
+          Click <strong>Save &amp; Launch</strong>. Each iteration is automatic: the builder pushes
+          real commits, the deploy gate waits until your version endpoint matches the new SHA, and a
           tester checks only the live app and returns PASS or FAIL.
         </p>
-        <ScreenshotPlaceholder caption="The mission control screen, showing the Start run button." />
+        <ScreenshotPlaceholder
+          asset="ratchet-guide-composer-mission-control.png"
+          alt="Composer mission control view with the mission.yaml preview pane and the Save & Launch button"
+          caption="The composer's mission control view, showing the mission.yaml preview and the Save & Launch button."
+        />
       </>
     ),
   },
@@ -932,6 +936,14 @@ export default function RatchetGuidePage() {
             <p className="mt-4 text-sm text-muted" data-changelog-screenshot-refresh>
               Note: on 2026-07-22, all screenshots in this guide were refreshed against the live
               dash.saniorem.com dashboard.
+            </p>
+
+            <p className="mt-4 text-sm text-muted" data-changelog-screenshot-gap-fill>
+              Note: on 2026-07-22, the &ldquo;Start the run&rdquo; step gained a real capture of the
+              composer&apos;s mission control view (Save &amp; Launch); the &ldquo;Watch it
+              iterate&rdquo; timeline slot remains a placeholder because the live dashboard has no
+              per-iteration timeline panel and its runs data cannot be shown without exposing
+              operator data.
             </p>
 
             {guideRevisions.length > 0 ? (

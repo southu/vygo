@@ -57,17 +57,17 @@
   },
   {
     "slot": "fig-05-mission-control",
-    "screenshot_file": null,
-    "screenshot_url": null,
+    "screenshot_file": "apps/web/public/content/ratchet-guide-assets/ratchet-guide-composer-mission-control.png",
+    "screenshot_url": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-composer-mission-control.png",
     "dash_route": "https://dash.saniorem.com/composer",
     "guide_step": "Run your first mission › Step 6: Start the run",
     "guide_step_url": "https://www.vygo.ai/vibe-coding/ratchet-guide#quick-start",
     "viewport": "1440x900 @ 100%",
-    "content_match": "fail",
+    "content_match": "pass",
     "pii_review": "pass",
-    "flagged": true,
-    "flag_reason": "UI-no-longer-exists",
-    "note": "The step depicts a \"Start run\" button on a mission-control screen. The live composer has no such control — a mission is committed with Enqueue / Save & Launch and started by the queue runner (Pause/Resume live on /queue). No 1:1 UI exists to capture, so no image was written and none was fabricated. Follow-up guide-text revision needed to replace \"Start run\" with Enqueue / Save & Launch + queue runner. Matches inventory capture=flagged for this slot. pii_review pass because no image exists and nothing sensitive is listed."
+    "flagged": false,
+    "flag_reason": null,
+    "note": "Resolved 2026-07-22 (gap-fill pass): real 1440x900 capture of the live composer's mission.yaml preview pane with the Save & Launch button. Demo values only (demo-app folder, demo-mission, repo github.com/acme/demo-app, live_url demo.example.com); queue panel in its empty state with server-rendered demo priority items. No real emails, tokens, session identifiers, or operator data in frame. The guide step now names Save & Launch, the control that replaced the retired 'Start run' button, so the step wording and the capture agree."
   },
   {
     "slot": "fig-06-mission-timeline",
