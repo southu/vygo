@@ -929,6 +929,11 @@ export default function RatchetGuidePage() {
               .
             </p>
 
+            <p className="mt-4 text-sm text-muted" data-changelog-screenshot-refresh>
+              Note: on 2026-07-22, all screenshots in this guide were refreshed against the live
+              dash.saniorem.com dashboard.
+            </p>
+
             {guideRevisions.length > 0 ? (
               <div className="mt-8" data-section="revision-history">
                 <h3
