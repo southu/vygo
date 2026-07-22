@@ -628,41 +628,13 @@
   margin-top: 0;
 }
 
-/* Screenshot / illustration placeholders */
+/* Captured screenshot figures */
 
-.screenshot-placeholder {
+.guide-screenshot {
   margin: 1.25rem 0 0;
 }
 
-.screenshot-placeholder-frame {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  min-height: 9rem;
-  border-radius: var(--radius-card);
-  border: 1.5px dashed var(--color-border);
-  background: repeating-linear-gradient(
-    135deg,
-    var(--color-canvas),
-    var(--color-canvas) 10px,
-    var(--color-surface) 10px,
-    var(--color-surface) 20px
-  );
-  color: var(--color-muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  padding: 1rem;
-}
-
-.screenshot-placeholder-frame svg {
-  width: 1.75rem;
-  height: 1.75rem;
-  opacity: 0.6;
-}
-
-.screenshot-placeholder-img {
+.guide-screenshot-img {
   display: block;
   width: 100%;
   height: auto;
@@ -671,7 +643,7 @@
   background: var(--color-surface);
 }
 
-.screenshot-placeholder-caption {
+.guide-screenshot-caption {
   margin: 0.5rem 0 0;
   font-size: 0.8125rem;
   color: var(--color-muted);

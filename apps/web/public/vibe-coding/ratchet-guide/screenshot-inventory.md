@@ -51,15 +51,17 @@ Checked boxes are verified-good slots; unchecked boxes are the capture targets.
       composer's mission.yaml preview pane with the Save & Launch button, demo
       form values only; the step caption/prose now names Save & Launch, the
       control that replaced the retired "Start run" button)
-- [ ] slot `quick-start` / step 7 "Watch it iterate" — no asset; frame-only
-      placeholder captioned "The mission timeline panel, showing build, deploy
-      gate, and test status per iteration." — status: blocked (2026-07-22: the
-      live product has no per-iteration mission-timeline panel — /dashboard
-      surfaces only an Active runs table — and its runs data is
-      control-plane-gated: /api/runs returns 401 unauthenticated so the page
-      renders a data-load error, while an authenticated render would expose
-      real operator run data. No clean, representative capture is possible, so
-      no asset was fabricated.)
+- [x] slot `quick-start` / step 7 "Watch it iterate" — asset
+      `/content/ratchet-guide-assets/ratchet-guide-dashboard-mission-timeline-opt.webp`
+      — status: resolved (2026-07-22: real 1440×900 capture of the live
+      dash.saniorem.com/dashboard runs view — the deployed dashboard UI
+      rendered as-is, with only its /api/runs data call stubbed to sanitized
+      demo-mission values, the same demo-value sanitization convention as the
+      composer captures. Three active run cards show the loop phases
+      building / deploying / testing with per-run iteration and streak, above
+      the Finished & aborted table. This clears the earlier blocker: no
+      authenticated fetch was made and no operator run data, credentials, or
+      PII appear in frame.)
 
 ## Live verification (2026-07-22)
 
@@ -90,8 +92,10 @@ screenshot problem.
 - Total image slots on the published guide page: **6**
 - Slots with status `missing`, `placeholder-only`, or `broken-URL`: **0**
   (gap-fill pass of 2026-07-22: step 6 resolved with
-  `ratchet-guide-composer-mission-control.png`; step 7 blocked — no
-  capturable UI, see the slot entry for the concrete reason)
+  `ratchet-guide-composer-mission-control.png`; step 7 resolved later the
+  same day with `ratchet-guide-dashboard-mission-timeline-opt.webp`, a
+  sanitized demo-data render of the live dashboard runs view — all six slots
+  now carry a real capture)
 
 ## Machine-readable inventory (2026-07-22)
 

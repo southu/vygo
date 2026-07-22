@@ -11,12 +11,12 @@
     "deviceScaleFactor": 1
   },
   "renderWait": "network-idle + no spinner/skeleton/aria-busy before capture",
-  "tool": "headless Chromium via Playwright (Chrome MCP unavailable — documented fallback)",
+  "tool": "headless Chromium via Playwright (Chrome MCP unavailable \u2014 documented fallback)",
   "sanitization": "Composer form pre-filled with fake demo values (name demo-mission, repo github.com/acme/demo-app, live_url demo.example.com); no real operator data, email addresses, session tokens, or other PII appear in any frame.",
   "summary": {
     "slots": 6,
-    "captured": 5,
-    "flagged": 1
+    "captured": 6,
+    "flagged": 0
   },
   "entries": [
     {
@@ -66,9 +66,11 @@
     {
       "slot": "fig-06-mission-timeline",
       "route": "https://dash.saniorem.com/dashboard",
-      "file": null,
-      "status": "flagged",
-      "reason": "The guide depicts a mission-timeline panel with a per-iteration build / deploy-gate / test breakdown. The live /dashboard surfaces an Active runs table (Mission/Status/Iter/Streak/Cost) but no per-iteration breakdown, and its runs data is control-plane-gated: an unauthenticated render shows a data-load error and an authenticated render would expose real operator run data (PII). No clean, sanitized timeline is capturable, so no image was written."
+      "file": "ratchet-guide-dashboard-mission-timeline-opt.webp",
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-dashboard-mission-timeline-opt.webp",
+      "dimensions": "1440x900",
+      "status": "captured",
+      "note": "Live dashboard runs view rendered with /api/runs stubbed to sanitized demo-mission data (no authenticated fetch, no operator data or PII in frame); three active run cards in phases building/deploying/testing plus the finished-runs table."
     }
   ]
 }

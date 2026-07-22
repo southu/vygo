@@ -6,7 +6,7 @@ import { BackToTop } from "@/components/vibe-coding/BackToTop";
 import { StepList, type Step } from "@/components/vibe-coding/StepCard";
 import { Callout } from "@/components/vibe-coding/Callout";
 import { CodeBlock } from "@/components/vibe-coding/CodeBlock";
-import { ScreenshotPlaceholder } from "@/components/vibe-coding/ScreenshotPlaceholder";
+import { GuideScreenshot } from "@/components/vibe-coding/GuideScreenshot";
 import { AdvancedExpander } from "@/components/vibe-coding/AdvancedExpander";
 import { GuideModeToggle } from "@/components/vibe-coding/GuideModeToggle";
 import { getVibeModulePage } from "@/content/vibe-coding-modules";
@@ -188,7 +188,7 @@ const quickStartSteps: Step[] = [
           <strong>Version endpoint</strong> field (e.g. <code>GET /version</code>) that returns the
           deployed git SHA.
         </p>
-        <ScreenshotPlaceholder
+        <GuideScreenshot
           asset="ratchet-guide-composer-product-shell-setup-opt.webp"
           alt="Composer product shell setup page showing the Git remote, Live URL, and Version endpoint fields"
           caption="Composer's product shell setup screen, showing the Git remote, Live URL, and Version endpoint fields."
@@ -219,7 +219,7 @@ const quickStartSteps: Step[] = [
           to &lsquo;Get started&rsquo;.&rdquo; Note anything the change must not touch in the{" "}
           <strong>Constraints</strong> field.
         </p>
-        <ScreenshotPlaceholder
+        <GuideScreenshot
           asset="ratchet-guide-composer-goal-capture-opt.webp"
           alt="Composer goal capture page showing the Goal and Constraints input fields"
           caption="The goal capture screen, with the Goal and Constraints fields."
@@ -236,7 +236,7 @@ const quickStartSteps: Step[] = [
           steps instead of one mega-mission. Click <strong>Accept draft</strong> to take the queue
           as-is for a first run.
         </p>
-        <ScreenshotPlaceholder
+        <GuideScreenshot
           asset="ratchet-guide-composer-draft-queue-opt.webp"
           alt="Composer draft queue page showing the proposed step list and the Accept draft button"
           caption="The draft queue screen, showing the proposed steps and the Accept draft button."
@@ -259,7 +259,7 @@ const quickStartSteps: Step[] = [
           &mdash; the run of consecutive live passes required to finish (2 is a reasonable first
           value) &mdash; and an optional <strong>Spend cap</strong> field.
         </p>
-        <ScreenshotPlaceholder
+        <GuideScreenshot
           asset="ratchet-guide-composer-run-limits-opt.webp"
           alt="Composer run limits page showing the Max iterations, Pass streak, and Spend cap fields"
           caption="The run limits screen, with Max iterations, Pass streak, and Spend cap fields."
@@ -276,7 +276,7 @@ const quickStartSteps: Step[] = [
           real commits, the deploy gate waits until your version endpoint matches the new SHA, and a
           tester checks only the live app and returns PASS or FAIL.
         </p>
-        <ScreenshotPlaceholder
+        <GuideScreenshot
           asset="ratchet-guide-composer-mission-control.png"
           alt="Composer mission control view with the mission.yaml preview pane and the Save & Launch button"
           caption="The composer's mission control view, showing the mission.yaml preview and the Save & Launch button."
@@ -293,7 +293,11 @@ const quickStartSteps: Step[] = [
           tester&apos;s feedback into the next build automatically. A PASS advances the streak. You
           do not need to intervene between iterations.
         </p>
-        <ScreenshotPlaceholder caption="The mission timeline panel, showing build, deploy gate, and test status per iteration." />
+        <GuideScreenshot
+          asset="ratchet-guide-dashboard-mission-timeline-opt.webp"
+          alt="Ratchet dashboard mission timeline showing three active run cards with per-run phase, iteration, and streak fields above a table of finished runs"
+          caption="The dashboard's mission timeline, showing each active run's phase (building, deploying, testing), iteration, and pass streak, with finished runs below."
+        />
       </>
     ),
   },
@@ -940,10 +944,10 @@ export default function RatchetGuidePage() {
 
             <p className="mt-4 text-sm text-muted" data-changelog-screenshot-gap-fill>
               Note: on 2026-07-22, the &ldquo;Start the run&rdquo; step gained a real capture of the
-              composer&apos;s mission control view (Save &amp; Launch); the &ldquo;Watch it
-              iterate&rdquo; timeline slot remains a placeholder because the live dashboard has no
-              per-iteration timeline panel and its runs data cannot be shown without exposing
-              operator data.
+              composer&apos;s mission control view (Save &amp; Launch), and the &ldquo;Watch it
+              iterate&rdquo; step gained a real capture of the dashboard&apos;s mission timeline
+              &mdash; rendered with sanitized demo-mission data only, so no operator run data
+              appears in frame.
             </p>
 
             {guideRevisions.length > 0 ? (

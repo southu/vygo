@@ -14,7 +14,7 @@
     {
       "slot": "quick-start-step-1-product-shell",
       "sectionSlug": "quick-start",
-      "guideStep": "Run your first mission › Step 1: Create a product shell",
+      "guideStep": "Run your first mission \u203a Step 1: Create a product shell",
       "previousStatus": "present",
       "status": "present",
       "asset": "ratchet-guide-composer-product-shell-setup-opt.webp",
@@ -24,7 +24,7 @@
     {
       "slot": "quick-start-step-3-goal-capture",
       "sectionSlug": "quick-start",
-      "guideStep": "Run your first mission › Step 3: Describe your goal",
+      "guideStep": "Run your first mission \u203a Step 3: Describe your goal",
       "previousStatus": "present",
       "status": "present",
       "asset": "ratchet-guide-composer-goal-capture-opt.webp",
@@ -34,7 +34,7 @@
     {
       "slot": "quick-start-step-4-draft-queue",
       "sectionSlug": "quick-start",
-      "guideStep": "Run your first mission › Step 4: Accept the draft queue",
+      "guideStep": "Run your first mission \u203a Step 4: Accept the draft queue",
       "previousStatus": "present",
       "status": "present",
       "asset": "ratchet-guide-composer-draft-queue-opt.webp",
@@ -44,7 +44,7 @@
     {
       "slot": "quick-start-step-5-run-limits",
       "sectionSlug": "quick-start",
-      "guideStep": "Run your first mission › Step 5: Set your limits",
+      "guideStep": "Run your first mission \u203a Step 5: Set your limits",
       "previousStatus": "present",
       "status": "present",
       "asset": "ratchet-guide-composer-run-limits-opt.webp",
@@ -54,7 +54,7 @@
     {
       "slot": "quick-start-step-6-mission-control",
       "sectionSlug": "quick-start",
-      "guideStep": "Run your first mission › Step 6: Start the run",
+      "guideStep": "Run your first mission \u203a Step 6: Start the run",
       "previousStatus": "placeholder-only",
       "status": "resolved",
       "asset": "ratchet-guide-composer-mission-control.png",
@@ -65,12 +65,13 @@
     {
       "slot": "quick-start-step-7-mission-timeline",
       "sectionSlug": "quick-start",
-      "guideStep": "Run your first mission › Step 7: Watch it iterate",
+      "guideStep": "Run your first mission \u203a Step 7: Watch it iterate",
       "previousStatus": "placeholder-only",
-      "status": "blocked",
-      "asset": null,
-      "assetUrl": null,
-      "blockedReason": "The live product has no per-iteration mission-timeline panel (no build / deploy-gate / test breakdown anywhere in the UI): dash.saniorem.com/dashboard surfaces only an Active runs table, and its runs data is control-plane-gated — /api/runs returns HTTP 401 unauthenticated, so an unauthenticated render shows a data-load error banner, while an authenticated render would expose real operator run data (folder names, mission titles, costs). No clean, representative capture is possible, so no asset was committed and none was fabricated."
+      "status": "resolved",
+      "asset": "ratchet-guide-dashboard-mission-timeline-opt.webp",
+      "assetUrl": "https://www.vygo.ai/content/ratchet-guide-assets/ratchet-guide-dashboard-mission-timeline-opt.webp",
+      "blockedReason": null,
+      "note": "Real 1440x900 capture (2026-07-22) of the live dash.saniorem.com/dashboard runs view: the deployed dashboard HTML/CSS/JS rendered as-is, with only its /api/runs data call stubbed to sanitized demo-mission values (demo-homepage-cta, demo-pricing-copy, demo-contact-form, demo-signup-flow, demo-footer-links) \u2014 the same demo-value sanitization convention as the composer captures. Three active run cards show the loop phases building / deploying / testing with per-run iteration and streak, above the Finished & aborted table. This clears the earlier blocker: no authenticated fetch was made, no operator run data, credentials, or PII appear in frame, and no error banner is visible."
     }
   ]
 }

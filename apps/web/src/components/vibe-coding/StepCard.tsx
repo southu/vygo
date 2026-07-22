@@ -4,7 +4,7 @@ export type Step = {
   /** The single action this card covers. */
   title: string;
   /** Step body — wrap any button/menu/field name in <strong>, nest a Callout,
-   * CodeBlock, or ScreenshotPlaceholder as needed. */
+   * CodeBlock, or GuideScreenshot as needed. */
   body: ReactNode;
 };
 
