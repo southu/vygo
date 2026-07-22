@@ -155,18 +155,29 @@ If it is good, you have **approved** it — proceed to publish.
 ## Stage 4 — Publish
 
 Publishing flips the drafted learnings to `incorporated` (stamping
-`incorporated_date`), appends the revision to `data/guide-revisions.json`, and —
-with `--commit --push` — commits those data files plus the guide page and pushes
-to `main` so the normal deploy pipeline ships it:
+`incorporated_date`) and appends the revision to `data/guide-revisions.json`.
+Run the approve step **without** `--commit` so you can format the stores before
+committing (the workflow writes them with `JSON.stringify`, so a one-line
+Prettier pass is needed to keep CI's `format:check` green — see the note below):
 
 ```sh
-pnpm guide-update approve <revision-id> --commit --push
+pnpm guide-update approve <revision-id>
+pnpm exec prettier --write data/ratchet-learnings.json data/guide-revisions.json
+git add data/ratchet-learnings.json data/guide-revisions.json
+git commit -m "docs(ratchet-guide): publish revision <revision-id>"
+git push origin HEAD:main
 ```
 
 The guide page's **Revision history** renders from `data/guide-revisions.json`
-automatically, so no manual page edit is needed. (If instead the guide was
-published by hand through a CMS, record that with
-`pnpm guide-update record-publish <revision-id>` — no git.)
+automatically, so no manual page edit is needed — only the two data stores are
+committed. (If instead the guide was published by hand through a CMS, record
+that with `pnpm guide-update record-publish <revision-id>` — no git.)
+
+> **Why the Prettier pass:** the workflow writes both JSON stores with
+> `JSON.stringify(…, null, 2)`, which expands short arrays onto multiple lines;
+> the repo's Prettier config collapses them. `approve --commit` would commit the
+> unformatted stores and turn CI's `format:check` red, so approve without
+> `--commit` and format the two files yourself before committing.
 
 No publish/deploy credentials are read or printed by the workflow, and the
 generated copy is scanned for credential-like material before it is written.
