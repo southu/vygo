@@ -25,8 +25,8 @@ export function ScreenshotPlaceholder({
           className="screenshot-placeholder-img"
           src={`${ASSET_BASE}/${asset}`}
           alt={caption}
-          width={1200}
-          height={675}
+          width={1440}
+          height={900}
           loading="lazy"
         />
       ) : (

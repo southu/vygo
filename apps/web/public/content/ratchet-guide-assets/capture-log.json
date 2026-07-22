@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-07-22",
+  "source": "https://dash.saniorem.com",
+  "servedFrom": "https://www.vygo.ai/content/ratchet-guide-assets",
+  "assetDir": "apps/web/public/content/ratchet-guide-assets",
+  "inventorySource": "apps/web/src/content/ratchet-guide-image-inventory.ts",
+  "viewport": { "width": 1440, "height": 900, "zoom": "100%", "deviceScaleFactor": 1 },
+  "renderWait": "network-idle + no spinner/skeleton/aria-busy before capture",
+  "tool": "headless Chromium via Playwright (Chrome MCP unavailable — documented fallback)",
+  "sanitization": "Composer form pre-filled with fake demo values (name demo-mission, repo github.com/acme/demo-app, live_url demo.example.com); no real operator data, email addresses, session tokens, or other PII appear in any frame.",
+  "summary": { "slots": 6, "captured": 4, "flagged": 2 },
+  "entries": [
+    {
+      "slot": "fig-01-product-shell-setup",
+      "route": "https://dash.saniorem.com/composer",
+      "file": "ratchet-guide-composer-product-shell-setup.png",
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-product-shell-setup.png",
+      "dimensions": "1440x900",
+      "status": "captured"
+    },
+    {
+      "slot": "fig-02-goal-capture",
+      "route": "https://dash.saniorem.com/composer",
+      "file": "ratchet-guide-composer-goal-capture.png",
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-goal-capture.png",
+      "dimensions": "1440x900",
+      "status": "captured",
+      "note": "Guide names a separate 'Constraints' field; on the live composer constraints are expressed via the acceptance-criteria list (+ Add criterion / Skip). The Goal capture region (mission field + acceptance list) is present and was captured."
+    },
+    {
+      "slot": "fig-03-draft-queue",
+      "route": "https://dash.saniorem.com/composer",
+      "file": "ratchet-guide-composer-draft-queue.png",
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-draft-queue.png",
+      "dimensions": "1440x900",
+      "status": "captured",
+      "note": "Guide names an 'Accept draft' button; the live composer drafts via AI assist and commits with Inject into mission / Enqueue. The Mission queue panel (Enqueue, Priority order) is present and was captured."
+    },
+    {
+      "slot": "fig-04-run-limits",
+      "route": "https://dash.saniorem.com/composer",
+      "file": "ratchet-guide-composer-run-limits.png",
+      "servedPath": "/content/ratchet-guide-assets/ratchet-guide-composer-run-limits.png",
+      "dimensions": "1440x900",
+      "status": "captured"
+    },
+    {
+      "slot": "fig-05-mission-control",
+      "route": "https://dash.saniorem.com/composer",
+      "file": null,
+      "status": "flagged",
+      "reason": "The guide depicts a 'Start run' button on a mission-control screen. The live composer has no such control - a mission is committed with Enqueue / Save & Launch and started by the queue runner (Pause/Resume live on /queue). No 1:1 UI exists to capture, so no image was written."
+    },
+    {
+      "slot": "fig-06-mission-timeline",
+      "route": "https://dash.saniorem.com/dashboard",
+      "file": null,
+      "status": "flagged",
+      "reason": "The guide depicts a mission-timeline panel with a per-iteration build / deploy-gate / test breakdown. The live /dashboard surfaces an Active runs table (Mission/Status/Iter/Streak/Cost) but no per-iteration breakdown, and its runs data is control-plane-gated: an unauthenticated render shows a data-load error and an authenticated render would expose real operator run data (PII). No clean, sanitized timeline is capturable, so no image was written."
+    }
+  ]
+}

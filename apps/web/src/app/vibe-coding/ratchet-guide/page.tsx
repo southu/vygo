@@ -272,10 +272,7 @@ const quickStartSteps: Step[] = [
           commits, the deploy gate waits until your version endpoint matches the new SHA, and a
           tester checks only the live app and returns PASS or FAIL.
         </p>
-        <ScreenshotPlaceholder
-          asset="ratchet-guide-composer-mission-control.png"
-          caption="The mission control screen, showing the Start run button."
-        />
+        <ScreenshotPlaceholder caption="The mission control screen, showing the Start run button." />
       </>
     ),
   },
@@ -288,10 +285,7 @@ const quickStartSteps: Step[] = [
           tester&apos;s feedback into the next build automatically. A PASS advances the streak. You
           do not need to intervene between iterations.
         </p>
-        <ScreenshotPlaceholder
-          asset="ratchet-guide-dashboard-mission-timeline.png"
-          caption="The mission timeline panel, showing build, deploy gate, and test status per iteration."
-        />
+        <ScreenshotPlaceholder caption="The mission timeline panel, showing build, deploy gate, and test status per iteration." />
       </>
     ),
   },
