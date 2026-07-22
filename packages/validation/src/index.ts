@@ -338,6 +338,17 @@ export function toGuideLearningsResponse(
   };
 }
 
+export {
+  STALENESS_REASONS,
+  computeStaleness,
+  resolveLastRefresh,
+  windowToken,
+  type StalenessReason,
+  type StalenessInput,
+  type StalenessStatus,
+  type RefreshSourceEntry,
+} from "./staleness.js";
+
 export const availabilityStatusSchema = z.enum(["open", "waitlist", "paused"]);
 
 export type AvailabilityStatus = z.infer<typeof availabilityStatusSchema>;

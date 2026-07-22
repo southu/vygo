@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-07-22T06:01:50.076Z",
+  "method": "The staleness signal is a pure function of the pending-learnings count, the guide's last-refresh timestamp, and config/learnings-cadence.json. This demonstration forces an over-threshold condition (fired), captures the badge and the /api/staleness payload, then performs a refresh bringing pending back under the threshold (cleared) and captures the cleared state. Both payloads are produced by the same computeStaleness module that serves GET /api/staleness on the deployed app. No credentials or secrets are included.",
+  "config": {
+    "source": "config/learnings-cadence.json",
+    "threshold": 5,
+    "window": "P30D",
+    "window_days": 30
+  },
+  "fired": {
+    "timestamp": "2026-07-22T06:01:49.512Z",
+    "badge": {
+      "id": "staleness-badge",
+      "data_stale": "true",
+      "active": true
+    },
+    "api_staleness": {
+      "stale": true,
+      "reasons": [
+        "pending-over-threshold"
+      ],
+      "pending_count": 6,
+      "threshold": 5,
+      "last_refresh": "2026-07-21T06:01:49.512Z",
+      "window": "P30D",
+      "window_days": 30,
+      "computed_at": "2026-07-22T06:01:49.512Z"
+    }
+  },
+  "cleared": {
+    "timestamp": "2026-07-22T06:01:51.076Z",
+    "badge": {
+      "id": "staleness-badge",
+      "data_stale": "false",
+      "active": false
+    },
+    "api_staleness": {
+      "stale": false,
+      "reasons": [],
+      "pending_count": 2,
+      "threshold": 5,
+      "last_refresh": "2026-07-22T06:01:50.076Z",
+      "window": "P30D",
+      "window_days": 30,
+      "computed_at": "2026-07-22T06:01:51.076Z"
+    }
+  },
+  "test_run": {
+    "command": "pnpm exec tsx --test packages/validation/src/staleness.test.ts",
+    "passed": true,
+    "states": {
+      "over-threshold": "pass",
+      "over-window": "pass",
+      "cleared": "pass"
+    },
+    "output": "TAP version 13\n# Subtest: over-threshold: stale when pending EXCEEDS the configured threshold\nok 1 - over-threshold: stale when pending EXCEEDS the configured threshold\n  ---\n  duration_ms: 1.249504\n  type: 'test'\n  ...\n# Subtest: over-window: stale when the guide's last refresh is older than the window\nok 2 - over-window: stale when the guide's last refresh is older than the window\n  ---\n  duration_ms: 0.141883\n  type: 'test'\n  ...\n# Subtest: cleared: not stale when both limits are back under their configured values\nok 3 - cleared: not stale when both limits are back under their configured values\n  ---\n  duration_ms: 0.141122\n  type: 'test'\n  ...\n# Subtest: both limits crossed reports both reasons, pending first\nok 4 - both limits crossed reports both reasons, pending first\n  ---\n  duration_ms: 0.128382\n  type: 'test'\n  ...\n# Subtest: resolveLastRefresh picks the newest incorporated updated timestamp\nok 5 - resolveLastRefresh picks the newest incorporated updated timestamp\n  ---\n  duration_ms: 0.180872\n  type: 'test'\n  ...\n# Subtest: windowToken renders a whole-day ISO-8601 duration\nok 6 - windowToken renders a whole-day ISO-8601 duration\n  ---\n  duration_ms: 0.058928\n  type: 'test'\n  ...\n1..6\n# tests 6\n# suites 0\n# pass 6\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 192.580311\n"
+  }
+}

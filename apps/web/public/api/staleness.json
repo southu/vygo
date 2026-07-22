@@ -1,0 +1,10 @@
+{
+  "stale": false,
+  "reasons": [],
+  "pending_count": 2,
+  "threshold": 5,
+  "last_refresh": "2026-07-22T05:12:34.697Z",
+  "window": "P30D",
+  "window_days": 30,
+  "computed_at": "2026-07-22T06:01:48.974Z"
+}

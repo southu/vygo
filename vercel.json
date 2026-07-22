@@ -295,6 +295,10 @@
       "destination": "/api/readiness.json"
     },
     {
+      "source": "/api/staleness",
+      "destination": "/api/staleness.json"
+    },
+    {
       "source": "/api/railway-foundation",
       "destination": "/api/railway-foundation.json"
     },
@@ -405,6 +409,45 @@
     },
     {
       "source": "/api/readiness.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/api/staleness",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/api/staleness.json",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/staleness-demo.json",
       "headers": [
         {
           "key": "Content-Type",

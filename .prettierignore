@@ -7,6 +7,8 @@ pnpm-lock.yaml
 apps/web/out
 apps/web/src/generated
 apps/web/public/api/readiness.json
+apps/web/public/api/staleness.json
+apps/web/public/staleness-demo.json
 apps/web/public/api/railway-foundation.json
 apps/web/public/api/provision.json
 shared/provision.json

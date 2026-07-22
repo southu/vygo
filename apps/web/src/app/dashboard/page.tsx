@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { AnalysesConsole } from "@/components/AnalysesConsole";
+import { StalenessBadge } from "@/components/StalenessBadge";
+import { readStalenessStatus } from "@/lib/staleness-source";
 
 export const metadata: Metadata = {
   title: "Analyses dashboard",
@@ -8,5 +10,16 @@ export const metadata: Metadata = {
 };
 
 export default function DashboardPage() {
-  return <AnalysesConsole />;
+  const staleness = readStalenessStatus();
+  return (
+    <>
+      <div className="container-page flex items-center gap-3 pt-6" data-section="staleness">
+        <span className="text-sm font-semibold uppercase tracking-wide text-muted">
+          Guide staleness
+        </span>
+        <StalenessBadge status={staleness} />
+      </div>
+      <AnalysesConsole />
+    </>
+  );
 }

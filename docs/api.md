@@ -53,6 +53,39 @@ build-metadata variable is set (e.g. a bare local run), the body is `unknown`.
 b657ec298a022aa45babc800d61d00ffdd34bc6c
 ```
 
+## `GET /api/staleness`
+
+Machine-readable staleness signal for the Ratchet guide-progress view, served as
+a static `application/json` file (`no-store`). Both limits are read ONLY from the
+single cadence config file `config/learnings-cadence.json` (the sole source of
+truth, established in step 1): `staleness_threshold` (pending-count limit N) and
+`refresh_window_days` (refresh window M). The status is generated at build time
+by `scripts/generate-staleness.ts` from the same inputs as the on-page
+`#staleness-badge`, so the badge's `data-stale` attribute always matches this
+endpoint.
+
+The guide is STALE when the pending-learnings count EXCEEDS the threshold, OR the
+guide's last refresh is older than the window. `stale` is true exactly when
+`reasons` is non-empty; the signal clears automatically once both limits are back
+under their configured values (no manual reset).
+
+```json
+{
+  "stale": false,
+  "reasons": [],
+  "pending_count": 2,
+  "threshold": 5,
+  "last_refresh": "2026-07-22T05:12:34.697Z",
+  "window": "P30D",
+  "window_days": 30,
+  "computed_at": "2026-07-22T06:01:48.974Z"
+}
+```
+
+`reasons` values: `"pending-over-threshold"` and `"guide-over-window"`. A recorded
+fire-then-clear demonstration (forced over-threshold, then refreshed clear, plus
+the passing three-state test output) is served at `/staleness-demo.json`.
+
 ## `GET /readyz`
 
 Dependency-aware readiness. HTTP 200 only when PostgreSQL is reachable and all
