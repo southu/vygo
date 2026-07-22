@@ -64,6 +64,7 @@ export function getPrimaryNav(): NavItem[] {
     { href: "/security", label: "Security" },
     { href: "/why-vygo", label: "Why vygo.ai" },
     { href: "/vibe-coding", label: "Vibe coding" },
+    { href: "/guide-progress", label: "Guide progress" },
     { href: "/readiness", label: "Readiness Check" },
   ];
 
@@ -91,6 +92,7 @@ export function getFooterNav(): NavItem[] {
     { href: "/why-vygo", label: "Why vygo.ai" },
     { href: "/vibe-coding", label: "Vibe coding" },
     { href: "/guide", label: "Guide" },
+    { href: "/guide-progress", label: "Guide progress" },
     { href: "/careers", label: "Careers" },
   ];
 

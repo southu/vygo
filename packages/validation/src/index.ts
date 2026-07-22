@@ -244,6 +244,100 @@ export {
 // re-exported from this browser-bundled barrel (it breaks the Next.js web
 // build). Import it via the "@vygo/validation/learnings-log" subpath instead.
 
+/**
+ * Public, browser-safe projection of the Ratchet learnings log for the
+ * guide-progress panel and its JSON API. This mapping is PURE (no node:fs) so
+ * the Fastify API route and the static web build share exactly one contract,
+ * guaranteeing the counts and rows rendered on the page match the endpoint.
+ *
+ * `status` collapses the internal lifecycle (pending-in-guide / draft /
+ * incorporated) into the two states the public panel shows: anything not yet
+ * incorporated into the guide is reported as "pending".
+ */
+export type PublicLearningStatus = "pending" | "incorporated";
+
+/** One learning as surfaced by GET /api/guide/learnings and the panel. */
+export interface PublicLearning {
+  id: string;
+  summary: string;
+  /** Source link (commit / PR / release-note URL). */
+  source: string;
+  status: PublicLearningStatus;
+  /** Affected guide section(s). */
+  sections: string[];
+  /** Calendar date the learning was captured (YYYY-MM-DD). */
+  date: string;
+}
+
+/** Full shape returned by GET /api/guide/learnings. */
+export interface GuideLearningsResponse {
+  guide_last_updated: string;
+  counts: { pending: number; incorporated: number };
+  learnings: PublicLearning[];
+}
+
+/**
+ * Minimal structural shape read from the on-disk learnings log. Declared
+ * locally (rather than importing the fs-touching learnings-log module) so this
+ * mapper stays browser-safe.
+ */
+export interface GuideLearningSourceEntry {
+  id: string;
+  summary: string;
+  source_link: string;
+  affected_sections: string[];
+  status: string;
+  date: string;
+  incorporated_date?: string;
+}
+
+/** Collapse an internal lifecycle status to the public pending/incorporated pair. */
+export function toPublicLearningStatus(status: string): PublicLearningStatus {
+  return status === "incorporated" ? "incorporated" : "pending";
+}
+
+/** Latest YYYY-MM-DD string in `dates`, or "" when the list is empty. */
+function latestDate(dates: string[]): string {
+  return dates.reduce((max, d) => (d > max ? d : max), "");
+}
+
+/**
+ * Project raw log entries into the public guide-learnings response. Counts are
+ * derived from the same mapped list that is returned, so counts.pending /
+ * counts.incorporated always equal the number of learnings in each state.
+ */
+export function toGuideLearningsResponse(
+  entries: GuideLearningSourceEntry[],
+): GuideLearningsResponse {
+  const learnings: PublicLearning[] = entries.map((entry) => ({
+    id: entry.id,
+    summary: entry.summary,
+    source: entry.source_link,
+    status: toPublicLearningStatus(entry.status),
+    sections: [...entry.affected_sections],
+    date: entry.date,
+  }));
+
+  const pending = learnings.filter((l) => l.status === "pending").length;
+  const incorporated = learnings.filter((l) => l.status === "incorporated").length;
+
+  // The guide's last-updated date is the most recent incorporation date; when
+  // nothing is incorporated yet, fall back to the most recent learning date.
+  const incorporatedDates = entries
+    .filter((e) => e.status === "incorporated" && e.incorporated_date)
+    .map((e) => e.incorporated_date as string);
+  const guide_last_updated =
+    incorporatedDates.length > 0
+      ? latestDate(incorporatedDates)
+      : latestDate(entries.map((e) => e.date));
+
+  return {
+    guide_last_updated,
+    counts: { pending, incorporated },
+    learnings,
+  };
+}
+
 export const availabilityStatusSchema = z.enum(["open", "waitlist", "paused"]);
 
 export type AvailabilityStatus = z.infer<typeof availabilityStatusSchema>;

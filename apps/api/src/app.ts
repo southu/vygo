@@ -24,6 +24,7 @@ import { registerAvailabilityRoutes } from "./routes/availability.js";
 import { registerDiagnosticsRoutes } from "./routes/diagnostics.js";
 import { registerTestSurfaceRoutes, TEST_SUPPORT_ROUTES } from "./routes/test-surface.js";
 import { registerWaitlistRoutes } from "./routes/waitlist.js";
+import { registerGuideLearningsRoutes } from "./routes/guide-learnings.js";
 import { registerApplyRoutes } from "./routes/apply.js";
 import { registerReadinessRoutes } from "./routes/readiness.js";
 import { registerAnalysesRoutes } from "./routes/analyses.js";
@@ -324,6 +325,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<AppContex
   });
 
   registerApplyRoutes(app, { getDb });
+
+  // Ratchet guide-progress learnings store (public product-progress data; no auth).
+  registerGuideLearningsRoutes(app);
 
   registerReadinessRoutes(app, {
     env,
