@@ -188,7 +188,10 @@ const quickStartSteps: Step[] = [
           <strong>Version endpoint</strong> field (e.g. <code>GET /version</code>) that returns the
           deployed git SHA.
         </p>
-        <ScreenshotPlaceholder caption="Composer's product shell setup screen, showing the Git remote, Live URL, and Version endpoint fields." />
+        <ScreenshotPlaceholder
+          asset="ratchet-guide-composer-product-shell-setup.png"
+          caption="Composer's product shell setup screen, showing the Git remote, Live URL, and Version endpoint fields."
+        />
       </>
     ),
   },
@@ -215,7 +218,10 @@ const quickStartSteps: Step[] = [
           to &lsquo;Get started&rsquo;.&rdquo; Note anything the change must not touch in the{" "}
           <strong>Constraints</strong> field.
         </p>
-        <ScreenshotPlaceholder caption="The goal capture screen, with the Goal and Constraints fields." />
+        <ScreenshotPlaceholder
+          asset="ratchet-guide-composer-goal-capture.png"
+          caption="The goal capture screen, with the Goal and Constraints fields."
+        />
       </>
     ),
   },
@@ -228,7 +234,10 @@ const quickStartSteps: Step[] = [
           steps instead of one mega-mission. Click <strong>Accept draft</strong> to take the queue
           as-is for a first run.
         </p>
-        <ScreenshotPlaceholder caption="The draft queue screen, showing the proposed steps and the Accept draft button." />
+        <ScreenshotPlaceholder
+          asset="ratchet-guide-composer-draft-queue.png"
+          caption="The draft queue screen, showing the proposed steps and the Accept draft button."
+        />
         <AdvancedExpander title="Editing draft steps before accepting">
           <Callout type="tip">
             You can edit any step&apos;s title or body before accepting &mdash; Composer treats your
@@ -247,7 +256,10 @@ const quickStartSteps: Step[] = [
           &mdash; the run of consecutive live passes required to finish (2 is a reasonable first
           value) &mdash; and an optional <strong>Spend cap</strong> field.
         </p>
-        <ScreenshotPlaceholder caption="The run limits screen, with Max iterations, Pass streak, and Spend cap fields." />
+        <ScreenshotPlaceholder
+          asset="ratchet-guide-composer-run-limits.png"
+          caption="The run limits screen, with Max iterations, Pass streak, and Spend cap fields."
+        />
       </>
     ),
   },
@@ -260,7 +272,10 @@ const quickStartSteps: Step[] = [
           commits, the deploy gate waits until your version endpoint matches the new SHA, and a
           tester checks only the live app and returns PASS or FAIL.
         </p>
-        <ScreenshotPlaceholder caption="The mission control screen, showing the Start run button." />
+        <ScreenshotPlaceholder
+          asset="ratchet-guide-composer-mission-control.png"
+          caption="The mission control screen, showing the Start run button."
+        />
       </>
     ),
   },
@@ -273,7 +288,10 @@ const quickStartSteps: Step[] = [
           tester&apos;s feedback into the next build automatically. A PASS advances the streak. You
           do not need to intervene between iterations.
         </p>
-        <ScreenshotPlaceholder caption="The mission timeline panel, showing build, deploy gate, and test status per iteration." />
+        <ScreenshotPlaceholder
+          asset="ratchet-guide-dashboard-mission-timeline.png"
+          caption="The mission timeline panel, showing build, deploy gate, and test status per iteration."
+        />
       </>
     ),
   },

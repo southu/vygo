@@ -662,6 +662,15 @@
   opacity: 0.6;
 }
 
+.screenshot-placeholder-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+}
+
 .screenshot-placeholder-caption {
   margin: 0.5rem 0 0;
   font-size: 0.8125rem;
