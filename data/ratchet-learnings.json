@@ -86,6 +86,17 @@
       "created": "2026-07-22T05:30:00.000Z",
       "updated": "2026-07-22T05:12:34.697Z",
       "incorporated_date": "2026-07-22"
+    },
+    {
+      "id": "L-2026-07-22-contributor-doc-e2e",
+      "summary": "TEST: contributor doc end-to-end cycle. This entry verifies docs/learning-cycle.md by driving one full learning through record -> draft -> review -> publish -> incorporated, following only that runbook. Pending: it is a documentation self-test and is incorporated by that very cycle; it is safe to leave incorporated.",
+      "title": "TEST: contributor doc end-to-end cycle",
+      "date": "2026-07-22",
+      "source_link": "https://github.com/southu/vygo/blob/main/docs/learning-cycle.md",
+      "affected_sections": ["overview"],
+      "status": "pending-in-guide",
+      "created": "2026-07-22T06:10:00.000Z",
+      "updated": "2026-07-22T06:10:00.000Z"
     }
   ]
 }

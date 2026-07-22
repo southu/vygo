@@ -260,6 +260,11 @@ export type PublicLearningStatus = "pending" | "incorporated";
 export interface PublicLearning {
   id: string;
   summary: string;
+  /**
+   * Short human-readable name for the learning (used to name it in changelog /
+   * revision entries). Present only when the source entry carries a title.
+   */
+  title?: string;
   /** Source link (commit / PR / release-note URL). */
   source: string;
   status: PublicLearningStatus;
@@ -267,6 +272,12 @@ export interface PublicLearning {
   sections: string[];
   /** Calendar date the learning was captured (YYYY-MM-DD). */
   date: string;
+  /**
+   * Calendar date (YYYY-MM-DD) the learning was incorporated into the guide.
+   * Present only for incorporated learnings; this is the dashboard's per-entry
+   * incorporation timestamp.
+   */
+  incorporated_date?: string;
 }
 
 /** Full shape returned by GET /api/guide/learnings. */
@@ -284,6 +295,7 @@ export interface GuideLearningsResponse {
 export interface GuideLearningSourceEntry {
   id: string;
   summary: string;
+  title?: string;
   source_link: string;
   affected_sections: string[];
   status: string;
@@ -312,10 +324,12 @@ export function toGuideLearningsResponse(
   const learnings: PublicLearning[] = entries.map((entry) => ({
     id: entry.id,
     summary: entry.summary,
+    ...(entry.title ? { title: entry.title } : {}),
     source: entry.source_link,
     status: toPublicLearningStatus(entry.status),
     sections: [...entry.affected_sections],
     date: entry.date,
+    ...(entry.incorporated_date ? { incorporated_date: entry.incorporated_date } : {}),
   }));
 
   const pending = learnings.filter((l) => l.status === "pending").length;

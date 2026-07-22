@@ -78,6 +78,12 @@ describe("guide learnings API", () => {
       assert.ok(learning.status === "pending" || learning.status === "incorporated");
       assert.ok(Array.isArray(learning.sections));
     }
+    // Incorporated learnings carry their per-entry incorporation date so the
+    // learnings dashboard can show an incorporation timestamp per learning.
+    const incorporated = body.learnings.find((l: { id: string }) => l.id === "L-seed-incorporated");
+    assert.equal(incorporated.incorporated_date, "2026-07-12");
+    const pending = body.learnings.find((l: { id: string }) => l.id === "L-seed-pending");
+    assert.equal(pending.incorporated_date, undefined);
   });
 
   it("POST appends a pending learning and bumps the pending count by one", async () => {
