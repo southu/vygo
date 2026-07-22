@@ -17,7 +17,8 @@ a minute.
 | Guide-revisions store (written by the workflow) | `data/guide-revisions.json`                                       |
 | Workflow CLI                                    | `pnpm guide-update <command>` (source: `scripts/guide-update.ts`) |
 | Public learnings JSON (dashboard backing data)  | <https://www.vygo.ai/api/guide/learnings>                         |
-| Learnings dashboard                             | <https://dash.saniorem.com>                                       |
+| Learnings dashboard (renders the JSON above)    | <https://www.vygo.ai/guide-progress>                              |
+| Operator console (Ratchet Mission Composer)     | <https://dash.saniorem.com>                                       |
 | Published guide + changelog                     | <https://www.vygo.ai/vibe-coding/ratchet-guide#revision-history>  |
 | Deploy gate (serves the deployed git SHA)       | <https://www.vygo.ai/version>                                     |
 
@@ -90,8 +91,8 @@ helper at the bottom):
 curl -s https://www.vygo.ai/api/guide/learnings | grep -o '"id":"<id>"[^}]*"status":"pending"'
 ```
 
-The same entry is what the learnings dashboard at <https://dash.saniorem.com>
-reads, so it shows there as **pending** too.
+The same entry is what the learnings dashboard at
+<https://www.vygo.ai/guide-progress> reads, so it shows there as **pending** too.
 
 ---
 
@@ -204,8 +205,18 @@ curl -s https://www.vygo.ai/api/guide/learnings \
 
 You should see `"status":"incorporated"` and an `"incorporated_date"` for your
 `<id>`. This is the exact data the learnings dashboard at
-<https://dash.saniorem.com> reads, so the entry shows there as **incorporated**
-with that date too.
+<https://www.vygo.ai/guide-progress> renders, so the entry shows there as
+**incorporated** with that date too.
+
+> **Which surface is which (reconciliation).** The **learnings dashboard** is
+> <https://www.vygo.ai/guide-progress>, backed by
+> <https://www.vygo.ai/api/guide/learnings> — that is where you confirm the
+> `pending → incorporated` flip. <https://dash.saniorem.com> is the **Ratchet
+> Mission Composer** operator console (it queues and tracks builds); it is
+> reachable but does not itself render the learnings list, so confirm on the
+> `guide-progress` dashboard above. Earlier drafts of this runbook called
+> `dash.saniorem.com` the learnings dashboard; the accurate surface is
+> `www.vygo.ai/guide-progress`.
 
 Finally, confirm the **guide changelog** gained a matching entry — the Revision
 history lists your revision id, its date, and every learning it incorporated:
