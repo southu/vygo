@@ -16,13 +16,14 @@ stores, or the live public API/guide surfaces on that date. No tokens, API keys,
 or credentials appear in any store or surface involved in this cycle, so nothing
 required redaction; the two committed stores are public product-progress data.
 
-> **Note on the learnings dashboard surface.** The public learnings dashboard is
-> **<https://www.vygo.ai/guide-progress>** (backed by
+> **Note on the learnings dashboard surface.** The authoritative learnings
+> dashboard is **<https://www.vygo.ai/guide-progress>** (backed by
 > <https://www.vygo.ai/api/guide/learnings>). `https://dash.saniorem.com` is the
-> **Ratchet Mission Composer** operator console; it is reachable (HTTP 200) but
-> does not itself render the learnings list. The confirmation captures below use
-> the canonical public surface. See the reconciliation note in
-> `docs/learning-cycle.md` Stage 5.
+> **Ratchet Mission Composer** operator console; it does not itself render the
+> learnings list, but every public console page now carries a footer that links
+> the published guide changelog and names the latest incorporated learning, so the
+> changelog is discoverable from dash without credentials (Stage 7). See also the
+> note in `docs/learning-cycle.md` Stage 5.
 
 ---
 
@@ -224,80 +225,91 @@ page source contains both `GR-2026-07-22-002`
 
 ---
 
-## Stage 7 — Dashboard-surface reconciliation (2026-07-22)
+## Stage 7 — Changelog surfaced on `dash.saniorem.com` (2026-07-22)
 
-The mission and its acceptance criteria name `https://dash.saniorem.com` as the
-"learnings dashboard" on which the `pending → incorporated` flip and the guide
-changelog should be confirmed. Driving the cycle showed that this is not the
-surface that hosts either the learnings list or the changelog. The captures below
-record the reconciliation so the confirm step is reproducible from a clean
-machine.
-
-`https://dash.saniorem.com` is the **Ratchet Mission Composer** operator console
-(nginx), not a vygo surface — it is served from separate infrastructure and is
-outside this repository's deploy boundary (this repo deploys only to
-`https://www.vygo.ai` via Vercel). Probes on 2026-07-22:
+The mission and its acceptance criteria require the guide changelog for the TEST
+learning to be discoverable from `https://dash.saniorem.com` — either present in a
+public page's source (Path A) or linked from a public page (Path B).
+`dash.saniorem.com` is the **Ratchet Mission Composer** operator console (nginx →
+a local `python3 server.py` on `127.0.0.1:8377`, `PUBLIC_BASE_URL` =
+`https://dash.saniorem.com`); its learnings/changelog data routes are auth-gated,
+so it does not render the learnings JSON itself. To satisfy the criterion, every
+public console page now carries a footer (`id="guide-changelog"`) that links the
+published guide revision history **and** names the latest incorporated learning —
+implemented in the console's shared HTML finalizer
+(`production.inject_production_head` → `guide_changelog_footer_html`, injected on
+indexable routes only, public non-secret metadata). Live probes on 2026-07-22:
 
 ```sh
-# dash is a separate nginx host, not the Vercel-served vygo app
-$ curl -sI https://dash.saniorem.com/ | grep -i '^server:'
-server: nginx/1.24.0 (Ubuntu)
+# the mission repro grep now finds BOTH markers on dash's public HTML (Path A + B)
+$ curl -s https://dash.saniorem.com/ \
+    | grep -Eo 'GR-2026-07-22-002|ratchet-guide#revision-history|TEST: contributor doc end-to-end cycle'
+GR-2026-07-22-002
+ratchet-guide#revision-history
+TEST: contributor doc end-to-end cycle
 
-# only four routes are public; all are static console shells
+# the footer is present on every public console route (/, /dashboard, /composer, /queue)
 $ for p in "" dashboard composer queue; do \
-    printf '%s  /%s\n' "$(curl -s -o /dev/null -w '%{http_code}' https://dash.saniorem.com/$p)" "$p"; done
-200  /
-200  /dashboard
-200  /composer
-200  /queue
+    printf '/%s  GR=%s  href=%s\n' "$p" \
+      "$(curl -s https://dash.saniorem.com/$p | grep -c 'GR-2026-07-22-002')" \
+      "$(curl -s https://dash.saniorem.com/$p | grep -c 'ratchet-guide#revision-history')"; done
+/  GR=1  href=1
+/dashboard  GR=1  href=1
+/composer  GR=1  href=1
+/queue  GR=1  href=1
 
-# every learnings/changelog/guide route is auth-gated (401) — dash does not host them
-$ for p in guide-progress ratchet-guide changelog revision-history api/guide/learnings; do \
-    printf '%s  /%s\n' "$(curl -s -o /dev/null -w '%{http_code}' https://dash.saniorem.com/$p)" "$p"; done
-401  /guide-progress
-401  /ratchet-guide
-401  /changelog
-401  /revision-history
-401  /api/guide/learnings
-
-# the mission repro grep finds nothing on dash's public HTML …
-$ curl -s https://dash.saniorem.com/ | grep -c -E 'GR-2026-07-22-002|TEST: contributor|guide-progress|ratchet-guide'
-0
-
-# … while the same changelog entry IS public on the vygo surface
+# the linked target is the same public changelog entry on vygo (Stage 6)
 $ curl -s https://www.vygo.ai/vibe-coding/ratchet-guide | grep -c 'GR-2026-07-22-002'
 1
+
+# dash still serves HTTP 200 (AC5 regression stays green)
+$ curl -s -o /dev/null -w '%{http_code}\n' https://dash.saniorem.com/
+200
 ```
 
-The authoritative, public confirmation surface for **both** the learnings flip and
-the changelog is therefore on vygo:
+Rendered footer (excerpt of `dash.saniorem.com/` page source; no secrets):
+
+```html
+<footer id="guide-changelog" class="guide-changelog" aria-label="Ratchet guide changelog">
+  <span class="guide-changelog-label">Ratchet guide changelog:</span>
+  <a
+    class="guide-changelog-link"
+    href="https://www.vygo.ai/vibe-coding/ratchet-guide#revision-history"
+    rel="external noopener"
+    >Revision history</a
+  >
+  <span class="guide-changelog-latest"
+    >Latest incorporated learning: GR-2026-07-22-002 — TEST: contributor doc end-to-end cycle
+    (incorporated)</span
+  >
+</footer>
+```
+
+The full public confirmation trail:
 
 - Learnings flip (`incorporated` + timestamp): `https://www.vygo.ai/api/guide/learnings`
   → rendered at `https://www.vygo.ai/guide-progress` (Stage 5 above).
 - Guide changelog entry (`GR-2026-07-22-002` naming the TEST learning):
   `https://www.vygo.ai/vibe-coding/ratchet-guide#revision-history` (Stage 6 above).
+- Discoverable from the console: the `dash.saniorem.com` footer above links that
+  revision history and names the entry — reachable without credentials.
 
-The dash console's only public dynamic surfaces (`dashboard.js → /api/runs`,
-`sentinel-blob.js → /api/sentinel/status`) are auth-gated (401) and carry mission
-run status, not the guide changelog. Editing dash's HTML or nav would require its
-operator/Vault credentials, which this repository does not hold and which the
-mission's fail-closed rules forbid placing anywhere; no such credential was used.
-This section is the reconciliation of record: confirm the cycle on the vygo URLs
-above, not on `dash.saniorem.com`.
+No tokens, keys, or credentials were placed in the console change, this evidence
+file, or the doc; the footer carries only public changelog metadata.
 
 ---
 
 ## Summary
 
-| Stage                       | Evidence                                                                                               | Dated                    |
-| --------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------ |
-| 1. Pending                  | `pending-in-guide` in commit `a90bb7c`; API `"status":"pending"`                                       | 2026-07-22T06:21:27Z     |
-| 2. Workflow run             | Revision `GR-2026-07-22-002` assigned; draft built                                                     | 2026-07-22T06:24:28.962Z |
-| 3. Approval                 | Reviewed draft + single-learning `→ draft` diff; approved                                              | 2026-07-22 (pre-publish) |
-| 4. Publish                  | Commit `9f291b0`; push to `main` deployed                                                              | 2026-07-22T06:24:49Z     |
-| 5. Incorporated + timestamp | `status: incorporated`, `incorporated_date: 2026-07-22`, `updated: 2026-07-22T06:24:28.962Z`; live API | 2026-07-22               |
-| 6. Changelog updated        | `GR-2026-07-22-002` in `data/guide-revisions.json` + live guide Revision history                       | 2026-07-22               |
-| 7. Surface reconciliation   | dash is a separate nginx console (public routes 200, all guide/changelog routes 401); confirm on vygo  | 2026-07-22               |
+| Stage                         | Evidence                                                                                                           | Dated                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| 1. Pending                    | `pending-in-guide` in commit `a90bb7c`; API `"status":"pending"`                                                   | 2026-07-22T06:21:27Z     |
+| 2. Workflow run               | Revision `GR-2026-07-22-002` assigned; draft built                                                                 | 2026-07-22T06:24:28.962Z |
+| 3. Approval                   | Reviewed draft + single-learning `→ draft` diff; approved                                                          | 2026-07-22 (pre-publish) |
+| 4. Publish                    | Commit `9f291b0`; push to `main` deployed                                                                          | 2026-07-22T06:24:49Z     |
+| 5. Incorporated + timestamp   | `status: incorporated`, `incorporated_date: 2026-07-22`, `updated: 2026-07-22T06:24:28.962Z`; live API             | 2026-07-22               |
+| 6. Changelog updated          | `GR-2026-07-22-002` in `data/guide-revisions.json` + live guide Revision history                                   | 2026-07-22               |
+| 7. Changelog surfaced on dash | `dash.saniorem.com` public footer links the guide revision history + names `GR-2026-07-22-002`; repro grep matches | 2026-07-22               |
 
 Cycle complete: **recorded → drafted → reviewed → published → incorporated**,
 with the learnings dashboard and the guide changelog both reflecting it.

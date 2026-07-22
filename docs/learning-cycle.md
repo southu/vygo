@@ -208,21 +208,25 @@ You should see `"status":"incorporated"` and an `"incorporated_date"` for your
 <https://www.vygo.ai/guide-progress> renders, so the entry shows there as
 **incorporated** with that date too.
 
-> **Which surface is which (reconciliation).** The **learnings dashboard** is
+> **Which surface is which.** The authoritative **learnings dashboard** is
 > <https://www.vygo.ai/guide-progress>, backed by
 > <https://www.vygo.ai/api/guide/learnings> — that is where you confirm the
-> `pending → incorporated` flip. <https://dash.saniorem.com> is the **Ratchet
-> Mission Composer** operator console (nginx; it queues and tracks builds). Its
-> public routes are only `/`, `/dashboard`, `/composer`, and `/queue` (static
-> console shells); every learnings/changelog route on it — `/guide-progress`,
-> `/ratchet-guide`, `/changelog`, `/api/guide/learnings` — returns **401** and
-> hosts no learnings list or changelog. So the console does **not** render this
-> data; confirm on the vygo surfaces below. Earlier drafts of this runbook called
-> `dash.saniorem.com` the learnings dashboard; the accurate confirm surfaces are
-> `www.vygo.ai/guide-progress` (learnings) and
-> `www.vygo.ai/vibe-coding/ratchet-guide#revision-history` (changelog). A
-> reproducible probe of both surfaces is recorded in
-> [`docs/learning-cycle-evidence.md`](./learning-cycle-evidence.md) Stage 7.
+> `pending → incorporated` flip with a timestamp. <https://dash.saniorem.com> is
+> the **Ratchet Mission Composer** operator console (nginx; it queues and tracks
+> builds); its data routes for learnings live behind auth. So it does not render
+> the learnings JSON itself — but every public console page (`/`, `/dashboard`,
+> `/composer`, `/queue`) carries a footer (`id="guide-changelog"`) that **links
+> the published guide revision history and names the latest incorporated
+> learning**, so the changelog is discoverable from `dash.saniorem.com` without
+> credentials. Confirm the flip on the vygo surfaces below; confirm the console
+> pointer with the probe in
+> [`docs/learning-cycle-evidence.md`](./learning-cycle-evidence.md) Stage 7:
+>
+> ```sh
+> curl -s https://dash.saniorem.com/ \
+>   | grep -Eo 'GR-2026-07-22-002|ratchet-guide#revision-history'
+> # both markers present: the console footer surfaces the changelog + the entry
+> ```
 
 Finally, confirm the **guide changelog** gained a matching entry — the Revision
 history lists your revision id, its date, and every learning it incorporated:
