@@ -7,6 +7,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/api/guide/learnings",
+      "destination": "https://api-production-7f2d.up.railway.app/api/guide/learnings"
+    },
+    {
       "source": "/api/roles/:id/applications",
       "destination": "/api/jobs?resource=role-apply&id=:id"
     },
