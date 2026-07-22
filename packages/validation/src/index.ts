@@ -240,32 +240,9 @@ export {
   type AdoptionSignals,
 } from "./detailed-analysis.js";
 
-export {
-  DEFAULT_CADENCE_CONFIG_PATH,
-  DEFAULT_LEARNINGS_LOG_PATH,
-  IMMUTABLE_ENTRY_FIELDS,
-  LEARNING_STATUSES,
-  LearningsLogError,
-  REPO_ROOT,
-  appendEntry,
-  assertAdditive,
-  cadenceConfigSchema,
-  countPending,
-  isGuideRefreshDue,
-  isRefreshWindowElapsed,
-  learningEntrySchema,
-  learningsLogSchema,
-  markIncorporated,
-  readCadenceConfig,
-  readLog,
-  writeLog,
-  type CadenceConfig,
-  type LearningEntry,
-  type LearningStatus,
-  type LearningsLog,
-  type NewLearningInput,
-  type WriteOptions,
-} from "./learnings-log.js";
+// NOTE: the learnings-log module touches node:fs/node:path and MUST NOT be
+// re-exported from this browser-bundled barrel (it breaks the Next.js web
+// build). Import it via the "@vygo/validation/learnings-log" subpath instead.
 
 export const availabilityStatusSchema = z.enum(["open", "waitlist", "paused"]);
 
