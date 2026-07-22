@@ -93,65 +93,6 @@ const guideToc: GuideTocEntry[] = [
     title: "My mission stopped before reaching a pass streak",
     level: 3,
   },
-  { id: "changelog", title: "Changelog", level: 2 },
-];
-
-/**
- * Recent Ratchet improvements incorporated into this guide, rendered in the
- * Changelog section at the end of the page. Every entry is also covered in the
- * guide body above (linked via `sectionHref`) and has a matching `incorporated`
- * entry, dated when it was folded in, in the learnings log
- * (/vibe-coding/ratchet-guide/learnings-log). `date` is the day the improvement
- * shipped; `sourceHref` points at the Ratchet project's release notes / commit.
- */
-const changelogEntries: {
-  date: string;
-  title: string;
-  where: string;
-  sectionHref: string;
-  sourceHref: string;
-  sourceLabel: string;
-}[] = [
-  {
-    date: "2026-07-18",
-    title: "Three deploy-gate strategies: version-endpoint, fixed-delay, and command",
-    where: "Wait for the deploy gate to confirm your push",
-    sectionHref: "#wait-for-the-deploy-gate-to-confirm-your-push",
-    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#deploy-strategies",
-    sourceLabel: "README · Deploy strategies",
-  },
-  {
-    date: "2026-07-18",
-    title: "CI-gated deploys with the command strategy",
-    where: "Wait for the deploy gate to confirm your push",
-    sectionHref: "#wait-for-the-deploy-gate-to-confirm-your-push",
-    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#deploy-strategies",
-    sourceLabel: "README · Deploy strategies",
-  },
-  {
-    date: "2026-07-18",
-    title: "Structurally sandboxed live tester with a three-pass protocol",
-    where: "Test only the live, deployed app",
-    sectionHref: "#test-only-the-live-deployed-app",
-    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#the-real-tester",
-    sourceLabel: "README · The real tester",
-  },
-  {
-    date: "2026-07-18",
-    title: "Append-only TESTLOG bug ledger",
-    where: "Test only the live, deployed app",
-    sectionHref: "#test-only-the-live-deployed-app",
-    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#testlogmd",
-    sourceLabel: "README · TESTLOG.md",
-  },
-  {
-    date: "2026-07-18",
-    title: "Per-invocation wall-clock timeouts with one retry",
-    where: "Troubleshooting & FAQ",
-    sectionHref: "#mission-stopped-before-pass-streak",
-    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#guardrails",
-    sourceLabel: "README · Guardrails",
-  },
 ];
 
 /** Small forward-path link appended to the end of each major guide section. */
@@ -418,14 +359,6 @@ export default function RatchetGuidePage() {
               After a push, the deploy gate polls your product&apos;s version endpoint until it
               returns the SHA that was just pushed.
             </p>
-            <p className="mt-3 text-muted">
-              The gate now offers <strong>three deploy-gate strategies</strong>, so a product can
-              prove its deploy landed in whatever way fits its host:{" "}
-              <strong>version-endpoint</strong> (the default &mdash; poll the version signal until
-              it serves the pushed SHA), <strong>fixed-delay</strong> (wait a set interval, the
-              escape hatch for products with no version endpoint), and <strong>command</strong>{" "}
-              (re-run a command until it exits 0).
-            </p>
             <AdvancedExpander title="Version endpoint matching and auth pitfalls">
               <Callout type="note">
                 SHA matching is case-insensitive, and a long-enough prefix of the full SHA counts as
@@ -436,16 +369,6 @@ export default function RatchetGuidePage() {
                 the live URL under test, the gate times out and the run looks stuck even though the
                 build succeeded.
               </Callout>
-            </AdvancedExpander>
-            <AdvancedExpander title="CI-gated deploys with the command strategy">
-              <p>
-                The <strong>command strategy</strong> is how you gate on an external CI or deploy
-                run: the gate re-runs a mission-supplied command (for example, watching a CI run to
-                completion) until it succeeds, then lets the tester proceed. Because that command
-                executes with the harness&apos;s own privileges, the field is trusted input &mdash;
-                it is accepted only from the harness&apos;s own mission files, never from arbitrary
-                mission text.
-              </p>
             </AdvancedExpander>
 
             <h3
@@ -462,23 +385,6 @@ export default function RatchetGuidePage() {
               advances a streak counter. The loop keeps repeating build &rarr; deploy gate &rarr;
               test until the required streak of consecutive passes is reached.
             </p>
-            <p className="mt-3 text-muted">
-              The tester is <strong>structurally sandboxed</strong>: it runs with no repo clone at
-              all &mdash; only the live URL and the shared test log &mdash; and follows a{" "}
-              <strong>three-pass protocol</strong> in priority order: a <em>regression pass</em>{" "}
-              (re-verify every previously reported bug against the live app), an{" "}
-              <em>acceptance pass</em> (check each criterion), and an <em>expansion pass</em> (probe
-              at least one area no earlier run covered).
-            </p>
-            <AdvancedExpander title="The append-only TESTLOG bug ledger (the ratchet property)">
-              <p>
-                The tester keeps an <strong>append-only TESTLOG bug ledger</strong>: every bug it
-                reports stays on the books across iterations and is re-verified on every later run.
-                A bug is closed only when its original repro steps no longer reproduce on the live
-                app. That is the ratchet property &mdash; once a bug is found it cannot silently
-                come back, because a regression re-opens it and blocks the pass streak.
-              </p>
-            </AdvancedExpander>
 
             <h3
               id="know-what-done-means-at-every-layer"
@@ -862,10 +768,7 @@ export default function RatchetGuidePage() {
             <p className="mt-3 text-muted">
               <strong>Cause:</strong> the <strong>Max iterations</strong> or{" "}
               <strong>Spend cap</strong> limit was reached before the required run of consecutive
-              passes. A single build or test step can also end a run on its own:{" "}
-              <strong>per-invocation wall-clock timeouts</strong> supervise every builder and tester
-              call, and on a timeout the whole process group is killed and the step gets exactly{" "}
-              <strong>one retry</strong> before the run stops.
+              passes.
             </p>
             <p className="mt-2 text-muted">
               <strong>Fix:</strong> raise the iteration or spend limit, lower the{" "}
@@ -885,87 +788,6 @@ export default function RatchetGuidePage() {
                 Plan multi-step campaigns instead of one mega-mission
               </a>
               ).
-            </p>
-          </section>
-
-          <section className="mt-14" data-section="changelog">
-            <h2 id="changelog" className="group scroll-mt-24 font-display text-2xl font-bold">
-              Changelog
-              <HeadingAnchor id="changelog" />
-            </h2>
-            <p className="mt-4 text-muted">
-              Recent Ratchet improvements folded into this guide, newest source first. Each row is
-              covered somewhere in the sections above and has an explicit date it shipped. The full
-              record &mdash; including improvements still <strong>pending</strong> with a reason
-              &mdash; lives in the{" "}
-              <a
-                href="/vibe-coding/ratchet-guide/learnings-log"
-                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
-                data-learnings-log-link
-              >
-                learnings log
-              </a>
-              .
-            </p>
-            <div className="mt-6 overflow-x-auto">
-              <table className="w-full border-collapse text-sm text-ink-soft">
-                <thead>
-                  <tr>
-                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
-                      Date
-                    </th>
-                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
-                      Improvement
-                    </th>
-                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
-                      Where it&apos;s covered
-                    </th>
-                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
-                      Source
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {changelogEntries.map((entry) => (
-                    <tr key={entry.title}>
-                      <td className="whitespace-nowrap border border-border px-3 py-2 align-top font-mono text-xs text-muted">
-                        <time dateTime={entry.date}>{entry.date}</time>
-                      </td>
-                      <td className="border border-border px-3 py-2 align-top font-medium text-ink">
-                        {entry.title}
-                      </td>
-                      <td className="border border-border px-3 py-2 align-top">
-                        <a
-                          href={entry.sectionHref}
-                          className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
-                        >
-                          {entry.where}
-                        </a>
-                      </td>
-                      <td className="border border-border px-3 py-2 align-top">
-                        <a
-                          href={entry.sourceHref}
-                          className="break-all font-mono text-xs text-purple hover:underline"
-                          rel="nofollow"
-                        >
-                          {entry.sourceLabel}
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-6 text-sm text-muted">
-              This changelog tracks Ratchet product improvements reflected in the guide. For the
-              history of the documentation pack itself, see{" "}
-              <a
-                href={guidePackEntryHref("CHANGELOG.md")}
-                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
-              >
-                the pack CHANGELOG
-              </a>
-              .
             </p>
           </section>
         </div>

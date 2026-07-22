@@ -1,1 +1,79 @@
-{ "entries": [] }
+{
+  "entries": [
+    {
+      "id": "L-2026-07-18-deploy-strategies",
+      "summary": "Three deploy-gate strategies: version-endpoint, fixed-delay, and command. The gate can verify a deploy by polling a version signal (default), by waiting a fixed delay for products with no version endpoint, or by re-running a command until it exits 0.",
+      "date": "2026-07-18",
+      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#deploy-strategies",
+      "affected_sections": ["core-workflow", "loop-and-missions"],
+      "status": "incorporated",
+      "created": "2026-07-22T00:00:00.000Z",
+      "updated": "2026-07-22T00:00:00.000Z",
+      "incorporated_date": "2026-07-22"
+    },
+    {
+      "id": "L-2026-07-18-ci-command-gate",
+      "summary": "CI-gated deploys via the command strategy. The gate can block on an external CI/deploy run by re-running a mission-supplied command; the command field is trusted input and is accepted only from the harness's own mission files.",
+      "date": "2026-07-18",
+      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#deploy-strategies",
+      "affected_sections": ["core-workflow", "footguns"],
+      "status": "incorporated",
+      "created": "2026-07-22T00:00:00.000Z",
+      "updated": "2026-07-22T00:00:00.000Z",
+      "incorporated_date": "2026-07-22"
+    },
+    {
+      "id": "L-2026-07-18-sandboxed-tester",
+      "summary": "Structurally sandboxed live tester with a three-pass protocol. The tester runs with no repo clone (only the live URL and the shared log) and works in priority order: a regression pass, an acceptance pass, then an expansion pass.",
+      "date": "2026-07-18",
+      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#the-real-tester",
+      "affected_sections": ["core-workflow", "loop-and-missions"],
+      "status": "incorporated",
+      "created": "2026-07-22T00:00:00.000Z",
+      "updated": "2026-07-22T00:00:00.000Z",
+      "incorporated_date": "2026-07-22"
+    },
+    {
+      "id": "L-2026-07-18-testlog-ledger",
+      "summary": "Append-only TESTLOG bug ledger. Every bug the tester reports stays on the books across iterations and is re-verified against the live app each run; a bug is closed only when its original repro steps no longer reproduce. This is the ratchet property that keeps fixes from regressing.",
+      "date": "2026-07-18",
+      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#testlogmd",
+      "affected_sections": ["core-workflow", "overview"],
+      "status": "incorporated",
+      "created": "2026-07-22T00:00:00.000Z",
+      "updated": "2026-07-22T00:00:00.000Z",
+      "incorporated_date": "2026-07-22"
+    },
+    {
+      "id": "L-2026-07-18-invocation-timeouts",
+      "summary": "Per-invocation wall-clock timeouts with one retry. Every builder and tester invocation runs under a wall-clock supervisor; on timeout the whole process group is killed, the partial output is archived, and the role gets exactly one retry before the run stops.",
+      "date": "2026-07-18",
+      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#guardrails",
+      "affected_sections": ["core-workflow", "troubleshooting-faq"],
+      "status": "incorporated",
+      "created": "2026-07-22T00:00:00.000Z",
+      "updated": "2026-07-22T00:00:00.000Z",
+      "incorporated_date": "2026-07-22"
+    },
+    {
+      "id": "L-2026-07-22-heal-restraint",
+      "summary": "Overnight helpers stay single-flight and respect operator holds: they never auto-unpause or requeue a run that is on hold or still live. Pending: this is host-private overnight-operations behavior, kept out of the public product-design guide, whose small-blast-radius helper principle already covers the concept.",
+      "date": "2026-07-22",
+      "source_link": "https://github.com/southu/ratchet/commit/1caad24bc9291f070c6f51d16716703ba393a0bf",
+      "affected_sections": ["principles", "lazy-medic-sentinel"],
+      "status": "pending-in-guide",
+      "created": "2026-07-22T00:00:00.000Z",
+      "updated": "2026-07-22T00:00:00.000Z"
+    },
+    {
+      "id": "L-2026-07-18-state-heartbeat",
+      "summary": "Run-state heartbeat plus the ratchet status / report / kill monitoring surface keep a live run's state file fresh and inspectable. Pending: this is an operator monitoring and host-operations surface, excluded by the pack's explicit no-host-ops scope.",
+      "date": "2026-07-18",
+      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#run-state--monitoring",
+      "affected_sections": ["operations"],
+      "status": "pending-in-guide",
+      "created": "2026-07-22T00:00:00.000Z",
+      "updated": "2026-07-22T00:00:00.000Z"
+    }
+  ]
+}

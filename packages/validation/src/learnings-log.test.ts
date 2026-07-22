@@ -173,10 +173,32 @@ describe("cadence config + committed seed", () => {
     assert.ok(cadence.refresh_window_days > 0);
   });
 
-  it("the committed seed log is valid and starts empty", () => {
+  it("the committed seed log is valid and additive-consistent", () => {
     const seed = readLog(DEFAULT_LEARNINGS_LOG_PATH);
     assert.ok(learningsLogSchema.safeParse(seed).success);
-    assert.equal(countPending(seed), 0);
+    assert.ok(seed.entries.length > 0, "seed should carry the guide-refresh learnings");
+
+    // Ids are unique.
+    const ids = new Set(seed.entries.map((entry) => entry.id));
+    assert.equal(ids.size, seed.entries.length);
+
+    // Incorporated entries carry an incorporated_date and a source link; pending
+    // entries carry a reason and no incorporated_date.
+    for (const entry of seed.entries) {
+      assert.ok(entry.source_link.length > 0);
+      if (entry.status === "incorporated") {
+        assert.ok(entry.incorporated_date, `${entry.id} should have incorporated_date`);
+      } else {
+        assert.equal(entry.incorporated_date, undefined);
+        assert.match(entry.summary, /pending:/i, `${entry.id} should state a reason`);
+      }
+    }
+
+    // Pending count must stay below the staleness threshold so a refresh isn't
+    // spuriously flagged as due right after seeding.
+    assert.ok(
+      countPending(seed) < readCadenceConfig(DEFAULT_CADENCE_CONFIG_PATH).staleness_threshold,
+    );
     assert.equal(isGuideRefreshDue(), false);
   });
 });

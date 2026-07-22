@@ -1,0 +1,774 @@
+diff --git a/apps/web/public/content/vibe-coding/ratchet-guide/CHANGELOG.md b/apps/web/public/content/vibe-coding/ratchet-guide/CHANGELOG.md
+index 6f1ed5b..f4347c2 100644
+--- a/apps/web/public/content/vibe-coding/ratchet-guide/CHANGELOG.md
++++ b/apps/web/public/content/vibe-coding/ratchet-guide/CHANGELOG.md
+@@ -8,6 +8,28 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
+ 
+ ---
+ 
++## v1.2 / guide-2026-07-22 — refresh for recent Ratchet improvements
++
++### Added
++
++- Recent-improvements **Changelog** section on the rendered guide index page, listing each incorporated Ratchet improvement with the date it shipped and a source link
++- New **learnings log** page ([`/vibe-coding/ratchet-guide/learnings-log`](../learnings-log)), an append-only record of improvements marked `incorporated` (with date + source) or `pending` (with a reason)
++
++### Changed
++
++- [`loop-and-missions.md`](./loop-and-missions.md) now covers the **three deploy-gate strategies** (version-endpoint, fixed-delay, command), the **structurally sandboxed three-pass tester**, the **append-only TESTLOG bug ledger**, and **per-invocation timeouts with one retry**
++- Guide index deploy-gate, live-tester, and troubleshooting sections updated to fold in the same improvements — existing sections and headings preserved, no rewrite
++
++### Incorporated improvements (source: Ratchet README / commit history, 2026-07-18)
++
++- Three deploy-gate strategies: version-endpoint, fixed-delay, and command
++- CI-gated deploys with the command strategy (trusted mission-file input only)
++- Structurally sandboxed live tester with a three-pass protocol
++- Append-only TESTLOG bug ledger (the ratchet property)
++- Per-invocation wall-clock timeouts with one retry
++
++---
++
+ ## v1.2 / guide-2026-07-17h — deep public sanitization (concepts only)
+ 
+ ### Removed
+diff --git a/apps/web/public/content/vibe-coding/ratchet-guide/loop-and-missions.md b/apps/web/public/content/vibe-coding/ratchet-guide/loop-and-missions.md
+index 09a5da1..8354aa7 100644
+--- a/apps/web/public/content/vibe-coding/ratchet-guide/loop-and-missions.md
++++ b/apps/web/public/content/vibe-coding/ratchet-guide/loop-and-missions.md
+@@ -88,7 +88,17 @@ Matching is case-insensitive; full SHA or a long-enough prefix is enough.
+ 
+ The path must be readable by the gate without control-plane login. If the version path is behind auth or always wrong, loops look “stuck” even when AI is fine.
+ 
+-Other gate strategies (fixed wait, custom command) exist as ideas for throwaways — production-minded products prefer an honest version signal.
++### Deploy-gate strategies (product idea)
++
++The gate supports three ways to decide a deploy has landed, so a product can pick whatever its host makes honest:
++
++| Strategy             | When to use                                                                                                       |
++| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
++| **version-endpoint** | Default — poll the version signal until it serves the pushed SHA                                                  |
++| **fixed-delay**      | Escape hatch for products with **no** version endpoint — wait a set interval, then assume success (less reliable) |
++| **command**          | Gate on an external CI/deploy run — re-run a command until it exits 0                                             |
++
++The **command** strategy is trusted input: because the command runs with the harness’s own privileges, it is accepted only from the harness’s own mission files, never from arbitrary mission text. Production-minded products still prefer an honest version signal over a blind fixed delay.
+ 
+ ---
+ 
+@@ -144,7 +154,13 @@ No provisioner recipes or host steps live in this pack.
+ 
+ ## Verdict contract (tester → loop)
+ 
+-The tester must return a structured result the loop can act on:
++The tester runs **structurally sandboxed** — no repo clone, only the live URL and the shared test log — and works in a **three-pass protocol**, in priority order:
++
++1. **Regression pass** — re-verify every previously reported bug against the live app
++2. **Acceptance pass** — check each acceptance criterion
++3. **Expansion pass** — probe at least one area no earlier run covered
++
++It then returns a structured result the loop can act on:
+ 
+ - Overall **PASS** or **FAIL**
+ - On FAIL: actionable feedback for the next builder iteration
+@@ -152,4 +168,12 @@ The tester must return a structured result the loop can act on:
+ 
+ Missing or malformed results are a contract failure — not a silent green.
+ 
++### The append-only TESTLOG bug ledger
++
++Findings accumulate in an **append-only TESTLOG bug ledger**: every bug the tester reports stays on the books across iterations and is re-checked on every later run. A bug is closed only when its original repro steps no longer reproduce on the live app. This is the ratchet property — once found, a bug cannot silently come back, because a regression re-opens it and blocks the pass streak.
++
++### Guardrail: per-invocation timeouts
++
++Every builder and tester invocation runs under a **per-invocation wall-clock timeout**. On a timeout the whole process group is killed, the partial output is archived, and the role gets exactly **one retry** before the run stops — so a single hung step can never wedge a run forever.
++
+ Continue → [Composer](./composer.md)
+diff --git a/apps/web/src/app/vibe-coding/ratchet-guide/learnings-log/page.tsx b/apps/web/src/app/vibe-coding/ratchet-guide/learnings-log/page.tsx
+new file mode 100644
+index 0000000..a6a8d60
+--- /dev/null
++++ b/apps/web/src/app/vibe-coding/ratchet-guide/learnings-log/page.tsx
+@@ -0,0 +1,191 @@
++import type { Metadata } from "next";
++import {
++  readLearningsLog,
++  incorporatedEntries,
++  pendingEntries,
++  type LearningEntry,
++} from "@/lib/learnings-source";
++import { readGuidePackManifest } from "@/lib/guide-source";
++
++const log = readLearningsLog();
++const incorporated = incorporatedEntries(log);
++const pending = pendingEntries(log);
++const version = readGuidePackManifest().version;
++
++export const metadata: Metadata = {
++  title: "Learnings log — Ratchet system guide",
++  description:
++    "Append-only log of Ratchet improvements captured during delivery: which were incorporated into the guide (with date and source), and which are pending with a reason.",
++};
++
++function SourceLink({ href }: { href: string }) {
++  return (
++    <a
++      href={href}
++      className="break-all font-mono text-sm text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
++      data-learnings-source
++      rel="nofollow"
++    >
++      {href}
++    </a>
++  );
++}
++
++function IncorporatedCard({ entry }: { entry: LearningEntry }) {
++  return (
++    <li className="card" data-learning-id={entry.id} data-learning-status="incorporated">
++      <div className="flex flex-wrap items-center gap-3">
++        <span
++          className="chip border-green/40 bg-green/10 font-semibold text-green-dark"
++          data-status="incorporated"
++        >
++          Incorporated
++        </span>
++        <span className="text-sm text-muted">
++          Incorporated <time dateTime={entry.incorporated_date}>{entry.incorporated_date}</time>
++        </span>
++        <span className="text-sm text-muted">
++          · Shipped <time dateTime={entry.date}>{entry.date}</time>
++        </span>
++      </div>
++      <p className="mt-3 text-ink-soft">{entry.summary}</p>
++      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
++        <span>
++          Guide sections:{" "}
++          <span className="font-medium text-ink">{entry.affected_sections.join(", ")}</span>
++        </span>
++      </div>
++      <p className="mt-2 text-sm">
++        Source: <SourceLink href={entry.source_link} />
++      </p>
++    </li>
++  );
++}
++
++function PendingCard({ entry }: { entry: LearningEntry }) {
++  // The one-line reason a pending learning was not folded into the guide is
++  // carried in the summary after "Pending:"; surface it as an explicit reason.
++  const [claim, reasonTail] = entry.summary.split(/Pending:\s*/i);
++  const reason = reasonTail?.trim();
++  return (
++    <li className="card" data-learning-id={entry.id} data-learning-status="pending">
++      <div className="flex flex-wrap items-center gap-3">
++        <span
++          className="chip border-amber/40 bg-amber/10 font-semibold text-amber-dark"
++          data-status="pending"
++        >
++          Pending
++        </span>
++        <span className="text-sm text-muted">
++          Identified <time dateTime={entry.date}>{entry.date}</time>
++        </span>
++      </div>
++      <p className="mt-3 text-ink-soft">{claim?.trim()}</p>
++      {reason ? (
++        <p className="mt-2 text-sm text-muted" data-learning-reason>
++          <strong className="text-ink">Reason not incorporated:</strong> {reason}
++        </p>
++      ) : null}
++      <p className="mt-2 text-sm">
++        Source: <SourceLink href={entry.source_link} />
++      </p>
++    </li>
++  );
++}
++
++export default function RatchetLearningsLogPage() {
++  return (
++    <main id="main-content" data-guide-doc="learnings-log">
++      <section className="section-pad" data-section="doc-header">
++        <div className="container-page max-w-4xl">
++          <nav aria-label="Breadcrumb" className="text-sm text-muted" data-breadcrumb>
++            <a href="/vibe-coding" className="font-medium text-purple hover:underline">
++              Vibe coding
++            </a>
++            <span aria-hidden="true" className="mx-2">
++              /
++            </span>
++            <a
++              href="/vibe-coding/ratchet-guide"
++              className="font-medium text-purple hover:underline"
++            >
++              Ratchet system guide
++            </a>
++            <span aria-hidden="true" className="mx-2">
++              /
++            </span>
++            <span aria-current="page">Learnings log</span>
++          </nav>
++          <div className="mt-6 flex flex-wrap items-center gap-3">
++            <p className="eyebrow">Ratchet system guide · {version}</p>
++            <span
++              className="chip border-green/40 bg-green/10 text-green-dark"
++              data-status="available"
++            >
++              Available
++            </span>
++          </div>
++          <h1 className="mt-4 font-display text-4xl font-bold sm:text-5xl">Learnings log</h1>
++          <p className="mt-6 text-lg text-muted">
++            An append-only record of recent Ratchet improvements captured during delivery. Each
++            learning is either <strong>incorporated</strong> into this guide — with the date it was
++            folded in and a source link — or left <strong>pending</strong> with a one-line reason.
++            Entries are never deleted or rewritten; status only moves forward.
++          </p>
++        </div>
++      </section>
++
++      <section className="section-pad border-t border-border" data-section="incorporated">
++        <div className="container-page max-w-4xl">
++          <h2 className="font-display text-2xl font-bold">
++            Incorporated into the guide ({incorporated.length})
++          </h2>
++          <p className="mt-3 text-muted">
++            Every improvement below is reflected in the guide body and listed in the guide&apos;s{" "}
++            <a
++              href="/vibe-coding/ratchet-guide#changelog"
++              className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
++            >
++              Changelog
++            </a>
++            .
++          </p>
++          {incorporated.length > 0 ? (
++            <ul className="mt-6 space-y-4">
++              {incorporated.map((entry) => (
++                <IncorporatedCard key={entry.id} entry={entry} />
++              ))}
++            </ul>
++          ) : (
++            <p className="mt-6 text-muted">No incorporated learnings yet.</p>
++          )}
++        </div>
++      </section>
++
++      {pending.length > 0 ? (
++        <section className="section-pad border-t border-border bg-surface" data-section="pending">
++          <div className="container-page max-w-4xl">
++            <h2 className="font-display text-2xl font-bold">Pending ({pending.length})</h2>
++            <p className="mt-3 text-muted">
++              Identified but deliberately not folded into the public guide. These do not appear in
++              the guide&apos;s Changelog as incorporated.
++            </p>
++            <ul className="mt-6 space-y-4">
++              {pending.map((entry) => (
++                <PendingCard key={entry.id} entry={entry} />
++              ))}
++            </ul>
++          </div>
++        </section>
++      ) : null}
++
++      <section className="section-pad border-t border-border" data-section="back">
++        <div className="container-page max-w-4xl">
++          <a href="/vibe-coding/ratchet-guide" className="btn-secondary" data-back-to-guide>
++            &larr; Back to the Ratchet system guide
++          </a>
++        </div>
++      </section>
++    </main>
++  );
++}
+diff --git a/apps/web/src/app/vibe-coding/ratchet-guide/page.tsx b/apps/web/src/app/vibe-coding/ratchet-guide/page.tsx
+index 9777e4a..3d913fc 100644
+--- a/apps/web/src/app/vibe-coding/ratchet-guide/page.tsx
++++ b/apps/web/src/app/vibe-coding/ratchet-guide/page.tsx
+@@ -93,6 +93,65 @@ const guideToc: GuideTocEntry[] = [
+     title: "My mission stopped before reaching a pass streak",
+     level: 3,
+   },
++  { id: "changelog", title: "Changelog", level: 2 },
++];
++
++/**
++ * Recent Ratchet improvements incorporated into this guide, rendered in the
++ * Changelog section at the end of the page. Every entry is also covered in the
++ * guide body above (linked via `sectionHref`) and has a matching `incorporated`
++ * entry, dated when it was folded in, in the learnings log
++ * (/vibe-coding/ratchet-guide/learnings-log). `date` is the day the improvement
++ * shipped; `sourceHref` points at the Ratchet project's release notes / commit.
++ */
++const changelogEntries: {
++  date: string;
++  title: string;
++  where: string;
++  sectionHref: string;
++  sourceHref: string;
++  sourceLabel: string;
++}[] = [
++  {
++    date: "2026-07-18",
++    title: "Three deploy-gate strategies: version-endpoint, fixed-delay, and command",
++    where: "Wait for the deploy gate to confirm your push",
++    sectionHref: "#wait-for-the-deploy-gate-to-confirm-your-push",
++    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#deploy-strategies",
++    sourceLabel: "README · Deploy strategies",
++  },
++  {
++    date: "2026-07-18",
++    title: "CI-gated deploys with the command strategy",
++    where: "Wait for the deploy gate to confirm your push",
++    sectionHref: "#wait-for-the-deploy-gate-to-confirm-your-push",
++    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#deploy-strategies",
++    sourceLabel: "README · Deploy strategies",
++  },
++  {
++    date: "2026-07-18",
++    title: "Structurally sandboxed live tester with a three-pass protocol",
++    where: "Test only the live, deployed app",
++    sectionHref: "#test-only-the-live-deployed-app",
++    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#the-real-tester",
++    sourceLabel: "README · The real tester",
++  },
++  {
++    date: "2026-07-18",
++    title: "Append-only TESTLOG bug ledger",
++    where: "Test only the live, deployed app",
++    sectionHref: "#test-only-the-live-deployed-app",
++    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#testlogmd",
++    sourceLabel: "README · TESTLOG.md",
++  },
++  {
++    date: "2026-07-18",
++    title: "Per-invocation wall-clock timeouts with one retry",
++    where: "Troubleshooting & FAQ",
++    sectionHref: "#mission-stopped-before-pass-streak",
++    sourceHref: "https://github.com/southu/ratchet/blob/main/README.md#guardrails",
++    sourceLabel: "README · Guardrails",
++  },
+ ];
+ 
+ /** Small forward-path link appended to the end of each major guide section. */
+@@ -359,6 +418,14 @@ export default function RatchetGuidePage() {
+               After a push, the deploy gate polls your product&apos;s version endpoint until it
+               returns the SHA that was just pushed.
+             </p>
++            <p className="mt-3 text-muted">
++              The gate now offers <strong>three deploy-gate strategies</strong>, so a product can
++              prove its deploy landed in whatever way fits its host:{" "}
++              <strong>version-endpoint</strong> (the default &mdash; poll the version signal until
++              it serves the pushed SHA), <strong>fixed-delay</strong> (wait a set interval, the
++              escape hatch for products with no version endpoint), and <strong>command</strong>{" "}
++              (re-run a command until it exits 0).
++            </p>
+             <AdvancedExpander title="Version endpoint matching and auth pitfalls">
+               <Callout type="note">
+                 SHA matching is case-insensitive, and a long-enough prefix of the full SHA counts as
+@@ -370,6 +437,16 @@ export default function RatchetGuidePage() {
+                 build succeeded.
+               </Callout>
+             </AdvancedExpander>
++            <AdvancedExpander title="CI-gated deploys with the command strategy">
++              <p>
++                The <strong>command strategy</strong> is how you gate on an external CI or deploy
++                run: the gate re-runs a mission-supplied command (for example, watching a CI run to
++                completion) until it succeeds, then lets the tester proceed. Because that command
++                executes with the harness&apos;s own privileges, the field is trusted input &mdash;
++                it is accepted only from the harness&apos;s own mission files, never from arbitrary
++                mission text.
++              </p>
++            </AdvancedExpander>
+ 
+             <h3
+               id="test-only-the-live-deployed-app"
+@@ -385,6 +462,23 @@ export default function RatchetGuidePage() {
+               advances a streak counter. The loop keeps repeating build &rarr; deploy gate &rarr;
+               test until the required streak of consecutive passes is reached.
+             </p>
++            <p className="mt-3 text-muted">
++              The tester is <strong>structurally sandboxed</strong>: it runs with no repo clone at
++              all &mdash; only the live URL and the shared test log &mdash; and follows a{" "}
++              <strong>three-pass protocol</strong> in priority order: a <em>regression pass</em>{" "}
++              (re-verify every previously reported bug against the live app), an{" "}
++              <em>acceptance pass</em> (check each criterion), and an <em>expansion pass</em> (probe
++              at least one area no earlier run covered).
++            </p>
++            <AdvancedExpander title="The append-only TESTLOG bug ledger (the ratchet property)">
++              <p>
++                The tester keeps an <strong>append-only TESTLOG bug ledger</strong>: every bug it
++                reports stays on the books across iterations and is re-verified on every later run.
++                A bug is closed only when its original repro steps no longer reproduce on the live
++                app. That is the ratchet property &mdash; once a bug is found it cannot silently
++                come back, because a regression re-opens it and blocks the pass streak.
++              </p>
++            </AdvancedExpander>
+ 
+             <h3
+               id="know-what-done-means-at-every-layer"
+@@ -768,7 +862,10 @@ export default function RatchetGuidePage() {
+             <p className="mt-3 text-muted">
+               <strong>Cause:</strong> the <strong>Max iterations</strong> or{" "}
+               <strong>Spend cap</strong> limit was reached before the required run of consecutive
+-              passes.
++              passes. A single build or test step can also end a run on its own:{" "}
++              <strong>per-invocation wall-clock timeouts</strong> supervise every builder and tester
++              call, and on a timeout the whole process group is killed and the step gets exactly{" "}
++              <strong>one retry</strong> before the run stops.
+             </p>
+             <p className="mt-2 text-muted">
+               <strong>Fix:</strong> raise the iteration or spend limit, lower the{" "}
+@@ -790,6 +887,87 @@ export default function RatchetGuidePage() {
+               ).
+             </p>
+           </section>
++
++          <section className="mt-14" data-section="changelog">
++            <h2 id="changelog" className="group scroll-mt-24 font-display text-2xl font-bold">
++              Changelog
++              <HeadingAnchor id="changelog" />
++            </h2>
++            <p className="mt-4 text-muted">
++              Recent Ratchet improvements folded into this guide, newest source first. Each row is
++              covered somewhere in the sections above and has an explicit date it shipped. The full
++              record &mdash; including improvements still <strong>pending</strong> with a reason
++              &mdash; lives in the{" "}
++              <a
++                href="/vibe-coding/ratchet-guide/learnings-log"
++                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
++                data-learnings-log-link
++              >
++                learnings log
++              </a>
++              .
++            </p>
++            <div className="mt-6 overflow-x-auto">
++              <table className="w-full border-collapse text-sm text-ink-soft">
++                <thead>
++                  <tr>
++                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
++                      Date
++                    </th>
++                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
++                      Improvement
++                    </th>
++                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
++                      Where it&apos;s covered
++                    </th>
++                    <th className="border border-border bg-surface px-3 py-2 text-left font-display font-semibold text-ink">
++                      Source
++                    </th>
++                  </tr>
++                </thead>
++                <tbody>
++                  {changelogEntries.map((entry) => (
++                    <tr key={entry.title}>
++                      <td className="whitespace-nowrap border border-border px-3 py-2 align-top font-mono text-xs text-muted">
++                        <time dateTime={entry.date}>{entry.date}</time>
++                      </td>
++                      <td className="border border-border px-3 py-2 align-top font-medium text-ink">
++                        {entry.title}
++                      </td>
++                      <td className="border border-border px-3 py-2 align-top">
++                        <a
++                          href={entry.sectionHref}
++                          className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
++                        >
++                          {entry.where}
++                        </a>
++                      </td>
++                      <td className="border border-border px-3 py-2 align-top">
++                        <a
++                          href={entry.sourceHref}
++                          className="break-all font-mono text-xs text-purple hover:underline"
++                          rel="nofollow"
++                        >
++                          {entry.sourceLabel}
++                        </a>
++                      </td>
++                    </tr>
++                  ))}
++                </tbody>
++              </table>
++            </div>
++            <p className="mt-6 text-sm text-muted">
++              This changelog tracks Ratchet product improvements reflected in the guide. For the
++              history of the documentation pack itself, see{" "}
++              <a
++                href={guidePackEntryHref("CHANGELOG.md")}
++                className="text-purple underline decoration-purple/40 underline-offset-2 hover:decoration-purple"
++              >
++                the pack CHANGELOG
++              </a>
++              .
++            </p>
++          </section>
+         </div>
+       </div>
+ 
+diff --git a/apps/web/src/lib/learnings-source.ts b/apps/web/src/lib/learnings-source.ts
+new file mode 100644
+index 0000000..11d0e97
+--- /dev/null
++++ b/apps/web/src/lib/learnings-source.ts
+@@ -0,0 +1,53 @@
++/**
++ * Build-time access to the Ratchet learnings log data store.
++ *
++ * The log lives at the repo root under data/ratchet-learnings.json and is read
++ * from disk while the static export is generated — no runtime server code, no
++ * new dependency (mirrors lib/guide-source.ts). Server components only: never
++ * import from a client component.
++ *
++ * The write/validation module (@vygo/validation/learnings-log) touches
++ * node:fs and node:path and must not reach the browser bundle; here we only
++ * need read access for rendering, so we parse the JSON directly and keep the
++ * public shape narrow.
++ */
++import { readFileSync } from "node:fs";
++import path from "node:path";
++
++const LOG_PATH = path.join(process.cwd(), "../../data/ratchet-learnings.json");
++
++export type LearningStatus = "pending-in-guide" | "incorporated";
++
++export type LearningEntry = {
++  id: string;
++  summary: string;
++  /** Calendar date the improvement shipped (YYYY-MM-DD). */
++  date: string;
++  /** Source link: commit / PR / release-note anchor URL. */
++  source_link: string;
++  /** Guide section(s) the learning touches. */
++  affected_sections: string[];
++  status: LearningStatus;
++  created: string;
++  updated: string;
++  /** Present only when status is "incorporated". */
++  incorporated_date?: string;
++};
++
++export type LearningsLog = { entries: LearningEntry[] };
++
++/** Read and parse the learnings log data store at build time. */
++export function readLearningsLog(): LearningsLog {
++  const parsed = JSON.parse(readFileSync(LOG_PATH, "utf8")) as LearningsLog;
++  return { entries: Array.isArray(parsed.entries) ? parsed.entries : [] };
++}
++
++/** Incorporated entries, newest incorporated first. */
++export function incorporatedEntries(log: LearningsLog): LearningEntry[] {
++  return log.entries.filter((entry) => entry.status === "incorporated");
++}
++
++/** Entries still pending incorporation into the guide. */
++export function pendingEntries(log: LearningsLog): LearningEntry[] {
++  return log.entries.filter((entry) => entry.status === "pending-in-guide");
++}
+diff --git a/content/vibe-coding/ratchet-guide/CHANGELOG.md b/content/vibe-coding/ratchet-guide/CHANGELOG.md
+index 6f1ed5b..f4347c2 100644
+--- a/content/vibe-coding/ratchet-guide/CHANGELOG.md
++++ b/content/vibe-coding/ratchet-guide/CHANGELOG.md
+@@ -8,6 +8,28 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
+ 
+ ---
+ 
++## v1.2 / guide-2026-07-22 — refresh for recent Ratchet improvements
++
++### Added
++
++- Recent-improvements **Changelog** section on the rendered guide index page, listing each incorporated Ratchet improvement with the date it shipped and a source link
++- New **learnings log** page ([`/vibe-coding/ratchet-guide/learnings-log`](../learnings-log)), an append-only record of improvements marked `incorporated` (with date + source) or `pending` (with a reason)
++
++### Changed
++
++- [`loop-and-missions.md`](./loop-and-missions.md) now covers the **three deploy-gate strategies** (version-endpoint, fixed-delay, command), the **structurally sandboxed three-pass tester**, the **append-only TESTLOG bug ledger**, and **per-invocation timeouts with one retry**
++- Guide index deploy-gate, live-tester, and troubleshooting sections updated to fold in the same improvements — existing sections and headings preserved, no rewrite
++
++### Incorporated improvements (source: Ratchet README / commit history, 2026-07-18)
++
++- Three deploy-gate strategies: version-endpoint, fixed-delay, and command
++- CI-gated deploys with the command strategy (trusted mission-file input only)
++- Structurally sandboxed live tester with a three-pass protocol
++- Append-only TESTLOG bug ledger (the ratchet property)
++- Per-invocation wall-clock timeouts with one retry
++
++---
++
+ ## v1.2 / guide-2026-07-17h — deep public sanitization (concepts only)
+ 
+ ### Removed
+diff --git a/content/vibe-coding/ratchet-guide/loop-and-missions.md b/content/vibe-coding/ratchet-guide/loop-and-missions.md
+index 09a5da1..8354aa7 100644
+--- a/content/vibe-coding/ratchet-guide/loop-and-missions.md
++++ b/content/vibe-coding/ratchet-guide/loop-and-missions.md
+@@ -88,7 +88,17 @@ Matching is case-insensitive; full SHA or a long-enough prefix is enough.
+ 
+ The path must be readable by the gate without control-plane login. If the version path is behind auth or always wrong, loops look “stuck” even when AI is fine.
+ 
+-Other gate strategies (fixed wait, custom command) exist as ideas for throwaways — production-minded products prefer an honest version signal.
++### Deploy-gate strategies (product idea)
++
++The gate supports three ways to decide a deploy has landed, so a product can pick whatever its host makes honest:
++
++| Strategy             | When to use                                                                                                       |
++| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
++| **version-endpoint** | Default — poll the version signal until it serves the pushed SHA                                                  |
++| **fixed-delay**      | Escape hatch for products with **no** version endpoint — wait a set interval, then assume success (less reliable) |
++| **command**          | Gate on an external CI/deploy run — re-run a command until it exits 0                                             |
++
++The **command** strategy is trusted input: because the command runs with the harness’s own privileges, it is accepted only from the harness’s own mission files, never from arbitrary mission text. Production-minded products still prefer an honest version signal over a blind fixed delay.
+ 
+ ---
+ 
+@@ -144,7 +154,13 @@ No provisioner recipes or host steps live in this pack.
+ 
+ ## Verdict contract (tester → loop)
+ 
+-The tester must return a structured result the loop can act on:
++The tester runs **structurally sandboxed** — no repo clone, only the live URL and the shared test log — and works in a **three-pass protocol**, in priority order:
++
++1. **Regression pass** — re-verify every previously reported bug against the live app
++2. **Acceptance pass** — check each acceptance criterion
++3. **Expansion pass** — probe at least one area no earlier run covered
++
++It then returns a structured result the loop can act on:
+ 
+ - Overall **PASS** or **FAIL**
+ - On FAIL: actionable feedback for the next builder iteration
+@@ -152,4 +168,12 @@ The tester must return a structured result the loop can act on:
+ 
+ Missing or malformed results are a contract failure — not a silent green.
+ 
++### The append-only TESTLOG bug ledger
++
++Findings accumulate in an **append-only TESTLOG bug ledger**: every bug the tester reports stays on the books across iterations and is re-checked on every later run. A bug is closed only when its original repro steps no longer reproduce on the live app. This is the ratchet property — once found, a bug cannot silently come back, because a regression re-opens it and blocks the pass streak.
++
++### Guardrail: per-invocation timeouts
++
++Every builder and tester invocation runs under a **per-invocation wall-clock timeout**. On a timeout the whole process group is killed, the partial output is archived, and the role gets exactly **one retry** before the run stops — so a single hung step can never wedge a run forever.
++
+ Continue → [Composer](./composer.md)
+diff --git a/data/ratchet-learnings.json b/data/ratchet-learnings.json
+index 5fe3208..ea945a6 100644
+--- a/data/ratchet-learnings.json
++++ b/data/ratchet-learnings.json
+@@ -1 +1,79 @@
+-{ "entries": [] }
++{
++  "entries": [
++    {
++      "id": "L-2026-07-18-deploy-strategies",
++      "summary": "Three deploy-gate strategies: version-endpoint, fixed-delay, and command. The gate can verify a deploy by polling a version signal (default), by waiting a fixed delay for products with no version endpoint, or by re-running a command until it exits 0.",
++      "date": "2026-07-18",
++      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#deploy-strategies",
++      "affected_sections": ["core-workflow", "loop-and-missions"],
++      "status": "incorporated",
++      "created": "2026-07-22T00:00:00.000Z",
++      "updated": "2026-07-22T00:00:00.000Z",
++      "incorporated_date": "2026-07-22"
++    },
++    {
++      "id": "L-2026-07-18-ci-command-gate",
++      "summary": "CI-gated deploys via the command strategy. The gate can block on an external CI/deploy run by re-running a mission-supplied command; the command field is trusted input and is accepted only from the harness's own mission files.",
++      "date": "2026-07-18",
++      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#deploy-strategies",
++      "affected_sections": ["core-workflow", "footguns"],
++      "status": "incorporated",
++      "created": "2026-07-22T00:00:00.000Z",
++      "updated": "2026-07-22T00:00:00.000Z",
++      "incorporated_date": "2026-07-22"
++    },
++    {
++      "id": "L-2026-07-18-sandboxed-tester",
++      "summary": "Structurally sandboxed live tester with a three-pass protocol. The tester runs with no repo clone (only the live URL and the shared log) and works in priority order: a regression pass, an acceptance pass, then an expansion pass.",
++      "date": "2026-07-18",
++      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#the-real-tester",
++      "affected_sections": ["core-workflow", "loop-and-missions"],
++      "status": "incorporated",
++      "created": "2026-07-22T00:00:00.000Z",
++      "updated": "2026-07-22T00:00:00.000Z",
++      "incorporated_date": "2026-07-22"
++    },
++    {
++      "id": "L-2026-07-18-testlog-ledger",
++      "summary": "Append-only TESTLOG bug ledger. Every bug the tester reports stays on the books across iterations and is re-verified against the live app each run; a bug is closed only when its original repro steps no longer reproduce. This is the ratchet property that keeps fixes from regressing.",
++      "date": "2026-07-18",
++      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#testlogmd",
++      "affected_sections": ["core-workflow", "overview"],
++      "status": "incorporated",
++      "created": "2026-07-22T00:00:00.000Z",
++      "updated": "2026-07-22T00:00:00.000Z",
++      "incorporated_date": "2026-07-22"
++    },
++    {
++      "id": "L-2026-07-18-invocation-timeouts",
++      "summary": "Per-invocation wall-clock timeouts with one retry. Every builder and tester invocation runs under a wall-clock supervisor; on timeout the whole process group is killed, the partial output is archived, and the role gets exactly one retry before the run stops.",
++      "date": "2026-07-18",
++      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#guardrails",
++      "affected_sections": ["core-workflow", "troubleshooting-faq"],
++      "status": "incorporated",
++      "created": "2026-07-22T00:00:00.000Z",
++      "updated": "2026-07-22T00:00:00.000Z",
++      "incorporated_date": "2026-07-22"
++    },
++    {
++      "id": "L-2026-07-22-heal-restraint",
++      "summary": "Overnight helpers stay single-flight and respect operator holds: they never auto-unpause or requeue a run that is on hold or still live. Pending: this is host-private overnight-operations behavior, kept out of the public product-design guide, whose small-blast-radius helper principle already covers the concept.",
++      "date": "2026-07-22",
++      "source_link": "https://github.com/southu/ratchet/commit/1caad24bc9291f070c6f51d16716703ba393a0bf",
++      "affected_sections": ["principles", "lazy-medic-sentinel"],
++      "status": "pending-in-guide",
++      "created": "2026-07-22T00:00:00.000Z",
++      "updated": "2026-07-22T00:00:00.000Z"
++    },
++    {
++      "id": "L-2026-07-18-state-heartbeat",
++      "summary": "Run-state heartbeat plus the ratchet status / report / kill monitoring surface keep a live run's state file fresh and inspectable. Pending: this is an operator monitoring and host-operations surface, excluded by the pack's explicit no-host-ops scope.",
++      "date": "2026-07-18",
++      "source_link": "https://github.com/southu/ratchet/blob/main/README.md#run-state--monitoring",
++      "affected_sections": ["operations"],
++      "status": "pending-in-guide",
++      "created": "2026-07-22T00:00:00.000Z",
++      "updated": "2026-07-22T00:00:00.000Z"
++    }
++  ]
++}
+diff --git a/packages/validation/src/learnings-log.test.ts b/packages/validation/src/learnings-log.test.ts
+index a4f8824..3031f9f 100644
+--- a/packages/validation/src/learnings-log.test.ts
++++ b/packages/validation/src/learnings-log.test.ts
+@@ -173,10 +173,32 @@ describe("cadence config + committed seed", () => {
+     assert.ok(cadence.refresh_window_days > 0);
+   });
+ 
+-  it("the committed seed log is valid and starts empty", () => {
++  it("the committed seed log is valid and additive-consistent", () => {
+     const seed = readLog(DEFAULT_LEARNINGS_LOG_PATH);
+     assert.ok(learningsLogSchema.safeParse(seed).success);
+-    assert.equal(countPending(seed), 0);
++    assert.ok(seed.entries.length > 0, "seed should carry the guide-refresh learnings");
++
++    // Ids are unique.
++    const ids = new Set(seed.entries.map((entry) => entry.id));
++    assert.equal(ids.size, seed.entries.length);
++
++    // Incorporated entries carry an incorporated_date and a source link; pending
++    // entries carry a reason and no incorporated_date.
++    for (const entry of seed.entries) {
++      assert.ok(entry.source_link.length > 0);
++      if (entry.status === "incorporated") {
++        assert.ok(entry.incorporated_date, `${entry.id} should have incorporated_date`);
++      } else {
++        assert.equal(entry.incorporated_date, undefined);
++        assert.match(entry.summary, /pending:/i, `${entry.id} should state a reason`);
++      }
++    }
++
++    // Pending count must stay below the staleness threshold so a refresh isn't
++    // spuriously flagged as due right after seeding.
++    assert.ok(
++      countPending(seed) < readCadenceConfig(DEFAULT_CADENCE_CONFIG_PATH).staleness_threshold,
++    );
+     assert.equal(isGuideRefreshDue(), false);
+   });
+ });

@@ -88,7 +88,17 @@ Matching is case-insensitive; full SHA or a long-enough prefix is enough.
 
 The path must be readable by the gate without control-plane login. If the version path is behind auth or always wrong, loops look “stuck” even when AI is fine.
 
-Other gate strategies (fixed wait, custom command) exist as ideas for throwaways — production-minded products prefer an honest version signal.
+### Deploy-gate strategies (product idea)
+
+The gate supports three ways to decide a deploy has landed, so a product can pick whatever its host makes honest:
+
+| Strategy             | When to use                                                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **version-endpoint** | Default — poll the version signal until it serves the pushed SHA                                                  |
+| **fixed-delay**      | Escape hatch for products with **no** version endpoint — wait a set interval, then assume success (less reliable) |
+| **command**          | Gate on an external CI/deploy run — re-run a command until it exits 0                                             |
+
+The **command** strategy is trusted input: because the command runs with the harness’s own privileges, it is accepted only from the harness’s own mission files, never from arbitrary mission text. Production-minded products still prefer an honest version signal over a blind fixed delay.
 
 ---
 
@@ -144,12 +154,26 @@ No provisioner recipes or host steps live in this pack.
 
 ## Verdict contract (tester → loop)
 
-The tester must return a structured result the loop can act on:
+The tester runs **structurally sandboxed** — no repo clone, only the live URL and the shared test log — and works in a **three-pass protocol**, in priority order:
+
+1. **Regression pass** — re-verify every previously reported bug against the live app
+2. **Acceptance pass** — check each acceptance criterion
+3. **Expansion pass** — probe at least one area no earlier run covered
+
+It then returns a structured result the loop can act on:
 
 - Overall **PASS** or **FAIL**
 - On FAIL: actionable feedback for the next builder iteration
 - Open issues aligned with durable campaign notes
 
 Missing or malformed results are a contract failure — not a silent green.
+
+### The append-only TESTLOG bug ledger
+
+Findings accumulate in an **append-only TESTLOG bug ledger**: every bug the tester reports stays on the books across iterations and is re-checked on every later run. A bug is closed only when its original repro steps no longer reproduce on the live app. This is the ratchet property — once found, a bug cannot silently come back, because a regression re-opens it and blocks the pass streak.
+
+### Guardrail: per-invocation timeouts
+
+Every builder and tester invocation runs under a **per-invocation wall-clock timeout**. On a timeout the whole process group is killed, the partial output is archived, and the role gets exactly **one retry** before the run stops — so a single hung step can never wedge a run forever.
 
 Continue → [Composer](./composer.md)

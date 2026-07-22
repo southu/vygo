@@ -8,6 +8,28 @@ Pack folders: **`v1.2`** (current) · **`v1.1`** (archive). Section labels below
 
 ---
 
+## v1.2 / guide-2026-07-22 — refresh for recent Ratchet improvements
+
+### Added
+
+- Recent-improvements **Changelog** section on the rendered guide index page, listing each incorporated Ratchet improvement with the date it shipped and a source link
+- New **learnings log** page ([`/vibe-coding/ratchet-guide/learnings-log`](../learnings-log)), an append-only record of improvements marked `incorporated` (with date + source) or `pending` (with a reason)
+
+### Changed
+
+- [`loop-and-missions.md`](./loop-and-missions.md) now covers the **three deploy-gate strategies** (version-endpoint, fixed-delay, command), the **structurally sandboxed three-pass tester**, the **append-only TESTLOG bug ledger**, and **per-invocation timeouts with one retry**
+- Guide index deploy-gate, live-tester, and troubleshooting sections updated to fold in the same improvements — existing sections and headings preserved, no rewrite
+
+### Incorporated improvements (source: Ratchet README / commit history, 2026-07-18)
+
+- Three deploy-gate strategies: version-endpoint, fixed-delay, and command
+- CI-gated deploys with the command strategy (trusted mission-file input only)
+- Structurally sandboxed live tester with a three-pass protocol
+- Append-only TESTLOG bug ledger (the ratchet property)
+- Per-invocation wall-clock timeouts with one retry
+
+---
+
 ## v1.2 / guide-2026-07-17h — deep public sanitization (concepts only)
 
 ### Removed
