@@ -25,6 +25,43 @@ export default function HomePage() {
 
   return (
     <main id="main-content">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Lovable" },
+              { "@type": "ListItem", position: 2, name: "Cursor" },
+              { "@type": "ListItem", position: 3, name: "Replit" },
+              { "@type": "ListItem", position: 4, name: "Bolt" },
+              { "@type": "ListItem", position: 5, name: "v0" },
+              { "@type": "ListItem", position: 6, name: "Claude Code" },
+              { "@type": "ListItem", position: 7, name: "Grok" },
+              { "@type": "ListItem", position: 8, name: "GitHub Copilot" },
+              { "@type": "ListItem", position: 9, name: "Windsurf" },
+            ],
+          }),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: homepageFaqItems.map((item) => ({
+              "@type": "Question",
+              name: item.question,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: item.answer,
+              },
+            })),
+          }),
+        }}
+      />
       {/* Hero */}
       <section className="section-pad" data-section="hero">
         <div className="container-page grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
