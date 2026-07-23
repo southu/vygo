@@ -1,0 +1,4 @@
+url: https://www.vygo.ai/version
+http_status: 200
+body: a9f96c5790985e9bdcdf34a63375b764ea04f970
+local_head_at_verify_start: see git

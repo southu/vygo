@@ -22,6 +22,7 @@ import { apiUrl } from "@/lib/api";
 import { trackAnalytics } from "@/lib/analytics";
 import { captureAttribution, type WaitlistAttribution } from "@/lib/attribution";
 import { useAvailability } from "./AvailabilityProvider";
+import { FooterEmail } from "./FooterEmail";
 
 /**
  * Cloudflare official always-pass test sitekey (public).
@@ -682,7 +683,7 @@ export function WaitlistForm({
       const message =
         body?.error?.message ||
         (res.status === 429
-          ? "Too many attempts. Please try again later or email hello@vygo.ai."
+          ? "Too many attempts. Please try again later or email hello [at] vygo.ai."
           : "Something went wrong. Please try again.");
 
       if (body?.error?.fields) {
@@ -1306,10 +1307,8 @@ export function WaitlistForm({
                   <p className="font-semibold text-ink">Verification could not load</p>
                   <p className="mt-1">
                     Disable strict blockers for this site, reload the page, or email{" "}
-                    <a className="font-semibold text-purple underline" href="mailto:hello@vygo.ai">
-                      hello@vygo.ai
-                    </a>{" "}
-                    with your details. Your entered answers are preserved.
+                    <FooterEmail className="font-semibold text-purple underline" /> with your
+                    details. Your entered answers are preserved.
                   </p>
                 </div>
               ) : null}
@@ -1427,8 +1426,8 @@ export function WaitlistForm({
           {availabilityCopy.message}
         </p>
         <p className="mt-2 text-sm text-ink-soft">
-          Submission is not available until openings resume. Check back later or email
-          hello@vygo.ai.
+          Submission is not available until openings resume. Check back later or email{" "}
+          <FooterEmail className="font-semibold text-purple underline" />.
         </p>
         <div className="mt-6">
           <button

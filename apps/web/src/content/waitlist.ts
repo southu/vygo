@@ -4,7 +4,7 @@ export const waitlistContent = {
   page: {
     eyebrow: "LIMITED SENIOR-POD CAPACITY",
     headline: "Apply for the next production opening.",
-    body: "Tell us what you built, where it is getting stuck, and what deadline matters. We prioritize products with validated demand, active users, sensitive data, or a real commercial opportunity blocked by production risk. VYGO reviews applications against the next available Production Readiness Audit and engineering opening. For hard commercial or security-review deadlines, contact hello@vygo.ai.",
+    body: "Tell us what you built, where it is getting stuck, and what deadline matters. We prioritize products with validated demand, active users, sensitive data, or a real commercial opportunity blocked by production risk. VYGO reviews applications against the next available Production Readiness Audit and engineering opening. For hard commercial or security-review deadlines, contact hello [at] vygo.ai.",
   },
   form: {
     step1Title: "About you and the product",
@@ -48,7 +48,7 @@ export const waitlistContent = {
   },
   success: {
     heading: "You’re on the list.",
-    body: "VYGO will review your application against the next available Production Readiness Audit and engineering opening. If a customer contract or security review has a hard deadline, contact hello@vygo.ai.",
+    body: "VYGO will review your application against the next available Production Readiness Audit and engineering opening. If a customer contract or security review has a hard deadline, contact hello [at] vygo.ai.",
     nextLinkLabel: "View what happens next",
     nextHref: "/audit",
   },
@@ -61,7 +61,7 @@ export const waitlistContent = {
 
 export const thankYouContent = {
   heading: "Thank you for applying.",
-  body: "VYGO will review your application against the next available Production Readiness Audit and engineering opening. If a customer contract or security review has a hard deadline, contact hello@vygo.ai.",
+  body: "VYGO will review your application against the next available Production Readiness Audit and engineering opening. If a customer contract or security review has a hard deadline, contact hello [at] vygo.ai.",
   cta: { label: "View the Production Readiness Audit", href: "/audit" },
   homeCta: { label: "Back to home", href: "/" },
 } as const;

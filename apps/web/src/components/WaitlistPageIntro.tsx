@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { waitlistContent } from "@/content/waitlist";
 import { hardenInquiryCopy, parseOfferFromSearch } from "@/content/inquiry-offers";
+import { TextWithEmail } from "@/components/TextWithEmail";
 
 /**
  * Waitlist page intro that adapts when ?offer=harden identifies a free
@@ -20,7 +21,7 @@ export function WaitlistPageIntro() {
         {isHarden ? hardenInquiryCopy.heading : waitlistContent.page.headline}
       </h1>
       <p className="mt-5 text-lg text-muted">
-        {isHarden ? hardenInquiryCopy.body : waitlistContent.page.body}
+        <TextWithEmail text={isHarden ? hardenInquiryCopy.body : waitlistContent.page.body} />
       </p>
     </div>
   );

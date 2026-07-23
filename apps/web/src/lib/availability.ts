@@ -164,7 +164,7 @@ export function availabilityCopy(
       return {
         label: "AVAILABILITY UNAVAILABLE",
         message:
-          "We could not load current availability. You can still apply below, or email hello@vygo.ai.",
+          "We could not load current availability. You can still apply below, or email hello [at] vygo.ai.",
         action: "apply",
         ctaLabel: "Apply",
       };

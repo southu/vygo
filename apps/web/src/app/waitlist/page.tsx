@@ -5,6 +5,7 @@ import { waitlistContent } from "@/content/waitlist";
 import { AvailabilityCard } from "@/components/AvailabilityCard";
 import { WaitlistPageForm } from "@/components/WaitlistPageForm";
 import { WaitlistPageIntro } from "@/components/WaitlistPageIntro";
+import { TextWithEmail } from "@/components/TextWithEmail";
 
 export const metadata: Metadata = {
   title: site.metadata.waitlistTitle,
@@ -23,7 +24,9 @@ export default function WaitlistPage() {
                 <h1 className="mt-4 font-display text-4xl font-bold sm:text-5xl">
                   {waitlistContent.page.headline}
                 </h1>
-                <p className="mt-5 text-lg text-muted">{waitlistContent.page.body}</p>
+                <p className="mt-5 text-lg text-muted">
+                  <TextWithEmail text={waitlistContent.page.body} />
+                </p>
               </div>
             }
           >

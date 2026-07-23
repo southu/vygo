@@ -37,7 +37,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "Can you start immediately?",
     answer:
-      "Capacity depends on the current senior engineering pods. The website shows the next real opening. Urgent, contract-blocking situations should be described in the application so we can review them appropriately. For hard deadlines, contact hello@vygo.ai.",
+      "Capacity depends on the current senior engineering pods. The website shows the next real opening. Urgent, contract-blocking situations should be described in the application so we can review them appropriately. For hard deadlines, contact hello [at] vygo.ai.",
   },
   {
     question: "What happens after launch?",
