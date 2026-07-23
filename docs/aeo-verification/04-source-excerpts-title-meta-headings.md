@@ -5,15 +5,20 @@ Deploy SHA: 0bc7e4419a53fc397be654a3114f8534a39696b3
 Fetched: 2026-07-23T15:10:36.355281+00:00
 
 ## <title>
+
 `vygo.ai — Production Engineering for Lovable, Cursor, Replit, Bolt & v0 Apps`
+
 - Mentions a tool name: True
 - Contains banned location phrasing: False
 
 ## meta description
+
 `An AI-powered development environment built on a flow state model that merges agentic capabilities with developer editor interactions.`
+
 - Contains banned location phrasing: False
 
 ## h1–h3 headings
+
 - h1: Turn your working prototype into production-grade software.
 - h2: Built for products created with Lovable, Cursor, Replit, Bolt, v0, and more:
 - h2: Not sure how production-ready your prototype really is?

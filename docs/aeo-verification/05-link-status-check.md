@@ -41,6 +41,7 @@ Fetched: 2026-07-23T15:10:36.353649+00:00
 - [OK] https://www.vygo.ai/why-vygo → 200
 
 ## Summary
+
 - Links checked: 35
 - Broken: 0
 - Result: **PASS**

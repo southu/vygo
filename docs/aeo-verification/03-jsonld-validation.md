@@ -7,6 +7,7 @@ Fetched: 2026-07-23T15:10:36.354629+00:00
 Method: extract `<script type="application/ld+json">` blocks, `json.loads`, assert structure.
 
 ## Block 1: @type = `ItemList`
+
 ```json
 {
   "@context": "https://schema.org",
@@ -65,6 +66,7 @@ Method: extract `<script type="application/ld+json">` blocks, `json.loads`, asse
 - ItemList valid: **PASS**
 
 ## Block 2: @type = `FAQPage`
+
 ```json
 {
   "@context": "https://schema.org",
@@ -110,6 +112,7 @@ Method: extract `<script type="application/ld+json">` blocks, `json.loads`, asse
 - FAQPage valid: **PASS**
 
 ## Summary
+
 - ItemList: PASS
 - FAQPage: PASS
 - Result: **PASS**
