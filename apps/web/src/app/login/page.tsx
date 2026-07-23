@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CtaLink } from "@/components/CtaLink";
+import { EmailText } from "@/components/EmailText";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -31,7 +32,10 @@ export default function LoginPage() {
           </CtaLink>
         </div>
         <p className="mt-8 text-sm text-muted">
-          Demo user: <code className="font-mono">demo@vygo.ai</code>
+          Demo user:{" "}
+          <code className="font-mono">
+            <EmailText address="demo@vygo.ai" />
+          </code>
         </p>
       </div>
     </main>

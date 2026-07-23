@@ -39,10 +39,10 @@ export const site = {
       "What vibe coding is and is not, the Ratchet loop from goal to a streak of live-verified passes, the non-negotiables, and topics including the system guide and rebuild checklist.",
     privacyTitle: "Privacy Policy",
     privacyDescription:
-      "Privacy Policy for VYGO LLC explaining how vygo.ai collects, uses, and protects personal information from the marketing site and waitlist. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+      "Privacy Policy for VYGO LLC explaining how vygo.ai collects, uses, and protects personal information from the marketing site and waitlist. Questions, privacy requests, or legal notices may be sent to hello [at] vygo.ai. Notices are effective when received.",
     termsTitle: "Terms of Use",
     termsDescription:
-      "Terms of Use for the vygo.ai website and waitlist features operated by VYGO LLC, a Michigan limited liability company. Questions, privacy requests, or legal notices may be sent to hello@vygo.ai. Notices are effective when received.",
+      "Terms of Use for the vygo.ai website and waitlist features operated by VYGO LLC, a Michigan limited liability company. Questions, privacy requests, or legal notices may be sent to hello [at] vygo.ai. Notices are effective when received.",
     thankYouTitle: "Thank you",
     thankYouDescription:
       "Thank you for applying to the next production opening with VYGO. We review applications against available openings.",

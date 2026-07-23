@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiUrl } from "@/lib/api";
+import { EmailText } from "@/components/EmailText";
 
 /**
  * Analysis history view.
@@ -391,7 +392,7 @@ export function AnalysesConsole() {
           Opening any completed run renders the same readiness report a fresh run produces. History
           is scoped to a single identity — no cross-user listing — shown here for{" "}
           <code className="font-mono" data-testid="analysis-view-user">
-            {source.user}
+            <EmailText address={source.user} />
           </code>{" "}
           (<span data-testid="analysis-view-label">{source.label}</span>).
         </p>

@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react";
 import { brand } from "@vygo/ui";
 
-const atIndex = brand.email.indexOf("@");
-const emailUser = brand.email.slice(0, atIndex);
-const emailDomain = brand.email.slice(atIndex + 1);
+function obfuscatedLabel(email: string): string {
+  const atIndex = email.indexOf("@");
+  if (atIndex < 0) {
+    return email;
+  }
+  return `${email.slice(0, atIndex)} [at] ${email.slice(atIndex + 1)}`;
+}
 
 /**
  * Inline email address rendered Cloudflare-safe.
@@ -15,13 +19,15 @@ const emailDomain = brand.email.slice(atIndex + 1);
  * on direct request — so the address is composed only after hydration. The
  * server-rendered label stays human-readable without matching an email
  * pattern, giving the edge rewriter nothing to match.
+ *
+ * @param address - Email to display (defaults to the public brand contact).
  */
-export function EmailText() {
-  const [label, setLabel] = useState(`${emailUser} [at] ${emailDomain}`);
+export function EmailText({ address = brand.email }: { address?: string }) {
+  const [label, setLabel] = useState(obfuscatedLabel(address));
 
   useEffect(() => {
-    setLabel(brand.email);
-  }, []);
+    setLabel(address);
+  }, [address]);
 
   return <span>{label}</span>;
 }
