@@ -10,6 +10,16 @@ const publicTierPrices = {
 /** Inquiry offer key for free vygo Harden fit assessment. */
 export const hardenOfferKey = "harden" as const;
 
+/**
+ * Cross-tier delivery guarantees appended to the END of every engagement
+ * tier's outcomes list. Kept as a single shared source so no tier can omit
+ * them and QA/UAT is never presented as exclusive to higher tiers.
+ */
+const tierQaUatGuarantees = [
+  "Structured UAT program — your team validates every feature before cutover",
+  "Independent QA sign-off on every release",
+] as const;
+
 export const pricingContent = {
   flags: commercialFlags,
   page: {
@@ -139,8 +149,7 @@ export const pricingContent = {
         "Automated tests and deployment pipeline",
         "Monitoring and operational runbooks",
         "Full IP handoff",
-        "Structured UAT program — your team validates every feature before cutover",
-        "Independent QA sign-off on every release",
+        ...tierQaUatGuarantees,
       ],
     },
     {
@@ -159,8 +168,7 @@ export const pricingContent = {
         "Load testing and SLO dashboards",
         "SOC 2 Type I readiness program",
         "Full IP handoff",
-        "Structured UAT program — your team validates every feature before cutover",
-        "Independent QA sign-off on every release",
+        ...tierQaUatGuarantees,
       ],
     },
     {
@@ -179,8 +187,7 @@ export const pricingContent = {
         "Type II evidence program and auditor coordination",
         "ISO 27001 pathway where required",
         "Full IP handoff",
-        "Structured UAT program — your team validates every feature before cutover",
-        "Independent QA sign-off on every release",
+        ...tierQaUatGuarantees,
       ],
     },
   ],
