@@ -78,8 +78,7 @@ export const methodContent = {
         "Requirements that shift after test plans are agreed",
         "Limited customer availability for UAT",
       ],
-      gate:
-        "Nothing goes live without independent QA sign-off — not just developer-tested code.",
+      gate: "Nothing goes live without independent QA sign-off — not just developer-tested code.",
     },
     {
       title: "Harden",

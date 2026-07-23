@@ -136,14 +136,14 @@ file left byte-for-byte untouched.
 
 Per-slot outcomes (also recorded inline on each slot entry above):
 
-| Slot                                    | Outcome           | Asset file touched? |
-| --------------------------------------- | ----------------- | ------------------- |
-| step 1 "Create a product shell"         | confirmed-current | no                  |
-| step 3 "Describe your goal"             | confirmed-current | no                  |
-| step 4 "Accept the draft queue"         | confirmed-current | no                  |
-| step 5 "Set your limits"                | confirmed-current | no                  |
-| step 6 "Start the run"                  | confirmed-current | no                  |
-| step 7 "Watch it iterate"               | confirmed-current | no                  |
+| Slot                            | Outcome           | Asset file touched? |
+| ------------------------------- | ----------------- | ------------------- |
+| step 1 "Create a product shell" | confirmed-current | no                  |
+| step 3 "Describe your goal"     | confirmed-current | no                  |
+| step 4 "Accept the draft queue" | confirmed-current | no                  |
+| step 5 "Set your limits"        | confirmed-current | no                  |
+| step 6 "Start the run"          | confirmed-current | no                  |
+| step 7 "Watch it iterate"       | confirmed-current | no                  |
 
 Result: 6 of 6 slots confirmed-current, 0 refreshed, and **zero slots are
 marked suspect-stale** — no slot carries, or previously carried without a

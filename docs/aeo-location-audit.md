@@ -49,6 +49,7 @@ Every occurrence of AI tool mentions in templates, pages, or content:
 ## 2. 'Built for' Pill Strip Rendering
 
 The 'Built for' tool pill strip section is rendered in:
+
 - **File**: apps/web/src/app/page.tsx:49
 - **Code Block**:
   ```tsx

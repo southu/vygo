@@ -49,20 +49,20 @@ build via the default Playwright `baseURL`.
 
 ## Acceptance criteria (verified against live)
 
-| #   | Criterion | Result |
-| --- | --------- | ------ |
-| 1   | `GET /` returns HTTP 200 | 200 (see `http-status.txt`) |
-| 2   | Team/About page 200 + QA & UAT Lead card content | 200; card + summary rendered |
-| 3   | How-We-Work 200 + QA step copy | 200; QA step + activities rendered |
-| 4   | Each of two QA/UAT bullets appears exactly once per tier, all tiers | 1× per tier × 3 tiers (rendered DOM) |
-| 5   | FAQ served + QA/UAT entry answer present when expanded | Accordion expands to full answer |
-| 6   | `not just developer-tested code` verbatim in production | Present (/method gate) |
-| 7   | `separate from the engineers writing the code` verbatim | Present (homepage FAQ) |
-| 8   | 0× `US-based`/`offshore`/`onshore`/`nearshore` in the 4 blocks | 0 occurrences (`text-checks.txt`) |
-| 9   | No QA/UAT phrased as optional / add-on / extra-cost / tier-only | 0 occurrences; inclusive framing only |
-| 10  | Screenshots for 4 locations at 375px and 1280px | 8 PNGs under `screenshots/` |
-| 11  | 0 console error entries per page at both viewports | 0 errors on all 8 captures |
-| 12  | No horizontal overflow; no collapsed target section | overflow 0px; heights all > 0 |
-| 13  | e2e suite passes + asserts new QA & UAT copy | `qa-uat-copy.spec.ts`, 5 passed |
-| 14  | Primary nav pages 200 with non-empty bodies | All 16 routes 200 (`http-status.txt`) |
-| 15  | `/version` == tip of main after any push | Re-verified post-deploy |
+| #   | Criterion                                                           | Result                                |
+| --- | ------------------------------------------------------------------- | ------------------------------------- |
+| 1   | `GET /` returns HTTP 200                                            | 200 (see `http-status.txt`)           |
+| 2   | Team/About page 200 + QA & UAT Lead card content                    | 200; card + summary rendered          |
+| 3   | How-We-Work 200 + QA step copy                                      | 200; QA step + activities rendered    |
+| 4   | Each of two QA/UAT bullets appears exactly once per tier, all tiers | 1× per tier × 3 tiers (rendered DOM)  |
+| 5   | FAQ served + QA/UAT entry answer present when expanded              | Accordion expands to full answer      |
+| 6   | `not just developer-tested code` verbatim in production             | Present (/method gate)                |
+| 7   | `separate from the engineers writing the code` verbatim             | Present (homepage FAQ)                |
+| 8   | 0× `US-based`/`offshore`/`onshore`/`nearshore` in the 4 blocks      | 0 occurrences (`text-checks.txt`)     |
+| 9   | No QA/UAT phrased as optional / add-on / extra-cost / tier-only     | 0 occurrences; inclusive framing only |
+| 10  | Screenshots for 4 locations at 375px and 1280px                     | 8 PNGs under `screenshots/`           |
+| 11  | 0 console error entries per page at both viewports                  | 0 errors on all 8 captures            |
+| 12  | No horizontal overflow; no collapsed target section                 | overflow 0px; heights all > 0         |
+| 13  | e2e suite passes + asserts new QA & UAT copy                        | `qa-uat-copy.spec.ts`, 5 passed       |
+| 14  | Primary nav pages 200 with non-empty bodies                         | All 16 routes 200 (`http-status.txt`) |
+| 15  | `/version` == tip of main after any push                            | Re-verified post-deploy               |

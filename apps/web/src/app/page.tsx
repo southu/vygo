@@ -72,7 +72,7 @@ export default function HomePage() {
                 },
                 {
                   name: "Claude Code",
-                  desc: "A command-line interface agent from Anthropic that reads, writes, edits, and navigates codebase files directly within the local terminal.",
+                  desc: "A command-line interface agent developed by Anthropic that reads, writes, edits, and navigates codebase files directly within the local terminal.",
                 },
                 {
                   name: "Grok",
@@ -80,7 +80,7 @@ export default function HomePage() {
                 },
                 {
                   name: "GitHub Copilot",
-                  desc: "An AI pair programmer that provides autocomplete suggestions, interactive chat support, and codebase search within major IDEs.",
+                  desc: "An AI pair programmer that provides autocomplete suggestions, chat support, and contextual codebase search within major IDEs.",
                 },
                 {
                   name: "Windsurf",
