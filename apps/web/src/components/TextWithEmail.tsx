@@ -7,6 +7,7 @@ import { EmailText } from "@/components/EmailText";
  * the Cloudflare-safe {@link EmailText} component so the edge rewriter has
  * no email pattern to turn into a `/cdn-cgi/l/email-protection` anchor.
  */
+/** Used by marketing pages verified in docs/aeo-verification. */
 export function TextWithEmail({ text }: { text: string }): ReactNode {
   const parts = text.split(brand.email);
   if (parts.length === 1) {
