@@ -1,10 +1,32 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import type { LegalDocument } from "@/content/legal";
 import { legalMeta } from "@/content/legal";
+import { EmailText } from "@/components/EmailText";
 
 type Props = {
   document: LegalDocument;
 };
+
+/**
+ * Render body text, swapping the contact email for the Cloudflare-safe
+ * {@link EmailText} component. Legal copy embeds the address as plain text,
+ * which Cloudflare's edge email obfuscation rewrites into a
+ * `/cdn-cgi/l/email-protection` anchor that 404s on direct request; composing
+ * the address after hydration keeps the served HTML free of an email pattern.
+ */
+function renderText(text: string) {
+  const parts = text.split(legalMeta.contactEmail);
+  if (parts.length === 1) {
+    return text;
+  }
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {part}
+      {index < parts.length - 1 ? <EmailText /> : null}
+    </Fragment>
+  ));
+}
 
 export function LegalDocumentView({ document }: Props) {
   return (
@@ -38,7 +60,7 @@ export function LegalDocumentView({ document }: Props) {
                           key={`${section.heading}-p-${index}`}
                           className="text-sm leading-relaxed text-muted"
                         >
-                          {block.text}
+                          {renderText(block.text)}
                         </p>
                       );
                     }
@@ -53,10 +75,10 @@ export function LegalDocumentView({ document }: Props) {
                             {item.lead ? (
                               <>
                                 <span className="font-medium text-ink">{item.lead}</span>{" "}
-                                {item.text}
+                                {renderText(item.text)}
                               </>
                             ) : (
-                              item.text
+                              renderText(item.text)
                             )}
                           </li>
                         ))}
