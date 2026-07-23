@@ -61,11 +61,11 @@ export const methodContent = {
       title: "Quality assurance & UAT, built into every build",
       weeks: "Throughout the build",
       objectives:
-        "Engineer quality in from day one instead of inspecting it at the end: test plans are built against validated requirements, and automated and manual testing runs throughout the build rather than only at launch.",
+        "Every engagement includes a dedicated QA resource from day one, so quality is engineered in throughout the build instead of inspected at the end.",
       activities: [
-        "Test plans written against validated requirements from day one",
-        "Automated and manual testing run continuously throughout the build",
-        "Structured user acceptance testing (UAT) with customers before launch",
+        "Test plans are written against validated requirements.",
+        "Automated and manual testing runs throughout the build.",
+        "Structured UAT happens before launch.",
       ],
       involvement:
         "Confirm acceptance criteria against requirements, review test evidence, and take part in structured UAT before launch.",
@@ -78,7 +78,8 @@ export const methodContent = {
         "Requirements that shift after test plans are agreed",
         "Limited customer availability for UAT",
       ],
-      gate: "Structured UAT is passed and accepted before the launch and handoff step.",
+      gate:
+        "Nothing goes live without independent QA sign-off — not just developer-tested code.",
     },
     {
       title: "Harden",
