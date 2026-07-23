@@ -105,8 +105,8 @@
       "NEXT_PUBLIC_TURNSTILE_SITE_KEY"
     ]
   },
-  "gitSha": "ab8c263de649281fb998c2b2f47ceae69e9f8746",
-  "generatedAt": "2026-07-20T19:13:43.600Z",
+  "gitSha": "f582869cebf06ed7fce6ebcdc01ce5991b668ee8",
+  "generatedAt": "2026-07-23T13:06:07.308Z",
   "secretsScan": {
     "policy": "names-only",
     "selfScan": "passed",

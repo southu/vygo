@@ -52,7 +52,7 @@ export default function HomePage() {
                 { name: "Replit", desc: "A collaborative browser-based workspace that utilizes the Replit Agent to build, run, and deploy software applications automatically." },
                 { name: "Bolt", desc: "A browser-based development environment that spins up full-stack web projects with automatic package installation and container-based execution." },
                 { name: "v0", desc: "A generative UI system created by Vercel that builds React components and layouts using Tailwind CSS and shadcn/ui." },
-                { name: "Claude Code", desc: "A command-line agent from Anthropic that reads, writes, edits, and navigates codebase files directly within the local terminal." },
+                { name: "Claude Code", desc: "A command-line interface agent from Anthropic that reads, writes, edits, and navigates codebase files directly within the local terminal." },
                 { name: "Grok", desc: "An AI assistant developed by xAI that provides real-time search capabilities and context-aware coding assistance across multiple programming languages." },
                 { name: "GitHub Copilot", desc: "An AI pair programmer that provides autocomplete suggestions, interactive chat support, and codebase search within major IDEs." },
                 { name: "Windsurf", desc: "An AI-powered development environment built on a flow state model that merges agentic capabilities with developer editor interactions." }
