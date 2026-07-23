@@ -1,5 +1,5 @@
 import { homepage } from "@/content/homepage";
-import { faqItems } from "@/content/faq";
+import { homepageFaqItems } from "@/content/faq";
 import { pricingContent } from "@/content/pricing";
 import { commercialFlags } from "@/content/flags";
 import { CtaLink } from "@/components/CtaLink";
@@ -369,7 +369,7 @@ export default function HomePage() {
         <div className="container-page max-w-3xl">
           <SectionHeading title="Frequently asked questions" underline={false} />
           <div className="mt-8">
-            <FAQAccordion items={faqItems} />
+            <FAQAccordion items={homepageFaqItems} />
           </div>
         </div>
       </section>
