@@ -52,6 +52,6 @@ export const faqItems: FaqItem[] = [
   {
     question: "Who tests the software before launch?",
     answer:
-      "Every build is tested by a dedicated QA & UAT Lead — a separate role from the engineers who write the code, so the people verifying the work are never the people who built it. The QA & UAT Lead runs functional and user-acceptance testing before launch, and you, the client, review and approve what ships. Nothing goes live without your sign-off.",
+      "Every engagement includes a dedicated QA & UAT Lead who verifies the software — separate from the engineers writing the code — so the people checking the work are never the people who built it. The QA & UAT Lead runs functional and user-acceptance testing before launch as a standard part of every project. You approve what ships; we verify it works.",
   },
 ];
