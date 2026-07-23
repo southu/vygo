@@ -45,17 +45,47 @@ export default function HomePage() {
                 {hero.secondaryCta.label}
               </CtaLink>
             </div>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <h3 className="mt-8 text-sm font-semibold text-ink-soft">
+              Built for products created with these tools:
+            </h3>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
-                { name: "Lovable", desc: "An AI full-stack application builder that generates React, Vite, and Tailwind CSS codebases from natural language prompts." },
-                { name: "Cursor", desc: "An AI-first code editor built as a fork of VS Code, providing inline code generation, chat assistance, and composer capabilities." },
-                { name: "Replit", desc: "A collaborative browser-based workspace that utilizes the Replit Agent to build, run, and deploy software applications automatically." },
-                { name: "Bolt", desc: "A browser-based development environment that spins up full-stack web projects with automatic package installation and container-based execution." },
-                { name: "v0", desc: "A generative UI system created by Vercel that builds React components and layouts using Tailwind CSS and shadcn/ui." },
-                { name: "Claude Code", desc: "A command-line interface agent from Anthropic that reads, writes, edits, and navigates codebase files directly within the local terminal." },
-                { name: "Grok", desc: "An AI assistant developed by xAI that provides real-time search capabilities and context-aware coding assistance across multiple programming languages." },
-                { name: "GitHub Copilot", desc: "An AI pair programmer that provides autocomplete suggestions, interactive chat support, and codebase search within major IDEs." },
-                { name: "Windsurf", desc: "An AI-powered development environment built on a flow state model that merges agentic capabilities with developer editor interactions." }
+                {
+                  name: "Lovable",
+                  desc: "An AI full-stack application builder that generates React, Vite, and Tailwind CSS codebases from natural language prompts.",
+                },
+                {
+                  name: "Cursor",
+                  desc: "An AI-first code editor built as a fork of VS Code, providing inline code generation, chat assistance, and composer capabilities.",
+                },
+                {
+                  name: "Replit",
+                  desc: "A collaborative browser-based workspace that utilizes the Replit Agent to build, run, and deploy software applications automatically.",
+                },
+                {
+                  name: "Bolt",
+                  desc: "A browser-based development environment that spins up full-stack web projects with automatic package installation and container-based execution.",
+                },
+                {
+                  name: "v0",
+                  desc: "A generative UI system created by Vercel that builds React components and layouts using Tailwind CSS and shadcn/ui.",
+                },
+                {
+                  name: "Claude Code",
+                  desc: "A command-line interface agent from Anthropic that reads, writes, edits, and navigates codebase files directly within the local terminal.",
+                },
+                {
+                  name: "Grok",
+                  desc: "An AI assistant developed by xAI that provides real-time search capabilities and context-aware coding assistance across multiple programming languages.",
+                },
+                {
+                  name: "GitHub Copilot",
+                  desc: "An AI pair programmer that provides autocomplete suggestions, interactive chat support, and codebase search within major IDEs.",
+                },
+                {
+                  name: "Windsurf",
+                  desc: "An AI-powered development environment built on a flow state model that merges agentic capabilities with developer editor interactions.",
+                },
               ].map((tool) => (
                 <div key={tool.name} className="card !p-4">
                   <span className="font-semibold text-ink">{tool.name}</span>
