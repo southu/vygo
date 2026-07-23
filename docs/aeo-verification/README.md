@@ -3,16 +3,17 @@
 **Site:** https://www.vygo.ai  
 **Scope:** End-to-end acceptance verification of the AEO/copy rebuild on the live deployment.  
 **Deploy version endpoint:** https://www.vygo.ai/version  
-**Branch:** `main`
+**Branch:** `main`  
+**Fetched:** 2026-07-23T15:28:35.934494+00:00
 
-All checks below were run against the live site after deploy SHA `0bc7e4419a53fc397be654a3114f8534a39696b3` matched `main` HEAD.
+All checks below were run against the live site after deploy SHA `05d5fc25cda1762f9085e879592619efe420fe56` matched `main` HEAD.
 
 ## Deploy SHA
 
 | Field                | Value                                                 |
 | -------------------- | ----------------------------------------------------- |
-| `GET /version`       | `0bc7e4419a53fc397be654a3114f8534a39696b3` (HTTP 200) |
-| `git rev-parse HEAD` | `0bc7e4419a53fc397be654a3114f8534a39696b3`            |
+| `GET /version`       | `05d5fc25cda1762f9085e879592619efe420fe56` (HTTP 200) |
+| `git rev-parse HEAD` | `05d5fc25cda1762f9085e879592619efe420fe56`            |
 | Match                | **Yes**                                               |
 
 See also [`00-deploy-version.txt`](./00-deploy-version.txt).
@@ -22,16 +23,16 @@ See also [`00-deploy-version.txt`](./00-deploy-version.txt).
 | #   | Check                                                                                                                                 | Result                        | Evidence                                                                                                                                         |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | **Built for** section lists ≥6–8 named vibe-coding tools including **Claude** and **Grok**, each with a distinct descriptive sentence | **PASS**                      | [`01-built-for-section.md`](./01-built-for-section.md), [`01-built-for-html-excerpt.txt`](./01-built-for-html-excerpt.txt)                       |
-| 2   | Zero matches for banned location phrasing on every marketing page                                                                     | **PASS** (35 pages, 0 hits)   | [`02-crawl-location-phrases.md`](./02-crawl-location-phrases.md) (alias: `crawl-location-phrases.md`)                                            |
+| 2   | Zero matches for banned location phrasing on every marketing page                                                                     | **PASS** (33 pages, 0 hits)   | [`02-crawl-location-phrases.md`](./02-crawl-location-phrases.md) (alias: `crawl-location-phrases.md`)                                            |
 | 3   | ItemList + FAQPage JSON-LD present, parse as JSON, valid structure                                                                    | **PASS**                      | [`03-jsonld-validation.md`](./03-jsonld-validation.md)                                                                                           |
 | 4   | `<title>` / meta description mention tool names; no location text in title, meta, or h1–h3                                            | **PASS**                      | [`04-source-excerpts-title-meta-headings.md`](./04-source-excerpts-title-meta-headings.md), [`04-source-excerpts.txt`](./04-source-excerpts.txt) |
 | 5   | CTAs **Apply for the next opening** and **See how the rebuild works** present; href targets return 200–399                            | **PASS**                      | [`05-cta-check.md`](./05-cta-check.md)                                                                                                           |
-| 6   | Internal marketing navigation links return 200–399                                                                                    | **PASS** (35 links, 0 broken) | [`05-link-status-check.md`](./05-link-status-check.md)                                                                                           |
+| 6   | Internal marketing navigation links return 200–399                                                                                    | **PASS** (34 links, 0 broken) | [`05-link-status-check.md`](./05-link-status-check.md)                                                                                           |
 | 7   | Home loads HTTPS 200; primary nav resolves                                                                                            | **PASS**                      | home + link matrix                                                                                                                               |
 
 ### Check 1 — Built for tools
 
-Nine named tools, each with a unique descriptive sentence:
+9 named tools, each with a unique descriptive sentence:
 
 1. Lovable
 2. Cursor
@@ -47,14 +48,14 @@ Heading: _Built for products created with Lovable, Cursor, Replit, Bolt, v0, and
 
 ### Check 2 — Location phrasing
 
-Crawled 35 marketing/content URLs. Patterns (case-insensitive): `US-based`, `U.S.-based`, `based in the United States`, `American engineers`, and equivalents. **0 matches.**
+Crawled 33 marketing/content URLs. Patterns (case-insensitive): `US-based`, `U.S.-based`, `based in the United States`, `American engineers`, and equivalents. **0 matches.**
 
 ### Check 3 — JSON-LD
 
 Programmatic validation of live home page scripts:
 
-- `ItemList` with 9 non-empty `itemListElement` entries
-- `FAQPage` with multiple `Question` entities, each with `acceptedAnswer.text`
+- `ItemList` with non-empty `itemListElement` entries
+- `FAQPage` with Question entities, each with `acceptedAnswer.text`
 
 ### Check 4 — Title / meta / headings
 
@@ -64,16 +65,16 @@ Programmatic validation of live home page scripts:
 
 ### Check 5 — CTAs
 
-| CTA                        | Target                           | Status |
-| -------------------------- | -------------------------------- | ------ |
-| See how the rebuild works  | `/method`                        | 200    |
-| Apply for the next opening | `/waitlist` (CtaLink → ApplyCta) | 200    |
+| CTA                        | Target      | Status |
+| -------------------------- | ----------- | ------ |
+| See how the rebuild works  | `/method`   | 200    |
+| Apply for the next opening | `/waitlist` | 200    |
 
 ### Checks 6–7 — Navigation
 
 All discovered internal HTML marketing links returned 200–399. No broken navigation.
 
-**Residual markup fixed during verification:** Cloudflare was rewriting literal `hello@vygo.ai` on `/waitlist` and `/thank-you` into `href="/cdn-cgi/l/email-protection"` (404 on direct GET). Fixed via `TextWithEmail` / `FooterEmail` and `[at]`-form contact strings. Post-redeploy: **zero** `cdn-cgi/l/email-protection` hrefs on those pages.
+**Residual markup fixed during this verification:** Cloudflare was rewriting `demo@vygo.ai` on `/analyses` (and the login demo label) into `href="/cdn-cgi/l/email-protection"` (404 on direct GET). Fixed by extending `EmailText` to accept an `address` prop and using it in `AnalysesConsole` and `/login`. Privacy/terms meta descriptions use `hello [at] vygo.ai`. Post-redeploy: **zero** `cdn-cgi/l/email-protection` hrefs on crawled pages.
 
 ## File index
 
@@ -108,4 +109,4 @@ All discovered internal HTML marketing links returned 200–399. No broken navig
 
 ## Overall
 
-**ALL CHECKS PASS** against deploy `0bc7e4419a53fc397be654a3114f8534a39696b3`.
+**ALL CHECKS PASS** against deploy `05d5fc25cda1762f9085e879592619efe420fe56`.

@@ -1,8 +1,10 @@
-# Check 5/7 — Internal link HTTP status (live, post-redeploy)
+# Checks 6–7 — Internal link HTTP status (live)
 
 Base: https://www.vygo.ai
-Deploy SHA: 0bc7e4419a53fc397be654a3114f8534a39696b3
-Fetched: 2026-07-23T15:10:36.353649+00:00
+Deploy SHA: 05d5fc25cda1762f9085e879592619efe420fe56
+Fetched: 2026-07-23T15:28:35.934494+00:00
+
+Internal HTML/nav links discovered on home + marketing pages (plus primary nav).
 
 - [OK] https://www.vygo.ai/ → 200
 - [OK] https://www.vygo.ai/analyses → 200
@@ -15,15 +17,14 @@ Fetched: 2026-07-23T15:10:36.353649+00:00
 - [OK] https://www.vygo.ai/careers/qa-uat-lead → 200
 - [OK] https://www.vygo.ai/guide → 200
 - [OK] https://www.vygo.ai/guide-progress → 200
-- [OK] https://www.vygo.ai/insights → 200
 - [OK] https://www.vygo.ai/method → 200
 - [OK] https://www.vygo.ai/pricing → 200
 - [OK] https://www.vygo.ai/privacy → 200
 - [OK] https://www.vygo.ai/readiness → 200
+- [OK] https://www.vygo.ai/readiness/ → 200
 - [OK] https://www.vygo.ai/security → 200
 - [OK] https://www.vygo.ai/site.webmanifest → 200
 - [OK] https://www.vygo.ai/terms → 200
-- [OK] https://www.vygo.ai/thank-you → 200
 - [OK] https://www.vygo.ai/vibe-coding → 200
 - [OK] https://www.vygo.ai/vibe-coding/case-studies → 200
 - [OK] https://www.vygo.ai/vibe-coding/live-verify-testing → 200
@@ -40,8 +41,12 @@ Fetched: 2026-07-23T15:10:36.353649+00:00
 - [OK] https://www.vygo.ai/waitlist → 200
 - [OK] https://www.vygo.ai/why-vygo → 200
 
+## Cloudflare email-protection residual
+
+Pages containing `cdn-cgi/l/email-protection` in source: none
+
 ## Summary
 
-- Links checked: 35
+- Links checked: 34
 - Broken: 0
 - Result: **PASS**
