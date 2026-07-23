@@ -48,6 +48,7 @@ export default function HomePage() {
             <h3 className="mt-8 text-sm font-semibold text-ink-soft">
               Built for products created with these tools:
             </h3>
+            {/* Grid of vibe-coding tools (at least 6-8 named tools) */}
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 {
