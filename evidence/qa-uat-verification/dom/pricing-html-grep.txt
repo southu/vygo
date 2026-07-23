@@ -1,0 +1,24 @@
+Production-served HTML grep — QA/UAT deliverable bullets on /pricing
+Source: curl https://www.vygo.ai/pricing
+Method: count VISIBLE server-rendered <li> elements (real quotes),
+        excluding the Next.js RSC flight payload (which uses escaped \" quotes).
+======================================================================
+Visible <li> occurrences of bullet 1 ("Structured UAT program …"): 3  (expected 3 = one per tier)
+Visible <li> occurrences of bullet 2 ("Independent QA sign-off …"):  3  (expected 3 = one per tier)
+
+Authoritative per-tier rendered-DOM counts (from Playwright innerText):
+{
+  "launch": {
+    "Structured UAT program — your team validates every feature before cutover": 1,
+    "Independent QA sign-off on every release": 1
+  },
+  "scale": {
+    "Structured UAT program — your team validates every feature before cutover": 1,
+    "Independent QA sign-off on every release": 1
+  },
+  "enterprise": {
+    "Structured UAT program — your team validates every feature before cutover": 1,
+    "Independent QA sign-off on every release": 1
+  }
+}
+=> Each bullet appears exactly once in each of the launch/scale/enterprise tiers.

@@ -1,0 +1,22 @@
+Primary-nav + target-page HTTP regression check against https://www.vygo.ai
+Date: 2026-07-23T11:35:46Z
+======================================================================
+  /                        HTTP 200  132898 bytes
+  /audit                   HTTP 200  53734 bytes
+  /method                  HTTP 200  75508 bytes
+  /security                HTTP 200  49639 bytes
+  /why-vygo                HTTP 200  45718 bytes
+  /vibe-coding             HTTP 200  84289 bytes
+  /guide                   HTTP 200  62960 bytes
+  /guide-progress          HTTP 200  46394 bytes
+  /readiness               HTTP 200  159844 bytes
+  /pricing                 HTTP 200  79201 bytes
+  /careers                 HTTP 200  34326 bytes
+  /careers/qa-uat-lead     HTTP 200  34308 bytes
+  /waitlist                HTTP 200  30858 bytes
+  /privacy                 HTTP 200  57172 bytes
+  /terms                   HTTP 200  46325 bytes
+  /version                 HTTP 200  40 bytes
+======================================================================
+/version body: 840bf4da20f75f26627a75714879b7ebefea499b
+local HEAD:    840bf4da20f75f26627a75714879b7ebefea499b

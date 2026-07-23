@@ -1,0 +1,11 @@
+URL: https://www.vygo.ai/pricing
+Viewport: 1280x900
+Console error count: 0
+document.documentElement.scrollWidth: 1280 (viewport 1280, overflow 0)
+Target boundingBox height: 637.1
+
+--- ERROR-LEVEL ENTRIES ---
+(none)
+
+--- ALL CONSOLE ENTRIES ---
+(none)

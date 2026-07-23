@@ -1,0 +1,14 @@
+{
+  "launch": {
+    "Structured UAT program — your team validates every feature before cutover": 1,
+    "Independent QA sign-off on every release": 1
+  },
+  "scale": {
+    "Structured UAT program — your team validates every feature before cutover": 1,
+    "Independent QA sign-off on every release": 1
+  },
+  "enterprise": {
+    "Structured UAT program — your team validates every feature before cutover": 1,
+    "Independent QA sign-off on every release": 1
+  }
+}

@@ -1,0 +1,11 @@
+URL: https://www.vygo.ai/method
+Viewport: 375x812
+Console error count: 0
+document.documentElement.scrollWidth: 375 (viewport 375, overflow 0)
+Target boundingBox height: 924.3
+
+--- ERROR-LEVEL ENTRIES ---
+(none)
+
+--- ALL CONSOLE ENTRIES ---
+(none)

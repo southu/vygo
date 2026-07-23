@@ -1,0 +1,107 @@
+{
+  "base": "https://www.vygo.ai",
+  "tierReport": {
+    "launch": {
+      "Structured UAT program — your team validates every feature before cutover": 1,
+      "Independent QA sign-off on every release": 1
+    },
+    "scale": {
+      "Structured UAT program — your team validates every feature before cutover": 1,
+      "Independent QA sign-off on every release": 1
+    },
+    "enterprise": {
+      "Structured UAT program — your team validates every feature before cutover": 1,
+      "Independent QA sign-off on every release": 1
+    }
+  },
+  "summary": [
+    {
+      "target": "a-careers-qa-uat-card",
+      "viewport": "mobile",
+      "width": 375,
+      "url": "https://www.vygo.ai/careers",
+      "consoleErrors": 0,
+      "scrollWidth": 375,
+      "overflowPx": 0,
+      "sectionHeight": 336.9,
+      "screenshot": "screenshots/a-careers-qa-uat-card.mobile.png"
+    },
+    {
+      "target": "b-method-qa-step",
+      "viewport": "mobile",
+      "width": 375,
+      "url": "https://www.vygo.ai/method",
+      "consoleErrors": 0,
+      "scrollWidth": 375,
+      "overflowPx": 0,
+      "sectionHeight": 924.3,
+      "screenshot": "screenshots/b-method-qa-step.mobile.png"
+    },
+    {
+      "target": "c-pricing-tier-deliverables",
+      "viewport": "mobile",
+      "width": 375,
+      "url": "https://www.vygo.ai/pricing",
+      "consoleErrors": 0,
+      "scrollWidth": 375,
+      "overflowPx": 0,
+      "sectionHeight": 634.2,
+      "screenshot": "screenshots/c-pricing-tier-deliverables.mobile.png"
+    },
+    {
+      "target": "d-faq-qa-uat",
+      "viewport": "mobile",
+      "width": 375,
+      "url": "https://www.vygo.ai/",
+      "consoleErrors": 0,
+      "scrollWidth": 375,
+      "overflowPx": 0,
+      "sectionHeight": 339.5,
+      "screenshot": "screenshots/d-faq-qa-uat.mobile.png"
+    },
+    {
+      "target": "a-careers-qa-uat-card",
+      "viewport": "desktop",
+      "width": 1280,
+      "url": "https://www.vygo.ai/careers",
+      "consoleErrors": 0,
+      "scrollWidth": 1280,
+      "overflowPx": 0,
+      "sectionHeight": 315.6,
+      "screenshot": "screenshots/a-careers-qa-uat-card.desktop.png"
+    },
+    {
+      "target": "b-method-qa-step",
+      "viewport": "desktop",
+      "width": 1280,
+      "url": "https://www.vygo.ai/method",
+      "consoleErrors": 0,
+      "scrollWidth": 1280,
+      "overflowPx": 0,
+      "sectionHeight": 376,
+      "screenshot": "screenshots/b-method-qa-step.desktop.png"
+    },
+    {
+      "target": "c-pricing-tier-deliverables",
+      "viewport": "desktop",
+      "width": 1280,
+      "url": "https://www.vygo.ai/pricing",
+      "consoleErrors": 0,
+      "scrollWidth": 1280,
+      "overflowPx": 0,
+      "sectionHeight": 637.1,
+      "screenshot": "screenshots/c-pricing-tier-deliverables.desktop.png"
+    },
+    {
+      "target": "d-faq-qa-uat",
+      "viewport": "desktop",
+      "width": 1280,
+      "url": "https://www.vygo.ai/",
+      "consoleErrors": 0,
+      "scrollWidth": 1280,
+      "overflowPx": 0,
+      "sectionHeight": 193.2,
+      "screenshot": "screenshots/d-faq-qa-uat.desktop.png"
+    }
+  ]
+}

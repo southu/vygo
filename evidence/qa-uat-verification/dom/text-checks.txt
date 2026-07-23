@@ -1,0 +1,92 @@
+QA & UAT copy — production rendered-DOM text checks
+Source: dom/rendered-sections.json (captured from https://www.vygo.ai)
+======================================================================
+
+### Block: careers-qa-uat-card
+  [workforce-location] "us-based": 0 occurrences
+  [workforce-location] "offshore": 0 occurrences
+  [workforce-location] "onshore": 0 occurrences
+  [workforce-location] "nearshore": 0 occurrences
+  [optional-framing]  "optional": 0 occurrences
+  [optional-framing]  "add-on": 0 occurrences
+  [optional-framing]  "add on": 0 occurrences
+  [optional-framing]  "extra cost": 0 occurrences
+  [optional-framing]  "additional cost": 0 occurrences
+  [optional-framing]  "additional fee": 0 occurrences
+  [optional-framing]  "at extra": 0 occurrences
+  [optional-framing]  "available only": 0 occurrences
+  [optional-framing]  "only available": 0 occurrences
+  [optional-framing]  "upgrade to": 0 occurrences
+  [optional-framing]  "higher tier": 0 occurrences
+  [optional-framing]  "premium tier": 0 occurrences
+  [optional-framing]  "surcharge": 0 occurrences
+
+### Block: method-qa-step
+  [workforce-location] "us-based": 0 occurrences
+  [workforce-location] "offshore": 0 occurrences
+  [workforce-location] "onshore": 0 occurrences
+  [workforce-location] "nearshore": 0 occurrences
+  [optional-framing]  "optional": 0 occurrences
+  [optional-framing]  "add-on": 0 occurrences
+  [optional-framing]  "add on": 0 occurrences
+  [optional-framing]  "extra cost": 0 occurrences
+  [optional-framing]  "additional cost": 0 occurrences
+  [optional-framing]  "additional fee": 0 occurrences
+  [optional-framing]  "at extra": 0 occurrences
+  [optional-framing]  "available only": 0 occurrences
+  [optional-framing]  "only available": 0 occurrences
+  [optional-framing]  "upgrade to": 0 occurrences
+  [optional-framing]  "higher tier": 0 occurrences
+  [optional-framing]  "premium tier": 0 occurrences
+  [optional-framing]  "surcharge": 0 occurrences
+
+### Block: pricing-scale-tier
+  [workforce-location] "us-based": 0 occurrences
+  [workforce-location] "offshore": 0 occurrences
+  [workforce-location] "onshore": 0 occurrences
+  [workforce-location] "nearshore": 0 occurrences
+  [optional-framing]  "optional": 0 occurrences
+  [optional-framing]  "add-on": 0 occurrences
+  [optional-framing]  "add on": 0 occurrences
+  [optional-framing]  "extra cost": 0 occurrences
+  [optional-framing]  "additional cost": 0 occurrences
+  [optional-framing]  "additional fee": 0 occurrences
+  [optional-framing]  "at extra": 0 occurrences
+  [optional-framing]  "available only": 0 occurrences
+  [optional-framing]  "only available": 0 occurrences
+  [optional-framing]  "upgrade to": 0 occurrences
+  [optional-framing]  "higher tier": 0 occurrences
+  [optional-framing]  "premium tier": 0 occurrences
+  [optional-framing]  "surcharge": 0 occurrences
+
+### Block: faq-qa-uat
+  [workforce-location] "us-based": 0 occurrences
+  [workforce-location] "offshore": 0 occurrences
+  [workforce-location] "onshore": 0 occurrences
+  [workforce-location] "nearshore": 0 occurrences
+  [optional-framing]  "optional": 0 occurrences
+  [optional-framing]  "add-on": 0 occurrences
+  [optional-framing]  "add on": 0 occurrences
+  [optional-framing]  "extra cost": 0 occurrences
+  [optional-framing]  "additional cost": 0 occurrences
+  [optional-framing]  "additional fee": 0 occurrences
+  [optional-framing]  "at extra": 0 occurrences
+  [optional-framing]  "available only": 0 occurrences
+  [optional-framing]  "only available": 0 occurrences
+  [optional-framing]  "upgrade to": 0 occurrences
+  [optional-framing]  "higher tier": 0 occurrences
+  [optional-framing]  "premium tier": 0 occurrences
+  [optional-framing]  "surcharge": 0 occurrences
+
+======================================================================
+Verbatim-phrase survival (across all captured blocks):
+  "not just developer-tested code": PRESENT verbatim
+  "separate from the engineers writing the code": PRESENT verbatim
+
+======================================================================
+RESULT: PASS — all checks clean
+
+Note on /method: the only 'Optional' token elsewhere on the How-We-Work page
+is the 'Ops continuity' cell in the tier-comparison matrix (about post-launch
+vygo Ops, not QA/UAT). The QA & UAT step block itself contains no optional /
+add-on / extra-cost / tier-restricted framing, as shown above.
