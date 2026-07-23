@@ -1,8 +1,8 @@
 # Check 4 — Title, meta description, headings
 
 Source: https://www.vygo.ai/
-Deploy SHA: a9f96c5790985e9bdcdf34a63375b764ea04f970
-Fetched: 2026-07-23T15:04:48.154545+00:00
+Deploy SHA: 0bc7e4419a53fc397be654a3114f8534a39696b3
+Fetched: 2026-07-23T15:10:36.355281+00:00
 
 ## <title>
 `vygo.ai — Production Engineering for Lovable, Cursor, Replit, Bolt & v0 Apps`
@@ -10,7 +10,7 @@ Fetched: 2026-07-23T15:04:48.154545+00:00
 - Contains banned location phrasing: False
 
 ## meta description
-`vygo re-engineers validated products built with Lovable, Cursor, Replit, Bolt, and v0 into secure, scalable software with compliance readiness. Senior production engineering with fixed-price work after audit and full IP handoff.`
+`An AI-powered development environment built on a flow state model that merges agentic capabilities with developer editor interactions.`
 - Contains banned location phrasing: False
 
 ## h1–h3 headings

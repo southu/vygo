@@ -1,4 +1,6 @@
 url: https://www.vygo.ai/version
 http_status: 200
-body: a9f96c5790985e9bdcdf34a63375b764ea04f970
-local_head_at_verify_start: see git
+body: 0bc7e4419a53fc397be654a3114f8534a39696b3
+git_HEAD: 0bc7e4419a53fc397be654a3114f8534a39696b3
+match: True
+fetched: 2026-07-23T15:10:36.353428+00:00

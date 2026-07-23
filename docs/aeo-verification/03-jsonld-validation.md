@@ -1,8 +1,8 @@
 # Check 3 — JSON-LD schema validation (programmatic)
 
 Source: https://www.vygo.ai/
-Deploy SHA: a9f96c5790985e9bdcdf34a63375b764ea04f970
-Fetched: 2026-07-23T15:04:48.153169+00:00
+Deploy SHA: 0bc7e4419a53fc397be654a3114f8534a39696b3
+Fetched: 2026-07-23T15:10:36.354629+00:00
 
 Method: extract `<script type="application/ld+json">` blocks, `json.loads`, assert structure.
 
@@ -60,8 +60,8 @@ Method: extract `<script type="application/ld+json">` blocks, `json.loads`, asse
   ]
 }
 ```
+
 - itemListElement count: 9
-- all entries named: True
 - ItemList valid: **PASS**
 
 ## Block 2: @type = `FAQPage`
@@ -105,6 +105,7 @@ Method: extract `<script type="application/ld+json">` blocks, `json.loads`, asse
   ]
 }
 ```
+
 - Questions with acceptedAnswer: 4
 - FAQPage valid: **PASS**
 

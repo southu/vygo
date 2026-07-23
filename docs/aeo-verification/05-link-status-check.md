@@ -1,7 +1,8 @@
-# Check 5/7 — Internal link HTTP status (live)
+# Check 5/7 — Internal link HTTP status (live, post-redeploy)
 
 Base: https://www.vygo.ai
-Fetched: 2026-07-23T15:06:44.228822+00:00
+Deploy SHA: 0bc7e4419a53fc397be654a3114f8534a39696b3
+Fetched: 2026-07-23T15:10:36.353649+00:00
 
 - [OK] https://www.vygo.ai/ → 200
 - [OK] https://www.vygo.ai/analyses → 200
@@ -12,7 +13,6 @@ Fetched: 2026-07-23T15:06:44.228822+00:00
 - [OK] https://www.vygo.ai/careers/gtm-lead → 200
 - [OK] https://www.vygo.ai/careers/product-designer → 200
 - [OK] https://www.vygo.ai/careers/qa-uat-lead → 200
-- [BROKEN] https://www.vygo.ai/cdn-cgi/l/email-protection → 404 (HTTP Error 404: Not Found)
 - [OK] https://www.vygo.ai/guide → 200
 - [OK] https://www.vygo.ai/guide-progress → 200
 - [OK] https://www.vygo.ai/insights → 200
@@ -41,9 +41,6 @@ Fetched: 2026-07-23T15:06:44.228822+00:00
 - [OK] https://www.vygo.ai/why-vygo → 200
 
 ## Summary
-- Links checked: 36
-- Broken navigation links: 0
-- Cloudflare email-protection artifacts: 1
-  - CF ARTIFACT: ('https://www.vygo.ai/cdn-cgi/l/email-protection', 404, 'HTTP Error 404: Not Found')
-- Navigation result: **PASS**
-- CF email-protection (pre-fix on live): see README findings; fix ships with this evidence commit.
+- Links checked: 35
+- Broken: 0
+- Result: **PASS**
