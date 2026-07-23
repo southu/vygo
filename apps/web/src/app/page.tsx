@@ -82,9 +82,9 @@ export default function HomePage() {
                 {hero.secondaryCta.label}
               </CtaLink>
             </div>
-            <h3 className="mt-8 text-sm font-semibold text-ink-soft">
-              Built for products created with these tools:
-            </h3>
+            <h2 className="mt-8 text-sm font-semibold text-ink-soft">
+              Built for products created with Lovable, Cursor, Replit, Bolt, v0, and more:
+            </h2>
             {/* Grid of vibe-coding tools (at least 6-8 named tools) */}
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[

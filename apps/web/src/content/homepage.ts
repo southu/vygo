@@ -8,10 +8,10 @@ export const homepage = {
     bodyParagraphs: [
       "You have already proven the idea. We help you turn it into software that is secure, scalable, maintainable, and ready for real-world use.",
       "vygo preserves the experience and workflows your users already value, then strengthens the foundation beneath them—from architecture and infrastructure to security, testing, observability, and deployment.",
-      "Every engagement begins with a technical audit. From there, you receive a fixed-price production plan, senior U.S.-based engineering, and a complete handoff of the finished product and source code.",
+      "Every engagement begins with a technical audit. From there, you receive a fixed-price production plan, delivery by senior engineers, and a complete handoff of the finished product and source code.",
     ],
     proofLine:
-      "Senior U.S.-based engineers · Fixed price after audit · Typical delivery in 6–20 weeks · Full IP handoff",
+      "Senior engineers · Fixed price after audit · Typical delivery in 6–20 weeks · Full IP handoff",
     primaryCta: { label: ctas.applyNextOpening, href: ctaHrefs.waitlist },
     secondaryCta: { label: ctas.seeHowRebuildWorks, href: ctaHrefs.method },
     toolLine:
@@ -227,8 +227,8 @@ export const homepage = {
         body: "No junior bench learning on the product.",
       },
       {
-        title: "U.S.-based engineering",
-        body: "Engineering delivery is staffed from the United States.",
+        title: "Full IP handoff",
+        body: "You receive the complete product, source code, and infrastructure—no lock-in.",
       },
       {
         title: "Fixed price after audit",
@@ -243,7 +243,6 @@ export const homepage = {
         body: "Ongoing operations keep incentives connected after launch.",
       },
     ].filter((p) => {
-      if (p.title === "U.S.-based engineering" && !commercialFlags.showUsBasedClaim) return false;
       if (p.title === "Senior-only delivery" && !commercialFlags.showSeniorOnlyClaim) return false;
       return true;
     }),

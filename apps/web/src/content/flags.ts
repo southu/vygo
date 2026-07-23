@@ -6,8 +6,6 @@
 export const commercialFlags = {
   showPublicPricing: true,
   showOpsPricing: true,
-  /** Publish “U.S.-based” language only while operationally true. */
-  showUsBasedClaim: true,
   /** Publish “senior-only” language only while operationally true. */
   showSeniorOnlyClaim: true,
 } as const;

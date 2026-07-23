@@ -10,9 +10,9 @@ export const site = {
   promise: brand.promise,
   positioning: brand.positioning,
   metadata: {
-    homeTitle: "vygo.ai — Production Engineering for AI-Built Software",
+    homeTitle: "vygo.ai — Production Engineering for Lovable, Cursor, Replit, Bolt & v0 Apps",
     homeDescription:
-      "vygo re-engineers validated AI-built products into secure, scalable software with compliance readiness. Senior U.S.-based production engineering with fixed-price work after audit and full IP handoff.",
+      "vygo re-engineers validated products built with Lovable, Cursor, Replit, Bolt, and v0 into secure, scalable software with compliance readiness. Senior production engineering with fixed-price work after audit and full IP handoff.",
     auditTitle: "Production Readiness Audit for AI-Built Apps",
     auditDescription:
       "A two-week Production Readiness Audit from VYGO: prioritized findings, keep-versus-rebuild map, and a fixed-price plan for AI-built products.",
