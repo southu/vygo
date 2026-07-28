@@ -1,0 +1,127 @@
+{
+  "base": "https://www.vygo.ai",
+  "startedAt": "2026-07-28T20:39:22.404Z",
+  "assertions": {
+    "projectStepVisible": true,
+    "promptBlockVisible": true,
+    "promptContainsDiagnosticHeader": true,
+    "promptLength": 6629,
+    "noExpiredFailedState": true,
+    "awaitingStateShown": true,
+    "pasteStepVisible": true,
+    "newAnalysisResetsToProject": true,
+    "noStalePromptAfterReset": true,
+    "noStalePasteAfterReset": true
+  },
+  "consoleErrors": [],
+  "failedRequests": [],
+  "appRequests": [
+    {
+      "method": "GET",
+      "url": "https://www.vygo.ai/readiness?new=1",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "https://www.vygo.ai/_next/static/chunks/app/readiness/page-89a54720688765cc.js",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "url": "https://www.vygo.ai/v1/readiness/session",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "url": "https://www.vygo.ai/api/readiness/token",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "https://www.vygo.ai/api/readiness/status?token=161c18e9-5804-4374-b74c-08b72b9e5bf9",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "https://www.vygo.ai/api/readiness/status?token=161c18e9-5804-4374-b74c-08b72b9e5bf9",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "https://www.vygo.ai/readiness/fallback.txt?token=giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0&_rsc=VnGVcZ1-Xum7bfQx",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "https://www.vygo.ai/_next/static/chunks/app/readiness/fallback/page-527649ce83ee235c.js",
+      "status": 200
+    },
+    {
+      "method": "PATCH",
+      "url": "https://www.vygo.ai/v1/readiness/session/giWJMbimpPUuCAP4TaU_hJKuvNAjeyQ0",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "https://www.vygo.ai/api/readiness/status?token=161c18e9-5804-4374-b74c-08b72b9e5bf9",
+      "status": 200
+    }
+  ],
+  "finishedAt": "2026-07-28T20:39:35.948Z",
+  "totalRequests": 74
+}
