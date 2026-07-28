@@ -114,6 +114,18 @@ export const readinessContent = {
     cantRunHref: "/readiness/fallback",
     pasteResults: "I've run it — paste results",
     resumeHint: "Your progress is saved. Use the resume link in email or keep this tab.",
+    /**
+     * Prompt-generation failure (Stage 2). Shown when we reached Stage 2 but the
+     * tailored diagnostic prompt could not be built from the Stage 1 answers.
+     * Distinct in wording from both the generic bootstrap error ("We could not
+     * start the check.") and the Stage 3 paste-parse-failure copy so a user can
+     * tell at a glance that it was prompt generation — not intake or paste —
+     * that broke. Shares the failed-state shape: heading + detail + next action.
+     */
+    generationErrorTitle: "We couldn't generate your diagnostic prompt",
+    generationErrorBody:
+      "We reached Stage 2 but couldn't turn your Stage 1 answers into a usable diagnostic prompt. This is on our side, not your paste — rebuild Stage 1 and we'll generate a fresh prompt.",
+    generationErrorAction: "Rebuild Stage 1",
   },
   waiting: {
     // Exact status line shown while polling for the AI's POSTed results.
@@ -139,12 +151,32 @@ export const readinessContent = {
     secretsMessage: "Remove secrets before submitting.",
     back: "Back to prompt",
     draftSaved: "Draft saved",
+    /**
+     * Neutral "nothing pasted yet" prompt-to-paste. NOT an error — shown while
+     * the paste field is empty in place of a silently-disabled submit button.
+     * Deliberately calm in tone (no "we couldn't…") so it reads differently from
+     * both the prompt-generation failure and the paste-parse failure.
+     */
+    emptyPrompt:
+      "Paste your Readiness Check output above to continue. Nothing is sent until you submit — we'll check the structure then.",
   },
   confirm: {
     title: "Here's what we learned",
     pendingTitle: "Here's what we learned so far",
     pendingBody:
       "We're still finishing the full parse. You can continue with what we have, or re-paste if something looks incomplete.",
+    /**
+     * Paste-parse failure (Stage 3). The ONE message for a genuinely
+     * malformed/non-matching paste or a real parse error — fired only when the
+     * server reports parseStatus "manual"/"error" or the parse request itself
+     * failed on the server, never for a benign still-parsing/partial state
+     * (that uses pendingTitle/pendingBody above). Worded distinctly from the
+     * Stage 2 prompt-generation failure so it's clear the paste — not prompt
+     * generation — is what didn't match.
+     */
+    parseFailedTitle: "We couldn't read a structured result",
+    parseFailedBody:
+      "This paste didn't match the expected VYGO-READINESS-REPORT structure, so we couldn't read a structured result from it. Re-paste the full report (including the === begin/end marker lines), or continue with what you pasted below.",
     stackLabel: "Stack",
     sizeLabel: "Size",
     findingsLabel: "Findings",

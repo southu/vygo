@@ -223,12 +223,30 @@ async function mintSubmissionToken(): Promise<string | null> {
   }
 }
 
+/**
+ * parseStatus values that mean the paste genuinely could not be read as a
+ * structured VYGO-READINESS-REPORT (server "manual"/"error"), as opposed to a
+ * benign still-parsing/partial state ("pending"/"partial"). Kept as a set so
+ * the confirm view branches on a real failure rather than inferring it from an
+ * empty-findings heuristic (which also matches benign pending).
+ */
+const PARSE_FAILURE_STATUSES = new Set(["manual", "error"]);
+function isParseFailureStatus(status: unknown): boolean {
+  return typeof status === "string" && PARSE_FAILURE_STATUSES.has(status);
+}
+
 type ConfirmState = {
   stack: string;
   size: string;
   findings: string[];
   parseStatus: string;
   pending: boolean;
+  /**
+   * True only when the paste genuinely failed to parse (malformed structure or
+   * a real server parse error) — drives the single paste-parse-failure message.
+   * Never set for benign pending/partial states.
+   */
+  parseFailed: boolean;
   /** Structured stack technologies (grouped into badge chips on confirm). */
   stackEntries: StackEntry[];
   /** Today's free-text stack paragraph, kept to surface any unparsed remainder. */
@@ -532,12 +550,17 @@ export function ReadinessFlow() {
                     ? (remote.draft.report as Parameters<typeof describeStack>[0])
                     : parseReadinessPastePartial(restoredPaste);
                 const findings = buildConfirmationFindings(report, 6);
+                const restoredParseStatus = String(remote.draft?.parseStatus || "partial");
+                const restoredParseFailed = isParseFailureStatus(remote.draft?.parseStatus);
                 setConfirm({
                   stack: describeStack(report),
                   size: describeSize(report),
                   findings,
-                  parseStatus: String(remote.draft?.parseStatus || "partial"),
-                  pending: remote.draft?.parseStatus === "pending" || findings.length === 0,
+                  parseStatus: restoredParseStatus,
+                  pending:
+                    !restoredParseFailed &&
+                    (remote.draft?.parseStatus === "pending" || findings.length === 0),
+                  parseFailed: restoredParseFailed,
                   raw: restoredPaste,
                   ...structuredConfirmFields(report, restoredPaste),
                 });
@@ -891,6 +914,7 @@ export function ReadinessFlow() {
       findings: clientFindings,
       parseStatus: clientFindings.length > 0 ? "partial" : "pending",
       pending: true,
+      parseFailed: false,
       raw: text,
       ...structuredConfirmFields(clientPartial, text),
     };
@@ -924,9 +948,17 @@ export function ReadinessFlow() {
           }
         }
       }
+      // Server-authoritative failure signal: "manual" (and "error") mean the
+      // paste could not be read as a structured report at all — a genuine
+      // parse failure, distinct from a benign "partial"/"pending" in-progress
+      // parse. Branch on it directly rather than inferring from empty findings.
+      const parseFailed = isParseFailureStatus(result.parseStatus);
       if (result.parseStatus === "ok") {
         trackAnalytics("parse_success", { parseStatus: result.parseStatus });
-      } else if (result.parseStatus === "partial" || result.parseStatus === "pending") {
+      } else if (
+        !parseFailed &&
+        (result.parseStatus === "partial" || result.parseStatus === "pending")
+      ) {
         trackAnalytics("parse_normalized", { parseStatus: result.parseStatus });
       } else {
         trackAnalytics("parse_failed", { parseStatus: result.parseStatus });
@@ -941,21 +973,36 @@ export function ReadinessFlow() {
         size: result.size || clientConfirm.size,
         findings: merged.slice(0, 6),
         parseStatus: result.parseStatus,
-        pending: result.parseStatus === "pending" || merged.length === 0,
+        // A genuine parse failure is not a benign "still parsing" state, so it
+        // must not render the pending copy.
+        pending: !parseFailed && (result.parseStatus === "pending" || merged.length === 0),
+        parseFailed,
         raw: text,
         ...structuredConfirmFields(structuredReport, text),
       });
       trackAnalytics("stage_started", { stage: "confirm" });
       setView("confirm");
     } catch (err) {
-      const e = err as Error & { code?: string; lines?: number[] };
+      const e = err as Error & { code?: string; status?: number; lines?: number[] };
       if (e.code === "SECRETS_DETECTED") {
         setSecretLines(Array.isArray(e.lines) ? e.lines : []);
         setSecretMessage(PASTE_SECRETS_BLOCK_MESSAGE);
         trackAnalytics("secret_scan_blocked", { hitCount: e.lines?.length ?? 0, source: "server" });
         return;
       }
-      trackAnalytics("parse_failed", { code: e.code || "network" });
+      // A real server-side parse error (the endpoint responded with a 5xx, i.e.
+      // a "true 500") is a genuine failure — surface the paste-parse-failure
+      // message, not a benign "still parsing" confirmation. A network/offline
+      // failure (fetch rejected, no HTTP status — e.g. the endpoint isn't live)
+      // stays graceful: we fall back to the client-side partial as pending.
+      const isServerParseError = typeof e.status === "number" && e.status >= 500;
+      trackAnalytics("parse_failed", { code: e.code || "network", status: e.status });
+      if (isServerParseError) {
+        setConfirm({ ...clientConfirm, pending: false, parseFailed: true });
+        trackAnalytics("stage_started", { stage: "confirm" });
+        setView("confirm");
+        return;
+      }
       // Graceful pending: show client-side confirmation.
       setConfirm(clientConfirm);
       trackAnalytics("stage_started", { stage: "confirm" });
@@ -1394,9 +1441,11 @@ export function ReadinessFlow() {
     // out of broken JSON into a misleading partial STACK. Also show it when
     // nothing structured parsed at all but we still have raw text to display.
     const rawText = confirm.raw.trim();
+    const parseFailed = confirm.parseFailed;
     const showRawFallback =
       rawText.length > 0 &&
-      (isMalformedStructuredPaste(confirm.raw) ||
+      (parseFailed ||
+        isMalformedStructuredPaste(confirm.raw) ||
         (confirm.stackEntries.length === 0 &&
           confirm.sizeMetrics.length === 0 &&
           confirm.findings.length === 0));
@@ -1416,9 +1465,21 @@ export function ReadinessFlow() {
         />
         <p className="eyebrow mt-4">{c.stage3.progressLabel}</p>
         <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          {confirm.pending ? c.confirm.pendingTitle : c.confirm.title}
+          {parseFailed
+            ? c.confirm.parseFailedTitle
+            : confirm.pending
+              ? c.confirm.pendingTitle
+              : c.confirm.title}
         </h2>
-        {confirm.pending ? (
+        {parseFailed ? (
+          <p
+            className="mt-3 text-sm font-medium text-red"
+            role="alert"
+            data-testid="readiness-parse-failed"
+          >
+            {c.confirm.parseFailedBody}
+          </p>
+        ) : confirm.pending ? (
           <p className="mt-3 text-sm text-muted" data-testid="readiness-confirm-pending">
             {c.confirm.pendingBody}
           </p>
@@ -1427,10 +1488,12 @@ export function ReadinessFlow() {
         {showRawFallback ? (
           <div className="readiness-step-panel mt-6" data-testid="readiness-confirm-raw-fallback">
             <p className="eyebrow">Pasted input</p>
-            <p className="mt-2 text-sm text-muted">
-              We couldn&apos;t read a structured result from this paste. Here&apos;s exactly what
-              you pasted — re-paste your Readiness Check output, or continue.
-            </p>
+            {!parseFailed ? (
+              <p className="mt-2 text-sm text-muted">
+                Here&apos;s exactly what you pasted — re-paste your Readiness Check output, or
+                continue.
+              </p>
+            ) : null}
             <pre
               data-testid="readiness-confirm-raw-text"
               className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-canvas px-3.5 py-3 text-sm text-ink-soft"
@@ -1571,6 +1634,12 @@ export function ReadinessFlow() {
             })}
           </div>
         </div>
+      ) : null}
+
+      {view === "stage3" && pasteText.trim().length === 0 ? (
+        <p className="mt-4 text-sm text-muted" data-testid="readiness-paste-empty-prompt">
+          {c.stage3.emptyPrompt}
+        </p>
       ) : null}
 
       {view === "stage3" ? (
@@ -2006,6 +2075,49 @@ export function ReadinessFlow() {
         </div>
 
         {stage3Panel}
+      </div>
+    );
+  }
+
+  // Prompt-generation failure: we're on Stage 2 but the tailored diagnostic
+  // prompt bundle is unusable (not built for any reason other than a benign
+  // "not built yet", which off-ramps earlier and never reaches here). Without
+  // this guard the render silently fell through to the Stage 1 view with no
+  // error shown. Distinct, actionable copy — never the generic bootstrap error
+  // nor the Stage 3 paste-parse-failure message.
+  if (view === "stage2") {
+    return (
+      <div className="readiness-assessment mt-8" data-testid="readiness-stage2-generation-error">
+        {newAnalysisControl}
+        <AssessmentProgress
+          current={FLOW_STEP_STAGE2}
+          total={FLOW_TOTAL_STEPS}
+          label="Diagnostic prompt"
+        />
+        <p className="eyebrow mt-4">{c.stage2.progressLabel}</p>
+        <div className="readiness-step-panel mt-4 border-red/30" role="alert">
+          <h2 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+            {c.stage2.generationErrorTitle}
+          </h2>
+          <p
+            className="mt-3 text-sm text-muted"
+            data-testid="readiness-stage2-generation-error-body"
+          >
+            {c.stage2.generationErrorBody}
+          </p>
+          <button
+            type="button"
+            className="btn-primary mt-5"
+            data-testid="readiness-stage2-generation-error-action"
+            onClick={() => {
+              setStepIndex(0);
+              trackAnalytics("stage_started", { stage: "stage1", from: "prompt_generation_error" });
+              setView("stage1");
+            }}
+          >
+            {c.stage2.generationErrorAction}
+          </button>
+        </div>
       </div>
     );
   }
