@@ -1580,21 +1580,26 @@ export function ReadinessFlow() {
         }
       : null;
 
-  /** Stage 3 paste-back panel — always mounted so the page/DOM always contains the large textarea. */
+  /**
+   * Stage 3 paste-back panel. Rendered ONLY while the flow is actually on the
+   * paste step (view === "stage3"). It is NOT mounted into the earlier views
+   * (project / stage1 / stage2): a page-source paste textarea is already
+   * guaranteed permanently by the static, inert SSR shell in
+   * app/readiness/page.tsx (a server sibling of this client component that
+   * stays in the DOM after hydration), so mounting a second copy here on every
+   * view only produced duplicate readiness-stage3 / readiness-paste-textarea
+   * nodes. On the project-selection start step (including the ?new=1 /
+   * "New analysis" reset) that stray, sr-only copy read as a stale prior-run
+   * paste panel — the reset must leave ONLY the project-selection UI on screen.
+   */
   const stage3Panel = (
-    <div
-      className={view === "stage3" ? "readiness-assessment mt-8" : "sr-only"}
-      data-testid="readiness-stage3"
-      aria-hidden={view === "stage3" ? undefined : true}
-    >
-      {view === "stage3" ? (
-        <AssessmentProgress
-          current={FLOW_STEP_STAGE3}
-          total={FLOW_TOTAL_STEPS}
-          label="Paste results"
-        />
-      ) : null}
-      <p className={`eyebrow ${view === "stage3" ? "mt-4" : ""}`}>{c.stage3.progressLabel}</p>
+    <div className="readiness-assessment mt-8" data-testid="readiness-stage3">
+      <AssessmentProgress
+        current={FLOW_STEP_STAGE3}
+        total={FLOW_TOTAL_STEPS}
+        label="Paste results"
+      />
+      <p className="eyebrow mt-4">{c.stage3.progressLabel}</p>
       <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
         {c.stage3.title}
       </h2>
@@ -1616,15 +1621,14 @@ export function ReadinessFlow() {
           data-testid="readiness-paste-textarea"
           spellCheck={false}
           autoComplete="off"
-          tabIndex={view === "stage3" ? 0 : -1}
         />
         <p className="mt-3 text-sm text-muted" data-testid="readiness-paste-helper">
           {c.stage3.noSendHelper}
         </p>
-        {view === "stage3" ? <AnswerCallout callout={stage3PasteCallout} /> : null}
+        <AnswerCallout callout={stage3PasteCallout} />
       </div>
 
-      {secretLines.length > 0 && view === "stage3" ? (
+      {secretLines.length > 0 ? (
         <div
           className="mt-3 rounded-xl border border-red/40 bg-red/5 p-3"
           role="alert"
@@ -1660,33 +1664,31 @@ export function ReadinessFlow() {
         </div>
       ) : null}
 
-      {view === "stage3" && pasteText.trim().length === 0 ? (
+      {pasteText.trim().length === 0 ? (
         <p className="mt-4 text-sm text-muted" data-testid="readiness-paste-empty-prompt">
           {c.stage3.emptyPrompt}
         </p>
       ) : null}
 
-      {view === "stage3" ? (
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => setView("stage2")}
-            data-testid="readiness-paste-back"
-          >
-            {c.stage3.back}
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={pasteSubmitting || pasteText.trim().length < 8}
-            onClick={() => void onPasteSubmit()}
-            data-testid="readiness-paste-submit"
-          >
-            {pasteSubmitting ? c.stage3.submitting : c.stage3.submit}
-          </button>
-        </div>
-      ) : null}
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => setView("stage2")}
+          data-testid="readiness-paste-back"
+        >
+          {c.stage3.back}
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={pasteSubmitting || pasteText.trim().length < 8}
+          onClick={() => void onPasteSubmit()}
+          data-testid="readiness-paste-submit"
+        >
+          {pasteSubmitting ? c.stage3.submitting : c.stage3.submit}
+        </button>
+      </div>
     </div>
   );
 
@@ -1926,8 +1928,6 @@ export function ReadinessFlow() {
             </fieldset>
           )}
         </div>
-
-        {stage3Panel}
       </div>
     );
   }
@@ -2097,8 +2097,6 @@ export function ReadinessFlow() {
             </Link>
           </p>
         </div>
-
-        {stage3Panel}
       </div>
     );
   }
@@ -2381,8 +2379,6 @@ export function ReadinessFlow() {
           </button>
         </div>
       </div>
-
-      {stage3Panel}
     </div>
   );
 }
