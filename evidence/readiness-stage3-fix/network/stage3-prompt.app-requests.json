@@ -1,0 +1,352 @@
+[
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/readiness",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/media/e807dee2426166ad-s.p.woff2",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/5532-b583bb5612526832.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/media/904be59b21bd51cb-s.p.woff2",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/main-app-b73d326a307a1fbf.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/9784-c13c4cf31eccc601.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/page-7fdd71c2b765ffbe.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/2449-660e0d5790baad84.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/554-62b941f734eb0e26.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/3343-1028be9ca5233b88.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/layout-95aacc24fbf95f86.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/2921-ba8504978d532350.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/e2f4d823-07dbfd76a4f19363.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/2173-36ad6a3e77a4dfb7.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/b87ffe50-4fd5c4a93e98f6fb.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/webpack-210ed0c1249144d7.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/css/0eb16ccd839bad69.css",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/2262-828da38a2d2eeaf5.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/readiness/page-99385f8a626caea4.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/media/37da3febcafd463e-s.woff2",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/cdn-cgi/rum?",
+    "status": 204
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/v1/public/availability",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/media/9e769f40faa52555-s.woff2",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/security.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/analytics",
+    "status": 204
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/why-vygo.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/method.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/index.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/audit.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/security/page-917527b8c62cfdd7.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/why-vygo/page-917527b8c62cfdd7.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/method/page-917527b8c62cfdd7.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/vibe-coding.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/audit/page-c0bf1bd7fbef0933.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/guide-progress.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/careers.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/pricing.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/waitlist.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/vibe-coding/page-e17e2d37240563b6.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/apply.txt?_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/careers/page-fc350f8d8fcd0a21.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/guide-progress/page-cf09d9445d406370.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/pricing/page-2cd7bb075748a0ed.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/waitlist/page-c576026a293dd9c1.js",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/apply/page-fcb34a0dceda5dbf.js",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/readiness/session",
+    "status": 201
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/analytics",
+    "status": 204
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/api/readiness/token",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/analytics",
+    "status": 204
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/analytics",
+    "status": 204
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/analytics",
+    "status": 204
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/analytics",
+    "status": 204
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/analytics",
+    "status": 204
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/api/readiness/status?token=96dcdd8f-b44a-4c0e-99ed-9666f388c34b",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/analytics",
+    "status": 204
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/readiness/fallback.txt?token=oGd28Neal6wfhOp-LJWAOaPPUPkjp-so&_rsc=VnGVcZ1-Xum7bfQx",
+    "status": 200
+  },
+  {
+    "method": "GET",
+    "url": "https://www.vygo.ai/_next/static/chunks/app/readiness/fallback/page-527649ce83ee235c.js",
+    "status": 200
+  },
+  {
+    "method": "PATCH",
+    "url": "https://www.vygo.ai/v1/readiness/session/oGd28Neal6wfhOp-LJWAOaPPUPkjp-so",
+    "status": 200
+  },
+  {
+    "method": "POST",
+    "url": "https://www.vygo.ai/v1/analytics",
+    "status": 204
+  }
+]

@@ -10,20 +10,30 @@ Verification bundle for the two Readiness Check fixes deployed to
 
 | | |
 | --- | --- |
-| Deployed commit under test | `7979cae9aea3b637596e01ff2c8f254634b37c77` |
-| Live `/version` at capture | `7979cae9aea3b637596e01ff2c8f254634b37c77` (matches HEAD) |
+| Deployed commit under test | `153d0869b41708854e3507a4d2cd7554191b25e2` |
+| Live `/version` at capture | `153d0869b41708854e3507a4d2cd7554191b25e2` (matches HEAD) |
 | Home page over HTTPS | `GET https://www.vygo.ai/` → **200** |
 | Captured | 2026-07-28 |
 
-Fix commits: `4b7c2e6`, `766b1ae`, `2b91ae6`, `b7aa9c3`, `72580b8`, `7979cae`
-(all in `apps/web/src/components/readiness/ReadinessFlow.tsx` + content).
-Regression coverage added in `3e85bfd` (`apps/web/e2e/readiness-flow.spec.ts`).
+Fix commits: `4b7c2e6`, `766b1ae`, `2b91ae6`, `b7aa9c3`, `72580b8`, `7979cae`, and
+**`153d086`** — this iteration's fix: surface the generated diagnostic prompt on
+the **Stage 3 of 3 — paste results** screen (it previously rendered only on the
+Stage 2 diagnostic-prompt view). All in
+`apps/web/src/components/readiness/ReadinessFlow.tsx` + content.
+Regression coverage in `3e85bfd` + `153d086` (`apps/web/e2e/readiness-flow.spec.ts`).
 
 ## Contents
 
 - **`notes/stage3-prompt-before-after.md`** — Stage 3 diagnostic-prompt fix:
-  pre-fix broken behavior, post-fix behavior, and live results
+  pre-fix broken behavior (prompt shown only on Stage 2), post-fix behavior
+  (prompt now shown on the Stage 3 paste-results screen too), and live results
   (acceptance #2).
+- **`capture/stage3-prompt-capture.mjs`** + **`stage3-capture-summary.json`** —
+  this-iteration live driver that walks project → intake → Stage 2 → Stage 3 and
+  asserts the Stage 3 prompt block (`readiness-stage3-prompt-block`) shows the
+  generated prompt, byte-identical to Stage 2 (`promptMatchesStage2: true`), with
+  `0` console errors and `0` failed app requests over 70 requests, against the
+  real deployed backend. Screenshots `screenshots/capture-0{1,2,3}-*.png`.
 - **`notes/manual-repro-new-analysis.md`** — new-analysis-when-exists bug: repro
   steps + observed pre-fix breakage and resolved post-fix behavior
   (acceptance #3).

@@ -3,7 +3,10 @@
 **Fix commits:** `2b91ae6`, `b7aa9c3` (ReadinessFlow.tsx `?new=1` isolation +
 synchronous prior-draft clear).
 **Verified against:** https://www.vygo.ai — deployed commit `7979cae`
-(live `/version` == `7979cae`), captured 2026-07-28.
+(live `/version` == `7979cae`), captured 2026-07-28. Re-confirmed still holding
+at deploy `153d086` (the Stage 3 prompt-display fix) — that change does not touch
+the `?new=1` isolation or prior-draft-clear paths; regression spec group **(b)**
+passes at `153d086` (see `../tests/regression-output.txt`).
 
 ## What the bug was
 

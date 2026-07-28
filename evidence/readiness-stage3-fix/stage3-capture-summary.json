@@ -1,0 +1,14 @@
+{
+  "baseUrl": "https://www.vygo.ai",
+  "mode": "live-backend",
+  "stage3PromptShown": true,
+  "stage3PromptLength": 6629,
+  "stage2PromptLength": 6629,
+  "promptMatchesStage2": true,
+  "consoleErrorCount": 0,
+  "consoleErrors": [],
+  "totalRequests": 71,
+  "appRequestCount": 70,
+  "failedRequestCount": 0,
+  "failedRequests": []
+}
