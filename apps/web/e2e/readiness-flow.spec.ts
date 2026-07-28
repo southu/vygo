@@ -176,10 +176,12 @@ async function startProjectRun(page: Page, project: string) {
 }
 
 /**
- * The LIVE interactive Stage 3 panel. /readiness also renders a static, readonly
- * SSR paste shell (sr-only, class "sr-only") that shares the readiness-stage3 /
- * readiness-paste-* testids for the always-present-in-source acceptance; scope to
- * the live `.readiness-assessment` root so actions never target the inert shell.
+ * The LIVE interactive Stage 3 panel. /readiness ships a static, readonly SSR
+ * paste shell in page source (same readiness-stage3 / readiness-paste-* testids)
+ * for the always-present-in-source acceptance, but that shell REMOVES itself once
+ * the client hydrates (ReadinessStage3Shell) — so after hydration only the live
+ * panel carries these testids. Scoping to the `.readiness-assessment` root keeps
+ * actions unambiguous regardless.
  */
 function liveStage3(page: Page) {
   return page.locator('div.readiness-assessment[data-testid="readiness-stage3"]');
@@ -229,13 +231,14 @@ test.describe("readiness flow — starting a new analysis over an existing one (
     await expect(page.getByTestId("readiness-project")).toBeVisible();
     await expect(page.getByTestId("readiness-stage2")).toHaveCount(0);
     await expect(page.getByTestId("readiness-prompt-block")).toHaveCount(0);
-    // Regression: the reset must leave ONLY the project-selection UI — no live
-    // interactive Stage 3 paste panel may remain mounted. Exactly the single
-    // inert SSR paste shell survives (one readiness-stage3 / one paste textarea);
-    // a duplicate here is the "two stale stage3 panels on the project step" bug.
+    // Regression: the reset must leave ONLY the project-selection UI. The inert
+    // SSR paste shell removes itself after hydration, so NO readiness-stage3 /
+    // readiness-paste-textarea node survives on the project step — neither the
+    // live interactive panel (would be the "leaked stage3" bug) nor a lingering
+    // shell.
     await expect(liveStage3(page)).toHaveCount(0);
-    await expect(page.getByTestId("readiness-stage3")).toHaveCount(1);
-    await expect(page.getByTestId("readiness-paste-textarea")).toHaveCount(1);
+    await expect(page.getByTestId("readiness-stage3")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-paste-textarea")).toHaveCount(0);
 
     // A second run starts cleanly and reaches its own fresh prompt — the intake
     // steps start empty (project step, empty Stage 1), not pre-filled from run 1.
@@ -276,12 +279,13 @@ test.describe("readiness flow — starting a new analysis over an existing one (
     await expect(page.getByTestId("readiness-stage2")).toHaveCount(0);
     await expect(page.getByTestId("readiness-prompt-block")).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("PRIOR ANALYSIS PASTE");
-    // Regression for the reported ?new=1 defect: the project step showed TWO
-    // stale readiness-stage3 panels / paste textareas. Only the single inert SSR
-    // shell may remain; no live interactive paste panel is mounted here.
+    // Regression for the reported ?new=1 defect: the project step rendered stale
+    // readiness-stage3 / readiness-paste-textarea nodes alongside the fresh
+    // project step. After hydration the SSR shell removes itself and no live
+    // panel is mounted here, so the project step shows project selection only.
     await expect(liveStage3(page)).toHaveCount(0);
-    await expect(page.getByTestId("readiness-stage3")).toHaveCount(1);
-    await expect(page.getByTestId("readiness-paste-textarea")).toHaveCount(1);
+    await expect(page.getByTestId("readiness-stage3")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-paste-textarea")).toHaveCount(0);
 
     // And a brand-new analysis can be started successfully from here.
     await startProjectRun(page, "Fresh After New");

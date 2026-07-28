@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { readinessContent } from "@/content/readiness";
 import { ReadinessFlow } from "@/components/readiness/ReadinessFlow";
+import { ReadinessStage3Shell } from "@/components/readiness/ReadinessStage3Shell";
 import { ReadinessDeepDives } from "@/components/readiness/ReadinessDeepDives";
 import { ReadinessPillarNav } from "@/components/readiness/ReadinessPillarNav";
 import { ReadinessScrollSpy } from "@/components/readiness/ReadinessScrollSpy";
@@ -20,7 +21,6 @@ export const metadata: Metadata = {
 export default function ReadinessPage() {
   const c = readinessContent.page;
   const na = readinessContent.newAnalysis;
-  const s3 = readinessContent.stage3;
   const radar = readinessContent.radar;
   // Real report data (build-time self-assessment) drives the radar + its tooltips.
   const chartData = getReadinessReportChartData();
@@ -95,43 +95,17 @@ export default function ReadinessPage() {
           {/*
             Static Stage 3 paste-back shell in the HTML document so GET /readiness
             always contains a large paste textarea in page source (acceptance).
-            The interactive client flow owns the live Stage 3 UI with the same
-            data-testid after hydration; this shell stays hidden and inert.
             The paste path posts the delimited results block to the same ingest
             endpoint the customer's AI uses directly (POST /api/readiness/submit)
             with the same per-session submission token.
+
+            The interactive client flow owns the live Stage 3 UI with the same
+            data-testid after hydration, so the shell REMOVES itself once hydrated
+            (see ReadinessStage3Shell): otherwise its stale readiness-stage3 /
+            readiness-paste-textarea nodes leaked onto the project-selection start
+            step (?new=1 / "New analysis"), which must render project selection only.
           */}
-          <div
-            className="sr-only"
-            aria-hidden="true"
-            data-readiness-stage3-shell="true"
-            data-testid="readiness-stage3"
-          >
-            <h2>{s3.title}</h2>
-            <p>{s3.body}</p>
-            <p>{s3.noSendHelper}</p>
-            <form
-              action="/api/readiness/submit"
-              method="post"
-              data-submit-url="/api/readiness/submit"
-              data-testid="readiness-paste-form"
-            >
-              <label htmlFor="readiness-paste-shell">{s3.textareaLabel}</label>
-              <textarea
-                id="readiness-paste-shell"
-                name="paste"
-                rows={16}
-                readOnly
-                tabIndex={-1}
-                placeholder={s3.textareaPlaceholder}
-                data-testid="readiness-paste-textarea"
-                defaultValue=""
-              />
-              <button type="submit" disabled tabIndex={-1} data-testid="readiness-paste-submit">
-                {s3.submit}
-              </button>
-            </form>
-          </div>
+          <ReadinessStage3Shell />
         </div>
       </section>
 
