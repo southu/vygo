@@ -154,3 +154,70 @@ test.describe("Consumer surfaces: no entity or P-handoff legal language", () => 
     expect(termsHtml.length).toBeGreaterThan(500);
   });
 });
+
+test.describe("Homepage tool grid outbound links", () => {
+  const consoleErrors: string[] = [];
+  const pageErrors: Error[] = [];
+
+  test.beforeEach(async ({ page }) => {
+    await mockAvailability(page, "open");
+
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        consoleErrors.push(msg.text());
+      }
+    });
+    page.on("pageerror", (err) => {
+      pageErrors.push(err);
+    });
+  });
+
+  test("tool tiles render as valid outbound attribution anchors", async ({ page }) => {
+    await page.goto("/");
+
+    const expectedTools = [
+      { name: "Lovable", host: "lovable.dev" },
+      { name: "Cursor", host: "cursor.com" },
+      { name: "Replit", host: "replit.com" },
+      { name: "Bolt", host: "bolt.new" },
+      { name: "v0", host: /(?:v0\.dev|v0\.app)/ },
+      { name: "Claude Code", host: "claude.com", path: "product/claude-code" },
+      { name: "Grok", host: "grok.com" },
+      { name: "GitHub Copilot", host: "github.com", path: "features/copilot" },
+      { name: "Windsurf", host: "windsurf.com" },
+    ];
+
+    const grid = page.locator('[data-section="hero"] .mt-4.grid');
+    await expect(grid).toBeVisible();
+
+    for (const tool of expectedTools) {
+      const anchor = grid.locator("a", { hasText: tool.name });
+      await expect(anchor).toBeVisible();
+
+      await expect(anchor).toHaveAttribute("target", "_blank");
+
+      const rel = await anchor.getAttribute("rel");
+      expect(rel).toContain("noopener");
+      expect(rel).toContain("noreferrer");
+
+      const href = await anchor.getAttribute("href");
+      expect(href).not.toBeNull();
+
+      const url = new URL(href!);
+      expect(url.searchParams.get("src")).toBe("vygo");
+
+      if (typeof tool.host === "string") {
+        expect(url.host).toBe(tool.host);
+      } else {
+        expect(url.host).toMatch(tool.host);
+      }
+
+      if (tool.path) {
+        expect(url.pathname).toContain(tool.path);
+      }
+    }
+
+    expect(consoleErrors).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
+});

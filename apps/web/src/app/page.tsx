@@ -90,46 +90,66 @@ export default function HomePage() {
               {[
                 {
                   name: "Lovable",
+                  url: "https://lovable.dev",
                   desc: "An AI full-stack application builder that generates React, Vite, and Tailwind CSS codebases from natural language prompts.",
                 },
                 {
                   name: "Cursor",
+                  url: "https://cursor.com",
                   desc: "An AI-first code editor built as a fork of VS Code, providing inline code generation, chat assistance, and composer capabilities.",
                 },
                 {
                   name: "Replit",
+                  url: "https://replit.com",
                   desc: "A collaborative browser-based workspace that utilizes the Replit Agent to build, run, and deploy software applications automatically.",
                 },
                 {
                   name: "Bolt",
+                  url: "https://bolt.new",
                   desc: "A browser-based development environment that spins up full-stack web projects with automatic package installation and container-based execution.",
                 },
                 {
                   name: "v0",
+                  url: "https://v0.dev",
                   desc: "A generative UI system created by Vercel that builds React components and layouts using Tailwind CSS and shadcn/ui.",
                 },
                 {
                   name: "Claude Code",
+                  url: "https://claude.com/product/claude-code",
                   desc: "A command-line interface agent developed by Anthropic that reads, writes, edits, and navigates codebase files directly within the local terminal.",
                 },
                 {
                   name: "Grok",
+                  url: "https://grok.com",
                   desc: "An AI assistant developed by xAI that provides real-time search capabilities and context-aware coding assistance across multiple programming languages.",
                 },
                 {
                   name: "GitHub Copilot",
+                  url: "https://github.com/features/copilot",
                   desc: "An AI pair programmer that provides autocomplete suggestions, chat support, and contextual codebase search within major IDEs.",
                 },
                 {
                   name: "Windsurf",
+                  url: "https://windsurf.com",
                   desc: "An AI-powered development environment built on a flow state model that merges agentic capabilities with developer editor interactions.",
                 },
-              ].map((tool) => (
-                <div key={tool.name} className="card !p-4">
-                  <span className="font-semibold text-ink">{tool.name}</span>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">{tool.desc}</p>
-                </div>
-              ))}
+              ].map((tool) => {
+                const u = new URL(tool.url);
+                u.searchParams.set("src", "vygo");
+                const href = u.toString();
+                return (
+                  <a
+                    key={tool.name}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="card !p-4 block hover:no-underline cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple focus-visible:ring-offset-2"
+                  >
+                    <span className="font-semibold text-ink">{tool.name}</span>
+                    <p className="mt-1 text-xs leading-relaxed text-muted">{tool.desc}</p>
+                  </a>
+                );
+              })}
             </div>
           </div>
           <HeroArchitectureDiagram
