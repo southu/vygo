@@ -401,30 +401,42 @@ export function ReadinessFlow() {
         // "New analysis" / "Run again" entry point (?new=1): always land on the
         // fresh project-label start step, bypassing any resume-to-later-stage or
         // scored-snapshot redirect. A completed prior analysis never blocks this.
+        //
+        // A new analysis must be fully ISOLATED from any prior (completed or
+        // in-progress) analysis: create a FRESH session row rather than resuming
+        // the prior token (?token= or the persisted local token). Reusing the
+        // prior token would let this run share one readiness_sessions row with
+        // the earlier analysis — and because a draft PATCH replaces the whole
+        // draft, startRun()'s persist() would then OVERWRITE the prior
+        // analysis's session draft (data loss), while any stale
+        // stage1/paste/confirm draft on the reused token could leak into the new
+        // run on a plain reload before that persist runs. A fresh token leaves
+        // the prior session/draft intact and readable and starts the new run
+        // from an empty intake draft. Run attribution is unaffected: the
+        // run-start principal is the submission-token credential (minted below),
+        // never this session token.
         if (newAnalysisRequestedFromUrl()) {
-          let t = fromUrl || local?.token || null;
-          if (t) {
-            try {
-              const remote = await getReadinessSession(t);
-              t = remote.token;
-            } catch {
-              t = null;
-            }
-          }
-          if (!t) {
-            const created = await createReadinessSession({
-              stage: "intake",
-              draft: draftFromStage1(EMPTY_STAGE1),
-            });
-            t = created.token;
-          }
+          const created = await createReadinessSession({
+            stage: "intake",
+            draft: draftFromStage1(EMPTY_STAGE1),
+          });
           if (cancelled) return;
+          const t = created.token;
           setToken(t);
           setStage1(EMPTY_STAGE1);
           setStepIndex(0);
           setPasteText("");
           setConfirm(null);
           setStartStatus("idle");
+          // Point local persistence at the fresh session so a later plain reload
+          // (no ?new=1) resumes THIS empty analysis, never the prior completed
+          // one — and never re-reads the prior analysis's stale draft.
+          saveReadinessLocal({
+            token: t,
+            stage: "intake",
+            stage1: EMPTY_STAGE1,
+            updatedAt: new Date().toISOString(),
+          });
           // Mint the run-start credential up front so "Start analysis" is instant.
           void mintSubmissionToken().then((st) => {
             if (!cancelled && st) setSubmissionToken(st);
