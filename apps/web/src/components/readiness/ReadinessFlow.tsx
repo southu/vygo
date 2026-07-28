@@ -50,6 +50,7 @@ import {
   type ScoreResponse,
 } from "@/lib/readiness/api";
 import {
+  clearReadinessLocal,
   loadKnownProjects,
   loadReadinessLocal,
   rememberProjectLabel,
@@ -416,6 +417,17 @@ export function ReadinessFlow() {
         // run-start principal is the submission-token credential (minted below),
         // never this session token.
         if (newAnalysisRequestedFromUrl()) {
+          // Drop the prior analysis's local draft SYNCHRONOUSLY, before the
+          // createReadinessSession round-trip below. The prior draft carries the
+          // just-completed run's paste text, parsed findings, project label and
+          // session token; leaving it in localStorage until this async call
+          // resolves would keep that stale state readable for the whole handoff
+          // window (and a plain reload mid-flight could resurrect it into the
+          // "new" run). Clearing first guarantees no residual prior-analysis data
+          // is visible during the new-analysis load. The durable analyses/snapshot
+          // rows (and the prior session row server-side) are untouched, so the
+          // completed analysis stays fully accessible via /analyses.
+          clearReadinessLocal();
           const created = await createReadinessSession({
             stage: "intake",
             draft: draftFromStage1(EMPTY_STAGE1),
