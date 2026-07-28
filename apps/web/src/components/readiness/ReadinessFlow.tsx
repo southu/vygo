@@ -295,6 +295,23 @@ export function ReadinessFlow() {
   const [submissionExpired, setSubmissionExpired] = useState(false);
   /** received_at of the ingest record already rendered (consume-once). */
   const ingestedRef = useRef<string | null>(null);
+  /**
+   * True only when the active submission token was RESTORED from a prior
+   * session's persisted draft (a resumed run) — such a token could be genuinely
+   * expired, so an "expired" poll must be honoured. A token minted fresh in THIS
+   * session stays false: a brand-new prompt must never flip straight to the
+   * failed "results link expired" state on a first-poll 404, which can happen for
+   * a beat while the mint write becomes read-consistent across the edge/store.
+   */
+  const submissionTokenRestoredRef = useRef(false);
+  /**
+   * Set once the status poll has observed the active token as valid
+   * (pending / ready / rate-limited). Until then, an "expired" reading on a
+   * freshly minted token is treated as a transient read-after-write gap rather
+   * than a real expiry — so a fresh analysis always renders the generated prompt
+   * and its "awaiting paste" state before any jump-to-failed can occur.
+   */
+  const sawValidStatusRef = useRef(false);
 
   const step: Stage1Step = STAGE1_STEPS[stepIndex] ?? "productDescription";
 
@@ -446,6 +463,10 @@ export function ReadinessFlow() {
                 ? remote.draft.submissionToken.trim()
                 : "";
             if (remoteSubmissionToken) {
+              // Restored from a prior session — an "expired" poll on this token
+              // is trustworthy (it may be a genuinely stale link), so allow the
+              // failed/start-over state for it.
+              submissionTokenRestoredRef.current = true;
               setSubmissionToken(remoteSubmissionToken);
               submissionTokenPromise = Promise.resolve(remoteSubmissionToken);
             } else {
@@ -975,6 +996,9 @@ export function ReadinessFlow() {
     if (view !== "stage2" || !submissionToken || submissionExpired) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // New watch on this token: require the poll to reconfirm the token is valid
+    // before any "expired" reading may flip to the failed state (see below).
+    sawValidStatusRef.current = false;
 
     const schedule = (ms: number) => {
       if (!cancelled) timer = setTimeout(tick, ms);
@@ -986,9 +1010,15 @@ export function ReadinessFlow() {
       if (cancelled) return;
       switch (status.kind) {
         case "pending":
+          // Token is valid and simply awaiting the AI's POST — the "prompt
+          // generated, awaiting paste" state. Mark it seen so a later genuine
+          // expiry (30-min TTL elapsed) can transition to failed.
+          sawValidStatusRef.current = true;
           schedule(INGEST_POLL_INTERVAL_MS);
           return;
         case "rate_limited":
+          // A 429 still proves the token exists — count it as a valid sighting.
+          sawValidStatusRef.current = true;
           schedule(Math.max(INGEST_POLL_INTERVAL_MS, status.retryAfterSeconds * 1000));
           return;
         case "unavailable":
@@ -996,10 +1026,21 @@ export function ReadinessFlow() {
           schedule(INGEST_POLL_INTERVAL_MS * 2);
           return;
         case "expired":
-          trackAnalytics("ingest_expired", {});
-          setSubmissionExpired(true);
+          // Only honour expiry for a token we KNOW could be stale: one restored
+          // from a prior session, or one we've already confirmed valid at least
+          // once this session. A first-poll "expired" on a freshly minted token
+          // is a backend read-after-write gap, not a real expiry — treat it as
+          // transient and keep the prompt + awaiting-paste state up, so a fresh
+          // analysis never jumps to failed before showing the generated prompt.
+          if (submissionTokenRestoredRef.current || sawValidStatusRef.current) {
+            trackAnalytics("ingest_expired", {});
+            setSubmissionExpired(true);
+            return;
+          }
+          schedule(INGEST_POLL_INTERVAL_MS * 2);
           return;
         case "ready": {
+          sawValidStatusRef.current = true;
           // Consume-once: never re-render the same landed record twice.
           if (status.receivedAt && ingestedRef.current === status.receivedAt) {
             schedule(INGEST_POLL_INTERVAL_MS);
@@ -1141,6 +1182,10 @@ export function ReadinessFlow() {
   const onStartOver = async () => {
     trackAnalytics("start_over", { from: "ingest_expired" });
     ingestedRef.current = null;
+    // Fresh prompt/token about to be minted — reset the expiry-trust flags so
+    // the new link is treated as freshly minted, not resumed.
+    submissionTokenRestoredRef.current = false;
+    sawValidStatusRef.current = false;
     setSubmissionExpired(false);
     setSubmissionToken(null);
     setStage1(EMPTY_STAGE1);
@@ -1224,6 +1269,11 @@ export function ReadinessFlow() {
     trackAnalytics("new_analysis_clicked", { from: view });
     setStartStatus("idle");
     setConflictRunId(null);
+    // Starting a new analysis reuses the same principal but a fresh prompt/token
+    // watch — treat its submission token as freshly minted, never resumed.
+    submissionTokenRestoredRef.current = false;
+    sawValidStatusRef.current = false;
+    setSubmissionExpired(false);
     setStage1(EMPTY_STAGE1);
     setStepIndex(0);
     setPasteText("");
