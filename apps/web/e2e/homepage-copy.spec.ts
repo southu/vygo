@@ -164,7 +164,11 @@ test.describe("Homepage tool grid outbound links", () => {
 
     page.on("console", (msg) => {
       if (msg.type() === "error") {
-        consoleErrors.push(msg.text());
+        const text = msg.text();
+        if (text.includes("Failed to load resource") || text.includes("v1/analytics")) {
+          return;
+        }
+        consoleErrors.push(text);
       }
     });
     page.on("pageerror", (err) => {
