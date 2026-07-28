@@ -209,6 +209,37 @@ test.describe("readiness flow — single analysis reaches the diagnostic prompt 
     await expect(promptBlock).toContainText("VYGO READINESS DIAGNOSTIC PROMPT");
     expect((await promptBlock.innerText()).trim().length).toBeGreaterThan(50);
   });
+
+  test("Stage 3 (paste results) also displays the generated diagnostic prompt", async ({
+    page,
+  }) => {
+    await installReadinessRoutes(page);
+    await installTurnstileStub(page);
+
+    await page.goto("/readiness");
+    await startProjectRun(page, "Clinic Scheduler");
+    await completeIntake(page);
+
+    // From the Stage 2 prompt view, advance to the Stage 3 paste step.
+    await expect(page.getByTestId("readiness-stage2")).toBeVisible();
+    await page.getByTestId("readiness-go-paste").click();
+
+    const stage3 = liveStage3(page);
+    await expect(stage3).toBeVisible();
+    await expect(stage3.getByText("Stage 3 of 3 — paste results")).toBeVisible();
+
+    // The generated diagnostic prompt is shown ON Stage 3 (mission requirement),
+    // not only on Stage 2 — the paste step is self-contained.
+    const stage3Prompt = page.getByTestId("readiness-stage3-prompt-block");
+    await expect(stage3Prompt).toBeVisible();
+    await expect(stage3Prompt).toContainText("VYGO READINESS DIAGNOSTIC PROMPT");
+    expect((await stage3Prompt.innerText()).trim().length).toBeGreaterThan(50);
+
+    // No failed/error state on the Stage 3 UI while the prompt + paste box show.
+    await expect(page.getByTestId("readiness-parse-failed")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-stage2-generation-error")).toHaveCount(0);
+    await expect(stage3.getByTestId("readiness-paste-textarea")).toBeVisible();
+  });
 });
 
 test.describe("readiness flow — starting a new analysis over an existing one (b)", () => {

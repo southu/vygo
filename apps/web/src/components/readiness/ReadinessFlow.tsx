@@ -1605,6 +1605,50 @@ export function ReadinessFlow() {
       </h2>
       <p className="mt-3 text-base text-muted">{c.stage3.body}</p>
 
+      {/*
+        Generated diagnostic prompt, surfaced on Stage 3 (not only Stage 2). The
+        paste step is where a user actually needs the prompt in hand — to run it
+        and paste back its output — so the tailored prompt is shown here for
+        reference and re-copy. Rendered only when the prompt bundle is available
+        (intake complete); the paste UI below still works if it is not.
+      */}
+      {promptBundle?.prompt ? (
+        <div
+          className="readiness-step-panel mt-6"
+          data-testid="readiness-stage3-prompt"
+          data-variant={promptBundle.variant}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-display text-lg font-semibold text-ink">
+                {c.stage3.promptReferenceTitle}
+                {howTo ? (
+                  <span className="ml-2 text-sm font-normal text-muted">for {howTo.toolName}</span>
+                ) : null}
+              </h3>
+              <p className="mt-1 text-sm text-muted">{c.stage3.promptReferenceHelper}</p>
+            </div>
+            <button
+              type="button"
+              className={copied ? "btn-secondary shrink-0" : "btn-primary shrink-0"}
+              onClick={onCopy}
+              data-testid="readiness-stage3-copy"
+              data-copied={copied ? "true" : "false"}
+              aria-live="polite"
+            >
+              {copied ? c.stage3.promptReferenceCopied : c.stage3.promptReferenceCopy}
+            </button>
+          </div>
+          <pre
+            className="mt-3 max-h-[22rem] overflow-auto rounded-xl border border-border bg-trust p-4 text-left font-mono text-xs leading-relaxed text-white/90 sm:text-sm"
+            data-testid="readiness-stage3-prompt-block"
+            tabIndex={0}
+          >
+            {promptBundle.prompt}
+          </pre>
+        </div>
+      ) : null}
+
       <div className="readiness-step-panel mt-6">
         <label htmlFor="readiness-paste" className="text-sm font-medium text-ink-soft">
           {c.stage3.textareaLabel}

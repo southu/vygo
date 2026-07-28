@@ -149,6 +149,17 @@ export const readinessContent = {
     submit: "Submit report",
     submitting: "Checking…",
     secretsMessage: "Remove secrets before submitting.",
+    /**
+     * Stage 3 prompt reference. The tailored diagnostic prompt generated at
+     * Stage 2 is shown again here (collapsed by default) so the paste step is
+     * self-contained: a user who lands on Stage 3 can re-read or re-copy the
+     * exact prompt they were meant to run without stepping back to Stage 2.
+     */
+    promptReferenceTitle: "Your diagnostic prompt",
+    promptReferenceHelper:
+      "This is the prompt from Stage 2 — run it in your AI tool, then paste the report it produces below.",
+    promptReferenceCopy: "Copy prompt",
+    promptReferenceCopied: "Copied",
     back: "Back to prompt",
     draftSaved: "Draft saved",
     /**
