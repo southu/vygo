@@ -17,7 +17,8 @@ test.describe("WaitlistForm", () => {
 
   test("keyboard-only open, complete, submit, dismiss modal", async ({ page }) => {
     await page.goto("/");
-    const invoker = page.getByTestId("availability-bar-cta");
+    const invoker = page.getByTestId("desktop-primary-cta");
+    await expect(invoker).toBeEnabled();
     await invoker.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("waitlist-modal")).toBeVisible();
@@ -379,7 +380,8 @@ test.describe("WaitlistForm", () => {
 
   test("modal focus trap keeps Shift+Tab within dialog after open", async ({ page }) => {
     await page.goto("/");
-    const invoker = page.getByTestId("availability-bar-cta");
+    const invoker = page.getByTestId("desktop-primary-cta");
+    await expect(invoker).toBeEnabled();
     await invoker.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("waitlist-modal")).toBeVisible();
@@ -408,7 +410,8 @@ test.describe("WaitlistForm", () => {
 
   test("Tab from focused error summary reaches the first summary link", async ({ page }) => {
     await page.goto("/");
-    const invoker = page.getByTestId("availability-bar-cta");
+    const invoker = page.getByTestId("desktop-primary-cta");
+    await expect(invoker).toBeEnabled();
     await invoker.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("waitlist-modal")).toBeVisible();
@@ -445,7 +448,8 @@ test.describe("WaitlistForm", () => {
 
   test("focus is inside the modal after the success card renders", async ({ page }) => {
     await page.goto("/");
-    const invoker = page.getByTestId("availability-bar-cta");
+    const invoker = page.getByTestId("desktop-primary-cta");
+    await expect(invoker).toBeEnabled();
     await invoker.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("waitlist-modal")).toBeVisible();

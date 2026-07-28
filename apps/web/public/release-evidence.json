@@ -1,11 +1,11 @@
 {
   "app": "vygo",
   "service": "vygo-web",
-  "commit": "f582869cebf06ed7fce6ebcdc01ce5991b668ee8",
-  "sha": "f582869cebf06ed7fce6ebcdc01ce5991b668ee8",
-  "version": "f582869cebf06ed7fce6ebcdc01ce5991b668ee8",
+  "commit": "71d3fd627603a8b16e5187267d36b2a3f8523ebf",
+  "sha": "71d3fd627603a8b16e5187267d36b2a3f8523ebf",
+  "version": "71d3fd627603a8b16e5187267d36b2a3f8523ebf",
   "ready": false,
-  "generatedAt": "2026-07-23T13:06:08.448Z",
+  "generatedAt": "2026-07-28T15:10:07.106Z",
   "suite": {
     "cleanInstall": "passed",
     "lint": "passed",
