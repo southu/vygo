@@ -325,7 +325,7 @@ test.describe("readiness flow — starting a new analysis over an existing one (
 });
 
 test.describe("readiness flow — Stage 3 paste-parse failure raw fallback (c)", () => {
-  test("malformed paste shows the verbatim raw fallback and 'continue' advances past the failed parse", async ({
+  test("malformed paste shows the verbatim raw fallback and offers ONLY re-paste — never advances past the failed parse", async ({
     page,
   }) => {
     const routes = await installReadinessRoutes(page, {
@@ -355,10 +355,17 @@ test.describe("readiness flow — Stage 3 paste-parse failure raw fallback (c)",
     await expect(rawText).toBeVisible();
     await expect(rawText).toHaveText(malformed);
 
-    // Continue past the failed parse — must advance (to the gate), not get stuck.
-    await page.getByTestId("readiness-confirm-looks-right").click();
-    await expect(page.getByTestId("readiness-score-gate")).toBeVisible();
-    await expect(page.getByTestId("readiness-confirm-raw-fallback")).toHaveCount(0);
+    // A failed parse must NOT expose the findings-confirmation control and must
+    // NOT advance to the gate: report_parsed / findings_confirmed require a
+    // genuine successful parse. Only a re-paste path is offered.
+    await expect(page.getByTestId("readiness-confirm-looks-right")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-confirm-repaste")).toBeVisible();
+
+    // Re-paste returns to the paste step so the user can supply a readable report.
+    await page.getByTestId("readiness-confirm-repaste").click();
+    await expect(liveStage3(page)).toBeVisible();
+    await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
   });
 
   test("the existing score-gate deep link still renders (paste/confirm changes did not regress the gate)", async ({

@@ -1255,6 +1255,21 @@ export function ReadinessFlow() {
   };
 
   const onLooksRight = async () => {
+    // Authoritative gate: findings_confirmed is reachable ONLY from a genuine
+    // report_parsed. If the current parse did not succeed (failed / pending /
+    // empty), the transition model rejects report_pasted → findings_confirmed,
+    // so refuse to advance and send the user back to re-paste instead. This is
+    // the code-level enforcement behind the UI hiding the control below.
+    if (
+      !confirm ||
+      confirm.pending ||
+      !parseReachesReportParsed({
+        parseStatus: confirm.parseStatus,
+        findingsCount: confirm.findings.length,
+      })
+    ) {
+      return;
+    }
     trackAnalytics("stage_completed", { stage: "confirm" });
     // Cancel any pending paste-debounce PATCH so it cannot race after confirm.
     if (pasteDebounceRef.current) {
@@ -1668,23 +1683,45 @@ export function ReadinessFlow() {
 
         <AnswerCallout callout={confirmCallout} />
 
+        {/*
+          Findings-confirmation gate. The explicit "Looks right → continue"
+          control is exposed ONLY when the authoritative state is report_parsed
+          — i.e. a genuine successful parse produced findings. On a failed,
+          pending, or empty parse the state is report_pasted, and the ONLY
+          forward action offered is re-paste: the transition model has no
+          report_pasted → findings_confirmed edge, so we never surface a way to
+          "continue with what we have" past an unparseable report.
+        */}
         <div className="mt-8 flex flex-col items-start gap-4">
-          <button
-            type="button"
-            className="btn-primary w-full sm:w-auto"
-            onClick={() => void onLooksRight()}
-            data-testid="readiness-confirm-looks-right"
-          >
-            {c.confirm.looksRight}
-          </button>
-          <button
-            type="button"
-            className="text-sm font-semibold text-purple underline underline-offset-2 hover:text-purple-dark"
-            onClick={onSomethingOff}
-            data-testid="readiness-confirm-something-off"
-          >
-            {c.confirm.looksWrong}
-          </button>
+          {readinessState === "report_parsed" ? (
+            <>
+              <button
+                type="button"
+                className="btn-primary w-full sm:w-auto"
+                onClick={() => void onLooksRight()}
+                data-testid="readiness-confirm-looks-right"
+              >
+                {c.confirm.looksRight}
+              </button>
+              <button
+                type="button"
+                className="text-sm font-semibold text-purple underline underline-offset-2 hover:text-purple-dark"
+                onClick={onSomethingOff}
+                data-testid="readiness-confirm-something-off"
+              >
+                {c.confirm.looksWrong}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn-primary w-full sm:w-auto"
+              onClick={onSomethingOff}
+              data-testid="readiness-confirm-repaste"
+            >
+              {c.confirm.repaste}
+            </button>
+          )}
         </div>
       </div>
     );

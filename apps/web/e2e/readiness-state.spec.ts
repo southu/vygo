@@ -218,6 +218,50 @@ test.describe("readiness state model — ordered progression exposed live", () =
     await expect.poll(() => readState(page)).toBe("report_pasted");
     // Findings confirmation is not auto-reached (no gate yet).
     await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
+
+    // The explicit findings-confirmation control ("Looks right → continue") must
+    // NOT be exposed on a failed parse — there is no report_pasted →
+    // findings_confirmed edge. Only a re-paste control is offered.
+    await expect(page.getByTestId("readiness-confirm-looks-right")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-confirm-repaste")).toBeVisible();
+
+    // Activating the only forward control re-paste returns to user_ready_to_paste,
+    // and still never reaches findings confirmation.
+    await page.getByTestId("readiness-confirm-repaste").click();
+    await expect.poll(() => readState(page)).toBe("user_ready_to_paste");
+    await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
+  });
+
+  test("a report parsed as all-UNKNOWN (rejected) holds at report_pasted and offers only re-paste", async ({
+    page,
+  }) => {
+    const routes = await installRoutes(page);
+    await installTurnstileStub(page);
+    // The parser rejects an all-UNKNOWN report: no readable structured result.
+    routes.setParseFailure();
+
+    await page.goto("/readiness?new=1");
+    await startProjectRun(page, "All Unknown Project");
+    await completeIntake(page);
+    await page.getByTestId("readiness-go-paste").click();
+
+    const stage3 = page.locator('div.readiness-assessment[data-testid="readiness-stage3"]');
+    await stage3.getByTestId("readiness-paste-textarea").fill(
+      [
+        "=== begin VYGO-READINESS-REPORT ===",
+        "STACK: UNKNOWN",
+        "SIZE: UNKNOWN",
+        "FINDINGS: UNKNOWN",
+        "=== end VYGO-READINESS-REPORT ===",
+      ].join("\n"),
+    );
+    await stage3.getByTestId("readiness-paste-submit").click();
+
+    await expect(page.getByTestId("readiness-parse-failed")).toBeVisible();
+    // Never report_parsed, never findings confirmed.
+    await expect.poll(() => readState(page)).toBe("report_pasted");
+    await expect(page.getByTestId("readiness-confirm-looks-right")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
   });
 });
 

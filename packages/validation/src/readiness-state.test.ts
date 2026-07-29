@@ -60,8 +60,14 @@ test("legal backward controls are allowed (re-paste / back)", () => {
   assert.equal(canTransition("report_pasted", "user_ready_to_paste"), true);
 });
 
-test("an explicit continue on a failed parse (report_pasted → findings_confirmed) is legal", () => {
-  assert.equal(canTransition("report_pasted", "findings_confirmed"), true);
+test("report_pasted → findings_confirmed is REJECTED — a failed/unparsed report can never be confirmed", () => {
+  // findings_confirmed is reachable ONLY from report_parsed. There is no
+  // report_pasted → findings_confirmed edge, so an unparseable paste (all fields
+  // UNKNOWN, parse failure, still pending) can never "continue with what we have".
+  assert.equal(canTransition("report_pasted", "findings_confirmed"), false);
+  assert.equal(nextReadinessState("report_pasted", "findings_confirmed"), "report_pasted");
+  // report_parsed is the only state from which findings_confirmed is reachable.
+  assert.equal(canTransition("report_parsed", "findings_confirmed"), true);
 });
 
 test("start-over resets to intake from anywhere", () => {

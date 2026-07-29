@@ -49,10 +49,14 @@ const LEGAL_TRANSITIONS: Record<ReadinessState, readonly ReadinessState[]> = {
   intake: ["prompt_displayed"],
   prompt_displayed: ["user_ready_to_paste", "intake"],
   user_ready_to_paste: ["report_pasted", "prompt_displayed", "intake"],
-  // From report_pasted a successful parse advances to report_parsed; the user
-  // may re-paste (back to user_ready_to_paste); and an explicit "continue with
-  // what we have" on a failed parse is a user-driven confirm (findings_confirmed).
-  report_pasted: ["report_parsed", "user_ready_to_paste", "findings_confirmed", "intake"],
+  // From report_pasted the ONLY forward edge is report_parsed, and that edge is
+  // taken only on a genuine successful parse (see parseReachesReportParsed). A
+  // failed, pending, or empty parse has no forward edge from here — the user can
+  // only re-paste (back to user_ready_to_paste) or start over. There is NO
+  // report_pasted → findings_confirmed edge: findings_confirmed requires a
+  // successful parse (report_parsed) first, then an explicit user confirmation.
+  // This is what forbids "continue with what we have" on an unparseable paste.
+  report_pasted: ["report_parsed", "user_ready_to_paste", "intake"],
   report_parsed: ["findings_confirmed", "user_ready_to_paste", "intake"],
   findings_confirmed: ["intake"],
 };

@@ -175,7 +175,7 @@ export const readinessContent = {
     title: "Here's what we learned",
     pendingTitle: "Here's what we learned so far",
     pendingBody:
-      "We're still finishing the full parse. You can continue with what we have, or re-paste if something looks incomplete.",
+      "We're still finishing the full parse. Hang tight — once it's read a structured result you'll be able to confirm the findings. If it looks incomplete you can re-paste.",
     /**
      * Paste-parse failure (Stage 3). The ONE message for a genuinely
      * malformed/non-matching paste or a real parse error — fired only when the
@@ -187,7 +187,7 @@ export const readinessContent = {
      */
     parseFailedTitle: "We couldn't read a structured result",
     parseFailedBody:
-      "This paste didn't match the expected VYGO-READINESS-REPORT structure, so we couldn't read a structured result from it. Re-paste the full report (including the === begin/end marker lines), or continue with what you pasted below.",
+      "This paste didn't match the expected VYGO-READINESS-REPORT structure, so we couldn't read a structured result from it. Re-paste the full report (including the === begin/end marker lines) — we can only continue once a structured result is read.",
     stackLabel: "Stack",
     sizeLabel: "Size",
     findingsLabel: "Findings",
