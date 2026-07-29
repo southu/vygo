@@ -14,10 +14,10 @@ The system is three small pieces working together, not one monolith:
 
 - **The control loop** — a build → deploy gate → live test cycle that keeps
   running a step until it passes against the real, deployed product.
-- **The goal-intake dashboard** — internally nicknamed the harness
-  dashboard, the human-facing surface where a goal turns into a queue of
-  small, verifiable steps. It lives behind a private, authenticated URL and
-  is never linked from public navigation.
+- **The goal-intake dashboard** — internally nicknamed the harness dashboard,
+  the human-facing surface where a goal turns into a queue of small,
+  verifiable steps. It lives behind a private, authenticated URL and is
+  never linked from public navigation.
 - **Read-only ops tooling** — an optional helper that watches a run and
   flags when it looks stuck, but never writes a line of product code.
 
