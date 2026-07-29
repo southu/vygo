@@ -148,6 +148,48 @@ function readState(page: Page) {
   return page.evaluate(() => document.documentElement.dataset.readinessState ?? null);
 }
 
+/** The run/analysis identifier the current run persisted to localStorage. */
+function readStoredRunId(page: Page) {
+  return page.evaluate(() => {
+    try {
+      const raw = window.localStorage.getItem("vygo:readiness:v1");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { runId?: string | null };
+      return parsed.runId ?? null;
+    } catch {
+      return null;
+    }
+  });
+}
+
+/** The prior-run fields that a ?new=1 start must have wiped from localStorage. */
+function readStoredRunData(page: Page) {
+  return page.evaluate(() => {
+    try {
+      const raw = window.localStorage.getItem("vygo:readiness:v1");
+      if (!raw) return null;
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  });
+}
+
+/** A persisted Step-8 / completed readiness run (findings confirmed, gate stage). */
+const PRIOR_STEP8_STATE = {
+  token: "prior-completed-token-8888888888",
+  stage: "gate",
+  stage1: COMPLETE_STAGE1,
+  pasteText: "VYGO-READINESS-REPORT: prior findings the new run must not restore.",
+  findings: ["Prior auth finding", "Prior rate-limit finding"],
+  parseStatus: "ok",
+  confirmedAt: "2026-01-01T00:00:00.000Z",
+  completed: true,
+  progress: 100,
+  runId: "run_prior_completed",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
 test.describe("readiness state model — ordered progression exposed live", () => {
   test("a fresh ?new=1 flow walks every stage in order with none skipped", async ({ page }) => {
     const routes = await installRoutes(page);
@@ -246,15 +288,17 @@ test.describe("readiness state model — ordered progression exposed live", () =
     await page.getByTestId("readiness-go-paste").click();
 
     const stage3 = page.locator('div.readiness-assessment[data-testid="readiness-stage3"]');
-    await stage3.getByTestId("readiness-paste-textarea").fill(
-      [
-        "=== begin VYGO-READINESS-REPORT ===",
-        "STACK: UNKNOWN",
-        "SIZE: UNKNOWN",
-        "FINDINGS: UNKNOWN",
-        "=== end VYGO-READINESS-REPORT ===",
-      ].join("\n"),
-    );
+    await stage3
+      .getByTestId("readiness-paste-textarea")
+      .fill(
+        [
+          "=== begin VYGO-READINESS-REPORT ===",
+          "STACK: UNKNOWN",
+          "SIZE: UNKNOWN",
+          "FINDINGS: UNKNOWN",
+          "=== end VYGO-READINESS-REPORT ===",
+        ].join("\n"),
+      );
     await stage3.getByTestId("readiness-paste-submit").click();
 
     await expect(page.getByTestId("readiness-parse-failed")).toBeVisible();
@@ -360,6 +404,115 @@ test.describe("readiness state model — resume vs. fresh URL", () => {
     await page.goto("/readiness?new=1");
     await expect(page.getByTestId("readiness-project")).toBeVisible();
     await expect.poll(() => readState(page)).toBe("intake");
+  });
+
+  test("?new=1 after persisted Step 8 state shows a clean prompt stage with a fresh run id", async ({
+    page,
+  }) => {
+    // Seed a persisted, COMPLETED (Step 8 / gate) readiness run in localStorage.
+    await page.addInitScript(
+      ({ key, state }) => window.localStorage.setItem(key, JSON.stringify(state)),
+      { key: "vygo:readiness:v1", state: PRIOR_STEP8_STATE },
+    );
+    await installRoutes(page);
+    await installTurnstileStub(page);
+
+    await page.goto("/readiness?new=1");
+
+    // A clean prompt-stage session: the project start step, not the prior gate.
+    await expect(page.getByTestId("readiness-project")).toBeVisible();
+    await expect.poll(() => readState(page)).toBe("intake");
+    // No restored confirm/score-gate/paste from the prior completed run.
+    await expect(page.getByTestId("readiness-confirm")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
+
+    // A fresh analysis/run identifier, different from the prior run's.
+    await expect.poll(() => readStoredRunId(page)).not.toBeNull();
+    const newRunId = await readStoredRunId(page);
+    expect(newRunId).not.toBe(PRIOR_STEP8_STATE.runId);
+    expect(await page.evaluate(() => document.documentElement.dataset.readinessRunId ?? null)).toBe(
+      newRunId,
+    );
+
+    // Every prior-run field was wiped from the persisted state — nothing from the
+    // completed run can repopulate the new one during or after hydration.
+    const stored = await readStoredRunData(page);
+    expect(stored?.stage).toBe("intake");
+    expect(stored?.pasteText ?? "").toBe("");
+    expect(stored?.findings ?? null).toBeFalsy();
+    expect(stored?.parseStatus ?? null).toBeFalsy();
+    expect(stored?.confirmedAt ?? null).toBeFalsy();
+    expect(stored?.completed ?? null).toBeFalsy();
+  });
+
+  test("two consecutive ?new=1 starts create different run ids and each renders a clean prompt stage", async ({
+    page,
+  }) => {
+    // Start from a prior completed run so the first ?new=1 also proves isolation.
+    await page.addInitScript(
+      ({ key, state }) => window.localStorage.setItem(key, JSON.stringify(state)),
+      { key: "vygo:readiness:v1", state: PRIOR_STEP8_STATE },
+    );
+    await installRoutes(page);
+    await installTurnstileStub(page);
+
+    // First new=1.
+    await page.goto("/readiness?new=1");
+    await expect(page.getByTestId("readiness-project")).toBeVisible();
+    await expect.poll(() => readState(page)).toBe("intake");
+    await expect.poll(() => readStoredRunId(page)).not.toBeNull();
+    const firstRunId = await readStoredRunId(page);
+    expect(firstRunId).not.toBe(PRIOR_STEP8_STATE.runId);
+
+    // Second new=1 in the SAME browser session (localStorage persists across the
+    // reload). It must mint a different run id and again show a clean prompt stage.
+    await page.goto("/readiness?new=1");
+    await expect(page.getByTestId("readiness-project")).toBeVisible();
+    await expect.poll(() => readState(page)).toBe("intake");
+    await expect.poll(() => readStoredRunId(page)).not.toBe(firstRunId);
+    const secondRunId = await readStoredRunId(page);
+    expect(secondRunId).not.toBeNull();
+    expect(secondRunId).not.toBe(firstRunId);
+
+    // Clean each time: no restored confirm/gate/paste.
+    await expect(page.getByTestId("readiness-confirm")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
+    const stored = await readStoredRunData(page);
+    expect(stored?.stage).toBe("intake");
+    expect(stored?.pasteText ?? "").toBe("");
+    expect(stored?.findings ?? null).toBeFalsy();
+  });
+
+  test("ordinary resume (no ?new=1) keeps the persisted run id and stage", async ({ page }) => {
+    // A valid incomplete resumable state persisted at the paste stage with a run id.
+    await installRoutes(page, {
+      token: SESSION_TOKEN,
+      stage: "paste",
+      draft: { stage1: COMPLETE_STAGE1, project: "Resume Project", pasteText: "" },
+    });
+    await page.addInitScript(
+      ({ key, state }) => window.localStorage.setItem(key, JSON.stringify(state)),
+      {
+        key: "vygo:readiness:v1",
+        state: {
+          token: SESSION_TOKEN,
+          stage: "paste",
+          stage1: COMPLETE_STAGE1,
+          projectLabel: "Resume Project",
+          runId: "run_resume_keep",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      },
+    );
+    await installTurnstileStub(page);
+
+    await page.goto("/readiness");
+    // Restores the persisted stage AND keeps its existing run identifier.
+    await expect.poll(() => readState(page)).toBe("user_ready_to_paste");
+    await expect.poll(() => readStoredRunId(page)).toBe("run_resume_keep");
+    expect(await page.evaluate(() => document.documentElement.dataset.readinessRunId ?? null)).toBe(
+      "run_resume_keep",
+    );
   });
 
   test("?new=1 does not hydrate a prior resumable session into a later stage", async ({ page }) => {

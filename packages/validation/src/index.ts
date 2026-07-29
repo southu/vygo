@@ -62,9 +62,12 @@ export {
   hydrateReadinessState,
   persistedStageForState,
   entryReadinessState,
+  shouldRestorePersistedReadinessRun,
+  freshReadinessRun,
   type ReadinessState,
   type ParseOutcome,
   type HydrationInput,
+  type FreshReadinessRun,
 } from "./readiness-state.js";
 
 export {

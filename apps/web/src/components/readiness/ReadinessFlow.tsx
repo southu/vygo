@@ -55,7 +55,8 @@ import {
   type ScoreResponse,
 } from "@/lib/readiness/api";
 import {
-  clearReadinessLocal,
+  initNewReadinessRun,
+  generateReadinessRunId,
   loadKnownProjects,
   loadReadinessLocal,
   rememberProjectLabel,
@@ -287,6 +288,13 @@ export function ReadinessFlow() {
   const c = readinessContent;
   const [view, setView] = useState<View>("loading");
   const [token, setToken] = useState<string | null>(null);
+  /**
+   * Client-generated identifier for the current analysis run. A ?new=1 visit
+   * mints a fresh one synchronously (initNewReadinessRun) before any resume runs;
+   * a plain visit restores the persisted run's id. Exposed on the document so a
+   * new run can be told apart from the prior run's persisted state.
+   */
+  const [runId, setRunId] = useState<string | null>(null);
   const [submissionToken, setSubmissionToken] = useState<string | null>(null);
   const [stage1, setStage1] = useState<ReadinessStage1Answers>(EMPTY_STAGE1);
   const [stepIndex, setStepIndex] = useState(0);
@@ -357,10 +365,13 @@ export function ReadinessFlow() {
       stage1: nextStage1,
       email: email || undefined,
       pasteText: extra?.pasteText ?? pasteText,
+      // Keep the current run id on every write so it survives a run's many
+      // persists (a later save must not silently drop it and break resume).
+      runId: extra?.runId ?? runId ?? undefined,
       updatedAt: new Date().toISOString(),
       ...extra,
     }),
-    [email, pasteText],
+    [email, pasteText, runId],
   );
 
   const persist = useCallback(
@@ -428,17 +439,40 @@ export function ReadinessFlow() {
         // run-start principal is the submission-token credential (minted below),
         // never this session token.
         if (newAnalysisRequestedFromUrl()) {
-          // Drop the prior analysis's local draft SYNCHRONOUSLY, before the
-          // createReadinessSession round-trip below. The prior draft carries the
-          // just-completed run's paste text, parsed findings, project label and
-          // session token; leaving it in localStorage until this async call
-          // resolves would keep that stale state readable for the whole handoff
-          // window (and a plain reload mid-flight could resurrect it into the
-          // "new" run). Clearing first guarantees no residual prior-analysis data
-          // is visible during the new-analysis load. The durable analyses/snapshot
-          // rows (and the prior session row server-side) are untouched, so the
-          // completed analysis stays fully accessible via /analyses.
-          clearReadinessLocal();
+          // Initialise the new run SYNCHRONOUSLY, before the createReadinessSession
+          // round-trip below AND before any of the resume/hydration logic further
+          // down can read persisted state. initNewReadinessRun() overwrites the
+          // persisted readiness state with a clean intake state stamped with a
+          // FRESH run id: it drops the prior run's prompt response, pasted input,
+          // parse error, parse result, findings, progress, stage and completion
+          // flags in one synchronous write. Overwriting (not clear-then-async-write)
+          // leaves no window in which the prior completed/Step-8 draft is readable
+          // — not during the handoff, and not if a plain reload races mid-flight —
+          // and durably stores the new run id even if the session create below
+          // fails. The durable analyses/snapshot rows (and the prior session row
+          // server-side) are untouched, so the completed analysis stays fully
+          // accessible via /analyses.
+          const freshRunId = initNewReadinessRun();
+          // Reset every piece of in-memory run state too, so nothing a prior
+          // in-page "New analysis" left behind can survive into this run. On a
+          // fresh page load these are already at their defaults; the explicit
+          // reset makes the "clear all run data" contract hold from any entry.
+          setRunId(freshRunId);
+          setStage1(EMPTY_STAGE1);
+          setStepIndex(0);
+          setPasteText("");
+          setConfirm(null);
+          setEmail("");
+          setSecretLines([]);
+          setSecretMessage("");
+          setBackgroundResultsReceived(false);
+          setSubmissionExpired(false);
+          setSubmissionToken(null);
+          setStartStatus("idle");
+          setConflictRunId(null);
+          submissionTokenRestoredRef.current = false;
+          sawValidStatusRef.current = false;
+          ingestedRef.current = null;
           const created = await createReadinessSession({
             stage: "intake",
             draft: draftFromStage1(EMPTY_STAGE1),
@@ -446,18 +480,15 @@ export function ReadinessFlow() {
           if (cancelled) return;
           const t = created.token;
           setToken(t);
-          setStage1(EMPTY_STAGE1);
-          setStepIndex(0);
-          setPasteText("");
-          setConfirm(null);
-          setStartStatus("idle");
           // Point local persistence at the fresh session so a later plain reload
           // (no ?new=1) resumes THIS empty analysis, never the prior completed
-          // one — and never re-reads the prior analysis's stale draft.
+          // one — and never re-reads the prior analysis's stale draft. Carry the
+          // fresh run id so the reload restores the SAME run identity.
           saveReadinessLocal({
             token: t,
             stage: "intake",
             stage1: EMPTY_STAGE1,
+            runId: freshRunId,
             updatedAt: new Date().toISOString(),
           });
           // Mint the run-start credential up front so "Start analysis" is instant.
@@ -475,6 +506,14 @@ export function ReadinessFlow() {
         let restoredEmail = local?.email || "";
         let restoredPaste = local?.pasteText || "";
         let restoredProjectLabel = local?.projectLabel || "";
+        // A plain (non-?new=1) visit restores the persisted run's identifier so
+        // the resumed run keeps its identity. Legacy drafts predating run ids —
+        // and fresh sessions — get one minted below.
+        let restoredRunId = (local?.runId || "").trim();
+        // A legacy draft (or a brand-new session) has no run id yet — mint one so
+        // every run has a stable identifier from its first load.
+        if (!restoredRunId) restoredRunId = generateReadinessRunId();
+        setRunId(restoredRunId);
         const didResume = Boolean(fromUrl || local?.token);
         // Tracks whether we had to mint a fresh submission token this load (vs.
         // reusing one already embedded in a previously generated prompt) so a
@@ -571,6 +610,7 @@ export function ReadinessFlow() {
                 stage1: restoredStage1,
                 email: restoredEmail || undefined,
                 pasteText: restoredPaste,
+                runId: restoredRunId || undefined,
                 updatedAt: new Date().toISOString(),
               });
               if (restoredStage === "gate") {
@@ -643,6 +683,7 @@ export function ReadinessFlow() {
           email: restoredEmail || undefined,
           pasteText: restoredPaste,
           projectLabel: restoredProjectLabel || undefined,
+          runId: restoredRunId || undefined,
           updatedAt: new Date().toISOString(),
         });
 
@@ -1343,11 +1384,16 @@ export function ReadinessFlow() {
     setConfirm(null);
     setSecretLines([]);
     setSecretMessage("");
+    // A start-over is a fresh run of intake — mint a new run id so it is not
+    // conflated with the run whose results link just expired.
+    const startOverRunId = generateReadinessRunId();
+    setRunId(startOverRunId);
     saveReadinessLocal({
       token,
       stage: "intake",
       stage1: EMPTY_STAGE1,
       email: email || undefined,
+      runId: startOverRunId,
       updatedAt: new Date().toISOString(),
     });
     if (token) {
@@ -1431,6 +1477,9 @@ export function ReadinessFlow() {
     setSecretLines([]);
     setSecretMessage("");
     setNewProjectInput("");
+    // Fresh run id for the new in-page analysis so it is distinguishable from
+    // the run just left behind (persisted by the next persist() via buildLocal).
+    setRunId(generateReadinessRunId());
     const known = loadKnownProjects();
     setKnownProjects(known);
     if (known[0]) {
@@ -1508,6 +1557,19 @@ export function ReadinessFlow() {
       }
     };
   }, [readinessState]);
+
+  // Expose the current run identifier so a ?new=1 start can be told apart from
+  // the prior run's persisted state (a fresh id proves the new run is isolated),
+  // and a plain resume can be seen to keep its existing id.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (runId) document.documentElement.dataset.readinessRunId = runId;
+    return () => {
+      if (typeof document !== "undefined") {
+        delete document.documentElement.dataset.readinessRunId;
+      }
+    };
+  }, [runId]);
 
   if (view === "loading") {
     return (

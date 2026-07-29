@@ -254,3 +254,70 @@ export function entryReadinessState(input: {
   if (!input.resumed) return "intake";
   return hydrateReadinessState(input.resumed);
 }
+
+// ---------------------------------------------------------------------------
+// New-analysis (?new=1) run initialisation — clear ALL prior run data before
+// any hydration can restore it.
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether a persisted readiness run may be restored on this page load. A
+ * new-analysis request (?new=1 / "New analysis") must NEVER restore prior run
+ * data — not the prompt response, pasted input, parse error/result, findings,
+ * progress, stage, or any completion flag — so it always returns false. A plain
+ * visit restores. This is the single authoritative rule the flow reads so
+ * "wipe everything on ?new=1, resume otherwise" cannot drift between call sites.
+ */
+export function shouldRestorePersistedReadinessRun(newAnalysisRequested: boolean): boolean {
+  return !newAnalysisRequested;
+}
+
+/**
+ * The shape of a freshly-initialised readiness run: a brand-new run identifier
+ * and the intake stage, with every prior-run field cleared. The optional
+ * cleared fields are listed explicitly (rather than merely omitted) so a caller
+ * that spreads this over a prior persisted state overwrites — not merges — each
+ * one, and so the "what a new run wipes" contract has one source of truth: the
+ * analysis prompt response, pasted input, parse error, parse status/result,
+ * findings, progress percentage, and completion flags.
+ */
+export type FreshReadinessRun = {
+  runId: string;
+  stage: ReadinessState;
+  promptResponse: undefined;
+  pasteText: undefined;
+  parseError: undefined;
+  parseStatus: undefined;
+  report: undefined;
+  findings: undefined;
+  progress: undefined;
+  confirmedAt: undefined;
+  submissionId: undefined;
+  completed: undefined;
+};
+
+/**
+ * Build the cleared state for a brand-new analysis run stamped with `runId`.
+ * Every prior-run field is set to `undefined` so spreading this over a completed
+ * or Step-8 persisted state wipes it: the new run starts at intake with no
+ * restored prompt response, pasted input, parse error, parse result, finding,
+ * progress, or completion flag. Pure and synchronous — it never touches storage
+ * or the network, so it can run before any hydration/resume reads persisted
+ * state.
+ */
+export function freshReadinessRun(runId: string): FreshReadinessRun {
+  return {
+    runId,
+    stage: "intake",
+    promptResponse: undefined,
+    pasteText: undefined,
+    parseError: undefined,
+    parseStatus: undefined,
+    report: undefined,
+    findings: undefined,
+    progress: undefined,
+    confirmedAt: undefined,
+    submissionId: undefined,
+    completed: undefined,
+  };
+}

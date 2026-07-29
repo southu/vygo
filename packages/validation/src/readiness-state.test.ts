@@ -7,6 +7,7 @@ import {
   backgroundCompletionMayEnter,
   canTransition,
   entryReadinessState,
+  freshReadinessRun,
   hydrateReadinessState,
   isParseFailureStatus,
   isReadinessState,
@@ -14,6 +15,7 @@ import {
   parseReachesReportParsed,
   persistedStageForState,
   readinessStateOrder,
+  shouldRestorePersistedReadinessRun,
   stateAfterParse,
   type ReadinessState,
 } from "./readiness-state.js";
@@ -249,6 +251,81 @@ test("without ?new=1 a resumable session hydrates to its legal stage", () => {
   );
   // No resumable session → intake.
   assert.equal(entryReadinessState({ newAnalysisRequested: false, resumed: null }), "intake");
+});
+
+// ---------------------------------------------------------------------------
+// New-analysis (?new=1) run initialisation — clear all prior run data.
+// ---------------------------------------------------------------------------
+
+test("?new=1 never restores a persisted run; a plain visit does", () => {
+  assert.equal(shouldRestorePersistedReadinessRun(true), false);
+  assert.equal(shouldRestorePersistedReadinessRun(false), true);
+});
+
+test("freshReadinessRun starts at intake with a fresh id and every prior-run field cleared", () => {
+  const fresh = freshReadinessRun("run_abc123");
+  assert.equal(fresh.runId, "run_abc123");
+  assert.equal(fresh.stage, "intake");
+  // Every prior-run field the mission enumerates is explicitly cleared, so
+  // spreading this over a completed / Step-8 draft wipes it (not merges):
+  // the analysis prompt response, pasted input, parse error, parse result,
+  // findings, progress, and completion flags.
+  assert.equal(fresh.promptResponse, undefined);
+  assert.equal(fresh.pasteText, undefined);
+  assert.equal(fresh.parseError, undefined);
+  assert.equal(fresh.parseStatus, undefined);
+  assert.equal(fresh.report, undefined);
+  assert.equal(fresh.findings, undefined);
+  assert.equal(fresh.progress, undefined);
+  assert.equal(fresh.confirmedAt, undefined);
+  assert.equal(fresh.submissionId, undefined);
+  assert.equal(fresh.completed, undefined);
+});
+
+test("spreading freshReadinessRun over a completed/Step-8 draft clears every prior field", () => {
+  // A completed (Step 9) draft with everything set.
+  const priorCompleted = {
+    runId: "run_prior",
+    token: "prior-token",
+    stage: "gate",
+    pasteText: "VYGO-READINESS-REPORT: ...",
+    promptResponse: "the AI response",
+    parseError: "boom",
+    parseStatus: "ok",
+    report: { stack: "Next.js" },
+    findings: ["Auth hardening", "Rate limiting"],
+    progress: 100,
+    confirmedAt: "2026-01-01T00:00:00.000Z",
+    submissionId: "sub-123",
+    completed: true,
+  };
+  const merged = { ...priorCompleted, ...freshReadinessRun("run_new") };
+  assert.equal(merged.runId, "run_new");
+  assert.equal(merged.stage, "intake");
+  for (const field of [
+    "pasteText",
+    "promptResponse",
+    "parseError",
+    "parseStatus",
+    "report",
+    "findings",
+    "progress",
+    "confirmedAt",
+    "submissionId",
+    "completed",
+  ] as const) {
+    assert.equal(merged[field], undefined, `${field} must be cleared`);
+  }
+});
+
+test("two consecutive fresh runs get distinct ids and both start clean at intake", () => {
+  const first = freshReadinessRun("run_first");
+  const second = freshReadinessRun("run_second");
+  assert.notEqual(first.runId, second.runId);
+  assert.equal(first.stage, "intake");
+  assert.equal(second.stage, "intake");
+  assert.equal(second.findings, undefined);
+  assert.equal(second.pasteText, undefined);
 });
 
 // A fresh flow never skips a stage: every legal single step from intake to
