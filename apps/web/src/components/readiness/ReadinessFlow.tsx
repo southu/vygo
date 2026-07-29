@@ -24,6 +24,10 @@ import {
   parseReadinessPastePartial,
   scanPasteForSecrets,
   structuredReadinessFromReport,
+  backgroundCompletionMayEnter,
+  canTransition,
+  parseReachesReportParsed,
+  type ReadinessState,
   type BlockerOption,
   type BuiltWithOption,
   type DeadlineOption,
@@ -312,6 +316,12 @@ export function ReadinessFlow() {
 
   // Ingest watch: waiting on the customer's AI to POST results back.
   const [submissionExpired, setSubmissionExpired] = useState(false);
+  /**
+   * True once the background mission-completion callback (ingest poll) has landed
+   * results. It records them as metadata and prefills the paste box, but never
+   * advances the readiness state — the user must review and submit explicitly.
+   */
+  const [backgroundResultsReceived, setBackgroundResultsReceived] = useState(false);
   /** received_at of the ingest record already rendered (consume-once). */
   const ingestedRef = useRef<string | null>(null);
   /**
@@ -946,9 +956,16 @@ export function ReadinessFlow() {
     // Persist draft (paste text) without waiting for parse — still no secrets.
     saveReadinessLocal(buildLocal(stage1, "paste", token, { pasteText: text }));
 
+    // Advance to report_pasted at once: the report has been submitted and is now
+    // being parsed. The confirm view renders in its pending form (report_pasted)
+    // until the parse resolves — report_parsed is reached only once the parse
+    // succeeds with findings (see parseReachesReportParsed below). This makes the
+    // report_pasted → report_parsed progression an explicit, observable step
+    // rather than a single jump straight to the parsed result.
+    setConfirm(clientConfirm);
+    setView("confirm");
+
     if (!token) {
-      setConfirm(clientConfirm);
-      setView("confirm");
       return;
     }
 
@@ -1126,7 +1143,41 @@ export function ReadinessFlow() {
           }
           ingestedRef.current = status.receivedAt ?? `ready-${Date.now()}`;
           trackAnalytics("ingest_landed", { source: "api" });
+          // Background mission-completion callback. It MUST NOT advance the
+          // readiness state into report_parsed or findings_confirmed — those
+          // require a user-driven parse and an explicit user confirmation. The
+          // transition model forbids both as background targets, so we only
+          // record the results as metadata (prefill the paste box + persist the
+          // draft) and surface a notice; the user reviews and submits explicitly.
+          const backgroundMayAutoAdvance =
+            backgroundCompletionMayEnter("report_parsed") &&
+            backgroundCompletionMayEnter("findings_confirmed");
           setPasteText(text);
+          setBackgroundResultsReceived(true);
+          // Persist as draft metadata on the SAME (paste) stage — no forward
+          // stage change — so a reload keeps the results without inventing
+          // report_parsed/confirm progress the user never confirmed.
+          saveReadinessLocal(buildLocal(stage1, "paste", token, { pasteText: text }));
+          if (token) {
+            void patchReadinessSession(token, {
+              stage: "paste",
+              draft: draftFromStage1(stage1, {
+                email: email || undefined,
+                pasteText: text,
+                submissionToken: submissionToken || undefined,
+              }),
+            }).catch(() => {
+              /* local metadata still applies */
+            });
+          }
+          if (!backgroundMayAutoAdvance) {
+            // The model's guard holds: stay on the current screen, never parse or
+            // confirm on the user's behalf. Keep polling for later records.
+            schedule(INGEST_POLL_INTERVAL_MS);
+            return;
+          }
+          // Not reached under the current transition model (both targets are
+          // forbidden); retained so loosening the guard re-enables auto-display.
           await runParseAndConfirmRef.current(text);
           return;
         }
@@ -1258,6 +1309,7 @@ export function ReadinessFlow() {
     submissionTokenRestoredRef.current = false;
     sawValidStatusRef.current = false;
     setSubmissionExpired(false);
+    setBackgroundResultsReceived(false);
     setSubmissionToken(null);
     setStage1(EMPTY_STAGE1);
     setStepIndex(0);
@@ -1345,6 +1397,7 @@ export function ReadinessFlow() {
     submissionTokenRestoredRef.current = false;
     sawValidStatusRef.current = false;
     setSubmissionExpired(false);
+    setBackgroundResultsReceived(false);
     setStage1(EMPTY_STAGE1);
     setStepIndex(0);
     setPasteText("");
@@ -1370,6 +1423,65 @@ export function ReadinessFlow() {
 
   // Highlight helper: line numbers for secret scan overlay
   const pasteLines = useMemo(() => pasteText.replace(/\r\n/g, "\n").split("\n"), [pasteText]);
+
+  /**
+   * Authoritative readiness state, derived from the single set of live facts the
+   * view renders. This is the one source of truth for progression — every other
+   * boolean the flow used to lean on (empty-findings heuristics, "did parse
+   * land" guesses) is subordinate to it. report_parsed is gated ONLY on a
+   * genuine successful parse (via parseReachesReportParsed); findings_confirmed
+   * only when the gate view is reached, which is only reachable through the
+   * explicit "Looks right → continue" control (onLooksRight).
+   */
+  const readinessState: ReadinessState = useMemo(() => {
+    switch (view) {
+      case "stage2":
+        return "prompt_displayed";
+      case "stage3":
+        return "user_ready_to_paste";
+      case "confirm":
+        if (!confirm) return "report_pasted";
+        // A report has been pasted; it only counts as report_parsed once a real
+        // parse succeeds with findings and is no longer pending.
+        return !confirm.pending &&
+          parseReachesReportParsed({
+            parseStatus: confirm.parseStatus,
+            findingsCount: confirm.findings.length,
+          })
+          ? "report_parsed"
+          : "report_pasted";
+      case "gate":
+        return "findings_confirmed";
+      // project / stage1 / off-ramps / loading / error are all pre-prompt.
+      default:
+        return "intake";
+    }
+  }, [view, confirm]);
+
+  /**
+   * Enforce the transition model: any state change the render produces must be a
+   * legal edge from the prior state. An illegal jump is a bug in a gate — surface
+   * it in development rather than letting the flow silently skip a stage. This
+   * never mutates state (the derivation above is authoritative); it only guards.
+   */
+  const prevReadinessStateRef = useRef<ReadinessState | null>(null);
+  useEffect(() => {
+    const prev = prevReadinessStateRef.current;
+    if (prev && prev !== readinessState && !canTransition(prev, readinessState)) {
+      console.warn(`[readiness] rejected illegal transition ${prev} → ${readinessState}`);
+    }
+    prevReadinessStateRef.current = readinessState;
+    // Expose the authoritative state so reload/multi-tab/server-hydrated resume
+    // and automated checks can read the exact readiness stage from the document.
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.readinessState = readinessState;
+    }
+    return () => {
+      if (typeof document !== "undefined") {
+        delete document.documentElement.dataset.readinessState;
+      }
+    };
+  }, [readinessState]);
 
   if (view === "loading") {
     return (
@@ -1448,14 +1560,16 @@ export function ReadinessFlow() {
 
   if (view === "gate") {
     return (
-      <ScoreGateForm
-        token={token || ""}
-        initialEmail={email}
-        source="paste"
-        onScored={onScored}
-        progressCurrent={FLOW_STEP_GATE}
-        progressTotal={FLOW_TOTAL_STEPS}
-      />
+      <div data-readiness-flow-root data-readiness-state={readinessState}>
+        <ScoreGateForm
+          token={token || ""}
+          initialEmail={email}
+          source="paste"
+          onScored={onScored}
+          progressCurrent={FLOW_STEP_GATE}
+          progressTotal={FLOW_TOTAL_STEPS}
+        />
+      </div>
     );
   }
 
@@ -1481,7 +1595,11 @@ export function ReadinessFlow() {
           }
         : null;
     return (
-      <div className="readiness-assessment mt-8" data-testid="readiness-confirm">
+      <div
+        className="readiness-assessment mt-8"
+        data-testid="readiness-confirm"
+        data-readiness-state={readinessState}
+      >
         <AssessmentProgress
           current={FLOW_STEP_CONFIRM}
           total={FLOW_TOTAL_STEPS}
@@ -1593,7 +1711,11 @@ export function ReadinessFlow() {
    * paste panel — the reset must leave ONLY the project-selection UI on screen.
    */
   const stage3Panel = (
-    <div className="readiness-assessment mt-8" data-testid="readiness-stage3">
+    <div
+      className="readiness-assessment mt-8"
+      data-testid="readiness-stage3"
+      data-readiness-state="user_ready_to_paste"
+    >
       <AssessmentProgress
         current={FLOW_STEP_STAGE3}
         total={FLOW_TOTAL_STEPS}
@@ -1853,6 +1975,7 @@ export function ReadinessFlow() {
       <div
         className="readiness-assessment mt-8"
         data-testid="readiness-project"
+        data-readiness-state={readinessState}
         data-visual-system="results-shared"
       >
         <AssessmentProgress current={1} total={FLOW_TOTAL_STEPS} label="Project" />
@@ -1985,6 +2108,7 @@ export function ReadinessFlow() {
       <div
         className="readiness-assessment mt-8"
         data-testid="readiness-stage2"
+        data-readiness-state={readinessState}
         data-variant={promptBundle.variant}
       >
         {newAnalysisControl}
@@ -2074,6 +2198,29 @@ export function ReadinessFlow() {
                 <p className="mt-1 text-sm text-muted">{c.waiting.helper}</p>
               </div>
             )}
+          </div>
+        ) : null}
+
+        {backgroundResultsReceived ? (
+          <div
+            className="readiness-step-panel mt-6 border-green/30"
+            role="status"
+            aria-live="polite"
+            data-testid="readiness-background-results"
+          >
+            <h3 className="font-display text-lg font-semibold text-ink">Your results came back</h3>
+            <p className="mt-1 text-sm text-muted">
+              We received a report from your tool and dropped it into the paste box. Review it and
+              submit to parse — we never confirm findings for you automatically.
+            </p>
+            <button
+              type="button"
+              className="btn-primary mt-4"
+              onClick={() => void goToStage3()}
+              data-testid="readiness-background-results-review"
+            >
+              Review &amp; paste results
+            </button>
           </div>
         ) : null}
 
@@ -2200,6 +2347,7 @@ export function ReadinessFlow() {
     <div
       className="readiness-assessment mt-8"
       data-testid="readiness-stage1"
+      data-readiness-state={readinessState}
       data-step={step}
       data-visual-system="results-shared"
     >
