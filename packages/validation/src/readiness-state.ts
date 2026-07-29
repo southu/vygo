@@ -207,6 +207,40 @@ export function hydrateReadinessState(input: HydrationInput): ReadinessState {
 }
 
 /**
+ * Canonical persisted-stage string for each readiness state. This is the inverse
+ * of hydrateReadinessState: the value written to the session row / local draft
+ * when the flow reaches a state, chosen so a later hydrateReadinessState() of
+ * that stage rebuilds the SAME state. Persisting through this map (rather than
+ * hand-picking a stage string at each call site) is what keeps the confirmed
+ * results gate durable: findings_confirmed persists as "gate", and "gate"
+ * hydrates back to findings_confirmed — so a plain reload or a second browser
+ * context restores the gate instead of dropping back to the confirm step.
+ *
+ * report_parsed has no distinct persisted stage of its own: it is a "confirm"
+ * stage whose parse succeeded, and hydrateReadinessState reconstructs it from the
+ * persisted parseStatus + findingsCount. It therefore shares the "confirm" stage
+ * with report_pasted; only the explicit-confirmation step advances to "gate".
+ */
+const PERSISTED_STAGE_FOR_STATE: Record<ReadinessState, string> = {
+  intake: "intake",
+  prompt_displayed: "prompt",
+  user_ready_to_paste: "paste",
+  report_pasted: "confirm",
+  report_parsed: "confirm",
+  findings_confirmed: "gate",
+};
+
+/**
+ * The stage string to persist for a readiness state so a subsequent hydration
+ * rebuilds the same state. Use this at every gate that writes progress, so the
+ * transition model — not an ad-hoc string literal — decides what "confirmed"
+ * looks like on disk.
+ */
+export function persistedStageForState(state: ReadinessState): string {
+  return PERSISTED_STAGE_FOR_STATE[state];
+}
+
+/**
  * Entry-point resolution combining URL intent with any resumable session. A
  * fresh-flow request (?new=1 / "New analysis") ALWAYS starts at intake and must
  * never hydrate a prior resumable session into a later stage. Otherwise the

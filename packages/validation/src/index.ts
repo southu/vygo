@@ -60,6 +60,7 @@ export {
   backgroundCompletionMayEnter,
   applyBackgroundCompletion,
   hydrateReadinessState,
+  persistedStageForState,
   entryReadinessState,
   type ReadinessState,
   type ParseOutcome,

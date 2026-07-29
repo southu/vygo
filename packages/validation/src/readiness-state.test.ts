@@ -12,6 +12,7 @@ import {
   isReadinessState,
   nextReadinessState,
   parseReachesReportParsed,
+  persistedStageForState,
   readinessStateOrder,
   stateAfterParse,
   type ReadinessState,
@@ -185,6 +186,35 @@ test("hydration of a confirm-stage draft respects the parse outcome (persistence
     hydrateReadinessState({ stage: "confirm", parseStatus: "pending", findingsCount: 0 }),
     "report_pasted",
   );
+});
+
+test("an explicitly confirmed flow persists a stage that hydrates back to findings_confirmed", () => {
+  // Regression: the confirmed results gate must survive a plain reload. The
+  // stage persisted for findings_confirmed must NOT hydrate back to a report_*
+  // state (which would drop the user from the results gate to the confirm step).
+  const stage = persistedStageForState("findings_confirmed");
+  assert.equal(stage, "gate");
+  assert.equal(hydrateReadinessState({ stage }), "findings_confirmed");
+  // Even with a persisted parse payload present on the draft, the confirmed
+  // stage hydrates to findings_confirmed — never regressing to report_parsed.
+  assert.equal(
+    hydrateReadinessState({ stage, parseStatus: "ok", findingsCount: 6 }),
+    "findings_confirmed",
+  );
+});
+
+test("persistedStageForState round-trips every state through hydration", () => {
+  // report_parsed is the one non-injective case: it persists as the "confirm"
+  // stage and is reconstructed from a successful parse payload, so its round
+  // trip must carry that payload. Every other state round-trips on stage alone.
+  for (const state of READINESS_STATES) {
+    const stage = persistedStageForState(state);
+    const hydrated =
+      state === "report_parsed"
+        ? hydrateReadinessState({ stage, parseStatus: "ok", findingsCount: 4 })
+        : hydrateReadinessState({ stage });
+    assert.equal(hydrated, state, `${state} → ${stage} → ${hydrated}`);
+  }
 });
 
 test("hydration falls back to intake for unknown/missing stages", () => {

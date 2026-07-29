@@ -27,6 +27,7 @@ import {
   backgroundCompletionMayEnter,
   canTransition,
   parseReachesReportParsed,
+  persistedStageForState,
   type ReadinessState,
   type BlockerOption,
   type BuiltWithOption,
@@ -1280,7 +1281,17 @@ export function ReadinessFlow() {
     // if a prior partial PATCH dropped the server parse payload (server also
     // merges drafts and re-parses pasteText as a fallback).
     const clientPartial = pasteText ? parseReadinessPastePartial(pasteText) : {};
-    await persist(stage1, "confirm", {
+    // Persist the AUTHORITATIVE findings_confirmed state, which the transition
+    // model maps to the "gate" stage (hydrateReadinessState: gate →
+    // findings_confirmed). This is the explicit-confirmation gate: only reachable
+    // through this control, only after a genuine report_parsed. Persisting "gate"
+    // (not "confirm") is what makes a plain /readiness reload — or a resumable
+    // session reopened in another browser context — restore the results gate
+    // (Step 9) rather than falling back to Confirm findings (Step 8). The
+    // confirmedAt marker records the explicit user confirmation; the report/parse
+    // payload is kept so the gate still has scoring evidence. Background
+    // mission-completion callbacks never write this stage — they persist "paste".
+    await persist(stage1, persistedStageForState("findings_confirmed"), {
       pasteText,
       source: "paste",
       parseStatus: confirm?.parseStatus || "ok",

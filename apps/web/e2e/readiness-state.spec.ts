@@ -318,6 +318,50 @@ test.describe("readiness state model — resume vs. fresh URL", () => {
     await expect.poll(() => readState(page)).toBe("user_ready_to_paste");
   });
 
+  test("an explicitly confirmed flow stays at findings_confirmed across a plain reload", async ({
+    page,
+  }) => {
+    // The exact mission scenario: run a fresh flow, submit a valid report, click
+    // "Looks right → continue" to reach the results gate (findings_confirmed),
+    // then reload /readiness WITHOUT ?new=1. The confirmed results gate must be
+    // restored — the flow must NOT drop back to the confirm step.
+    const routes = await installRoutes(page);
+    await installTurnstileStub(page);
+
+    await page.goto("/readiness?new=1");
+    await startProjectRun(page, "Confirmed Persist Project");
+    await completeIntake(page);
+    await page.getByTestId("readiness-go-paste").click();
+
+    const stage3 = page.locator('div.readiness-assessment[data-testid="readiness-stage3"]');
+    await stage3
+      .getByTestId("readiness-paste-textarea")
+      .fill("VYGO-READINESS-REPORT: auth needs hardening; add rate limiting.");
+    await stage3.getByTestId("readiness-paste-submit").click();
+    await expect.poll(() => readState(page)).toBe("report_parsed");
+
+    // Explicit confirmation → the results gate.
+    await page.getByTestId("readiness-confirm-looks-right").click();
+    await expect(page.getByTestId("readiness-score-gate")).toBeVisible();
+    await expect.poll(() => readState(page)).toBe("findings_confirmed");
+    // The confirmed stage was persisted as "gate" (findings_confirmed).
+    expect(routes.store.stage).toBe("gate");
+
+    // Wait a beat (mirrors the reported 3s window), then reload plainly.
+    await page.waitForTimeout(500);
+    await page.goto("/readiness");
+
+    // Restored to the results gate — findings_confirmed — not the confirm step.
+    await expect(page.getByTestId("readiness-score-gate")).toBeVisible();
+    await expect.poll(() => readState(page)).toBe("findings_confirmed");
+    await expect(page.getByTestId("readiness-confirm")).toHaveCount(0);
+
+    // ?new=1 still starts a fresh project flow rather than resuming the gate.
+    await page.goto("/readiness?new=1");
+    await expect(page.getByTestId("readiness-project")).toBeVisible();
+    await expect.poll(() => readState(page)).toBe("intake");
+  });
+
   test("?new=1 does not hydrate a prior resumable session into a later stage", async ({ page }) => {
     // Seed a prior completed analysis (prompt stage) in localStorage.
     await page.addInitScript(
