@@ -2223,6 +2223,7 @@ export function ReadinessFlow() {
         className="readiness-assessment mt-8"
         data-testid="readiness-stage2"
         data-readiness-state={readinessState}
+        data-readiness-stage="prompt-running"
         data-variant={promptBundle.variant}
       >
         {newAnalysisControl}
@@ -2235,6 +2236,21 @@ export function ReadinessFlow() {
         <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
           {c.stage2.title}
         </h2>
+        {/*
+          Explicit, always-present prompt-running stage marker. Ties the stage's
+          name ("prompt-running") to visible text and a stable DOM attribute so
+          the running step — prompt displayed, paused for the user to run it
+          externally — is unmistakably identifiable and never confused with the
+          later paste-results stage, independent of whether the submission-token
+          waiting panel below has rendered yet.
+        */}
+        <p
+          className="mt-3 inline-flex items-center gap-2 rounded-full border border-purple/30 bg-purple-soft/30 px-3 py-1 text-xs font-semibold text-purple"
+          data-testid="readiness-prompt-running-marker"
+          data-readiness-stage="prompt-running"
+        >
+          {c.stage2.runningMarker}
+        </p>
 
         <AnswerCallout callout={stage2Callout} />
 
@@ -2277,6 +2293,59 @@ export function ReadinessFlow() {
           >
             {promptBundle.prompt}
           </pre>
+        </div>
+
+        {/*
+          Direct report submission from the prompt-running stage. The primary
+          advance stays the explicit "I've run it — paste results" proceed action
+          further down (→ the dedicated paste-results stage). This is a secondary,
+          user-initiated shortcut: a user who already holds the report can submit
+          it here and the flow advances into the paste pipeline (report_pasted).
+          It is NOT the paste-results stage and never auto-activates — the active
+          readiness state stays prompt_displayed until the user actually submits,
+          so the generated prompt is always shown first and nothing advances from
+          background completion, polling, or elapsed time.
+        */}
+        <div
+          className="readiness-step-panel mt-6"
+          data-testid="readiness-prompt-running-submit-panel"
+        >
+          <h3 className="font-display text-lg font-semibold text-ink">
+            {c.stage2.alreadyRanTitle}
+          </h3>
+          <p className="mt-1 text-sm text-muted">{c.stage2.alreadyRanHelper}</p>
+          <label htmlFor="readiness-prompt-running-paste" className="sr-only">
+            {c.stage3.textareaLabel}
+          </label>
+          <textarea
+            id="readiness-prompt-running-paste"
+            rows={6}
+            value={pasteText}
+            onChange={(ev) => onPasteChange(ev.target.value)}
+            placeholder={c.stage3.textareaPlaceholder}
+            className="mt-3 w-full rounded-xl border border-border bg-canvas px-3 py-3 font-mono text-xs leading-relaxed text-ink sm:text-sm"
+            data-testid="readiness-prompt-running-paste"
+            spellCheck={false}
+            autoComplete="off"
+          />
+          {secretLines.length > 0 ? (
+            <p
+              className="mt-2 text-sm font-semibold text-red"
+              role="alert"
+              data-testid="readiness-prompt-running-secrets"
+            >
+              {secretMessage || PASTE_SECRETS_BLOCK_MESSAGE}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            className="btn-primary mt-3"
+            disabled={pasteSubmitting || pasteText.trim().length === 0}
+            onClick={() => void onPasteSubmit()}
+            data-testid="readiness-prompt-running-submit"
+          >
+            {pasteSubmitting ? c.stage3.submitting : c.stage3.submit}
+          </button>
         </div>
 
         {submissionToken ? (

@@ -113,6 +113,22 @@ export const readinessContent = {
     cantRun: "Can't run this?",
     cantRunHref: "/readiness/fallback",
     pasteResults: "I've run it — paste results",
+    /**
+     * Prompt-running stage marker. Names the stage explicitly so the running
+     * step (prompt displayed, paused for the user to run it externally) is
+     * clearly identifiable — distinct from the later paste-results stage.
+     */
+    runningMarker: "Prompt-running stage — run this in your tool, then continue",
+    /**
+     * Optional direct-submit shortcut shown inside the prompt-running stage. The
+     * primary advance stays the explicit "I've run it — paste results" proceed
+     * action; this lets a user who already has the report submit it here without
+     * stepping through the proceed action first. Purely user-initiated — never
+     * triggered by background mission completion or polling.
+     */
+    alreadyRanTitle: "Already have the report?",
+    alreadyRanHelper:
+      "Paste the report from your tool here to submit it now — or use “I've run it — paste results” below to open the full paste step. Nothing advances on its own.",
     resumeHint: "Your progress is saved. Use the resume link in email or keep this tab.",
     /**
      * Prompt-generation failure (Stage 2). Shown when we reached Stage 2 but the

@@ -59,6 +59,15 @@ test("each forward step in the progression is a legal transition", () => {
   assert.equal(canTransition("report_parsed", "findings_confirmed"), true);
 });
 
+test("submitting report content directly from the prompt-running stage is legal (prompt_displayed → report_pasted)", () => {
+  // An explicit user submit of report content from the prompt-running stage
+  // jumps into the paste pipeline. It reaches report_pasted (pasted, not yet
+  // parsed) — never report_parsed or findings_confirmed directly.
+  assert.equal(canTransition("prompt_displayed", "report_pasted"), true);
+  assert.equal(canTransition("prompt_displayed", "report_parsed"), false);
+  assert.equal(canTransition("prompt_displayed", "findings_confirmed"), false);
+});
+
 test("legal backward controls are allowed (re-paste / back)", () => {
   assert.equal(canTransition("user_ready_to_paste", "prompt_displayed"), true);
   assert.equal(canTransition("report_parsed", "user_ready_to_paste"), true);

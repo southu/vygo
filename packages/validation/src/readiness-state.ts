@@ -47,7 +47,17 @@ export type ReadinessState = (typeof READINESS_STATES)[number];
  */
 const LEGAL_TRANSITIONS: Record<ReadinessState, readonly ReadinessState[]> = {
   intake: ["prompt_displayed"],
-  prompt_displayed: ["user_ready_to_paste", "intake"],
+  // From the prompt-running stage the primary forward edge is the explicit
+  // "proceed to paste" action (user_ready_to_paste). Submitting report content
+  // directly from the prompt-running stage is ALSO an explicit user action and
+  // jumps straight into the paste pipeline (report_pasted) — the report has been
+  // pasted but not yet parsed. This edge is reachable only by a user-initiated
+  // submit, never by a background mission-completion callback (those are barred
+  // by guardMissionCallback), so it cannot let polling race the flow forward.
+  // There is deliberately still NO prompt_displayed → report_parsed /
+  // findings_confirmed edge: those require a successful parse and explicit
+  // confirmation respectively.
+  prompt_displayed: ["user_ready_to_paste", "report_pasted", "intake"],
   user_ready_to_paste: ["report_pasted", "prompt_displayed", "intake"],
   // From report_pasted the ONLY forward edge is report_parsed, and that edge is
   // taken only on a genuine successful parse (see parseReachesReportParsed). A
