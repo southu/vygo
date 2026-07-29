@@ -22,12 +22,15 @@ import {
   isMalformedStructuredPaste,
   isNotBuiltYet,
   parseReadinessPastePartial,
+  readinessPasteValidationMessage,
   scanPasteForSecrets,
   structuredReadinessFromReport,
+  validateReadinessReportPaste,
   guardMissionCallback,
   canTransition,
   parseReachesReportParsed,
   persistedStageForState,
+  type ReadinessPasteInvalidReason,
   type ReadinessState,
   type BlockerOption,
   type BuiltWithOption,
@@ -330,6 +333,12 @@ export function ReadinessFlow() {
   const [pasteText, setPasteText] = useState("");
   const [secretLines, setSecretLines] = useState<number[]>([]);
   const [secretMessage, setSecretMessage] = useState("");
+  // Recoverable paste-boundary validation failure (placeholder text, missing
+  // markers, truncated/malformed report). Null when the paste is clean or valid.
+  // A failure NEVER advances the flow, creates findings, or unlocks Confirm — it
+  // only surfaces a message while the exact paste stays in the box for correction.
+  const [pasteValidationError, setPasteValidationError] =
+    useState<ReadinessPasteInvalidReason | null>(null);
   const [pasteSubmitting, setPasteSubmitting] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const pasteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -969,6 +978,8 @@ export function ReadinessFlow() {
       setSecretLines([]);
       setSecretMessage("");
     }
+    // Clear a prior validation rejection as soon as the user starts correcting.
+    if (pasteValidationError) setPasteValidationError(null);
     if (pasteDebounceRef.current) clearTimeout(pasteDebounceRef.current);
     pasteDebounceRef.current = setTimeout(() => {
       const local = buildLocal(stage1, "paste", token, { pasteText: value });
@@ -1275,6 +1286,35 @@ export function ReadinessFlow() {
     }
     setSecretLines([]);
     setSecretMessage("");
+
+    // Paste-boundary validation. The submission is accepted ONLY when it is a
+    // complete VYGO-READINESS-REPORT: both marker lines present and the body
+    // passes the existing v1 schema/parser rules. Placeholder text ("Analysis
+    // completed."), missing markers, truncated reports, and other malformed
+    // input are invalid USER input — reject them here, before anything advances.
+    // On failure: surface a recoverable message, keep the exact paste in the box
+    // for correction, and do NOT ingest, parse, advance the view, create
+    // findings, or unlock Confirm. Progress therefore never moves for bad input.
+    const validation = validateReadinessReportPaste(pasteText);
+    if (!validation.valid) {
+      setPasteValidationError(validation.reason);
+      trackAnalytics("paste_rejected", { reason: validation.reason });
+      // Persist only the draft paste text at the (unchanged) paste stage so a
+      // reload keeps the user's text for correction — never the confirm stage.
+      if (token) {
+        void patchReadinessSession(token, {
+          stage: "paste",
+          draft: draftFromStage1(stage1, {
+            email: email || undefined,
+            pasteText,
+          }),
+        }).catch(() => {
+          /* local only */
+        });
+      }
+      return;
+    }
+    setPasteValidationError(null);
     setPasteSubmitting(true);
 
     // Paste fallback → the SAME ingest endpoint (POST /api/readiness/submit)
@@ -1813,6 +1853,45 @@ export function ReadinessFlow() {
       : null;
 
   /**
+   * Recoverable paste-boundary validation error. Rendered wherever a paste can be
+   * submitted (the paste-results stage and the prompt-running direct-submit
+   * panel) when the last submit was rejected. It shows a specific message, states
+   * that the exact paste is preserved for correction, and offers an actionable
+   * control back to the prompt or paste stage — none of which advances progress,
+   * creates findings, or unlocks Confirm findings.
+   */
+  const renderPasteValidationError = (opts: {
+    testid: string;
+    onBack: () => void;
+    backLabel: string;
+  }) =>
+    pasteValidationError ? (
+      <div
+        className="mt-3 rounded-xl border border-red/40 bg-red/5 p-3"
+        role="alert"
+        aria-live="assertive"
+        data-testid={opts.testid}
+        data-reason={pasteValidationError}
+      >
+        <p className="text-sm font-semibold text-red" data-testid={`${opts.testid}-message`}>
+          {readinessPasteValidationMessage(pasteValidationError)}
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          Your paste is kept above exactly as you entered it — correct it and submit again, or step
+          back.
+        </p>
+        <button
+          type="button"
+          className="btn-secondary mt-3"
+          onClick={opts.onBack}
+          data-testid={`${opts.testid}-back`}
+        >
+          {opts.backLabel}
+        </button>
+      </div>
+    ) : null;
+
+  /**
    * Stage 3 paste-back panel. Rendered ONLY while the flow is actually on the
    * paste step (view === "stage3"). It is NOT mounted into the earlier views
    * (project / stage1 / stage2): a page-source paste textarea is already
@@ -1943,6 +2022,12 @@ export function ReadinessFlow() {
           </div>
         </div>
       ) : null}
+
+      {renderPasteValidationError({
+        testid: "readiness-paste-validation",
+        onBack: () => setView("stage2"),
+        backLabel: c.stage3.back,
+      })}
 
       {pasteText.trim().length === 0 ? (
         <p className="mt-4 text-sm text-muted" data-testid="readiness-paste-empty-prompt">
@@ -2337,6 +2422,11 @@ export function ReadinessFlow() {
               {secretMessage || PASTE_SECRETS_BLOCK_MESSAGE}
             </p>
           ) : null}
+          {renderPasteValidationError({
+            testid: "readiness-prompt-running-validation",
+            onBack: () => setView("stage3"),
+            backLabel: c.stage2.pasteResults,
+          })}
           <button
             type="button"
             className="btn-primary mt-3"

@@ -12,6 +12,7 @@ export const READINESS_ANALYTICS_EVENTS = [
   "prompt_emailed",
   "fallback_taken",
   "paste_attempted",
+  "paste_rejected",
   "secret_scan_blocked",
   "parse_success",
   "parse_normalized",
