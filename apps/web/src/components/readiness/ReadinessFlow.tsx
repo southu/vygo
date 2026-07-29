@@ -645,7 +645,19 @@ export function ReadinessFlow() {
                   !Array.isArray(remote.draft.report)
                     ? (remote.draft.report as Parameters<typeof describeStack>[0])
                     : parseReadinessPastePartial(restoredPaste);
-                const findings = buildConfirmationFindings(report, 6);
+                // Prefer the findings the confirm stage persisted verbatim so a
+                // resumed Step 8 shows exactly the same structured findings it
+                // showed before the reload; fall back to deriving them from the
+                // report only for legacy drafts that predate persisted findings.
+                const persistedFindings = Array.isArray(remote.draft?.findings)
+                  ? (remote.draft.findings as unknown[]).filter(
+                      (f): f is string => typeof f === "string" && f.trim().length > 0,
+                    )
+                  : [];
+                const findings =
+                  persistedFindings.length > 0
+                    ? persistedFindings.slice(0, 6)
+                    : buildConfirmationFindings(report, 6);
                 const restoredParseStatus = String(remote.draft?.parseStatus || "partial");
                 const restoredParseFailed = isParseFailureStatus(remote.draft?.parseStatus);
                 setConfirm({
@@ -1088,6 +1100,44 @@ export function ReadinessFlow() {
       });
       trackAnalytics("stage_started", { stage: "confirm" });
       setView("confirm");
+      // Persist the genuine report_parsed result as a resumable "confirm" stage
+      // so a plain /readiness reload (no ?new=1) resumes THIS valid in-progress
+      // analysis at Step 8 — Confirm findings — showing the SAME structured
+      // findings, rather than dropping back to the empty paste step. Only a real
+      // successful parse (report_parsed: not failed, not pending, findings > 0)
+      // is persisted here; a failed/pending/empty parse stays report_pasted and
+      // is handled by the branches above/below. The displayed findings are
+      // persisted verbatim so the resumed view reproduces them exactly. This is
+      // strictly a user-driven interactive path — background mission-completion
+      // callbacks never call runParseAndConfirm, so this can never advance a
+      // superseded run. The confirm view above never depends on this write; it
+      // is awaited only to keep persistence ordered ahead of a later explicit
+      // "Looks right → continue" (which persists the authoritative "gate").
+      if (
+        parseReachesReportParsed({
+          parseStatus: result.parseStatus,
+          findingsCount: merged.length,
+        })
+      ) {
+        const confirmFindings = merged.slice(0, 6);
+        saveReadinessLocal(buildLocal(stage1, "confirm", token, { pasteText: text }));
+        try {
+          await patchReadinessSession(token, {
+            stage: "confirm",
+            draft: draftFromStage1(stage1, {
+              email: email || undefined,
+              pasteText: text,
+              source: "paste",
+              parseStatus: result.parseStatus,
+              report: structuredReport as Record<string, unknown>,
+              findings: confirmFindings,
+              submissionToken: submissionToken || undefined,
+            }),
+          });
+        } catch {
+          // Local persist already succeeded; the server retries on the next action.
+        }
+      }
     } catch (err) {
       const e = err as Error & { code?: string; status?: number; lines?: number[] };
       if (e.code === "SECRETS_DETECTED") {
