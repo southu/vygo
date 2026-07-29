@@ -60,10 +60,13 @@ import {
 import {
   initNewReadinessRun,
   generateReadinessRunId,
+  isResumableInProgress,
   loadKnownProjects,
   loadReadinessLocal,
+  loadReadinessResume,
   rememberProjectLabel,
   saveReadinessLocal,
+  saveReadinessResume,
   type ReadinessLocalState,
 } from "@/lib/readiness/storage";
 import { readinessAnalyticsEventCatalog, trackAnalytics } from "@/lib/analytics";
@@ -521,16 +524,28 @@ export function ReadinessFlow() {
           return;
         }
 
-        let sessionToken = fromUrl || local?.token || null;
-        let restoredStage1 = mergeStage1(local?.stage1 ?? {});
-        let restoredStage = local?.stage || "intake";
-        let restoredEmail = local?.email || "";
-        let restoredPaste = local?.pasteText || "";
-        let restoredProjectLabel = local?.projectLabel || "";
+        // Prefer the preserved valid Step-8 resume snapshot when the main key
+        // holds no advanced in-progress run of its own. This is the fix for the
+        // `?new=1` → clean start → plain `/readiness` sequence: a `?new=1` clean
+        // start overwrites the main key with a fresh intake (isolating the new
+        // run) but never touches the resume key, so a following plain
+        // `/readiness` restores the valid Step-8 session from the snapshot rather
+        // than resuming the clean intake at Step 1. A genuine advanced run in the
+        // main key (the user is mid-flow) is authoritative and never clobbered by
+        // an older snapshot. An explicit ?token= in the URL always wins.
+        const resume = fromUrl ? null : loadReadinessResume();
+        const effectiveLocal = resume && !isResumableInProgress(local) ? resume : local;
+
+        let sessionToken = fromUrl || effectiveLocal?.token || null;
+        let restoredStage1 = mergeStage1(effectiveLocal?.stage1 ?? {});
+        let restoredStage = effectiveLocal?.stage || "intake";
+        let restoredEmail = effectiveLocal?.email || "";
+        let restoredPaste = effectiveLocal?.pasteText || "";
+        let restoredProjectLabel = effectiveLocal?.projectLabel || "";
         // A plain (non-?new=1) visit restores the persisted run's identifier so
         // the resumed run keeps its identity. Legacy drafts predating run ids —
         // and fresh sessions — get one minted below.
-        let restoredRunId = (local?.runId || "").trim();
+        let restoredRunId = (effectiveLocal?.runId || "").trim();
         // A legacy draft (or a brand-new session) has no run id yet — mint one so
         // every run has a stable identifier from its first load.
         if (!restoredRunId) restoredRunId = generateReadinessRunId();
@@ -1120,7 +1135,15 @@ export function ReadinessFlow() {
         })
       ) {
         const confirmFindings = merged.slice(0, 6);
-        saveReadinessLocal(buildLocal(stage1, "confirm", token, { pasteText: text }));
+        const confirmLocal = buildLocal(stage1, "confirm", token, { pasteText: text });
+        saveReadinessLocal(confirmLocal);
+        // Also snapshot this valid Step-8 session under the SEPARATE resume key
+        // so a later `/readiness?new=1` (which overwrites the main key with a
+        // clean intake) cannot destroy the resumable session: a following plain
+        // `/readiness` restores Step 8 with the SAME structured findings from the
+        // same session token, while the clean-start run stays isolated in the
+        // main key. `?new=1` never writes or clears the resume key.
+        saveReadinessResume(confirmLocal);
         try {
           await patchReadinessSession(token, {
             stage: "confirm",

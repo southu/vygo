@@ -181,15 +181,68 @@ function json(body: unknown, status = 200) {
   return { status, contentType: "application/json", body: JSON.stringify(body) };
 }
 
-type SessionStore = { token: string; stage: string; draft: Record<string, unknown> };
+type Session = { token: string; stage: string; draft: Record<string, unknown> };
+
+/**
+ * A faithful multi-session store: each POST /session mints a DISTINCT token with
+ * its own row, exactly like the real backend. This is what makes a `?new=1`
+ * clean start isolate itself (a fresh token/row) while leaving the prior valid
+ * session's row — and its persisted confirm draft — intact and resumable. A
+ * single shared row would instead let the new run overwrite the old draft, which
+ * would not model the real backend and would mask the resume-after-new=1 fix.
+ *
+ * `.stage`/`.draft` reflect the most-recently-touched (active) session so the
+ * existing `expect.poll(() => store.stage)` assertions keep working, and
+ * `.sessionFor(token)` exposes any individual row.
+ */
+function createSessionStore() {
+  const sessions = new Map<string, Session>();
+  let counter = 0;
+  let activeToken = "";
+
+  function touch(token: string): Session {
+    let s = sessions.get(token);
+    if (!s) {
+      s = { token, stage: "intake", draft: {} };
+      sessions.set(token, s);
+    }
+    activeToken = token;
+    return s;
+  }
+
+  return {
+    mint(): Session {
+      counter += 1;
+      const token = counter === 1 ? SESSION_TOKEN : `${SESSION_TOKEN}-${counter}`;
+      return touch(token);
+    },
+    touch,
+    sessionFor(token: string) {
+      return sessions.get(token);
+    },
+    get stage() {
+      return sessions.get(activeToken)?.stage ?? "intake";
+    },
+    get draft() {
+      return sessions.get(activeToken)?.draft ?? {};
+    },
+    get count() {
+      return sessions.size;
+    },
+  };
+}
+
+function tokenFromUrl(url: string): string {
+  return decodeURIComponent(url.split("?")[0].split("/").pop() ?? "");
+}
 
 /**
  * Install the mocked readiness backend. The session store round-trips stage +
- * draft so a plain-reload resume reads back exactly what the confirm stage
- * persisted. The parse endpoint returns a genuine "ok" structured result.
+ * draft per token so a plain-reload resume reads back exactly what the confirm
+ * stage persisted. The parse endpoint returns a genuine "ok" structured result.
  */
 async function installRoutes(page: Page) {
-  const store: SessionStore = { token: SESSION_TOKEN, stage: "intake", draft: {} };
+  const store = createSessionStore();
 
   await page.route("**/v1/readiness/session", async (route: Route) => {
     if (route.request().method() !== "POST") return route.continue();
@@ -197,21 +250,25 @@ async function installRoutes(page: Page) {
       stage?: string;
       draft?: Record<string, unknown>;
     };
-    store.stage = body.stage ?? "intake";
-    store.draft = body.draft ?? {};
-    await route.fulfill(json({ token: store.token, stage: store.stage, draft: store.draft }));
+    // A fresh POST creates a brand-new session row with its own token.
+    const session = store.mint();
+    session.stage = body.stage ?? "intake";
+    session.draft = body.draft ?? {};
+    await route.fulfill(json({ token: session.token, stage: session.stage, draft: session.draft }));
   });
 
   await page.route("**/v1/readiness/session/*", async (route: Route) => {
+    const token = tokenFromUrl(route.request().url());
+    const session = store.touch(token);
     if (route.request().method() === "PATCH") {
       const body = (route.request().postDataJSON() ?? {}) as {
         stage?: string;
         draft?: Record<string, unknown>;
       };
-      if (typeof body.stage === "string") store.stage = body.stage;
-      if (body.draft && typeof body.draft === "object") store.draft = body.draft;
+      if (typeof body.stage === "string") session.stage = body.stage;
+      if (body.draft && typeof body.draft === "object") session.draft = body.draft;
     }
-    await route.fulfill(json({ token: store.token, stage: store.stage, draft: store.draft }));
+    await route.fulfill(json({ token: session.token, stage: session.stage, draft: session.draft }));
   });
 
   await page.route("**/api/readiness/token", async (route: Route) => {
@@ -416,5 +473,64 @@ test.describe("readiness race regression — full cohesive scenario", () => {
     // The resumed run keeps its identity.
     await expect.poll(() => readStoredRunId(page)).toBe(runIdBefore);
     await shot(page, "06-plain-reload-resumes-step8");
+  });
+
+  // BUG-1: the resumable valid session must be preserved SEPARATELY from the
+  // clean-start session. A ?new=1 clean start (which overwrites the main
+  // localStorage key to isolate a fresh run) must NOT destroy the saved resume
+  // token / structured draft of a valid Step-8 session — so a following plain
+  // /readiness (no ?new=1) still restores Step 8 with the SAME structured
+  // findings instead of dropping back to a fresh Step 1.
+  test("valid Step 8 → second new=1 clean start → plain /readiness still resumes Step 8 with the same findings", async ({
+    page,
+  }) => {
+    const { store } = await installRoutes(page);
+    await installTurnstileStub(page);
+
+    // Create a valid in-progress state at Step 8 (report_parsed) with structured
+    // findings via a clean ?new=1 start.
+    await page.goto("/readiness?new=1");
+    await startProjectRun(page, "Preserve Resume Project");
+    await completeIntake(page);
+    await page.getByTestId("readiness-go-paste").click();
+    const stage3 = stage3Of(page);
+    await stage3.getByTestId("readiness-paste-textarea").fill(VALID_REPORT);
+    await stage3.getByTestId("readiness-paste-submit").click();
+    await expect(page.getByTestId("readiness-confirm")).toBeVisible();
+    await expect.poll(() => readState(page)).toBe("report_parsed");
+    await expect.poll(() => store.stage).toBe("confirm");
+    await assertStructuredFindings(page);
+    const resumableRunId = await readStoredRunId(page);
+    expect(resumableRunId).not.toBeNull();
+    // The valid session lives in its own backend row — a fresh start below mints
+    // a distinct row, it does not overwrite this one.
+    const rowsAfterValid = store.count;
+
+    // --- A second ?new=1 is a clean, isolated Step 1 start -------------------
+    await page.goto("/readiness?new=1");
+    await expect(page.getByTestId("readiness-project")).toBeVisible();
+    await expect.poll(() => readState(page)).toBe("intake");
+    await expect(page.getByTestId("readiness-confirm")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
+    // A different run id — none of the valid Step-8 progress leaked in.
+    await expect.poll(() => readStoredRunId(page)).not.toBe(resumableRunId);
+    const cleanStartRunId = await readStoredRunId(page);
+    expect(cleanStartRunId).not.toBe(resumableRunId);
+    // The clean start opened a NEW session row; the valid session's row survives.
+    expect(store.count).toBeGreaterThan(rowsAfterValid);
+    await shot(page, "07-new1-after-valid-stays-clean");
+
+    // --- A following plain /readiness resumes the PRESERVED Step 8 session ----
+    await page.goto("/readiness");
+    await expect(page.getByTestId("readiness-confirm")).toBeVisible();
+    await expect.poll(() => readState(page)).toBe("report_parsed");
+    // Not the clean-start intake, not the paste step, not the score gate.
+    await expect(page.getByTestId("readiness-project")).toHaveCount(0);
+    await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
+    // The SAME structured findings from the preserved valid session are restored.
+    await assertStructuredFindings(page);
+    // Resumed with the original valid run's identity — not the clean-start run.
+    await expect.poll(() => readStoredRunId(page)).toBe(resumableRunId);
+    await shot(page, "08-plain-readiness-resumes-preserved-step8");
   });
 });
