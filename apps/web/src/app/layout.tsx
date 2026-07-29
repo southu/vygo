@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Montserrat, Open_Sans } from "next/font/google";
 import { site } from "@/content/site";
 import { publicConfig } from "@/lib/config";
+import { analyticsConfig } from "@/lib/analytics";
 import { AvailabilityProvider } from "@/components/AvailabilityProvider";
 import { WaitlistProvider } from "@/components/WaitlistProvider";
 import { AvailabilityBar } from "@/components/AvailabilityBar";
@@ -61,6 +62,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           type="application/json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(publicConfig) }}
         />
+        {/* Non-secret, first-party analytics contract in page source on every
+            route: provider, same-origin collect endpoint, and the event catalog.
+            No third-party domains, keys, or tokens — safe in the static bundle. */}
+        <script
+          id="vygo-analytics-config"
+          type="application/json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(analyticsConfig) }}
+        />
+        {/* Activate the optional GTM-style data layer so trackAnalytics() pushes
+            events into a stable, inspectable window.dataLayer array. */}
+        <script dangerouslySetInnerHTML={{ __html: "window.dataLayer=window.dataLayer||[];" }} />
         <a href="#main-content" className="skip-link">
           Skip to content
         </a>

@@ -101,6 +101,8 @@ export function getFooterNav(): NavItem[] {
   }
 
   items.push(
+    { href: "/onboarding", label: "Get started" },
+    { href: "/settings", label: "Settings" },
     { href: "/waitlist", label: "Waitlist" },
     { href: "/privacy", label: "Privacy" },
     { href: "/terms", label: "Terms" },

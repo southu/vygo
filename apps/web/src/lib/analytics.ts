@@ -32,6 +32,26 @@ export const READINESS_ANALYTICS_EVENTS = [
 
 export type ReadinessAnalyticsEventName = (typeof READINESS_ANALYTICS_EVENTS)[number];
 
+/**
+ * Product-surface instrumentation events for the settings and onboarding flows.
+ * Kept in one exported literal (like the readiness catalog) so minifiers retain
+ * the strings in the served client bundle and the live analytics config script
+ * can list them — makes the analytics contract objectively verifiable in page
+ * source without executing JS.
+ */
+export const PRODUCT_ANALYTICS_EVENTS = [
+  "settings_view",
+  "settings_saved",
+  "settings_reset",
+  "onboarding_view",
+  "onboarding_step_completed",
+  "onboarding_completed",
+  "onboarding_skipped",
+  "onboarding_cta_clicked",
+] as const;
+
+export type ProductAnalyticsEventName = (typeof PRODUCT_ANALYTICS_EVENTS)[number];
+
 export type AnalyticsEventName =
   | "waitlist_form_view"
   | "waitlist_step_change"
@@ -43,7 +63,21 @@ export type AnalyticsEventName =
   | "waitlist_turnstile_degraded"
   | "availability_view"
   | "availability_retry"
-  | ReadinessAnalyticsEventName;
+  | ReadinessAnalyticsEventName
+  | ProductAnalyticsEventName;
+
+/**
+ * Non-secret, first-party analytics config surfaced in every page's source
+ * (rendered as an inline JSON script in the root layout). Provider is our own
+ * same-origin collector — no third-party domains, keys, or tokens — so it is
+ * safe to ship in the static client bundle.
+ */
+export const analyticsConfig = {
+  provider: "vygo-first-party",
+  endpoint: "/v1/analytics",
+  dataLayer: "dataLayer",
+  events: [...READINESS_ANALYTICS_EVENTS, ...PRODUCT_ANALYTICS_EVENTS],
+} as const;
 
 export type AnalyticsPayload = {
   event: AnalyticsEventName;
