@@ -10,6 +10,8 @@ import { AvailabilityBar } from "@/components/AvailabilityBar";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
+import { ThemeManager } from "@/components/ThemeManager";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -44,8 +46,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${montserrat.variable} ${openSans.variable}`}>
+    <html
+      lang="en"
+      className={`${montserrat.variable} ${openSans.variable}`}
+      suppressHydrationWarning
+    >
       <head>
+        {/* Resolve + apply the active theme onto <html> before first paint so
+            CSS/theme tokens activate with no visible theme flash (FOUC). Must
+            run synchronously and ahead of body render. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         {/* Non-secret public config: the reachable API origin the Vercel frontend
             targets (NEXT_PUBLIC_API_BASE_URL) + the Railway cut-over target, for
             black-box verification. Live topology: GET /provisioning-status. */}
@@ -76,6 +86,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <a href="#main-content" className="skip-link">
           Skip to content
         </a>
+        <ThemeManager />
         <AvailabilityProvider>
           <WaitlistProvider>
             <AvailabilityBar />

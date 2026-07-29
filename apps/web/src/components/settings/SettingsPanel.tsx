@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { trackAnalytics } from "@/lib/analytics";
+import { applyTheme, resolveTheme } from "@/lib/theme";
 import {
   APPEARANCE_OPTIONS,
   DEFAULT_PREFERENCES,
@@ -71,6 +72,7 @@ export function SettingsPanel() {
   function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     savePreferences(prefs);
+    applyTheme(resolveTheme(prefs.appearance));
     setSaved(true);
     trackAnalytics("settings_saved", {
       appearance: prefs.appearance,
@@ -87,6 +89,7 @@ export function SettingsPanel() {
     setPrefs(DEFAULT_PREFERENCES);
     clearPreferences();
     savePreferences(DEFAULT_PREFERENCES);
+    applyTheme(resolveTheme(DEFAULT_PREFERENCES.appearance));
     setSaved(false);
     trackAnalytics("settings_reset");
   }
