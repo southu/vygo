@@ -9,6 +9,7 @@ import { GuideOffer } from "@/components/vibe-coding/GuideOffer";
 import { guideOffer } from "@/content/guide-offer";
 import { StepList } from "@/components/vibe-coding/StepCard";
 import { setupSteps } from "@/content/guide-setup";
+import { CodeBlock } from "@/components/vibe-coding/CodeBlock";
 
 export const metadata: Metadata = {
   title: site.metadata.vibeCodingTitle,
@@ -145,6 +146,43 @@ export default function VibeCodingPage() {
           <p className="rail mt-8 text-lg font-medium text-ink-soft">
             {content.mentalModel.sentence}
           </p>
+        </div>
+      </section>
+
+      {/* What changed since v1 — deploy gating, the babysit loop, ops tooling */}
+      <section className="section-pad border-t border-border bg-surface" data-section="whats-new">
+        <div className="container-page max-w-3xl">
+          <SectionHeading title={content.whatsNew.heading} intro={content.whatsNew.intro} />
+          <ol className="mt-8 space-y-4">
+            {content.whatsNew.items.map((item, index) => (
+              <li key={item.title} className="card">
+                <h3 className="font-display text-base font-semibold">
+                  <span className="mr-2 text-purple">{index + 1}.</span>
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm text-muted">{item.body}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-8 text-sm text-muted">{content.whatsNew.example.caption}</p>
+          <div className="mt-3">
+            <CodeBlock code={content.whatsNew.example.code} language="bash" />
+          </div>
+        </div>
+      </section>
+
+      {/* Learnings — transferable principles, not anecdotes tied to specific infra */}
+      <section className="section-pad" data-section="learnings">
+        <div className="container-page max-w-3xl">
+          <SectionHeading title={content.learnings.heading} intro={content.learnings.intro} />
+          <ul className="mt-8 space-y-4">
+            {content.learnings.items.map((item) => (
+              <li key={item.title} className="card">
+                <h3 className="font-display text-base font-semibold">{item.title}</h3>
+                <p className="mt-2 text-sm text-muted">{item.body}</p>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

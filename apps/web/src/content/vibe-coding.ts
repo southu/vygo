@@ -147,6 +147,65 @@ export const vibeCodingContent = {
     sentence:
       "Composer is the factory office where goals become queued missions, Ratchet is the factory floor that runs the build–deploy–test loop, and Vault is the key cabinet that keeps credentials out of the builder's hands.",
   },
+  whatsNew: {
+    heading: "What changed since v1",
+    intro:
+      "The loop above still holds. What changed is what happens inside Build and the deploy gate — three refinements shipped since this article first went live:",
+    items: [
+      {
+        title: "Deploy gating got more than one shape",
+        body: "v1 waited on a single version signal. The gate now supports three interchangeable strategies per project — poll a version endpoint, wait a fixed delay, or run a command — including a CI-gated variant that only lets a build reach the tester once its own pipeline is green.",
+      },
+      {
+        title: "A self-healing (babysit) loop watches the build, not just the product",
+        body: "Before a change ever reaches the deploy gate, an automated pass watches the pushed branch for CI failures, merge conflicts, and stale state, and repairs them without waiting on a human. The ratchet now stalls on real product bugs, not on plumbing.",
+      },
+      {
+        title: "Ops tooling: a sandboxed tester and an append-only bug ledger",
+        body: "The live tester runs three structurally isolated passes that must agree before a PASS counts, and every FAIL it reports is appended to a durable ledger instead of overwriting the last one — so a bug that resurfaces after being “fixed” shows up as history, not a surprise.",
+      },
+    ],
+    example: {
+      caption: "Illustrative deploy-gate config for a project (placeholder values):",
+      code: [
+        "# .env — deploy-gate configuration",
+        "DEPLOY_VERSION_URL=https://example.com/version",
+        "REPO_SLUG=your-org/your-repo",
+        "CI_STATUS_URL=https://ci.example.com/status/${COMMIT_SHA}",
+      ].join("\n"),
+    },
+  },
+  learnings: {
+    heading: "Learnings",
+    intro:
+      "Transferable principles for anyone running an autonomous build–deploy–test loop in production — not anecdotes about any one install:",
+    items: [
+      {
+        title: "Automate the boring failures away from the interesting ones",
+        body: "A build-deploy-test loop produces two very different failure kinds: infrastructure noise (flaky CI, a stale branch, a merge conflict) and real product defects. Route the first kind to an automated self-healing pass and reserve human and agent attention for the second — mixing them trains everyone to stop reading the loop's reports.",
+      },
+      {
+        title: "One flaky pass is not a pass",
+        body: "If verification is cheap enough to re-run, require agreement across multiple independent passes before accepting a result. A single green run tells you the code can pass; a streak tells you it does.",
+      },
+      {
+        title: "Make failures durable, not disposable",
+        body: "An append-only ledger of what failed and when turns “didn't we already fix this?” from a guess into a lookup. Overwriting the last failure with the current one destroys exactly the information you need when something regresses.",
+      },
+      {
+        title: "Bound every automated step with a timeout and a fixed retry budget",
+        body: "A loop that can retry forever is indistinguishable from one that's stuck. A hard wall-clock limit plus a single automatic retry keeps a hang from becoming an outage, without letting a retry storm run away.",
+      },
+      {
+        title: "Give every deploy an honest, independently checkable proof of what's live",
+        body: "Whichever gating strategy you pick — polling a status endpoint, waiting out a fixed delay, or running a command — the tester must be able to verify the deploy on its own, independent of anything the builder claims.",
+      },
+      {
+        title: "Keep the watcher role strictly observational",
+        body: "Whatever process babysits the pipeline should repair plumbing, not slip in product changes of its own — otherwise you've just added a second, unaccountable builder.",
+      },
+    ],
+  },
   topics: {
     heading: "Topics",
     intro:
