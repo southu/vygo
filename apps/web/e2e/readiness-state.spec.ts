@@ -322,14 +322,12 @@ test.describe("readiness state model — background mission-completion callback"
     await expect(page.getByTestId("readiness-stage2")).toBeVisible();
     await expect.poll(() => readState(page)).toBe("prompt_displayed");
 
-    // Fire the background mission-completion path: the ingest status now reports a
-    // landed report. The poll picks it up.
-    routes.landBackgroundResults(
-      "VYGO-READINESS-REPORT: findings from the customer's AI posting back.",
-    );
+    // Fire the background mission-completion path with a bare completion body.
+    // The poll picks it up as an asynchronous mission callback.
+    routes.landBackgroundResults("Analysis completed.");
 
-    // The background callback records results as metadata (a notice appears +
-    // the paste box is prefilled) but must NOT advance the readiness state.
+    // The callback surfaces ONLY a "results are ready" notice — it must NOT
+    // advance the readiness state, complete the paste stage, or reach Confirm.
     await expect(page.getByTestId("readiness-background-results")).toBeVisible();
     // Give the poll ample time; the state must remain prompt_displayed.
     await page.waitForTimeout(1500);
@@ -338,12 +336,13 @@ test.describe("readiness state model — background mission-completion callback"
     await expect(page.getByTestId("readiness-score-gate")).toHaveCount(0);
 
     // Reviewing is user-driven: the notice's control moves to the paste step
-    // (user_ready_to_paste) with the received results prefilled — still no
-    // automatic parse/confirm.
+    // (user_ready_to_paste) — and the completion text was NEVER copied into the
+    // pasted-report field, so the paste box is still empty and no findings exist.
     await page.getByTestId("readiness-background-results-review").click();
     await expect.poll(() => readState(page)).toBe("user_ready_to_paste");
     const stage3 = page.locator('div.readiness-assessment[data-testid="readiness-stage3"]');
-    await expect(stage3.getByTestId("readiness-paste-textarea")).not.toHaveValue("");
+    await expect(stage3.getByTestId("readiness-paste-textarea")).toHaveValue("");
+    await expect(page.getByTestId("readiness-confirm")).toHaveCount(0);
   });
 });
 

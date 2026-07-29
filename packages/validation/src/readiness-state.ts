@@ -160,6 +160,94 @@ export function applyBackgroundCompletion(current: ReadinessState): ReadinessSta
   return current;
 }
 
+/**
+ * True when an asynchronous readiness mission update belongs to the run that is
+ * currently active in the flow. A readiness analysis is asynchronous: the
+ * customer's AI POSTs results back (or a mission completion fires) some time
+ * after the run began, by which point the user may have started a NEWER run.
+ * Every such callback is stamped with the run id it was produced for, and this
+ * gate compares it to the flow's active run id.
+ *
+ * Fails closed: a callback with no run id, or one that arrives while no run is
+ * active, does NOT match — an unattributable late callback must never be allowed
+ * to touch a run it cannot be proven to belong to. Only a non-empty run id that
+ * exactly equals the active run id matches.
+ */
+export function missionCallbackMatchesRun(
+  callbackRunId: string | null | undefined,
+  activeRunId: string | null | undefined,
+): boolean {
+  const cb = typeof callbackRunId === "string" ? callbackRunId.trim() : "";
+  const active = typeof activeRunId === "string" ? activeRunId.trim() : "";
+  if (!cb || !active) return false;
+  return cb === active;
+}
+
+/** What an asynchronous mission callback is permitted to do once guarded. */
+export type MissionCallbackDecision = {
+  /** True only when the callback's run id matches the active run (see below). */
+  matchesActiveRun: boolean;
+  /**
+   * True when the callback may record its results as background metadata (a
+   * "results are ready" notice). Equal to matchesActiveRun — a callback from an
+   * earlier run is dropped entirely.
+   */
+  accepted: boolean;
+  /**
+   * The readiness state after the callback. ALWAYS the current state: a
+   * background callback never advances readiness progress, never completes the
+   * paste stage, and never reaches Confirm findings.
+   */
+  nextState: ReadinessState;
+  /**
+   * Whether the callback may write its body into the pasted-report field.
+   * ALWAYS false: mission status / completion text must never populate the
+   * paste box — only a user's own paste does.
+   */
+  writesPasteText: boolean;
+  /**
+   * Whether the callback may create structured findings. ALWAYS false: findings
+   * come only from a user-driven parse of a genuinely pasted report.
+   */
+  createsFindings: boolean;
+};
+
+/**
+ * Guard an asynchronous readiness mission callback against two independent rules,
+ * both of which must hold before ANY effect is applied to the flow:
+ *
+ *  1. Run-identity guard (missionCallbackMatchesRun): a late callback from an
+ *     EARLIER run is IGNORED — it cannot touch the newer run's state, paste
+ *     field, or findings. This stops a completion that finished after the user
+ *     started a fresh analysis (e.g. via /readiness?new=1) from leaking into the
+ *     new run.
+ *
+ *  2. Progression guard: even a callback that DOES belong to the active run is a
+ *     background event. It may surface that results arrived, but it must never
+ *     advance the readiness state, never populate the pasted-report field, and
+ *     never fabricate structured findings — those require a user-driven parse and
+ *     an explicit confirmation. So nextState is ALWAYS the current state and both
+ *     writesPasteText and createsFindings are ALWAYS false.
+ *
+ * In particular a callback whose body is only "Analysis completed." changes
+ * nothing: it does not advance progress, complete the paste stage, create
+ * findings, or reach Confirm findings.
+ */
+export function guardMissionCallback(input: {
+  callbackRunId: string | null | undefined;
+  activeRunId: string | null | undefined;
+  currentState: ReadinessState;
+}): MissionCallbackDecision {
+  const matchesActiveRun = missionCallbackMatchesRun(input.callbackRunId, input.activeRunId);
+  return {
+    matchesActiveRun,
+    accepted: matchesActiveRun,
+    nextState: input.currentState,
+    writesPasteText: false,
+    createsFindings: false,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Hydration / resume — rebuild the state from persisted data.
 // ---------------------------------------------------------------------------

@@ -59,6 +59,8 @@ export {
   stateAfterParse,
   backgroundCompletionMayEnter,
   applyBackgroundCompletion,
+  missionCallbackMatchesRun,
+  guardMissionCallback,
   hydrateReadinessState,
   persistedStageForState,
   entryReadinessState,
@@ -68,6 +70,7 @@ export {
   type ParseOutcome,
   type HydrationInput,
   type FreshReadinessRun,
+  type MissionCallbackDecision,
 } from "./readiness-state.js";
 
 export {

@@ -5,6 +5,8 @@ import {
   BACKGROUND_FORBIDDEN_STATES,
   applyBackgroundCompletion,
   backgroundCompletionMayEnter,
+  missionCallbackMatchesRun,
+  guardMissionCallback,
   canTransition,
   entryReadinessState,
   freshReadinessRun,
@@ -155,6 +157,67 @@ test("applyBackgroundCompletion never advances the state from any pre-confirm st
     const after = applyBackgroundCompletion(state);
     assert.equal(after, state);
     assert.equal(BACKGROUND_FORBIDDEN_STATES.has(after), false);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Asynchronous mission-callback guard (run-identity + progression).
+// ---------------------------------------------------------------------------
+
+test("missionCallbackMatchesRun accepts only an exact non-empty run-id match", () => {
+  assert.equal(missionCallbackMatchesRun("run_a", "run_a"), true);
+  assert.equal(missionCallbackMatchesRun(" run_a ", "run_a"), true);
+  // A different run id — a late callback from an earlier run — never matches.
+  assert.equal(missionCallbackMatchesRun("run_prior", "run_new"), false);
+  // Fails closed on unattributable callbacks (missing / empty ids).
+  assert.equal(missionCallbackMatchesRun(null, "run_new"), false);
+  assert.equal(missionCallbackMatchesRun("run_prior", null), false);
+  assert.equal(missionCallbackMatchesRun("", ""), false);
+  assert.equal(missionCallbackMatchesRun(undefined, undefined), false);
+});
+
+test("a completion callback from a PRIOR run does not advance a newer active run", () => {
+  // A new run is active (run_new). A completion callback produced by the earlier
+  // run (run_prior) arrives late — it must be ignored: not accepted, no paste
+  // write, no findings, and the readiness state is preserved (no advancement
+  // into report_pasted / report_parsed / Confirm-findings).
+  for (const currentState of READINESS_STATES) {
+    const decision = guardMissionCallback({
+      callbackRunId: "run_prior",
+      activeRunId: "run_new",
+      currentState,
+    });
+    assert.equal(decision.matchesActiveRun, false);
+    assert.equal(decision.accepted, false);
+    assert.equal(decision.nextState, currentState, `${currentState} must be preserved`);
+    assert.equal(decision.writesPasteText, false);
+    assert.equal(decision.createsFindings, false);
+  }
+});
+
+test('an "Analysis completed." callback never populates paste, creates findings, or advances', () => {
+  // Even for the ACTIVE run, a background mission-completion callback (body only
+  // "Analysis completed.") records nothing into the pasted-report field, creates
+  // no structured findings, and does not advance readiness progress or reach
+  // Confirm findings — the paste stage is never completed on the user's behalf.
+  for (const currentState of [
+    "prompt_displayed",
+    "user_ready_to_paste",
+    "report_pasted",
+  ] as const) {
+    const decision = guardMissionCallback({
+      callbackRunId: "run_active",
+      activeRunId: "run_active",
+      currentState,
+    });
+    // The run matches, so the notice may surface — but no progression happens.
+    assert.equal(decision.matchesActiveRun, true);
+    assert.equal(decision.accepted, true);
+    assert.equal(decision.nextState, currentState);
+    assert.equal(decision.writesPasteText, false);
+    assert.equal(decision.createsFindings, false);
+    // The resolved next state is never a forbidden background target.
+    assert.equal(BACKGROUND_FORBIDDEN_STATES.has(decision.nextState), false);
   }
 });
 

@@ -24,7 +24,7 @@ import {
   parseReadinessPastePartial,
   scanPasteForSecrets,
   structuredReadinessFromReport,
-  backgroundCompletionMayEnter,
+  guardMissionCallback,
   canTransition,
   parseReachesReportParsed,
   persistedStageForState,
@@ -295,6 +295,18 @@ export function ReadinessFlow() {
    * new run can be told apart from the prior run's persisted state.
    */
   const [runId, setRunId] = useState<string | null>(null);
+  /**
+   * Live mirror of the active run id. An asynchronous mission callback (the
+   * ingest poll) captures the run id its watch started under and compares it to
+   * THIS ref when results land, so a late callback from an earlier run — one the
+   * user has since replaced by starting a fresh analysis — is recognised as
+   * stale and ignored, even though the running effect closure still holds the
+   * old id.
+   */
+  const runIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    runIdRef.current = runId;
+  }, [runId]);
   const [submissionToken, setSubmissionToken] = useState<string | null>(null);
   const [stage1, setStage1] = useState<ReadinessStage1Answers>(EMPTY_STAGE1);
   const [stepIndex, setStepIndex] = useState(0);
@@ -1108,24 +1120,23 @@ export function ReadinessFlow() {
     }
   };
 
-  // Live ref so the ingest poll loop below always calls the latest closure
-  // without restarting its interval on every render.
-  const runParseAndConfirmRef = useRef(runParseAndConfirm);
-  useEffect(() => {
-    runParseAndConfirmRef.current = runParseAndConfirm;
-  });
-
   /**
    * Watch for the customer's AI POSTing results back (ingest). While the prompt
    * screen is up with a live submission token, poll the status endpoint on an
-   * interval; landed results render through the same analysis path as a manual
-   * paste (no reload), and an expired/unknown token stops the wait so the page
-   * can offer a start-over.
+   * interval. A landed result is a BACKGROUND mission callback: it only surfaces
+   * a "results are ready" notice — it never writes into the paste box, creates
+   * findings, or advances the flow (the user pastes and submits their own
+   * report). An expired/unknown token stops the wait so the page can offer a
+   * start-over.
    */
   useEffect(() => {
     if (view !== "stage2" || !submissionToken || submissionExpired) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // The run this watch belongs to. A callback that lands after the user has
+    // started a newer run (runIdRef.current has since changed) is a late callback
+    // from a superseded run and must be ignored (guardMissionCallback below).
+    const watchRunId = runIdRef.current;
     // New watch on this token: require the poll to reconfirm the token is valid
     // before any "expired" reading may flip to the failed state (see below).
     sawValidStatusRef.current = false;
@@ -1183,44 +1194,37 @@ export function ReadinessFlow() {
             schedule(INGEST_POLL_INTERVAL_MS);
             return;
           }
-          ingestedRef.current = status.receivedAt ?? `ready-${Date.now()}`;
-          trackAnalytics("ingest_landed", { source: "api" });
-          // Background mission-completion callback. It MUST NOT advance the
-          // readiness state into report_parsed or findings_confirmed — those
-          // require a user-driven parse and an explicit user confirmation. The
-          // transition model forbids both as background targets, so we only
-          // record the results as metadata (prefill the paste box + persist the
-          // draft) and surface a notice; the user reviews and submits explicitly.
-          const backgroundMayAutoAdvance =
-            backgroundCompletionMayEnter("report_parsed") &&
-            backgroundCompletionMayEnter("findings_confirmed");
-          setPasteText(text);
-          setBackgroundResultsReceived(true);
-          // Persist as draft metadata on the SAME (paste) stage — no forward
-          // stage change — so a reload keeps the results without inventing
-          // report_parsed/confirm progress the user never confirmed.
-          saveReadinessLocal(buildLocal(stage1, "paste", token, { pasteText: text }));
-          if (token) {
-            void patchReadinessSession(token, {
-              stage: "paste",
-              draft: draftFromStage1(stage1, {
-                email: email || undefined,
-                pasteText: text,
-                submissionToken: submissionToken || undefined,
-              }),
-            }).catch(() => {
-              /* local metadata still applies */
-            });
-          }
-          if (!backgroundMayAutoAdvance) {
-            // The model's guard holds: stay on the current screen, never parse or
-            // confirm on the user's behalf. Keep polling for later records.
-            schedule(INGEST_POLL_INTERVAL_MS);
+          // Guard this asynchronous mission callback before it touches anything.
+          // 1. Run-identity: a callback whose watch began under a run that is no
+          //    longer active (the user has since started a fresh analysis) is a
+          //    late callback from a superseded run — drop it and stop this watch
+          //    so it can never advance the newer run's paste/findings/confirm.
+          // 2. Progression: even for the active run this is a background event.
+          //    It records ONLY that results are ready; it must not populate the
+          //    pasted-report field, create structured findings, complete the
+          //    paste stage, or reach Confirm findings (decision.writesPasteText /
+          //    createsFindings are false, decision.nextState is unchanged). A bare
+          //    "Analysis completed." callback therefore changes no progress.
+          const decision = guardMissionCallback({
+            callbackRunId: watchRunId,
+            activeRunId: runIdRef.current,
+            currentState: "user_ready_to_paste",
+          });
+          if (!decision.accepted) {
+            // Stale callback from a run the user has replaced — ignore entirely
+            // and end this watch (a new run has its own watch).
             return;
           }
-          // Not reached under the current transition model (both targets are
-          // forbidden); retained so loosening the guard re-enables auto-display.
-          await runParseAndConfirmRef.current(text);
+          ingestedRef.current = status.receivedAt ?? `ready-${Date.now()}`;
+          trackAnalytics("ingest_landed", { source: "api" });
+          // Surface a metadata-only notice. Deliberately NO setPasteText, NO
+          // draft paste-text persist, NO parse/confirm: the mission callback
+          // never copies its body (status or completion text) into the paste box
+          // and never fabricates findings. The user pastes their own report and
+          // submits it explicitly to parse.
+          setBackgroundResultsReceived(true);
+          // Keep polling in case a later record lands; nothing here advances state.
+          schedule(INGEST_POLL_INTERVAL_MS);
           return;
         }
       }
@@ -2318,10 +2322,10 @@ export function ReadinessFlow() {
             aria-live="polite"
             data-testid="readiness-background-results"
           >
-            <h3 className="font-display text-lg font-semibold text-ink">Your results came back</h3>
+            <h3 className="font-display text-lg font-semibold text-ink">Your analysis finished</h3>
             <p className="mt-1 text-sm text-muted">
-              We received a report from your tool and dropped it into the paste box. Review it and
-              submit to parse — we never confirm findings for you automatically.
+              Your tool signalled that it finished. Head to the paste step and paste its full report
+              to review it — we never fill it in or confirm findings for you automatically.
             </p>
             <button
               type="button"
@@ -2329,7 +2333,7 @@ export function ReadinessFlow() {
               onClick={() => void goToStage3()}
               data-testid="readiness-background-results-review"
             >
-              Review &amp; paste results
+              Go to paste step
             </button>
           </div>
         ) : null}
