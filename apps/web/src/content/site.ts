@@ -66,6 +66,7 @@ export function getPrimaryNav(): NavItem[] {
     { href: "/vibe-coding", label: "Vibe coding" },
     { href: "/guide-progress", label: "Guide progress" },
     { href: "/readiness", label: "Readiness Check" },
+    { href: "/campaigns", label: "Campaigns" },
   ];
 
   if (commercialFlags.showPublicPricing) {
@@ -93,6 +94,7 @@ export function getFooterNav(): NavItem[] {
     { href: "/vibe-coding", label: "Vibe coding" },
     { href: "/guide", label: "Guide" },
     { href: "/guide-progress", label: "Guide progress" },
+    { href: "/campaigns", label: "Campaigns" },
     { href: "/careers", label: "Careers" },
   ];
 
