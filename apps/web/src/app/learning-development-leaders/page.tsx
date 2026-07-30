@@ -4,8 +4,10 @@ import {
   LEARNING_DEV_LEADERS_ROBOTS,
 } from "@/content/campaigns/learning-development-leaders";
 import { CampaignShell } from "@/components/campaign-landing/CampaignShell";
+import { campaignStructuredData } from "@/lib/campaign/structured-data";
 
 const { meta } = learningDevelopmentLeadersCampaign;
+const structuredData = campaignStructuredData(learningDevelopmentLeadersCampaign);
 
 /**
  * Independently addressable "scalable learning support for L&D / enablement
@@ -42,5 +44,19 @@ export const metadata: Metadata = {
 };
 
 export default function LearningDevelopmentLeadersPage() {
-  return <CampaignShell config={learningDevelopmentLeadersCampaign} />;
+  return (
+    <>
+      {/* Grounded schema.org JSON-LD (WebPage + FAQPage) derived only from the
+          approved campaign config — mirrors the homepage structured-data
+          convention and introduces no new claim or proof. */}
+      {structuredData.map((node, index) => (
+        <script
+          key={index}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(node) }}
+        />
+      ))}
+      <CampaignShell config={learningDevelopmentLeadersCampaign} />
+    </>
+  );
 }

@@ -20,6 +20,7 @@ import {
 } from "../../content/campaigns/learning-development-leaders";
 import { aiWorkforceAssessmentCampaign as assessment } from "../../content/campaigns/ai-workforce-capability-assessment";
 import { serializeCampaign, type CampaignCta, type CampaignSection } from "./types";
+import { campaignStructuredData } from "./structured-data";
 
 /** Collect every CTA declared anywhere in the campaign config. */
 function allCtas(config = campaign): CampaignCta[] {
@@ -120,4 +121,43 @@ test("serialized descriptor exposes the waitlist section in render order", () =>
   assert.ok(serialized.enabled.includes("waitlist"));
   assert.equal(serialized.order[serialized.order.length - 1], "closingCta");
   assert.equal(serialized.campaignId, LEARNING_DEV_LEADERS_SLUG);
+});
+
+// --- Structured data (JSON-LD) ---------------------------------------------
+
+test("structured data mirrors the page's unique metadata on a WebPage node", () => {
+  const nodes = campaignStructuredData(campaign);
+  const webPage = nodes.find((node) => node["@type"] === "WebPage");
+  assert.ok(webPage, "a WebPage node is emitted");
+  assert.equal(webPage!["@context"], "https://schema.org");
+  assert.equal(webPage!.name, campaign.meta.title);
+  assert.equal(webPage!.description, campaign.meta.description);
+  // Canonical in the structured data equals the page's canonical URL.
+  assert.equal(webPage!.url, LEARNING_DEV_LEADERS_CANONICAL);
+});
+
+test("FAQ structured data mirrors the on-page objections verbatim — no invented claims", () => {
+  const nodes = campaignStructuredData(campaign);
+  const faqPage = nodes.find((node) => node["@type"] === "FAQPage") as
+    | {
+        mainEntity: {
+          name: string;
+          acceptedAnswer: { text: string };
+        }[];
+      }
+    | undefined;
+  assert.ok(faqPage, "a FAQPage node is emitted when the campaign has objections");
+
+  const objections = campaign.sections.find((s) => s.type === "faq") as Extract<
+    CampaignSection,
+    { type: "faq" }
+  >;
+  // Every structured Q&A is a verbatim copy of an approved, on-page objection —
+  // so the schema answers always match the visible text and can never assert a
+  // claim the page does not already display.
+  assert.equal(faqPage!.mainEntity.length, objections.data.items.length);
+  faqPage!.mainEntity.forEach((entity, index) => {
+    assert.equal(entity.name, objections.data.items[index]!.question);
+    assert.equal(entity.acceptedAnswer.text, objections.data.items[index]!.answer);
+  });
 });
