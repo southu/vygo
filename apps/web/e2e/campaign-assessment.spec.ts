@@ -119,5 +119,10 @@ test.describe("AI production-readiness assessment landing", () => {
     await expect(page.locator("meta[name='twitter:title']")).toHaveCount(1);
     await expect(page.locator("meta[name='twitter:description']")).toHaveCount(1);
     await expect(page.locator("meta[name='twitter:image']")).toHaveCount(1);
+    // The Twitter/X card image must carry non-empty alt text so it is not
+    // announced without a description (parity with the Open Graph image).
+    await expect(page.locator("meta[name='twitter:image:alt']")).toHaveCount(1);
+    await expect(page.locator("meta[name='twitter:image:alt']")).not.toHaveAttribute("content", "");
+    await expect(page.locator("meta[property='og:image:alt']")).toHaveCount(1);
   });
 });
