@@ -40,13 +40,7 @@ export type CampaignImage = {
 
 /** Every shared section type the capability can render. */
 export type CampaignSectionType =
-  | "hero"
-  | "benefits"
-  | "method"
-  | "assurance"
-  | "faq"
-  | "lead"
-  | "closingCta";
+  "hero" | "benefits" | "method" | "assurance" | "faq" | "lead" | "closingCta";
 
 /**
  * The full menu of shared section types. A campaign enables a subset; anything

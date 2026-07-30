@@ -184,7 +184,8 @@ export const studentSuccessCampaign: CampaignConfig = {
       data: {
         eyebrow: "Apply",
         title: "Apply for the next production opening",
-        intro: "Tell us where to reach you and we'll review your product against available openings.",
+        intro:
+          "Tell us where to reach you and we'll review your product against available openings.",
         nameLabel: "Full name",
         emailLabel: "Work email",
         consentLabel:

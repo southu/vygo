@@ -85,7 +85,11 @@ export function CampaignConsent() {
           </label>
 
           <div className="mt-4 flex items-center gap-3">
-            <button type="button" className="btn btn-primary !min-h-0 px-3 py-1.5 text-xs" onClick={save}>
+            <button
+              type="button"
+              className="btn btn-primary !min-h-0 px-3 py-1.5 text-xs"
+              onClick={save}
+            >
               Save choices
             </button>
             <span role="status" aria-live="polite" className="text-xs text-green-dark">

@@ -75,7 +75,10 @@ export function LeadFormSection({ id, data }: { id: string; data: LeadSectionDat
           {/* Live region announces validation problems on submit. */}
           <div aria-live="assertive" role={errorCount > 0 ? "alert" : undefined}>
             {errorCount > 0 ? (
-              <p id={summaryId} className="mt-6 rounded-lg bg-purple-soft px-4 py-3 text-sm text-ink">
+              <p
+                id={summaryId}
+                className="mt-6 rounded-lg bg-purple-soft px-4 py-3 text-sm text-ink"
+              >
                 Please fix {errorCount === 1 ? "the field" : `${errorCount} fields`} highlighted
                 below.
               </p>

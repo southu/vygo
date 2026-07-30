@@ -7,12 +7,7 @@ import type { HeroSectionData } from "@/lib/campaign/types";
  */
 export function HeroSection({ id, data }: { id: string; data: HeroSectionData }) {
   return (
-    <section
-      id={id}
-      data-campaign-section="hero"
-      data-section-id={id}
-      className="section-pad"
-    >
+    <section id={id} data-campaign-section="hero" data-section-id={id} className="section-pad">
       <div className="container-page grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="max-w-2xl">
           {data.eyebrow ? <p className="eyebrow mb-3">{data.eyebrow}</p> : null}
