@@ -39,7 +39,9 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: meta.ogTitle,
     description: meta.ogDescription,
-    images: [meta.ogImage],
+    // Carry the same alt text as the Open Graph image so the Twitter/X card
+    // image is not announced without a description.
+    images: [{ url: meta.ogImage, alt: meta.ogImageAlt }],
   },
 };
 
