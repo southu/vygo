@@ -9,9 +9,22 @@ import { usePathname } from "next/navigation";
  * pathname is known at static-export time, so campaign pages are generated with
  * the global chrome already omitted.
  */
+/**
+ * Campaign landing routes that render their own reduced-navigation shell and
+ * therefore suppress the global site chrome. Includes the shared
+ * `/campaign/[slug]` surface and the independently addressable campaign pages.
+ */
+function isCampaignRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === "/campaign" ||
+    pathname.startsWith("/campaign/") ||
+    pathname === "/ai-workforce-capability-assessment"
+  );
+}
+
 export function ChromeGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isCampaign = pathname === "/campaign" || pathname?.startsWith("/campaign/");
-  if (isCampaign) return null;
+  if (isCampaignRoute(pathname)) return null;
   return <>{children}</>;
 }
