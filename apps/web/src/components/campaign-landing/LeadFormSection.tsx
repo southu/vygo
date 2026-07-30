@@ -59,7 +59,7 @@ export function LeadFormSection({ id, data }: { id: string; data: LeadSectionDat
 
   const errorCount = Object.keys(errors).length;
   const fieldClass =
-    "mt-1 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-ink outline-none focus-visible:border-purple";
+    "mt-1 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-ink focus:border-purple focus:outline-none focus:ring-2 focus:ring-purple";
 
   return (
     <section
