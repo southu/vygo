@@ -10,6 +10,7 @@ import { AvailabilityBar } from "@/components/AvailabilityBar";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
+import { ChromeGate } from "@/components/ChromeGate";
 import { ThemeManager } from "@/components/ThemeManager";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -89,11 +90,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <ThemeManager />
         <AvailabilityProvider>
           <WaitlistProvider>
-            <AvailabilityBar />
-            <SiteHeader />
+            {/* Campaign landing routes render their own reduced-navigation
+                shell, so the global chrome is gated off for them. */}
+            <ChromeGate>
+              <AvailabilityBar />
+              <SiteHeader />
+            </ChromeGate>
             {children}
-            <SiteFooter />
-            <StickyMobileCTA />
+            <ChromeGate>
+              <SiteFooter />
+              <StickyMobileCTA />
+            </ChromeGate>
           </WaitlistProvider>
         </AvailabilityProvider>
       </body>

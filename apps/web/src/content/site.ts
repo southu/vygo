@@ -46,6 +46,9 @@ export const site = {
     thankYouTitle: "Thank you",
     thankYouDescription:
       "Thank you for applying to the next production opening with VYGO. We review applications against available openings.",
+    accessibilityTitle: "Accessibility",
+    accessibilityDescription:
+      "vygo's commitment to an accessible website: semantic structure, keyboard operability, visible focus, and how to send accessibility feedback.",
   },
 } as const;
 
