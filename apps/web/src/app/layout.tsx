@@ -11,6 +11,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { StickyMobileCTA } from "@/components/StickyMobileCTA";
 import { ChromeGate } from "@/components/ChromeGate";
+import { CampaignConversionBootstrap } from "@/components/campaign-landing/CampaignConversionBootstrap";
 import { ThemeManager } from "@/components/ThemeManager";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -88,6 +89,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Skip to content
         </a>
         <ThemeManager />
+        {/* Global conversion-layer bootstrap: preserves approved campaign
+            parameters for the session on every route and instruments the
+            campaign landing surfaces (landing_page_view + primary_cta_activation)
+            without per-page wiring. Consent-gated + deduplicated via the shared
+            emitter. */}
+        <CampaignConversionBootstrap />
         <AvailabilityProvider>
           <WaitlistProvider>
             {/* Campaign landing routes render their own reduced-navigation

@@ -2,6 +2,7 @@
  * Permitted waitlist attribution only: UTM params, landing path, document referrer.
  * No fingerprints, geolocation, canvas, storage dumps, or other unapproved data.
  */
+import { getCampaignParams } from "./campaign/params";
 
 export type WaitlistAttribution = {
   utm: {
@@ -34,13 +35,19 @@ export function captureAttribution(): WaitlistAttribution {
   }
 
   const params = new URLSearchParams(window.location.search);
+  // Explicit values on the current URL win; otherwise fall back to the
+  // allowlisted campaign parameters preserved for this browser session, so
+  // attribution survives same-origin navigation from a campaign landing page.
+  const session = getCampaignParams();
+  const pick = (key: "utm_source" | "utm_medium" | "utm_campaign" | "utm_content" | "utm_term") =>
+    clip(params.get(key)) ?? clip(session[key] ?? null);
   return {
     utm: {
-      source: clip(params.get("utm_source")),
-      medium: clip(params.get("utm_medium")),
-      campaign: clip(params.get("utm_campaign")),
-      content: clip(params.get("utm_content")),
-      term: clip(params.get("utm_term")),
+      source: pick("utm_source"),
+      medium: pick("utm_medium"),
+      campaign: pick("utm_campaign"),
+      content: pick("utm_content"),
+      term: pick("utm_term"),
     },
     landingPage: window.location.pathname || "/waitlist",
     referrer: clip(document.referrer || null),

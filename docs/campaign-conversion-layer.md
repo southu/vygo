@@ -32,13 +32,13 @@ Preservation rules:
 Stable event names (`lib/analytics.ts` → `CAMPAIGN_CONVERSION_EVENTS`, also
 listed in the `vygo-analytics-config` script served on every page):
 
-| Event | `conversion_outcome` | When |
-| --- | --- | --- |
-| `landing_page_view` | `view` | Exactly once per landing page load |
-| `primary_cta_activation` | `activated` | Each primary CTA activation |
-| `form_start` | `started` | First interaction with a conversion form (once per attempt) |
-| `conversion_error` | `validation_error` / `submission_rejected` | Accessible client validation failure, or a rejected/failed destination submission |
-| `conversion_success` | `success` | Only after the destination confirms a successful completion |
+| Event                    | `conversion_outcome`                       | When                                                                              |
+| ------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------- |
+| `landing_page_view`      | `view`                                     | Exactly once per landing page load                                                |
+| `primary_cta_activation` | `activated`                                | Each primary CTA activation                                                       |
+| `form_start`             | `started`                                  | First interaction with a conversion form (once per attempt)                       |
+| `conversion_error`       | `validation_error` / `submission_rejected` | Accessible client validation failure, or a rejected/failed destination submission |
+| `conversion_success`     | `success`                                  | Only after the destination confirms a successful completion                       |
 
 Every payload (`lib/campaign/conversion.ts` → `buildConversionPayload`) carries:
 
@@ -47,6 +47,24 @@ Every payload (`lib/campaign/conversion.ts` → `buildConversionPayload`) carrie
   when no CTA applies (views, form and error/success events).
 - the available allowlisted campaign parameters, spread as top-level keys.
 - `conversion_outcome` — the stable outcome above.
+
+## Where it is wired
+
+- The configuration-driven landing route (`/campaign/[slug]`) self-instruments
+  through `CampaignShell` → `CampaignConversionProvider` (one `landing_page_view`)
+  and `CampaignCtaLink` (`primary_cta_activation` + param-propagated hrefs).
+- Every other campaign landing surface under the `/campaigns` path is
+  instrumented globally by `CampaignConversionBootstrap`, mounted once in the
+  root layout. On every route it preserves the approved parameters for the
+  session; on the instrumented paths (`lib/campaign/landing.ts` →
+  `isInstrumentedLandingPath`) it emits one `landing_page_view` and emits
+  `primary_cta_activation` when a primary CTA (`PRIMARY_CTA_SELECTOR`) is
+  activated, deriving a stable `cta_location` (`resolveCtaLocation`) and
+  propagating preserved parameters onto same-origin anchor destinations.
+- The waitlist destination (`WaitlistForm` + `lib/attribution.ts`) emits
+  `form_start`, `conversion_error`, and destination-confirmed
+  `conversion_success`, and its submitted attribution falls back to the
+  preserved session parameters so attribution survives same-origin navigation.
 
 ## Consent and de-duplication
 
@@ -67,4 +85,5 @@ Every payload (`lib/campaign/conversion.ts` → `buildConversionPayload`) carrie
 
 `apps/web/src/lib/campaign/*.test.ts` (run via `pnpm test:campaign`) cover
 allowlisting, session precedence, href propagation, payload shape, consent
-gating, and de-duplication / false-conversion prevention.
+gating, de-duplication / false-conversion prevention, instrumented landing-path
+detection, and stable `cta_location` resolution.
