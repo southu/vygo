@@ -5,6 +5,7 @@ import { MethodSection } from "./MethodSection";
 import { AssuranceSection } from "./AssuranceSection";
 import { FaqSection } from "./FaqSection";
 import { LeadFormSection } from "./LeadFormSection";
+import { WaitlistApplicationSection } from "./WaitlistApplicationSection";
 import { ClosingCtaSection } from "./ClosingCtaSection";
 
 /** Maps a configured section to its shared component. */
@@ -22,6 +23,8 @@ export function SectionRenderer({ section }: { section: CampaignSection }) {
       return <FaqSection id={section.id} data={section.data} />;
     case "lead":
       return <LeadFormSection id={section.id} data={section.data} />;
+    case "waitlist":
+      return <WaitlistApplicationSection id={section.id} data={section.data} />;
     case "closingCta":
       return <ClosingCtaSection id={section.id} data={section.data} />;
     default:

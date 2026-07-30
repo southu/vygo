@@ -40,7 +40,7 @@ export type CampaignImage = {
 
 /** Every shared section type the capability can render. */
 export type CampaignSectionType =
-  "hero" | "benefits" | "method" | "assurance" | "faq" | "lead" | "closingCta";
+  "hero" | "benefits" | "method" | "assurance" | "faq" | "lead" | "waitlist" | "closingCta";
 
 /**
  * The full menu of shared section types. A campaign enables a subset; anything
@@ -53,6 +53,7 @@ export const ALL_CAMPAIGN_SECTION_TYPES: readonly CampaignSectionType[] = [
   "assurance",
   "faq",
   "lead",
+  "waitlist",
   "closingCta",
 ] as const;
 
@@ -106,6 +107,17 @@ export type LeadSectionData = {
   footnote?: string;
 };
 
+/**
+ * On-page waitlist application section. Renders the site's live, production
+ * waitlist form (server-validated, Turnstile-gated, attribution-preserving) so
+ * the campaign's primary conversion completes without navigating away.
+ */
+export type WaitlistSectionData = {
+  eyebrow?: string;
+  title: string;
+  intro?: string;
+};
+
 export type ClosingCtaSectionData = {
   eyebrow?: string;
   title: string;
@@ -122,6 +134,7 @@ export type CampaignSection =
   | { id: string; type: "assurance"; data: AssuranceSectionData }
   | { id: string; type: "faq"; data: FaqSectionData }
   | { id: string; type: "lead"; data: LeadSectionData }
+  | { id: string; type: "waitlist"; data: WaitlistSectionData }
   | { id: string; type: "closingCta"; data: ClosingCtaSectionData };
 
 export type CampaignMeta = {

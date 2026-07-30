@@ -174,6 +174,12 @@ type WaitlistFormProps = {
   offer?: InquiryOfferKey | null;
   /** Prefill from readiness snapshot apply CTA. */
   prefill?: WaitlistPrefill | null;
+  /**
+   * Preserve the landing page's full query string in the submitted
+   * `landingPage` attribution (path + search). Used by campaign landing pages
+   * so supported click identifiers (gclid, fbclid, …) travel with the request.
+   */
+  fullUrlAttribution?: boolean;
 };
 
 export function WaitlistForm({
@@ -182,6 +188,7 @@ export function WaitlistForm({
   onDismiss,
   offer = null,
   prefill = null,
+  fullUrlAttribution = false,
 }: WaitlistFormProps) {
   const { form, success } = waitlistContent;
   const { uiState, copy: availabilityCopy } = useAvailability();
@@ -221,7 +228,9 @@ export function WaitlistForm({
   const pendingSubmitRef = useRef(false);
 
   const formStartedAtRef = useRef<number>(Date.now());
-  const attributionRef = useRef<WaitlistAttribution>(captureAttribution());
+  const attributionRef = useRef<WaitlistAttribution>(
+    captureAttribution({ fullUrl: fullUrlAttribution }),
+  );
   const idempotencyKeyRef = useRef<string | null>(null);
   const submittingRef = useRef(false);
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
@@ -277,7 +286,7 @@ export function WaitlistForm({
   useEffect(() => {
     if (!open) return;
     formStartedAtRef.current = Date.now();
-    attributionRef.current = captureAttribution();
+    attributionRef.current = captureAttribution({ fullUrl: fullUrlAttribution });
     setStep(1);
     const next = createInitialFormState(offer);
     if (prefill?.fullName) next.fullName = prefill.fullName;
@@ -298,7 +307,15 @@ export function WaitlistForm({
       headingRef.current?.focus();
     }, 0);
     return () => window.clearTimeout(t);
-  }, [open, mode, offer, prefill?.fullName, prefill?.email, prefill?.companyName]);
+  }, [
+    open,
+    mode,
+    offer,
+    prefill?.fullName,
+    prefill?.email,
+    prefill?.companyName,
+    fullUrlAttribution,
+  ]);
 
   useEffect(() => {
     trackAnalytics("waitlist_step_change", { step, mode });

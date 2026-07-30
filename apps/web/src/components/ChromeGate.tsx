@@ -19,7 +19,8 @@ function isCampaignRoute(pathname: string | null): boolean {
   return (
     pathname === "/campaign" ||
     pathname.startsWith("/campaign/") ||
-    pathname === "/ai-workforce-capability-assessment"
+    pathname === "/ai-workforce-capability-assessment" ||
+    pathname === "/learning-development-leaders"
   );
 }
 
