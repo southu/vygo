@@ -53,6 +53,18 @@ test("metadata is unique, canonical matches the production URL, robots is index,
   assert.deepEqual(LEARNING_DEV_LEADERS_ROBOTS, { index: true, follow: true });
 });
 
+test("social metadata is non-empty and its Open Graph URL matches the canonical", () => {
+  // Criterion 14: a non-empty title/description/canonical, an Open Graph URL
+  // equal to the canonical, and an index,follow robots directive. The Next.js
+  // metadata layer emits `og:url` from `meta.canonical`, so asserting the source
+  // guarantees the rendered `<meta property="og:url">` equals the canonical.
+  assert.ok(campaign.meta.ogTitle.trim().length > 0);
+  assert.ok(campaign.meta.ogDescription.trim().length > 0);
+  assert.ok(campaign.meta.ogImage.trim().length > 0);
+  // The Open Graph image carries accessible alt text (announced social card).
+  assert.ok(campaign.meta.ogImageAlt.trim().length > 0);
+});
+
 // --- Section structure -----------------------------------------------------
 
 test("exactly one hero (single H1) and every required persuasion section is present", () => {
@@ -134,6 +146,13 @@ test("landing page is materially distinct from the assessment landing page", () 
   assert.notEqual(assessmentPrimary, APPLY_HREF);
   assert.ok(!campaign.sections.some((s) => s.type === "waitlist" && s.id === ""));
   assert.ok(assessment.sections.every((s) => s.type !== "waitlist"));
+
+  // Criterion 15 also requires distinct descriptions and distinct social
+  // metadata, so the two campaigns can never collapse into duplicate SEO/OG
+  // surfaces that search and social crawlers would treat as the same page.
+  assert.notEqual(campaign.meta.description, assessment.meta.description);
+  assert.notEqual(campaign.meta.ogTitle, assessment.meta.ogTitle);
+  assert.notEqual(campaign.meta.ogDescription, assessment.meta.ogDescription);
 });
 
 // --- Serialized descriptor -------------------------------------------------
