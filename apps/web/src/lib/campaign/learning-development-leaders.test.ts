@@ -9,6 +9,7 @@
  * tsconfig path alias.
  */
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import {
   learningDevelopmentLeadersCampaign as campaign,
@@ -33,6 +34,42 @@ function allCtas(config = campaign): CampaignCta[] {
     }
   }
   return out;
+}
+
+/**
+ * Collect the campaign's rendered prose (headings, intros, benefit/objection
+ * copy, method steps, CTA labels) into one normalized string — lowercased,
+ * whitespace-collapsed, structural values (hrefs, anchors, image src/dimensions)
+ * excluded — so two campaigns can be compared as "normalized main-content text."
+ * Recurses the section data generically so a new textual field is included
+ * automatically without updating this helper.
+ */
+function normalizedContentText(config = campaign): string {
+  const parts: string[] = [];
+  const structuralKeys = new Set(["href", "src", "srcSet", "sizes", "variant", "width", "height"]);
+  const walk = (value: unknown, key?: string): void => {
+    if (typeof value === "string") {
+      // Skip URLs / in-page anchors: they are structure, not visible prose.
+      if (key && structuralKeys.has(key)) return;
+      if (/^(https?:\/\/|\/|#|mailto:|tel:)/.test(value.trim())) return;
+      parts.push(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const entry of value) walk(entry);
+      return;
+    }
+    if (value && typeof value === "object") {
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) walk(v, k);
+    }
+  };
+  walk(config.sections);
+  return parts.join(" ").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** Stable content-hash of the normalized main-content text (criterion 15). */
+function contentHash(config = campaign): string {
+  return createHash("sha256").update(normalizedContentText(config)).digest("hex");
 }
 
 // --- Route -----------------------------------------------------------------
@@ -153,6 +190,22 @@ test("landing page is materially distinct from the assessment landing page", () 
   assert.notEqual(campaign.meta.description, assessment.meta.description);
   assert.notEqual(campaign.meta.ogTitle, assessment.meta.ogTitle);
   assert.notEqual(campaign.meta.ogDescription, assessment.meta.ogDescription);
+});
+
+test("normalized main-content text hash differs from the assessment page (criterion 15)", () => {
+  // Beyond distinct metadata, criterion 15 requires the two pages' normalized
+  // main-content text hashes to differ — guarding against the config-driven
+  // pages ever collapsing into the same rendered body. Compare a normalized,
+  // structure-stripped hash of all rendered prose in each campaign's sections.
+  const ldText = normalizedContentText(campaign);
+  const assessmentText = normalizedContentText(assessment);
+  assert.ok(ldText.length > 500, "the L&D page renders substantial main content");
+  assert.notEqual(ldText, assessmentText, "main-content text must not be identical");
+  assert.notEqual(
+    contentHash(campaign),
+    contentHash(assessment),
+    "normalized main-content text hashes must differ",
+  );
 });
 
 // --- Serialized descriptor -------------------------------------------------
