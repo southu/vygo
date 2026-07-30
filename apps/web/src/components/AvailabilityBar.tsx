@@ -1,11 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ctaHrefs } from "@/content/ctas";
+import { appendCampaignParamsToHref } from "@/lib/campaign/params";
 import { useAvailability } from "./AvailabilityProvider";
 
 export function AvailabilityBar() {
   const { uiState, isBusy, copy, data } = useAvailability();
+
+  // Propagate the preserved allowlisted campaign parameters onto the Apply
+  // destination. Next's <Link> navigates using this prop (not the DOM href
+  // attribute), so the params must be resolved into the prop itself. Start from
+  // the bare href to match server output, then augment after hydration.
+  const [applyHref, setApplyHref] = useState<string>(ctaHrefs.apply);
+  useEffect(() => {
+    setApplyHref(appendCampaignParamsToHref(ctaHrefs.apply));
+  }, [uiState]);
 
   // Actionable availability states surface the Apply CTA, which navigates to the
   // application form. Loading stays busy/non-actionable; paused shows no action.
@@ -42,7 +53,7 @@ export function AvailabilityBar() {
 
         {showApply ? (
           <Link
-            href={ctaHrefs.apply}
+            href={applyHref}
             /* bg-green/white is 2.62:1, below AA for normal text; bg-green-dark/white
                is 5.48:1 and is already the design system's established darker-green
                pairing (used as this same button's hover state elsewhere). */

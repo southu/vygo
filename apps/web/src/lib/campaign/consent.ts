@@ -2,10 +2,12 @@
  * Shared analytics-consent reader for the conversion layer.
  *
  * Reuses the existing `vygo:consent` localStorage contract written by the
- * campaign consent control. Analytics and paid-media attribution beacons must
- * be gated on this state; functional session continuity (preserved campaign
- * parameters) is intentionally NOT gated so the experience keeps working with
- * analytics denied.
+ * campaign consent control. The app's established/default state is
+ * "analytics allowed" — the legacy first-party beacons fire unconditionally —
+ * so the conversion layer emits by default and is suppressed only when the user
+ * has EXPLICITLY denied optional analytics. Functional session continuity
+ * (preserved campaign parameters) is never gated, so the experience keeps
+ * working even with analytics denied.
  */
 
 export const CONSENT_STORAGE_KEY = "vygo:consent";
@@ -15,25 +17,51 @@ export const CONSENT_CHANGE_EVENT = "vygo:consent-change";
 
 type ConsentState = { analytics?: boolean };
 
-/** Pure parse of the stored consent blob → analytics-consent boolean. */
-export function parseAnalyticsConsent(raw: string | null): boolean {
-  if (!raw) return false;
+/**
+ * The three possible analytics-consent states:
+ *  - `granted`  — the user explicitly turned analytics on.
+ *  - `denied`   — the user explicitly turned analytics off.
+ *  - `unset`    — no explicit choice recorded; the app default (allowed) stands.
+ */
+export type ConsentDecision = "granted" | "denied" | "unset";
+
+/** Pure parse of the stored consent blob → an explicit/unset decision. */
+export function readAnalyticsConsentDecision(raw: string | null): ConsentDecision {
+  if (!raw) return "unset";
   try {
     const parsed = JSON.parse(raw) as ConsentState;
-    return Boolean(parsed?.analytics);
+    if (typeof parsed?.analytics === "boolean") return parsed.analytics ? "granted" : "denied";
+    return "unset";
+  } catch {
+    return "unset";
+  }
+}
+
+/** Pure check: has the user explicitly turned optional analytics ON. */
+export function parseAnalyticsConsent(raw: string | null): boolean {
+  return readAnalyticsConsentDecision(raw) === "granted";
+}
+
+/** True only when the user has EXPLICITLY denied optional analytics. */
+export function analyticsConsentDenied(): boolean {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) return false;
+    return (
+      readAnalyticsConsentDecision(window.localStorage.getItem(CONSENT_STORAGE_KEY)) === "denied"
+    );
   } catch {
     return false;
   }
 }
 
-/** True only when the user has explicitly allowed optional product analytics. */
+/**
+ * Whether analytics/attribution beacons may be sent. Default-allow: emission is
+ * suppressed only on an explicit denial, matching the app's existing state where
+ * the legacy beacons fire unconditionally. Absence of a stored choice keeps the
+ * default (allowed) so a normal visit is instrumented without any opt-in UI.
+ */
 export function hasAnalyticsConsent(): boolean {
-  try {
-    if (typeof window === "undefined" || !window.localStorage) return false;
-    return parseAnalyticsConsent(window.localStorage.getItem(CONSENT_STORAGE_KEY));
-  } catch {
-    return false;
-  }
+  return !analyticsConsentDenied();
 }
 
 /**

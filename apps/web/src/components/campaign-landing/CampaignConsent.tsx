@@ -9,14 +9,17 @@ type ConsentState = { analytics: boolean };
 
 /**
  * Approved consent-management control. Necessary cookies (e.g. verification) are
- * always on and informational; optional product analytics is off by default and
- * never preselected. Implemented as a disclosure (not a modal) so keyboard focus
- * is never trapped. Choices persist locally and are pushed to the data layer.
+ * always on and informational; optional product analytics follows the app's
+ * default (allowed) until the visitor changes it, and can be turned off here.
+ * Implemented as a disclosure (not a modal) so keyboard focus is never trapped.
+ * Choices persist locally and are pushed to the data layer.
  */
 export function CampaignConsent() {
   const panelId = useId();
   const [open, setOpen] = useState(false);
-  const [analytics, setAnalytics] = useState(false);
+  // Default-allow: reflects the app's existing state where analytics is on
+  // unless the visitor has explicitly opted out.
+  const [analytics, setAnalytics] = useState(true);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -24,10 +27,11 @@ export function CampaignConsent() {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<ConsentState>;
-        setAnalytics(Boolean(parsed.analytics));
+        // Only an explicit boolean overrides the default-on state.
+        if (typeof parsed.analytics === "boolean") setAnalytics(parsed.analytics);
       }
     } catch {
-      // Ignore unavailable/corrupt storage; defaults stand.
+      // Ignore unavailable/corrupt storage; the default-on state stands.
     }
   }, []);
 
@@ -72,7 +76,8 @@ export function CampaignConsent() {
           <p className="font-semibold text-ink">Manage your privacy choices</p>
           <p className="mt-2 text-xs">
             vygo uses only necessary cookies (such as verification) to run this site. Optional
-            product analytics is off unless you turn it on.
+            first-party product analytics is on to help us improve the experience — turn it off here
+            at any time and we&rsquo;ll stop sending analytics for this session.
           </p>
 
           <label className="mt-3 flex items-start gap-2">

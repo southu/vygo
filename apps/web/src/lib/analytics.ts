@@ -3,6 +3,7 @@
  * Never attach name, email, phone, free-text, Turnstile tokens, paste contents,
  * or other form PII. All sinks are same-origin / in-page only — no third parties.
  */
+import { analyticsConsentDenied } from "./campaign/consent";
 
 /** Canonical readiness instrumentation events (must appear in served JS). */
 export const READINESS_ANALYTICS_EVENTS = [
@@ -177,6 +178,11 @@ export function trackAnalytics(
   props?: Record<string, string | number | boolean | null | undefined>,
 ): void {
   if (typeof window === "undefined") return;
+
+  // Respect an explicit analytics opt-out for every first-party beacon (legacy
+  // and shared-conversion-layer alike). Default state is allowed, so a normal
+  // visit is unaffected; only a recorded denial suppresses the request.
+  if (analyticsConsentDenied()) return;
 
   const payload: AnalyticsPayload = {
     event,
