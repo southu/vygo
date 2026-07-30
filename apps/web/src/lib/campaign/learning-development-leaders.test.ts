@@ -88,6 +88,28 @@ test("every prominent conversion CTA targets the same on-page waitlist form", ()
   }
 });
 
+test("primary navigation carries exactly one campaign conversion link", () => {
+  // The single conversion link is the nav CTA (the on-page waitlist apply).
+  assert.equal(campaign.nav.cta.href, APPLY_HREF);
+  // The remaining reduced nav links are in-page section anchors, never a second
+  // route to the waitlist/apply conversion — so the header exposes no more than
+  // one conversion link.
+  const navConversionLinks = campaign.nav.links.filter(
+    (link) => link.href === APPLY_HREF || /^\/(waitlist|apply)\b/.test(link.href),
+  );
+  assert.equal(navConversionLinks.length, 0, "reduced nav links must not add a conversion route");
+});
+
+test("footer exposes reachable Privacy and Terms legal links", () => {
+  const legalHrefs = campaign.footer.legalLinks.map((link) => link.href);
+  assert.ok(legalHrefs.includes("/privacy"), "footer links to the Privacy policy");
+  assert.ok(legalHrefs.includes("/terms"), "footer links to the Terms of use");
+  // Same-origin, reachable paths (not empty or off-site placeholders).
+  for (const href of legalHrefs) {
+    assert.ok(href.startsWith("/"), `legal link should be a same-origin path: ${href}`);
+  }
+});
+
 // --- Material distinctness from Campaign 1 (assessment) --------------------
 
 test("landing page is materially distinct from the assessment landing page", () => {
