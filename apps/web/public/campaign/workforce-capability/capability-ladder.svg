@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" width="800" height="520" role="img" aria-label="Three stages from a validated prototype to a production-grade codebase your team owns">
+  <defs>
+    <style>
+      .display { font-family: 'Montserrat', 'Open Sans', system-ui, sans-serif; }
+      .body { font-family: 'Open Sans', system-ui, sans-serif; }
+    </style>
+  </defs>
+  <rect width="800" height="520" fill="#fafaf8" rx="16" />
+
+  <!-- Column 1: validated prototype -->
+  <g>
+    <rect x="32" y="72" width="200" height="376" rx="14" fill="#ffffff" stroke="#e5e4df" />
+    <rect x="32" y="72" width="200" height="52" rx="14" fill="#fef3e6" />
+    <text x="132" y="104" text-anchor="middle" class="display" font-size="15" font-weight="700" fill="#b45309">Validated prototype</text>
+    <circle cx="60" cy="164" r="6" fill="#b45309" />
+    <text x="78" y="169" class="body" font-size="13" fill="#16181d">Validated UX</text>
+    <circle cx="60" cy="204" r="6" fill="#b45309" />
+    <text x="78" y="209" class="body" font-size="13" fill="#16181d">Proven demand</text>
+    <circle cx="60" cy="244" r="6" fill="#b45309" />
+    <text x="78" y="249" class="body" font-size="13" fill="#16181d">Product rules</text>
+    <circle cx="60" cy="284" r="6" fill="#d1cfc8" />
+    <text x="78" y="289" class="body" font-size="13" fill="#6b7280">Fragile auth</text>
+    <circle cx="60" cy="324" r="6" fill="#d1cfc8" />
+    <text x="78" y="329" class="body" font-size="13" fill="#6b7280">No test coverage</text>
+    <circle cx="60" cy="364" r="6" fill="#d1cfc8" />
+    <text x="78" y="369" class="body" font-size="13" fill="#6b7280">One-person code</text>
+    <text x="132" y="418" text-anchor="middle" class="body" font-size="12" fill="#6b7280">Ships fast, stalls at</text>
+    <text x="132" y="434" text-anchor="middle" class="body" font-size="12" fill="#6b7280">production</text>
+  </g>
+
+  <!-- Arrow node: vygo production layer -->
+  <g>
+    <rect x="300" y="196" width="200" height="128" rx="14" fill="#5b47e0" />
+    <text x="400" y="238" text-anchor="middle" class="display" font-size="15" font-weight="700" fill="#ffffff">vygo production</text>
+    <text x="400" y="258" text-anchor="middle" class="display" font-size="15" font-weight="700" fill="#ffffff">layer</text>
+    <text x="400" y="286" text-anchor="middle" class="body" font-size="12" fill="#e8e6fa">Fixed method · senior-only</text>
+    <text x="400" y="304" text-anchor="middle" class="body" font-size="12" fill="#e8e6fa">QA/UAT on every build</text>
+    <path d="M240 260 H298" stroke="#4535b8" stroke-width="3" fill="none" marker-end="url(#arrow)" />
+    <path d="M500 260 H560" stroke="#12b76a" stroke-width="3" fill="none" marker-end="url(#arrowG)" />
+  </g>
+
+  <!-- Column 3: production-grade, team-owned -->
+  <g>
+    <rect x="568" y="72" width="200" height="376" rx="14" fill="#ffffff" stroke="#e5e4df" />
+    <rect x="568" y="72" width="200" height="52" rx="14" fill="#e7f7ef" />
+    <text x="668" y="104" text-anchor="middle" class="display" font-size="15" font-weight="700" fill="#0f9457">A codebase you own</text>
+    <circle cx="596" cy="164" r="6" fill="#12b76a" />
+    <text x="614" y="169" class="body" font-size="13" fill="#16181d">Architecture docs</text>
+    <circle cx="596" cy="204" r="6" fill="#12b76a" />
+    <text x="614" y="209" class="body" font-size="13" fill="#16181d">Runbooks</text>
+    <circle cx="596" cy="244" r="6" fill="#12b76a" />
+    <text x="614" y="249" class="body" font-size="13" fill="#16181d">Test suites</text>
+    <circle cx="596" cy="284" r="6" fill="#12b76a" />
+    <text x="614" y="289" class="body" font-size="13" fill="#16181d">Secure identity</text>
+    <circle cx="596" cy="324" r="6" fill="#12b76a" />
+    <text x="614" y="329" class="body" font-size="13" fill="#16181d">Repeatable deploys</text>
+    <circle cx="596" cy="364" r="6" fill="#12b76a" />
+    <text x="614" y="369" class="body" font-size="13" fill="#16181d">Full IP handoff</text>
+    <text x="668" y="418" text-anchor="middle" class="body" font-size="12" fill="#6b7280">Your team carries it</text>
+    <text x="668" y="434" text-anchor="middle" class="body" font-size="12" fill="#6b7280">forward</text>
+  </g>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="5" orient="auto">
+      <path d="M0 0 L8 5 L0 10 z" fill="#4535b8" />
+    </marker>
+    <marker id="arrowG" markerWidth="10" markerHeight="10" refX="7" refY="5" orient="auto">
+      <path d="M0 0 L8 5 L0 10 z" fill="#12b76a" />
+    </marker>
+  </defs>
+</svg>
