@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { CONSENT_STORAGE_KEY, notifyConsentChange } from "@/lib/campaign/consent";
 
-const STORAGE_KEY = "vygo:consent";
+const STORAGE_KEY = CONSENT_STORAGE_KEY;
 
 type ConsentState = { analytics: boolean };
 
@@ -41,6 +42,9 @@ export function CampaignConsent() {
     if (Array.isArray(layer)) {
       layer.push({ event: "consent_update", analytics_consent: analytics });
     }
+    // Let the shared conversion layer react in the same tab (enable/disable
+    // beacons) without a full reload.
+    notifyConsentChange();
     setSaved(true);
   }
 

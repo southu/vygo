@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { CtaLink } from "@/components/CtaLink";
 import { LogoText } from "@/components/LogoText";
+import { CampaignCtaLink } from "./CampaignCtaLink";
 import type { CampaignNavConfig } from "@/lib/campaign/types";
 
 /**
@@ -28,13 +28,14 @@ export function CampaignNav({ nav }: { nav: CampaignNavConfig }) {
               {link.label}
             </a>
           ))}
-          <CtaLink
+          <CampaignCtaLink
             href={nav.cta.href}
             variant={nav.cta.variant ?? "primary"}
             className="ml-1 !min-h-0 px-3 py-2 text-sm"
+            ctaLocation="nav_primary"
           >
             {nav.cta.label}
-          </CtaLink>
+          </CampaignCtaLink>
         </nav>
       </div>
     </header>

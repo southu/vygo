@@ -20,6 +20,11 @@ import {
 } from "@/content/inquiry-offers";
 import { apiUrl } from "@/lib/api";
 import { trackAnalytics } from "@/lib/analytics";
+import {
+  emitConversionEvent,
+  resolveLandingPageId,
+  type ConversionOutcome,
+} from "@/lib/campaign/conversion";
 import { captureAttribution, type WaitlistAttribution } from "@/lib/attribution";
 import { useAvailability } from "./AvailabilityProvider";
 import { FooterEmail } from "./FooterEmail";
@@ -229,7 +234,41 @@ export function WaitlistForm({
   const fieldClass =
     "mt-1.5 w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-ink shadow-sm focus-visible:border-purple";
 
+  // Shared conversion contract for this waitlist attempt. A stable landing_page
+  // id is resolved once so the whole attempt reports consistently, and campaign
+  // events carry the preserved session parameters.
+  const conversionLandingIdRef = useRef<string>("waitlist");
+  const conversionStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (open) conversionLandingIdRef.current = resolveLandingPageId();
+  }, [open]);
+
+  const emitConversion = (
+    event: "form_start" | "conversion_error" | "conversion_success",
+    outcome: ConversionOutcome,
+    extra?: Record<string, string | number | boolean | null>,
+    dedupeKey?: string,
+  ) => {
+    emitConversionEvent({
+      event,
+      landingPageId: conversionLandingIdRef.current,
+      ctaLocation: null,
+      outcome,
+      extra,
+      dedupeKey,
+    });
+  };
+
+  const markConversionStart = () => {
+    if (conversionStartedRef.current) return;
+    conversionStartedRef.current = true;
+    emitConversion("form_start", "started", { form_id: "waitlist" }, "waitlist");
+  };
+
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    // First genuine field interaction = form_start (once per attempt).
+    markConversionStart();
     setValues((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -252,6 +291,7 @@ export function WaitlistForm({
     setAwaitingToken(false);
     setVerificationTimedOut(false);
     pendingSubmitRef.current = false;
+    conversionStartedRef.current = false;
     trackAnalytics("waitlist_form_view", { mode, step: 1, offer: offer ?? "general" });
     // Focus heading when opened (modal or page mount).
     const t = window.setTimeout(() => {
@@ -468,6 +508,13 @@ export function WaitlistForm({
         fields: names,
         count: Object.keys(next).length,
       });
+      // Accessible client validation failure — conversion error, never a success.
+      markConversionStart();
+      emitConversion("conversion_error", "validation_error", {
+        form_id: "waitlist",
+        error_fields: names,
+        error_count: Object.keys(next).length,
+      });
       announceAssertive(
         `There ${Object.keys(next).length === 1 ? "is" : "are"} ${Object.keys(next).length} error${Object.keys(next).length === 1 ? "" : "s"} in the form. Review the error summary.`,
       );
@@ -674,6 +721,20 @@ export function WaitlistForm({
         trackAnalytics(isDuplicate ? "waitlist_duplicate" : "waitlist_success", {
           status: res.status,
         });
+        // Destination-confirmed completion (accepted:true + durable id). Emitted
+        // once per attempt via the application id so retries never double-count.
+        const applicationId =
+          typeof body.data.applicationId === "string" ? body.data.applicationId : "waitlist";
+        emitConversion(
+          "conversion_success",
+          "success",
+          {
+            form_id: "waitlist",
+            status: res.status,
+            duplicate: isDuplicate,
+          },
+          applicationId,
+        );
         // New logical attempt after completion uses a fresh key.
         idempotencyKeyRef.current = null;
         return;
@@ -707,6 +768,12 @@ export function WaitlistForm({
         status: res.status,
         code: code ?? "unknown",
       });
+      // Rejected destination submission — conversion error, never a success.
+      emitConversion("conversion_error", "submission_rejected", {
+        form_id: "waitlist",
+        status: res.status,
+        code: code ?? "unknown",
+      });
       // Keep idempotency key for retry of this attempt.
     } catch {
       setStatus("error");
@@ -714,6 +781,10 @@ export function WaitlistForm({
       announcePolite(message);
       announceAssertive(message);
       trackAnalytics("waitlist_failure", { code: "network" });
+      emitConversion("conversion_error", "submission_rejected", {
+        form_id: "waitlist",
+        code: "network",
+      });
     } finally {
       submittingRef.current = false;
     }

@@ -52,6 +52,22 @@ export const PRODUCT_ANALYTICS_EVENTS = [
 
 export type ProductAnalyticsEventName = (typeof PRODUCT_ANALYTICS_EVENTS)[number];
 
+/**
+ * Shared conversion-layer event contract used by every campaign landing page
+ * and the conversion flows they hand off to. Stable names so the contract is
+ * verifiable in served JS and the analytics config script. See
+ * `lib/campaign/conversion.ts` for the required payload shape.
+ */
+export const CAMPAIGN_CONVERSION_EVENTS = [
+  "landing_page_view",
+  "primary_cta_activation",
+  "form_start",
+  "conversion_error",
+  "conversion_success",
+] as const;
+
+export type CampaignConversionEventName = (typeof CAMPAIGN_CONVERSION_EVENTS)[number];
+
 export type AnalyticsEventName =
   | "waitlist_form_view"
   | "waitlist_step_change"
@@ -63,6 +79,7 @@ export type AnalyticsEventName =
   | "waitlist_turnstile_degraded"
   | "availability_view"
   | "availability_retry"
+  | CampaignConversionEventName
   | ReadinessAnalyticsEventName
   | ProductAnalyticsEventName;
 
@@ -76,7 +93,11 @@ export const analyticsConfig = {
   provider: "vygo-first-party",
   endpoint: "/v1/analytics",
   dataLayer: "dataLayer",
-  events: [...READINESS_ANALYTICS_EVENTS, ...PRODUCT_ANALYTICS_EVENTS],
+  events: [
+    ...CAMPAIGN_CONVERSION_EVENTS,
+    ...READINESS_ANALYTICS_EVENTS,
+    ...PRODUCT_ANALYTICS_EVENTS,
+  ],
 } as const;
 
 export type AnalyticsPayload = {

@@ -1,4 +1,4 @@
-import { CtaLink } from "@/components/CtaLink";
+import { CampaignCtaLink } from "./CampaignCtaLink";
 import type { HeroSectionData } from "@/lib/campaign/types";
 
 /**
@@ -28,16 +28,21 @@ export function HeroSection({ id, data }: { id: string; data: HeroSectionData })
             </ul>
           ) : null}
           <div className="mt-8 flex flex-wrap gap-3">
-            <CtaLink href={data.primaryCta.href} variant={data.primaryCta.variant ?? "primary"}>
+            <CampaignCtaLink
+              href={data.primaryCta.href}
+              variant={data.primaryCta.variant ?? "primary"}
+              ctaLocation="hero_primary"
+            >
               {data.primaryCta.label}
-            </CtaLink>
+            </CampaignCtaLink>
             {data.secondaryCta ? (
-              <CtaLink
+              <CampaignCtaLink
                 href={data.secondaryCta.href}
                 variant={data.secondaryCta.variant ?? "secondary"}
+                ctaLocation="hero_secondary"
               >
                 {data.secondaryCta.label}
-              </CtaLink>
+              </CampaignCtaLink>
             ) : null}
           </div>
         </div>

@@ -32,15 +32,16 @@
     "seed:local": "tsx scripts/seed-local.ts",
     "availability:set": "tsx scripts/set-availability.ts",
     "db:migrate": "tsx packages/db/src/cli-migrate.ts",
-    "test": "pnpm test:validation && pnpm test:callouts && pnpm test:readiness-storage && pnpm --filter @vygo/email test && pnpm --filter @vygo/edge test && pnpm --filter @vygo/api test",
+    "test": "pnpm test:validation && pnpm test:callouts && pnpm test:readiness-storage && pnpm test:campaign && pnpm --filter @vygo/email test && pnpm --filter @vygo/edge test && pnpm --filter @vygo/api test",
     "test:validation": "pnpm exec tsx --test packages/validation/src/**/*.test.ts",
+    "test:campaign": "pnpm exec tsx --test apps/web/src/lib/campaign/*.test.ts",
     "test:callouts": "pnpm exec tsx --test apps/web/src/lib/readiness/answer-callouts.test.ts",
     "test:readiness-storage": "pnpm exec tsx --test apps/web/src/lib/readiness/storage.test.ts",
     "test:integration": "pnpm --filter @vygo/api test",
     "test:email": "pnpm --filter @vygo/email test",
     "test:edge": "pnpm --filter @vygo/edge test",
     "test:e2e": "pnpm --filter @vygo/web test:e2e",
-    "ci:verify": "pnpm secret-scan && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:validation && pnpm test:email && pnpm test:edge && pnpm provision && pnpm foundation-status && pnpm readiness && pnpm build",
+    "ci:verify": "pnpm secret-scan && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test:validation && pnpm test:campaign && pnpm test:email && pnpm test:edge && pnpm provision && pnpm foundation-status && pnpm readiness && pnpm build",
     "clean": "pnpm -r --if-present run clean && rm -rf node_modules"
   },
   "devDependencies": {

@@ -2,7 +2,8 @@
 
 import { useId, useRef, useState } from "react";
 import { SectionHeading } from "@/components/SectionHeading";
-import { CtaLink } from "@/components/CtaLink";
+import { CampaignCtaLink } from "./CampaignCtaLink";
+import { useConversion } from "./ConversionProvider";
 import type { LeadSectionData } from "@/lib/campaign/types";
 
 type Errors = { name?: string; email?: string; consent?: string };
@@ -33,6 +34,15 @@ export function LeadFormSection({ id, data }: { id: string; data: LeadSectionDat
   const emailRef = useRef<HTMLInputElement>(null);
   const consentRef = useRef<HTMLInputElement>(null);
 
+  const { emitFormStart, emitConversionError } = useConversion();
+  const startedRef = useRef(false);
+
+  function handleFirstInteraction() {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    emitFormStart(id);
+  }
+
   function validate(): Errors {
     const next: Errors = {};
     if (!name.trim()) next.name = "Enter your full name.";
@@ -45,10 +55,17 @@ export function LeadFormSection({ id, data }: { id: string; data: LeadSectionDat
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     // Handled entirely on the client — the form never navigates or sends.
     event.preventDefault();
+    // A submit attempt always counts as an interaction (keyboard-only paths).
+    handleFirstInteraction();
     const next = validate();
     setErrors(next);
     if (Object.keys(next).length > 0) {
       setSubmitted(false);
+      // Accessible client validation failure — never a conversion.
+      emitConversionError(id, "validation_error", {
+        error_count: Object.keys(next).length,
+        error_fields: Object.keys(next).join(","),
+      });
       if (next.name) nameRef.current?.focus();
       else if (next.email) emailRef.current?.focus();
       else if (next.consent) consentRef.current?.focus();
@@ -92,13 +109,18 @@ export function LeadFormSection({ id, data }: { id: string; data: LeadSectionDat
             >
               <p className="font-semibold text-ink">{data.successMessage}</p>
               <div className="mt-4">
-                <CtaLink href="/waitlist" variant="primary">
+                <CampaignCtaLink href="/waitlist" variant="primary" ctaLocation="lead_complete">
                   Complete your application
-                </CtaLink>
+                </CampaignCtaLink>
               </div>
             </div>
           ) : (
-            <form className="mt-6 space-y-5" noValidate onSubmit={handleSubmit}>
+            <form
+              className="mt-6 space-y-5"
+              noValidate
+              onSubmit={handleSubmit}
+              onFocusCapture={handleFirstInteraction}
+            >
               <div>
                 <label htmlFor={nameId} className="text-sm font-medium text-ink">
                   {data.nameLabel} <span className="text-red">*</span>
