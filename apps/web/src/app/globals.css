@@ -89,7 +89,12 @@
   }
 
   .btn-on-dark {
-    @apply btn bg-green text-white hover:bg-green-dark;
+    /* Primary CTA on dark/green bands. White-on-green must clear WCAG AA
+       (>=4.5:1), so the fill is pinned to a dark green rather than the lighter
+       brand `--color-green` (#12b76a is only 2.62:1 with white). White on
+       #047857 is ~5.48:1; the pinned values also keep contrast passing under
+       the dark theme, where the green tokens brighten. */
+    @apply btn bg-[#047857] text-white hover:bg-[#035c43];
   }
 
   .btn-ghost-on-dark {
