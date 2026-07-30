@@ -157,7 +157,7 @@ Every citation is either an exact repository path or an exact
   professional/marketing data incl. UTM parameters
   `apps/web/src/content/legal.ts:72-74`.
 - Site is for people **18 and older**: `apps/web/src/content/legal.ts:246-252`.
-- Trademark usage: no `™`/`®` glyphs are used on-site; VYGO LLC owns site
+- Trademark usage: no `™`/`®` glyphs are used on-site; the legal entity owns site
   text/design/diagrams (`apps/web/src/content/legal.ts:313-318`).
 
 > **Attribution baseline for every campaign (binding).** `[SOURCED]` The
@@ -171,7 +171,7 @@ APPROVAL` plus a Privacy Policy update before launch.** `[RECOMMENDATION]`
 
 > **Brand & voice conventions (binding).** `[SOURCED]` Write the brand name as
 > lowercase **`vygo`** in prose and the wordmark; use **`vygo.ai`** as the
-> domain/title form; use uppercase **`VYGO LLC`** only for the legal entity
+> domain/title form; reserve the uppercase legal-entity name for legal pages (privacy/terms) only
 > (`packages/ui/src/index.ts:3-13`, `apps/web/src/components/LogoText.tsx:13-18`,
 > `apps/web/src/content/legal.ts`). Do not conflate these paid campaigns with
 > the internal operator "Campaign workspace" at `/campaigns`
