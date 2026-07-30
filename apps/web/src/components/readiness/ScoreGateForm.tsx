@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { readinessContent } from "@/content/readiness";
 import { trackAnalytics } from "@/lib/analytics";
+import { emitConversionEvent, resolveLandingPageId } from "@/lib/campaign/conversion";
 import { scoreReadiness, type ScoreResponse } from "@/lib/readiness/api";
 import { AssessmentProgress } from "@/components/readiness/AssessmentProgress";
 import { AnswerCallout } from "@/components/readiness/AnswerCallout";
@@ -230,6 +231,29 @@ export function ScoreGateForm({
     if (Object.keys(next).length > 0) {
       setStatus("error");
       setFeedback(c.error);
+      // Accessible client validation failure — conversion error, never a success.
+      emitConversionEvent({
+        event: "conversion_error",
+        landingPageId: resolveLandingPageId(),
+        ctaLocation: null,
+        outcome: "validation_error",
+        extra: {
+          form_id: "readiness",
+          error_fields: Object.keys(next).join(","),
+          error_count: Object.keys(next).length,
+        },
+      });
+      // Move focus to the first field with a programmatically associated error.
+      const firstField = next.name
+        ? "gate-name"
+        : next.email
+          ? "gate-email"
+          : next.privacyAccepted
+            ? "gate-privacy"
+            : null;
+      if (firstField && typeof document !== "undefined") {
+        requestAnimationFrame(() => document.getElementById(firstField)?.focus());
+      }
       return;
     }
 
@@ -280,6 +304,14 @@ export function ScoreGateForm({
       if (e.fields) setErrors(e.fields);
       setFeedback(e.message || c.error);
       setStatus("error");
+      // Rejected destination submission — conversion error, never a success.
+      emitConversionEvent({
+        event: "conversion_error",
+        landingPageId: resolveLandingPageId(),
+        ctaLocation: null,
+        outcome: "submission_rejected",
+        extra: { form_id: "readiness", code: e.code ?? "unknown" },
+      });
       if (!readinessE2E && turnstileWidgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.reset(turnstileWidgetIdRef.current);
@@ -394,9 +426,11 @@ export function ScoreGateForm({
             placeholder={c.namePlaceholder}
             required
             data-testid="gate-name"
+            aria-invalid={Boolean(errors.name)}
+            aria-describedby={errors.name ? "gate-name-error" : undefined}
           />
           {errors.name ? (
-            <p className="mt-1 text-xs text-red" data-field-error="name">
+            <p id="gate-name-error" className="mt-1 text-xs text-red" data-field-error="name">
               {errors.name}
             </p>
           ) : null}
@@ -417,9 +451,11 @@ export function ScoreGateForm({
             placeholder={c.emailPlaceholder}
             required
             data-testid="gate-email"
+            aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? "gate-email-error" : undefined}
           />
           {errors.email ? (
-            <p className="mt-1 text-xs text-red" data-field-error="email">
+            <p id="gate-email-error" className="mt-1 text-xs text-red" data-field-error="email">
               {errors.email}
             </p>
           ) : null}
@@ -452,6 +488,8 @@ export function ScoreGateForm({
             onChange={(e) => setPrivacyAccepted(e.target.checked)}
             required
             data-testid="gate-privacy"
+            aria-invalid={Boolean(errors.privacyAccepted)}
+            aria-describedby={errors.privacyAccepted ? "gate-privacy-error" : undefined}
           />
           <span>
             {c.privacyLabel}{" "}
@@ -462,7 +500,11 @@ export function ScoreGateForm({
           </span>
         </label>
         {errors.privacyAccepted ? (
-          <p className="text-xs text-red" data-field-error="privacyAccepted">
+          <p
+            id="gate-privacy-error"
+            className="text-xs text-red"
+            data-field-error="privacyAccepted"
+          >
             {errors.privacyAccepted}
           </p>
         ) : null}

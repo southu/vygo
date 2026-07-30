@@ -70,6 +70,7 @@ import {
   type ReadinessLocalState,
 } from "@/lib/readiness/storage";
 import { readinessAnalyticsEventCatalog, trackAnalytics } from "@/lib/analytics";
+import { emitConversionEvent, resolveLandingPageId } from "@/lib/campaign/conversion";
 import { ScoreGateForm } from "@/components/readiness/ScoreGateForm";
 import { AssessmentProgress } from "@/components/readiness/AssessmentProgress";
 import { AnswerCallout } from "@/components/readiness/AnswerCallout";
@@ -1472,6 +1473,18 @@ export function ReadinessFlow() {
       trackAnalytics("bucket_assigned", { bucket: result.bucket });
     }
     trackAnalytics("stage_completed", { stage: "gate" });
+    // Destination-confirmed completion: the scoring endpoint returned a durable
+    // scored snapshot. Emit conversion_success exactly once per attempt (deduped
+    // by snapshot id) BEFORE navigating — the beacon uses sendBeacon so it
+    // survives the same-tab navigation to the snapshot page.
+    emitConversionEvent({
+      event: "conversion_success",
+      landingPageId: resolveLandingPageId(),
+      ctaLocation: null,
+      outcome: "success",
+      dedupeKey: result.snapshotId,
+      extra: { form_id: "readiness" },
+    });
     const path =
       result.snapshotPath || `/readiness/snapshot?id=${encodeURIComponent(result.snapshotId)}`;
     if (typeof window !== "undefined") {
@@ -1542,6 +1555,18 @@ export function ReadinessFlow() {
     if (!project || startStatus === "starting") return;
     setStartStatus("starting");
     trackAnalytics("run_start_attempted", { mode: projectMode });
+    // Shared conversion contract: starting an analysis is the first genuine
+    // interaction with this assessment conversion flow. Emitted once per run
+    // (deduped by run id) through the same consent-gated pipeline as the
+    // waitlist/apply forms — a run start is never a conversion_success.
+    emitConversionEvent({
+      event: "form_start",
+      landingPageId: resolveLandingPageId(),
+      ctaLocation: null,
+      outcome: "started",
+      dedupeKey: runId ?? "readiness",
+      extra: { form_id: "readiness", mode: projectMode },
+    });
     let credential = submissionToken;
     if (!credential) {
       credential = await mintSubmissionToken();
