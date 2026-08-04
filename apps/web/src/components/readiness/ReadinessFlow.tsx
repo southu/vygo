@@ -1309,8 +1309,7 @@ export function ReadinessFlow() {
           // one poll, before their AI has sent anything. Treat an empty `received`
           // as still-waiting and keep polling until real results land.
           const landedText =
-            status.resultsText.trim() ||
-            (status.results ? JSON.stringify(status.results) : "");
+            status.resultsText.trim() || (status.results ? JSON.stringify(status.results) : "");
           if (!landedText) {
             schedule(INGEST_POLL_INTERVAL_MS);
             return;
@@ -1781,6 +1780,60 @@ export function ReadinessFlow() {
     };
   }, [runId]);
 
+  /**
+   * Server-recorded submission confirmation (timestamp + last-8 of the
+   * server-echoed token). Rendered wherever the flow shows a landed submission:
+   * on the paste step (view === "stage3", the screen the waiting page
+   * auto-advances to when the customer's AI POSTs results back) AND on the
+   * confirm view. Keeping it a single shared node guarantees the confirmation
+   * stays visible across that auto-advance — the waiting → paste transition must
+   * carry the confirmation with it, not strand it on a later screen. The values
+   * are server-authoritative (read back from the submit response or status
+   * poll), never client-generated. Declared before the early view returns so
+   * both the confirm and stage3 branches can reference it (no TDZ).
+   */
+  const submissionConfirmationBlock = submissionConfirmation ? (
+    <div
+      className="mt-6 rounded-xl border border-border bg-canvas px-4 py-4"
+      data-testid="readiness-submission-confirmation"
+      role="status"
+      aria-live="polite"
+    >
+      <p className="eyebrow" data-testid="readiness-submission-confirmation-eyebrow">
+        {c.confirm.received.eyebrow}
+      </p>
+      <p className="mt-2 text-sm font-semibold text-ink">{c.confirm.received.title}</p>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+            {c.confirm.received.timestampLabel}
+          </dt>
+          <dd className="mt-1 text-sm text-ink">
+            <time
+              dateTime={submissionConfirmation.recordedAt}
+              data-testid="readiness-submission-timestamp"
+            >
+              {submissionConfirmation.recordedAt}
+            </time>
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+            {c.confirm.received.tokenLabel}
+          </dt>
+          <dd className="mt-1 font-mono text-sm text-ink">
+            <span aria-hidden="true">…</span>
+            <span data-testid="readiness-submission-token-last8">
+              {submissionConfirmation.tokenLast8}
+            </span>
+          </dd>
+          <p className="mt-1 text-xs text-muted">{c.confirm.received.tokenHint}</p>
+        </div>
+      </dl>
+      <p className="mt-3 text-xs text-muted">{c.confirm.received.supportNote}</p>
+    </div>
+  ) : null;
+
   if (view === "loading") {
     return (
       <div className="readiness-step-panel mt-8" aria-busy="true" data-testid="readiness-loading">
@@ -1925,47 +1978,7 @@ export function ReadinessFlow() {
           </p>
         ) : null}
 
-        {submissionConfirmation ? (
-          <div
-            className="mt-6 rounded-xl border border-border bg-canvas px-4 py-4"
-            data-testid="readiness-submission-confirmation"
-            role="status"
-            aria-live="polite"
-          >
-            <p className="eyebrow" data-testid="readiness-submission-confirmation-eyebrow">
-              {c.confirm.received.eyebrow}
-            </p>
-            <p className="mt-2 text-sm font-semibold text-ink">{c.confirm.received.title}</p>
-            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted">
-                  {c.confirm.received.timestampLabel}
-                </dt>
-                <dd className="mt-1 text-sm text-ink">
-                  <time
-                    dateTime={submissionConfirmation.recordedAt}
-                    data-testid="readiness-submission-timestamp"
-                  >
-                    {submissionConfirmation.recordedAt}
-                  </time>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-muted">
-                  {c.confirm.received.tokenLabel}
-                </dt>
-                <dd className="mt-1 font-mono text-sm text-ink">
-                  <span aria-hidden="true">…</span>
-                  <span data-testid="readiness-submission-token-last8">
-                    {submissionConfirmation.tokenLast8}
-                  </span>
-                </dd>
-                <p className="mt-1 text-xs text-muted">{c.confirm.received.tokenHint}</p>
-              </div>
-            </dl>
-            <p className="mt-3 text-xs text-muted">{c.confirm.received.supportNote}</p>
-          </div>
-        ) : null}
+        {submissionConfirmationBlock}
 
         {showRawFallback ? (
           <div className="readiness-step-panel mt-6" data-testid="readiness-confirm-raw-fallback">
@@ -2127,6 +2140,15 @@ export function ReadinessFlow() {
         {c.stage3.title}
       </h2>
       <p className="mt-3 text-base text-muted">{c.stage3.body}</p>
+
+      {/*
+        Server-recorded submission confirmation, shown here the moment the
+        waiting screen (stage2) auto-advances to the paste step because the
+        customer's AI POSTed results back. This is what makes the waiting ->
+        next-step transition carry a visible timestamp + last-8 token
+        confirmation, rather than surfacing it only after a manual paste.
+      */}
+      {submissionConfirmationBlock}
 
       {/*
         Generated diagnostic prompt, surfaced on Stage 3 (not only Stage 2). The
