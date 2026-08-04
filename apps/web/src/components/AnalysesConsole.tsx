@@ -191,6 +191,58 @@ type ProjectGroup = {
   current: Analysis | null;
 };
 
+/**
+ * Empty state for a signed-in identity that has zero analyses. Post-purge this
+ * is the default state for every real account, so it must read as a deliberate,
+ * styled state — never a blank body, an empty table, or leftover seeded rows.
+ * It reuses the app's `card` chrome and points the visitor at starting a run.
+ */
+function AnalysesEmptyState({ label }: { label: string }) {
+  return (
+    <div
+      className="card flex flex-col items-center gap-4 py-12 text-center"
+      data-testid="analyses-empty-state"
+    >
+      <span
+        aria-hidden="true"
+        className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-soft/40 text-purple"
+      >
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h9L20 9.5V18.5A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5Z" />
+          <path d="M14 4v5h5" />
+          <path d="M8.5 13.5h7M8.5 16.5h4" />
+        </svg>
+      </span>
+      <div>
+        <h2 className="font-display text-xl font-semibold" data-testid="analyses-empty-heading">
+          No analyses yet
+        </h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted">
+          You haven&apos;t run a readiness check yet, so there&apos;s nothing to show here for{" "}
+          <EmailText address={label} />. Start your first analysis and it will appear here, grouped
+          by project, with the latest completed run marked as current.
+        </p>
+      </div>
+      <a
+        href="/readiness?new=1"
+        className="btn inline-flex bg-purple text-white"
+        data-testid="analyses-empty-new-analysis"
+      >
+        Start your first analysis
+      </a>
+    </div>
+  );
+}
+
 function OpenResultsLink({
   analysis,
   variant,
@@ -366,17 +418,23 @@ export function AnalysesConsole() {
     const currentByProject = data?.currentByProject ?? {};
     const order = data?.projects ?? [];
     const projects = order.length > 0 ? order : Array.from(new Set(analyses.map((a) => a.project)));
-    return projects.map((project) => {
-      const rows = analyses
-        .filter((a) => a.project === project)
-        .sort((a, b) => b.created_at.localeCompare(a.created_at));
-      // Prefer the explicit server marker; fall back to first completed row.
-      const currentId = currentByProject[project];
-      const current = currentId
-        ? (rows.find((r) => r.id === currentId) ?? null)
-        : (rows.find((r) => r.current) ?? rows.find((r) => isCompleted(r.status)) ?? null);
-      return { project, rows, current };
-    });
+    return (
+      projects
+        .map((project) => {
+          const rows = analyses
+            .filter((a) => a.project === project)
+            .sort((a, b) => b.created_at.localeCompare(a.created_at));
+          // Prefer the explicit server marker; fall back to first completed row.
+          const currentId = currentByProject[project];
+          const current = currentId
+            ? (rows.find((r) => r.id === currentId) ?? null)
+            : (rows.find((r) => r.current) ?? rows.find((r) => isCompleted(r.status)) ?? null);
+          return { project, rows, current };
+        })
+        // Never render an empty project section: a project label with zero rows
+        // would surface a seeded/echoed project name to a zero-analysis account.
+        .filter((group) => group.rows.length > 0)
+    );
   }, [data]);
 
   const resolving = source === undefined;
@@ -461,7 +519,7 @@ export function AnalysesConsole() {
         {source && !loading && !error && data && (
           <div className="mt-8 space-y-8" data-testid="analysis-history">
             {groups.length === 0 ? (
-              <p className="text-sm text-muted">No analyses yet.</p>
+              <AnalysesEmptyState label={source.label} />
             ) : (
               groups.map((group) => <ProjectSection key={group.project} group={group} />)
             )}
