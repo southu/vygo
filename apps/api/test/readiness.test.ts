@@ -933,6 +933,178 @@ describe("readiness ingest flow with database", () => {
     assert.notEqual(secondBody.run_id, startBody.run_id);
   });
 
+  // ---------------------------------------------------------------------------
+  // Submission-vs-session ordering (readiness-submission-race-fix)
+  //
+  // The AI's submission POST can land BEFORE the browser tab has created its
+  // readiness session and started polling. The durable submission store must
+  // record the token's `received` state the instant the POST lands, and the
+  // status poll (the session's very first read) must surface it — never
+  // `pending`/missing — regardless of ordering. A landed AI submission carries
+  // results, so the poll's terminal label is `completed`; either `received` or
+  // `completed` proves the submission was NOT lost. `pending` proves it was.
+  // ---------------------------------------------------------------------------
+
+  it("early submission before any session is recorded durably and observed on the session's first poll", async () => {
+    rateLimitStore.clear();
+    const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+    assert.equal(tokenRes.statusCode, 200);
+    const { token } = tokenRes.json() as { token: string };
+
+    // (a) The AI fires its submission POST for a fresh token BEFORE any readiness
+    // session/run for that token exists.
+    const submit = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, results: { overall: 91, bucket: "Launch" } },
+    });
+    assert.equal(submit.statusCode, 200);
+
+    // (b) The readiness session for the SAME token is created only now — after
+    // the submission was already recorded.
+    const start = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/start",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, project: "RaceEarlySubmit" },
+    });
+    assert.equal(start.statusCode, 201);
+
+    // (c)+(d) The session's very next poll observes the recorded submission —
+    // never pending/missing — so the early submission is not lost.
+    const status = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    assert.equal(status.statusCode, 200);
+    const body = status.json() as {
+      status?: string;
+      state?: string;
+      submission_token?: string;
+      results?: Record<string, unknown> | null;
+    };
+    assert.notEqual(body.status, "pending");
+    assert.ok(
+      body.status === "received" || body.status === "completed",
+      `expected received/completed on the first poll after an early submission, got "${body.status}"`,
+    );
+    assert.equal(body.submission_token, token);
+    assert.deepEqual(body.results, { overall: 91, bucket: "Launch" });
+  });
+
+  it("a recorded submission is still reported even if the short-lived token row is gone (never lost)", async () => {
+    rateLimitStore.clear();
+    const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+    const { token } = tokenRes.json() as { token: string };
+
+    const submit = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, results: { overall: 55, bucket: "Fix" } },
+    });
+    assert.equal(submit.statusCode, 200);
+
+    // Simulate the token row being purged/expired away after the submission was
+    // durably recorded. The durable submission store must remain authoritative:
+    // the poll must NOT 404/expire away an already-received submission.
+    await handle.sql`DELETE FROM readiness_ingest_tokens WHERE token = ${token}`;
+
+    const status = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    assert.equal(status.statusCode, 200);
+    const body = status.json() as { status?: string; results?: Record<string, unknown> | null };
+    assert.equal(body.status, "completed");
+    assert.deepEqual(body.results, { overall: 55, bucket: "Fix" });
+  });
+
+  it("regression — session first, then submission, then poll still reports received/completed", async () => {
+    rateLimitStore.clear();
+    const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+    const { token } = tokenRes.json() as { token: string };
+
+    // Normal order: the session/run is created and polling BEFORE the submission
+    // POST arrives. A started, still-processing run reports `received`.
+    const start = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/start",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, project: "RaceNormalOrder" },
+    });
+    assert.equal(start.statusCode, 201);
+
+    const midPoll = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    assert.equal(midPoll.statusCode, 200);
+    assert.equal((midPoll.json() as { status?: string }).status, "received");
+
+    // The submission POST now lands for the same token.
+    const submit = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, results_text: "All green; deploys are automated." },
+    });
+    assert.equal(submit.statusCode, 200);
+
+    // The subsequent poll still correctly reports the received submission.
+    const status = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    assert.equal(status.statusCode, 200);
+    const body = status.json() as { status?: string; submission_token?: string };
+    assert.notEqual(body.status, "pending");
+    assert.ok(body.status === "received" || body.status === "completed");
+    assert.equal(body.submission_token, token);
+  });
+
+  it("the same token submitted twice keeps a single consistent received/completed poll", async () => {
+    rateLimitStore.clear();
+    const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+    const { token } = tokenRes.json() as { token: string };
+
+    const results = { overall: 70, bucket: "Fix" };
+    const first = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, results },
+    });
+    assert.equal(first.statusCode, 200);
+    // A retry / duplicate submission of the SAME token (within the resubmit
+    // budget) must not corrupt state.
+    const second = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/submit",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, results },
+    });
+    assert.equal(second.statusCode, 200);
+
+    // The poll reports a single, consistent received/completed status — not a
+    // duplicated/garbled one — and the same status on a repeated read.
+    const pollA = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    const pollB = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    const bodyA = pollA.json() as { status?: string; results?: Record<string, unknown> | null };
+    const bodyB = pollB.json() as { status?: string };
+    assert.notEqual(bodyA.status, "pending");
+    assert.ok(bodyA.status === "received" || bodyA.status === "completed");
+    assert.equal(bodyA.status, bodyB.status);
+    assert.deepEqual(bodyA.results, results);
+  });
+
   it("distinguishes unknown and expired tokens on the status endpoint", async () => {
     rateLimitStore.clear();
 

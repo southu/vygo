@@ -4543,22 +4543,13 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
     try {
       await ensureReadinessTables(dbHandle);
 
-      const tokenRows = await dbHandle.sql<{ token: string; expires_at: Date | string }[]>`
-        SELECT token, expires_at
-        FROM readiness_ingest_tokens
-        WHERE token = ${token}
-        LIMIT 1
-      `;
-      const tokenRow = tokenRows[0];
-      if (!tokenRow) {
-        return reply.status(404).send({
-          status: "expired",
-          ...safeError("NOT_FOUND", "The submission token is unknown or expired."),
-        });
-      }
-
-      const expiresAtIso = new Date(tokenRow.expires_at).toISOString();
-
+      // The durable submission store is authoritative for "received". A row here
+      // means the AI's results POST already LANDED for this token, so the poll
+      // must surface it on its very first read — regardless of whether any
+      // readiness session/run was ever created for the token, and even if the
+      // short-lived token row itself has since expired away. This is what makes
+      // the submission-before-session ordering safe: a submission recorded
+      // before the session existed is never lost from the session's next poll.
       const submissionRows = await dbHandle.sql<{ payload: unknown; received_at: Date | string }[]>`
         SELECT payload, received_at
         FROM readiness_ingest_submissions
@@ -4568,100 +4559,125 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       `;
       const submission = submissionRows[0];
 
-      if (!submission) {
-        // No AI-ingest submission landed for this token. Bridge to a run created
-        // by POST /v1/readiness/start (durable `analyses` store): that is where a
-        // started run actually completes, so this is what transitions an accepted
-        // /start run to a viewable "ready" for the waiting page / acceptance poll.
-        const started = await resolveStartedRunStatus(dbHandle.sql, token);
-        if (started?.state === "ready") {
-          const receivedAt =
-            started.run.updated_at instanceof Date
-              ? started.run.updated_at.toISOString()
-              : String(started.run.updated_at);
-          return reply.status(200).send({
-            token,
-            submission_token: token,
-            // A started run whose processing has finished: the poll reports the
-            // submission as `completed` (a synonym-compatible terminal state).
-            status: "completed",
-            state: "completed",
-            expires_at: expiresAtIso,
-            received_at: receivedAt,
-            results: started.results,
-            results_text: started.resultsText,
-            run_id: started.run.id,
-            project: started.run.project_identifier,
-            run_status: started.run.status,
-          });
-        }
-        if (started?.state === "pending") {
-          return reply.status(200).send({
-            token,
-            submission_token: token,
-            // The started run is linked to this token's session and is still
-            // processing: report `received` (progressing to `completed`) rather
-            // than a bare `pending` so the poll reflects the accepted submission.
-            status: "received",
-            state: "received",
-            expires_at: expiresAtIso,
-            received_at:
-              started.run.created_at instanceof Date
-                ? started.run.created_at.toISOString()
-                : String(started.run.created_at),
-            run_id: started.run.id,
-            project: started.run.project_identifier,
-            run_status: started.run.status,
-          });
-        }
+      const tokenRows = await dbHandle.sql<{ token: string; expires_at: Date | string }[]>`
+        SELECT token, expires_at
+        FROM readiness_ingest_tokens
+        WHERE token = ${token}
+        LIMIT 1
+      `;
+      const tokenRow = tokenRows[0];
 
-        if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
-          return reply.status(410).send({
-            status: "expired",
-            ...safeError("EXPIRED_TOKEN", "The submission token is unknown or expired."),
-          });
-        }
+      if (submission) {
+        const payload =
+          submission.payload &&
+          typeof submission.payload === "object" &&
+          !Array.isArray(submission.payload)
+            ? (submission.payload as Record<string, unknown>)
+            : {};
+        // Re-redact on read-back so a planted secret in the raw ingest payload
+        // never echoes back to the page.
+        const resultsText =
+          typeof payload.results_text === "string"
+            ? redactPasteSecrets(payload.results_text).redacted
+            : null;
+        const results =
+          payload.results && typeof payload.results === "object" && !Array.isArray(payload.results)
+            ? (payload.results as Record<string, unknown>)
+            : null;
+        const receivedAt =
+          submission.received_at instanceof Date
+            ? submission.received_at.toISOString()
+            : String(submission.received_at);
+        // Prefer the token's real expiry; if the short-lived token row is already
+        // gone, derive a best-effort expiry from when the submission landed so the
+        // response shape stays stable.
+        const expiresAtIso = tokenRow
+          ? new Date(tokenRow.expires_at).toISOString()
+          : new Date(new Date(receivedAt).getTime() + INGEST_TOKEN_TTL_MS).toISOString();
+
         return reply.status(200).send({
           token,
           submission_token: token,
-          status: "pending",
-          state: "pending",
+          // An AI-ingest submission has landed for this token: its results are
+          // available, so the poll reports `completed`.
+          status: "completed",
+          state: "completed",
           expires_at: expiresAtIso,
+          received_at: receivedAt,
+          results,
+          results_text: resultsText,
         });
       }
 
-      const payload =
-        submission.payload &&
-        typeof submission.payload === "object" &&
-        !Array.isArray(submission.payload)
-          ? (submission.payload as Record<string, unknown>)
-          : {};
-      // Re-redact on read-back so a planted secret in the raw ingest payload
-      // never echoes back to the page.
-      const resultsText =
-        typeof payload.results_text === "string"
-          ? redactPasteSecrets(payload.results_text).redacted
-          : null;
-      const results =
-        payload.results && typeof payload.results === "object" && !Array.isArray(payload.results)
-          ? (payload.results as Record<string, unknown>)
-          : null;
-      const receivedAt =
-        submission.received_at instanceof Date
-          ? submission.received_at.toISOString()
-          : String(submission.received_at);
+      // No landed submission: the token itself must exist for the poll to report
+      // anything more specific than "unknown".
+      if (!tokenRow) {
+        return reply.status(404).send({
+          status: "expired",
+          ...safeError("NOT_FOUND", "The submission token is unknown or expired."),
+        });
+      }
 
+      const expiresAtIso = new Date(tokenRow.expires_at).toISOString();
+
+      // No AI-ingest submission landed for this token. Bridge to a run created
+      // by POST /v1/readiness/start (durable `analyses` store): that is where a
+      // started run actually completes, so this is what transitions an accepted
+      // /start run to a viewable "ready" for the waiting page / acceptance poll.
+      const started = await resolveStartedRunStatus(dbHandle.sql, token);
+      if (started?.state === "ready") {
+        const receivedAt =
+          started.run.updated_at instanceof Date
+            ? started.run.updated_at.toISOString()
+            : String(started.run.updated_at);
+        return reply.status(200).send({
+          token,
+          submission_token: token,
+          // A started run whose processing has finished: the poll reports the
+          // submission as `completed` (a synonym-compatible terminal state).
+          status: "completed",
+          state: "completed",
+          expires_at: expiresAtIso,
+          received_at: receivedAt,
+          results: started.results,
+          results_text: started.resultsText,
+          run_id: started.run.id,
+          project: started.run.project_identifier,
+          run_status: started.run.status,
+        });
+      }
+      if (started?.state === "pending") {
+        return reply.status(200).send({
+          token,
+          submission_token: token,
+          // The started run is linked to this token's session and is still
+          // processing: report `received` (progressing to `completed`) rather
+          // than a bare `pending` so the poll reflects the accepted submission.
+          status: "received",
+          state: "received",
+          expires_at: expiresAtIso,
+          received_at:
+            started.run.created_at instanceof Date
+              ? started.run.created_at.toISOString()
+              : String(started.run.created_at),
+          run_id: started.run.id,
+          project: started.run.project_identifier,
+          run_status: started.run.status,
+        });
+      }
+
+      if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+        return reply.status(410).send({
+          status: "expired",
+          ...safeError("EXPIRED_TOKEN", "The submission token is unknown or expired."),
+        });
+      }
       return reply.status(200).send({
         token,
         submission_token: token,
-        // An AI-ingest submission has landed for this token: its results are
-        // available, so the poll reports `completed`.
-        status: "completed",
-        state: "completed",
+        status: "pending",
+        state: "pending",
         expires_at: expiresAtIso,
-        received_at: receivedAt,
-        results,
-        results_text: resultsText,
       });
     } catch (error) {
       request.log.error(

@@ -1709,6 +1709,20 @@ async function handleStatusGet(req: EdgeRequest): Promise<ReadinessHandlerResult
     const sql = getSql(url);
     await ensureSubmissionTables(sql);
 
+    // The durable submission store is authoritative for "received": a row here
+    // means the AI's results POST already LANDED for this token, so the poll
+    // reports it on its first read regardless of whether a session ever existed
+    // or the short-lived token row has since expired — the submission is never
+    // lost from a session created after it was recorded.
+    const submissionRows = await sql<{ payload: unknown; received_at: Date | string }[]>`
+      SELECT payload, received_at
+      FROM readiness_ingest_submissions
+      WHERE token = ${token}
+      ORDER BY received_at DESC
+      LIMIT 1
+    `;
+    const submission = submissionRows[0];
+
     const tokenRows = await sql<{ token: string; expires_at: Date | string }[]>`
       SELECT token, expires_at
       FROM readiness_ingest_tokens
@@ -1716,6 +1730,52 @@ async function handleStatusGet(req: EdgeRequest): Promise<ReadinessHandlerResult
       LIMIT 1
     `;
     const tokenRow = tokenRows[0];
+
+    if (submission) {
+      const payload =
+        submission.payload &&
+        typeof submission.payload === "object" &&
+        !Array.isArray(submission.payload)
+          ? (submission.payload as Record<string, unknown>)
+          : {};
+      // Re-redact on read-back so a planted secret in the raw ingest payload
+      // never echoes back to the page.
+      const resultsText =
+        typeof payload.results_text === "string"
+          ? edgeRedactSecrets(payload.results_text).redacted
+          : null;
+      const results =
+        payload.results && typeof payload.results === "object" && !Array.isArray(payload.results)
+          ? (payload.results as Record<string, unknown>)
+          : null;
+      const receivedAt =
+        submission.received_at instanceof Date
+          ? submission.received_at.toISOString()
+          : String(submission.received_at);
+      // Prefer the token's real expiry; if the short-lived token row is already
+      // gone, derive a best-effort expiry from when the submission landed (edge
+      // tokens are minted with a 30-minute TTL) so the response shape is stable.
+      const expiresAtIso = tokenRow
+        ? new Date(tokenRow.expires_at).toISOString()
+        : new Date(new Date(receivedAt).getTime() + 30 * 60 * 1000).toISOString();
+
+      return {
+        status: 200,
+        body: {
+          token,
+          submission_token: token,
+          // A landed AI-ingest submission: results are available, so report
+          // `completed` (mirrored in `state`).
+          status: "completed",
+          state: "completed",
+          expires_at: expiresAtIso,
+          received_at: receivedAt,
+          results,
+          results_text: resultsText,
+        },
+      };
+    }
+
     if (!tokenRow) {
       return {
         status: 404,
@@ -1731,74 +1791,26 @@ async function handleStatusGet(req: EdgeRequest): Promise<ReadinessHandlerResult
 
     const expiresAtIso = new Date(tokenRow.expires_at).toISOString();
 
-    const submissionRows = await sql<{ payload: unknown; received_at: Date | string }[]>`
-      SELECT payload, received_at
-      FROM readiness_ingest_submissions
-      WHERE token = ${token}
-      ORDER BY received_at DESC
-      LIMIT 1
-    `;
-    const submission = submissionRows[0];
-
-    if (!submission) {
-      if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
-        return {
-          status: 410,
-          body: {
-            status: "expired",
-            error: {
-              code: "EXPIRED_TOKEN",
-              message: "The submission token is unknown or expired.",
-            },
-          },
-        };
-      }
+    if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
       return {
-        status: 200,
+        status: 410,
         body: {
-          token,
-          submission_token: token,
-          status: "pending",
-          state: "pending",
-          expires_at: expiresAtIso,
+          status: "expired",
+          error: {
+            code: "EXPIRED_TOKEN",
+            message: "The submission token is unknown or expired.",
+          },
         },
       };
     }
-
-    const payload =
-      submission.payload &&
-      typeof submission.payload === "object" &&
-      !Array.isArray(submission.payload)
-        ? (submission.payload as Record<string, unknown>)
-        : {};
-    // Re-redact on read-back so a planted secret in the raw ingest payload
-    // never echoes back to the page.
-    const resultsText =
-      typeof payload.results_text === "string"
-        ? edgeRedactSecrets(payload.results_text).redacted
-        : null;
-    const results =
-      payload.results && typeof payload.results === "object" && !Array.isArray(payload.results)
-        ? (payload.results as Record<string, unknown>)
-        : null;
-    const receivedAt =
-      submission.received_at instanceof Date
-        ? submission.received_at.toISOString()
-        : String(submission.received_at);
-
     return {
       status: 200,
       body: {
         token,
         submission_token: token,
-        // A landed AI-ingest submission: results are available, so report
-        // `completed` (mirrored in `state`).
-        status: "completed",
-        state: "completed",
+        status: "pending",
+        state: "pending",
         expires_at: expiresAtIso,
-        received_at: receivedAt,
-        results,
-        results_text: resultsText,
       },
     };
   } catch (error) {
