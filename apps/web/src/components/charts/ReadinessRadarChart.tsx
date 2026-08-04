@@ -269,11 +269,12 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   segmentKind="radar-axis"
                   testId={`radar-axis-${slug}`}
                   tooltipPlacement={h.placement}
+                  showAffordance={false}
                   controlClassName="flex h-10 w-10 items-center justify-center rounded-full"
                   onActivate={() => activateDimension(dim.dimension)}
                 >
-                  {/* Chart.js renders the single visible point marker. This control
-                      stays transparent so it only supplies the evidence affordance. */}
+                  {/* Chart.js renders the single visible point marker; this control
+                      is an invisible hit target for evidence interactions. */}
                   <span className="sr-only">View {dim.dimension} evidence</span>
                 </InteractiveChartSegment>
               </div>
@@ -301,6 +302,7 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   segmentKind="radar-axis"
                   testId={`radar-axis-chip-${dimensionSlug(dim.dimension)}`}
                   tooltipPlacement="top"
+                  showAffordance={false}
                   controlClassName="inline-flex items-center gap-1.5 rounded-full border border-border bg-canvas px-2.5 py-1 text-[11px] font-semibold text-ink-soft"
                   onActivate={() => activateDimension(dim.dimension)}
                 >

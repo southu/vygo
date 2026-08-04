@@ -106,6 +106,8 @@ type InteractiveChartSegmentProps = {
   segmentKind?: "radar-axis" | "gauge-segment" | "sub-metric-bar";
   /** Optional test id on the interactive control. */
   testId?: string;
+  /** Whether to render the pulse and info-dot discoverability affordance. */
+  showAffordance?: boolean;
   /**
    * Optional side-effect fired on click/tap of the control (e.g. smooth-scroll
    * to a deep-dive section). Runs in addition to — never instead of — the
@@ -151,6 +153,7 @@ export function InteractiveChartSegment({
   tooltipPlacement = "top",
   segmentKind,
   testId,
+  showAffordance = true,
   onActivate,
 }: InteractiveChartSegmentProps) {
   const tipId = useId();
@@ -281,18 +284,20 @@ export function InteractiveChartSegment({
         onKeyDown={onKeyDown}
       >
         {children}
-        {/* Discoverability: pulse ring + info dot (only when real evidence exists) */}
-        <span
-          className="chart-segment-affordance"
-          aria-hidden
-          data-testid="chart-segment-affordance"
-        >
-          <span className="chart-segment-pulse" />
+        {showAffordance ? (
+          /* Discoverability: pulse ring + info dot (only when real evidence exists) */
           <span
-            className="chart-segment-info-dot animate-pulse"
-            data-testid="chart-segment-info-dot"
-          />
-        </span>
+            className="chart-segment-affordance"
+            aria-hidden
+            data-testid="chart-segment-affordance"
+          >
+            <span className="chart-segment-pulse" />
+            <span
+              className="chart-segment-info-dot animate-pulse"
+              data-testid="chart-segment-info-dot"
+            />
+          </span>
+        ) : null}
       </div>
       {open ? (
         <div className={`chart-evidence-tooltip-anchor ${placementClass}`} aria-hidden={false}>
