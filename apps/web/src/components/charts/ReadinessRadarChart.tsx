@@ -58,28 +58,12 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
   const chartRef = useRef<Chart<"radar"> | null>(null);
   const uid = useId();
   const [hotspots, setHotspots] = useState<AxisHotspot[]>([]);
-  // Slug of the node most recently clicked — drives a brief visual acknowledgment
-  // (a temporary CSS class) that clears shortly after the click (AC5).
-  const [activatedSlug, setActivatedSlug] = useState<string | null>(null);
-  const ackTimerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (ackTimerRef.current != null) window.clearTimeout(ackTimerRef.current);
-    };
-  }, []);
-
   /**
-   * Smooth-scroll to a dimension's deep-dive section and flash the clicked node.
+   * Smooth-scroll to a dimension's deep-dive section.
    * scroll-margin-top on the target section keeps its heading clear of the
    * sticky header, so a plain scrollIntoView lands in the right place.
    */
   const activateDimension = useCallback((dimensionName: string) => {
-    const slug = dimensionSlug(dimensionName);
-    setActivatedSlug(slug);
-    if (ackTimerRef.current != null) window.clearTimeout(ackTimerRef.current);
-    ackTimerRef.current = window.setTimeout(() => setActivatedSlug(null), 700);
-
     if (typeof document === "undefined") return;
     const target = document.getElementById(dimensionSectionId(dimensionName));
     if (target && typeof target.scrollIntoView === "function") {
@@ -271,7 +255,6 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
               );
             }
             const slug = dimensionSlug(dim.dimension);
-            const activated = activatedSlug === slug;
             return (
               <div
                 key={`axis-${dim.dimension}`}
@@ -289,14 +272,9 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   controlClassName="flex h-10 w-10 items-center justify-center rounded-full"
                   onActivate={() => activateDimension(dim.dimension)}
                 >
-                  <span
-                    className={`radar-node-marker inline-block h-3.5 w-3.5 rounded-full bg-purple-dark ring-2 ring-white${
-                      activated ? " radar-node-activated" : ""
-                    }`}
-                    data-radar-axis={dim.dimension}
-                    data-score={Math.round(score)}
-                    data-activated={activated ? "true" : undefined}
-                  />
+                  {/* Chart.js renders the single visible point marker. This control
+                      stays transparent so it only supplies the evidence affordance. */}
+                  <span className="sr-only">View {dim.dimension} evidence</span>
                 </InteractiveChartSegment>
               </div>
             );
