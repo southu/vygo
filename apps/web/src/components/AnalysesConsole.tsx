@@ -16,12 +16,9 @@ import { EmailText } from "@/components/EmailText";
  * result.
  *
  * Identity is scoped: the view always names the exact identity whose history it
- * shows (no cross-user listing). It supports two documented, seeded fixture
- * identities so the whole model is verifiable in a browser after a deploy:
- *   - the multi-run demo user (default), and
- *   - the legacy pre-migration single-analysis user (?fixture=legacy), whose one
- *     original result is retained and viewable after migration.
- * Any other `?user=<id>` is fetched scope-required from the public list API.
+ * shows (no cross-user listing). It defaults to the seeded multi-run demo user
+ * so the whole model is verifiable in a browser after a deploy. Any other
+ * `?user=<id>` is fetched scope-required from the public list API.
  *
  * Each completed entry links to the EXISTING analysis-detail/results component
  * (SnapshotView) at /readiness/snapshot?id=<snapshotId> — the same UI/route a
@@ -29,7 +26,6 @@ import { EmailText } from "@/components/EmailText";
  */
 
 const DEMO_USER = "demo@vygo.ai";
-const LEGACY_USER = "legacy-single@vygo.ai";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -87,24 +83,19 @@ type HistoryResponse = {
 type ViewSource = {
   user: string;
   label: string;
-  /** Fixture identities seed-on-read via the demo op; scoped users use the list API. */
+  /** The demo fixture seeds-on-read via the demo op; scoped users use the list API. */
   via: "demo" | "scoped";
-  legacy: boolean;
 };
 
 function resolveSource(search: string): ViewSource {
   const params = new URLSearchParams(search);
-  const fixture = (params.get("fixture") || "").trim().toLowerCase();
   const rawUser = (params.get("user") || "").trim();
   const user = rawUser.toLowerCase();
 
-  if (fixture === "legacy" || user === LEGACY_USER) {
-    return { user: LEGACY_USER, label: "Legacy pre-migration user", via: "demo", legacy: true };
-  }
   if (rawUser && user !== DEMO_USER) {
-    return { user: rawUser, label: rawUser, via: "scoped", legacy: false };
+    return { user: rawUser, label: rawUser, via: "scoped" };
   }
-  return { user: DEMO_USER, label: "Demo user", via: "demo", legacy: false };
+  return { user: DEMO_USER, label: "Demo user", via: "demo" };
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -330,7 +321,6 @@ export function AnalysesConsole() {
     user: DEMO_USER,
     label: "Demo user",
     via: "demo",
-    legacy: false,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -418,7 +408,7 @@ export function AnalysesConsole() {
           >
             Readiness check
           </a>
-          {source.legacy || source.via === "scoped" ? (
+          {source.via === "scoped" ? (
             <a
               href="/analyses"
               className="btn inline-flex border border-border"
@@ -426,15 +416,7 @@ export function AnalysesConsole() {
             >
               Demo user history
             </a>
-          ) : (
-            <a
-              href="/analyses?fixture=legacy"
-              className="btn inline-flex border border-border"
-              data-testid="analyses-legacy-link"
-            >
-              Legacy pre-migration user
-            </a>
-          )}
+          ) : null}
           <button
             type="button"
             onClick={() => void load(source)}
@@ -443,20 +425,6 @@ export function AnalysesConsole() {
             Refresh
           </button>
         </div>
-
-        {source.legacy && (
-          <div
-            className="card mt-6 border-purple/30 bg-purple-soft/20"
-            data-testid="analysis-legacy-note"
-          >
-            <p className="text-sm text-muted">
-              This identity had a <strong>single analysis</strong> before the multi-run migration.
-              Its one original result was re-homed into{" "}
-              <code className="font-mono">Default project</code> and is still present and viewable
-              after this deploy — shown below as the current result of that project.
-            </p>
-          </div>
-        )}
 
         {loading && <p className="mt-8 text-muted">Loading analyses…</p>}
         {error && (
