@@ -31,17 +31,6 @@ import { loadSignedInEmail } from "@/lib/readiness/storage";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/**
- * Fallback snapshot ids for demo fixture rows that predate stored `snapshotId`.
- * Keyed by the fixture marker each seeded submission carries. Kept in sync with
- * DEMO_SNAPSHOT_IDS in api/readiness/[op].ts.
- */
-const FIXTURE_SNAPSHOT_IDS: Record<string, string> = {
-  legacy_single_analysis: "00000000-0000-4000-a000-0000000000e3",
-  default_project_rerun: "00000000-0000-4000-a000-0000000000e2",
-  second_project_analysis: "00000000-0000-4000-a000-0000000000e1",
-};
-
 /** Completed-status allowlist mirroring the server (isCompletedStatusEdge). */
 const COMPLETED_STATUSES = new Set([
   "completed",
@@ -69,16 +58,12 @@ type Analysis = {
 
 type HistoryResponse = {
   ok?: boolean;
-  seeded?: boolean;
-  legacy?: boolean;
   user?: string;
   defaultProject?: string;
-  secondProject?: string;
   projects?: string[];
   analyses?: Analysis[];
   /** project → id of that project's current (latest completed) run. */
   currentByProject?: Record<string, string>;
-  verify?: Record<string, string>;
 };
 
 /** Which identity's history is on screen. Always the real signed-in user (or an
@@ -145,10 +130,6 @@ function isCompleted(status: string): boolean {
 function resolveSnapshotId(a: Analysis): string | null {
   const sid = a.submission?.snapshotId;
   if (typeof sid === "string" && UUID_RE.test(sid.trim())) return sid.trim();
-  const fixture = a.submission?.fixture;
-  if (typeof fixture === "string" && FIXTURE_SNAPSHOT_IDS[fixture]) {
-    return FIXTURE_SNAPSHOT_IDS[fixture];
-  }
   return null;
 }
 
