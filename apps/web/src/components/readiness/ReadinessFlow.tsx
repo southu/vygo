@@ -351,9 +351,11 @@ export function ReadinessFlow() {
   // Ingest watch: waiting on the customer's AI to POST results back.
   const [submissionExpired, setSubmissionExpired] = useState(false);
   /**
-   * True once the background mission-completion callback (ingest poll) has landed
-   * results. It records them as metadata and prefills the paste box, but never
-   * advances the readiness state — the user must review and submit explicitly.
+   * True once the ingest poll has observed the customer's AI POSTing results back
+   * (status received / completed). It records the landing as metadata AND auto-
+   * advances the waiting screen to the paste step (user_ready_to_paste) so the
+   * open tab never strands the user; it still never fabricates findings or reaches
+   * report_parsed / findings_confirmed — the user pastes and confirms explicitly.
    */
   const [backgroundResultsReceived, setBackgroundResultsReceived] = useState(false);
   /** received_at of the ingest record already rendered (consume-once). */
@@ -999,6 +1001,17 @@ export function ReadinessFlow() {
     setView("stage3");
   };
 
+  /**
+   * Always-fresh handle to goToStage3 for the asynchronous ingest poll to call
+   * when results land. goToStage3 is re-created every render (it reads live
+   * stage1 / pasteText), so the poll must invoke the CURRENT one — capturing it
+   * in the effect closure would advance through a stale closure (exactly the
+   * class of bug that strands the waiting tab). Refreshing the ref on each render
+   * keeps the auto-advance wired to fresh state.
+   */
+  const goToStage3Ref = useRef(goToStage3);
+  goToStage3Ref.current = goToStage3;
+
   const onPasteChange = (value: string) => {
     setPasteText(value);
     // Clear secret highlight while editing
@@ -1208,11 +1221,13 @@ export function ReadinessFlow() {
   /**
    * Watch for the customer's AI POSTing results back (ingest). While the prompt
    * screen is up with a live submission token, poll the status endpoint on an
-   * interval. A landed result is a BACKGROUND mission callback: it only surfaces
-   * a "results are ready" notice — it never writes into the paste box, creates
-   * findings, or advances the flow (the user pastes and submits their own
-   * report). An expired/unknown token stops the wait so the page can offer a
-   * start-over.
+   * interval. When the poll observes a landed result (status received /
+   * completed) it records the landing AND auto-advances the waiting screen to the
+   * paste step within one interval — no refresh or click — so the tab never
+   * strands the user. It still never writes into the paste box or fabricates
+   * findings (the user pastes and submits their own report). A pending/processing
+   * poll keeps waiting; an expired/unknown token stops the wait so the page can
+   * offer a start-over.
    */
   useEffect(() => {
     if (view !== "stage2" || !submissionToken || submissionExpired) return;
@@ -1267,29 +1282,20 @@ export function ReadinessFlow() {
           return;
         case "ready": {
           sawValidStatusRef.current = true;
-          // Consume-once: never re-render the same landed record twice.
+          // Consume-once: never act on the same landed record twice.
           if (status.receivedAt && ingestedRef.current === status.receivedAt) {
             schedule(INGEST_POLL_INTERVAL_MS);
             return;
           }
-          const text =
-            status.resultsText.trim() ||
-            (status.results ? JSON.stringify(status.results, null, 2) : "");
-          if (!text) {
-            schedule(INGEST_POLL_INTERVAL_MS);
-            return;
-          }
-          // Guard this asynchronous mission callback before it touches anything.
-          // 1. Run-identity: a callback whose watch began under a run that is no
-          //    longer active (the user has since started a fresh analysis) is a
-          //    late callback from a superseded run — drop it and stop this watch
-          //    so it can never advance the newer run's paste/findings/confirm.
-          // 2. Progression: even for the active run this is a background event.
-          //    It records ONLY that results are ready; it must not populate the
-          //    pasted-report field, create structured findings, complete the
-          //    paste stage, or reach Confirm findings (decision.writesPasteText /
-          //    createsFindings are false, decision.nextState is unchanged). A bare
-          //    "Analysis completed." callback therefore changes no progress.
+          // Guard this asynchronous mission callback before it advances anything.
+          // Run-identity: a callback whose watch began under a run that is no
+          // longer active (the user has since started a fresh analysis) is a late
+          // callback from a superseded run — drop it and stop this watch so it can
+          // never advance the newer run's flow. The move made here is only into
+          // user_ready_to_paste (the paste step), a state the model explicitly
+          // permits a background completion to enter (backgroundCompletionMayEnter):
+          // it never writes the paste box, fabricates findings, or reaches
+          // report_parsed / findings_confirmed — the user still pastes and confirms.
           const decision = guardMissionCallback({
             callbackRunId: watchRunId,
             activeRunId: runIdRef.current,
@@ -1302,14 +1308,21 @@ export function ReadinessFlow() {
           }
           ingestedRef.current = status.receivedAt ?? `ready-${Date.now()}`;
           trackAnalytics("ingest_landed", { source: "api" });
-          // Surface a metadata-only notice. Deliberately NO setPasteText, NO
-          // draft paste-text persist, NO parse/confirm: the mission callback
-          // never copies its body (status or completion text) into the paste box
-          // and never fabricates findings. The user pastes their own report and
-          // submits it explicitly to parse.
+          // Record the landing so a Back to the prompt screen still shows the
+          // "results are ready" notice, then AUTO-ADVANCE off the waiting screen.
           setBackgroundResultsReceived(true);
-          // Keep polling in case a later record lands; nothing here advances state.
-          schedule(INGEST_POLL_INTERVAL_MS);
+          // The customer's AI has sent its results back (status received /
+          // completed): leave the "waiting for your AI to send results…" screen
+          // and open the paste step automatically — zero refresh, zero clicks — so
+          // the waiting tab never strands the user once results land. End this
+          // watch first (goToStage3 flips the view async after persisting, and the
+          // view change tears the effect down anyway) so no stray tick reschedules.
+          cancelled = true;
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+          void goToStage3Ref.current();
           return;
         }
       }
