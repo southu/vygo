@@ -1300,6 +1300,21 @@ export function ReadinessFlow() {
             schedule(INGEST_POLL_INTERVAL_MS);
             return;
           }
+          // Results-present guard: only a poll carrying ACTUAL results (a landed
+          // ingest submission's results_text/results, or a completed run's
+          // results) may advance the waiting screen. The status endpoint reports
+          // an accepted-but-still-processing /start run as `received` with NO
+          // results yet — advancing on that would bounce the operator off the
+          // prompt/waiting screen (and the AI-send path) to the paste step within
+          // one poll, before their AI has sent anything. Treat an empty `received`
+          // as still-waiting and keep polling until real results land.
+          const landedText =
+            status.resultsText.trim() ||
+            (status.results ? JSON.stringify(status.results) : "");
+          if (!landedText) {
+            schedule(INGEST_POLL_INTERVAL_MS);
+            return;
+          }
           // Guard this asynchronous mission callback before it advances anything.
           // Run-identity: a callback whose watch began under a run that is no
           // longer active (the user has since started a fresh analysis) is a late
