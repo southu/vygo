@@ -171,6 +171,10 @@
       "destination": "/api/readiness/demo"
     },
     {
+      "source": "/api/analyses/health",
+      "destination": "/api/readiness/health"
+    },
+    {
       "source": "/api/analyses/:id",
       "destination": "/api/readiness/analysis?id=:id"
     },
@@ -211,6 +215,10 @@
       "destination": "/api/readiness/submissions"
     },
     {
+      "source": "/api/analysis/health",
+      "destination": "/api/readiness/health"
+    },
+    {
       "source": "/api/analysis/:id",
       "destination": "/api/readiness/analysis?id=:id"
     },
@@ -233,6 +241,10 @@
     {
       "source": "/v1/analyses/demo",
       "destination": "/api/readiness/demo"
+    },
+    {
+      "source": "/v1/analyses/health",
+      "destination": "/api/readiness/health"
     },
     {
       "source": "/v1/analyses/:id",

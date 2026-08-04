@@ -82,6 +82,7 @@ const ALLOWED_OPS = new Set([
   "submit",
   "status",
   "ping",
+  "health",
   "analyses",
   "analysis",
   "submissions",
@@ -294,6 +295,7 @@ function applyBaseHeaders(res: EdgeResponse, origin: string | null, credentials 
 const PERMISSIVE_CORS_OPS = new Set<string>([
   "submit",
   "ping",
+  "health",
   "analyses",
   "analysis",
   "submissions",
@@ -1652,6 +1654,44 @@ async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
  */
 async function handlePing(_req: EdgeRequest): Promise<ReadinessHandlerResult> {
   return { status: 200, body: { ok: true } };
+}
+
+// ---------------------------------------------------------------------------
+// health — analyses-scoped DB connectivity probe (no auth, no secrets)
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/analyses/health (aliased /v1/analyses/health, /api/analysis/health)
+ *   - 200 { ok: true, database: "ok" }              — DB reachable, analyses readable
+ *   - 200 { ok: false, database: "not_configured" } — no DB URL on the edge
+ *   - 503 { ok: false, database: "error" }          — DB unreachable
+ *
+ * Mirrors the Fastify GET /v1/analyses/health probe. Registered as its own op so
+ * `health` is never matched as an analysis id by the /api/analyses/:id rewrite.
+ */
+async function handleAnalysesHealth(_req: EdgeRequest): Promise<ReadinessHandlerResult> {
+  const url = resolveDatabaseUrl();
+  if (!url) {
+    return {
+      status: 200,
+      body: { ok: false, service: "vygo-analyses", database: "not_configured", analyses: false },
+    };
+  }
+  try {
+    const sql = getSql(url);
+    await ensureAnalysesTablesEdge(sql);
+    await sql`SELECT 1 FROM analyses LIMIT 1`;
+    return {
+      status: 200,
+      body: { ok: true, service: "vygo-analyses", database: "ok", analyses: true },
+    };
+  } catch (error) {
+    return {
+      status: 503,
+      body: { ok: false, service: "vygo-analyses", database: "error", analyses: false },
+      logError: error,
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -3934,6 +3974,7 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
     "snapshot",
     "status",
     "ping",
+    "health",
     "analysis",
     "submissions",
     "result",
@@ -3996,6 +4037,8 @@ export default async function handler(req: EdgeRequest, res: EdgeResponse): Prom
       result = await handleStatusGet(req);
     } else if (op === "ping") {
       result = await handlePing(req);
+    } else if (op === "health") {
+      result = await handleAnalysesHealth(req);
     } else if (op === "analyses") {
       result = await handleAnalyses(req);
     } else if (op === "analysis") {
