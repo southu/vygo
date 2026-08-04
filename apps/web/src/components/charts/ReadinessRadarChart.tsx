@@ -249,7 +249,9 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                   key={`axis-${dim.dimension}`}
                   className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2"
                   style={{ left: `${h.left}%`, top: `${h.top}%` }}
+                  data-testid="radar-axis-marker"
                   data-radar-axis={dim.dimension}
+                  data-radar-score={score}
                   data-has-evidence="false"
                 />
               );
@@ -260,6 +262,10 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
                 key={`axis-${dim.dimension}`}
                 className="pointer-events-auto absolute z-20 -translate-x-1/2 -translate-y-1/2"
                 style={{ left: `${h.left}%`, top: `${h.top}%` }}
+                data-testid="radar-axis-marker"
+                data-radar-axis={dim.dimension}
+                data-radar-score={score}
+                data-has-evidence="true"
               >
                 <InteractiveChartSegment
                   score={score}

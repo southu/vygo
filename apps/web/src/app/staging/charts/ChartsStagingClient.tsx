@@ -6,9 +6,35 @@ import {
   ReadinessGauge,
   ReadinessRadarChart,
   SubMetricBars,
+  type ChartDimension,
   type ReadinessChartData,
 } from "@/components/charts";
 import { loadStagingChartData } from "@/lib/readiness/chart-data";
+
+const RADAR_FIXTURE_AXIS_COUNTS = new Set([3, 5, 8]);
+
+/**
+ * Deterministic chart-only fixtures for browser regression coverage. The first
+ * and last points deliberately sit on the scale bounds: a historical visible
+ * hotspot overlay could create an additional dot at those positions.
+ */
+function dimensionsForRadarFixture(
+  dimensions: ChartDimension[],
+  requestedAxisCount: number | null,
+): ChartDimension[] {
+  if (!requestedAxisCount || !RADAR_FIXTURE_AXIS_COUNTS.has(requestedAxisCount)) return dimensions;
+
+  return Array.from({ length: requestedAxisCount }, (_, index) => {
+    const source = dimensions[index % dimensions.length];
+    if (!source) return null;
+    const score = index === 0 ? 0 : index === requestedAxisCount - 1 ? 100 : source.score;
+    return {
+      ...source,
+      dimension: `Fixture axis ${index + 1}`,
+      score,
+    };
+  }).filter((dimension): dimension is ChartDimension => dimension !== null);
+}
 
 /**
  * Hidden staging surface for readiness chart components.
@@ -18,6 +44,7 @@ import { loadStagingChartData } from "@/lib/readiness/chart-data";
 export function ChartsStagingClient() {
   const searchParams = useSearchParams();
   const snapshotId = searchParams.get("id");
+  const requestedAxisCount = Number.parseInt(searchParams.get("axes") ?? "", 10);
   const [data, setData] = useState<ReadinessChartData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -61,6 +88,11 @@ export function ChartsStagingClient() {
       </div>
     );
   }
+
+  const radarDimensions = dimensionsForRadarFixture(
+    data.dimensions,
+    Number.isNaN(requestedAxisCount) ? null : requestedAxisCount,
+  );
 
   return (
     <div
@@ -126,7 +158,7 @@ export function ChartsStagingClient() {
           Maintainability, Compliance posture). Hover, tap, or focus an axis for evidence.
         </p>
         <div className="mx-auto mt-4 w-full max-w-lg px-1 sm:px-4">
-          <ReadinessRadarChart dimensions={data.dimensions} />
+          <ReadinessRadarChart dimensions={radarDimensions} />
         </div>
       </section>
 
