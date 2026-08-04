@@ -246,7 +246,11 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
               // Still render a non-interactive marker without affordance when no evidence.
               return (
                 <div
-                  key={`axis-${dim.dimension}`}
+                  // The array index is the chart axis identity. Dimension labels
+                  // are usually unique, but using a label as a React key can
+                  // produce a console warning (and stale overlay nodes) for a
+                  // malformed report with duplicate labels.
+                  key={`axis-${h.index}`}
                   className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2"
                   style={{ left: `${h.left}%`, top: `${h.top}%` }}
                   data-testid="radar-axis-marker"
@@ -259,7 +263,7 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
             const slug = dimensionSlug(dim.dimension);
             return (
               <div
-                key={`axis-${dim.dimension}`}
+                key={`axis-${h.index}`}
                 className="pointer-events-auto absolute z-20 -translate-x-1/2 -translate-y-1/2"
                 style={{ left: `${h.left}%`, top: `${h.top}%` }}
                 data-testid="radar-axis-marker"
@@ -296,10 +300,10 @@ export function ReadinessRadarChart({ dimensions, className }: ReadinessRadarCha
           data-testid="radar-axis-list"
           aria-label="Radar dimension evidence"
         >
-          {dimensions.map((dim) => {
+          {dimensions.map((dim, index) => {
             if (!hasChartEvidence(dim.evidence)) return null;
             return (
-              <li key={`list-${dim.dimension}`}>
+              <li key={`list-${index}`}>
                 <InteractiveChartSegment
                   score={clampScore(dim.score)}
                   evidence={dim.evidence}

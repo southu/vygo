@@ -8,6 +8,16 @@ import { test, expect } from "@playwright/test";
  */
 for (const axisCount of [3, 5, 8]) {
   test(`radar renders exactly one marker per axis for ${axisCount} axes`, async ({ page }) => {
+    const chartConsoleMessages: string[] = [];
+    page.on("console", (message) => {
+      if (
+        (message.type() === "error" || message.type() === "warning") &&
+        /radar|chart|duplicate.*key|two children.*same key/i.test(message.text())
+      ) {
+        chartConsoleMessages.push(message.text());
+      }
+    });
+
     await page.route("**/v1/readiness/score-preview", async (route) => {
       await route.fulfill({
         contentType: "application/json",
@@ -37,5 +47,10 @@ for (const axisCount of [3, 5, 8]) {
       return new Set(axes).size === nodes.length;
     });
     expect(uniqueAxisCount).toBe(true);
+
+    // A duplicate React key is a browser-console warning and can leave an old
+    // marker node in place after a report refresh. The radar must remain quiet
+    // while it lays out its transparent hotspots.
+    expect(chartConsoleMessages).toEqual([]);
   });
 }
