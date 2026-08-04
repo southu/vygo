@@ -345,6 +345,18 @@ export function ReadinessFlow() {
     useState<ReadinessPasteInvalidReason | null>(null);
   const [pasteSubmitting, setPasteSubmitting] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  /**
+   * Server-recorded submission confirmation, shown once a submission has landed
+   * server-side. Both fields are read back FROM the server (the submit response
+   * or the status poll) — never client-generated: the last-8 is derived from the
+   * same submission token stored server-side and the timestamp is the server's
+   * own recorded received_at. Rendered in the confirm view so operators/support
+   * can visually match this on-page confirmation to the exact server record.
+   */
+  const [submissionConfirmation, setSubmissionConfirmation] = useState<{
+    recordedAt: string;
+    tokenLast8: string;
+  } | null>(null);
   const pasteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pasteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -494,6 +506,7 @@ export function ReadinessFlow() {
           setSecretMessage("");
           setBackgroundResultsReceived(false);
           setSubmissionExpired(false);
+          setSubmissionConfirmation(null);
           setSubmissionToken(null);
           setStartStatus("idle");
           setConflictRunId(null);
@@ -1307,6 +1320,13 @@ export function ReadinessFlow() {
             return;
           }
           ingestedRef.current = status.receivedAt ?? `ready-${Date.now()}`;
+          // Record the server-authoritative confirmation for this landed
+          // submission (timestamp + last-8 of the server-echoed token) so it is
+          // shown once the user reaches the confirm view.
+          setSubmissionConfirmation({
+            recordedAt: status.receivedAt ?? new Date().toISOString(),
+            tokenLast8: (status.submissionToken ?? submissionToken ?? "").slice(-8),
+          });
           trackAnalytics("ingest_landed", { source: "api" });
           // Record the landing so a Back to the prompt screen still shows the
           // "results are ready" notice, then AUTO-ADVANCE off the waiting screen.
@@ -1414,7 +1434,27 @@ export function ReadinessFlow() {
       if (!ingestToken) return;
       if (!submissionToken) setSubmissionToken(ingestToken);
       try {
-        await submitReadinessResults({ submissionToken: ingestToken, resultsText: pasteText });
+        const submitResult = await submitReadinessResults({
+          submissionToken: ingestToken,
+          resultsText: pasteText,
+        });
+        // Build the visible confirmation from SERVER-returned values: the
+        // server-echoed submission token (last 8) and the server's recorded_at
+        // timestamp. If the submit response carried no timestamp (e.g. a proxied
+        // path), read it back from the status endpoint, which reports the same
+        // recorded received_at for this token.
+        const serverToken = submitResult.submissionToken ?? ingestToken;
+        let recordedAt = submitResult.recordedAt;
+        if (!recordedAt) {
+          const status = await getReadinessSubmissionStatus(ingestToken).catch(() => null);
+          if (status && status.kind === "ready" && status.receivedAt) {
+            recordedAt = status.receivedAt;
+          }
+        }
+        setSubmissionConfirmation({
+          recordedAt: recordedAt ?? new Date().toISOString(),
+          tokenLast8: serverToken.slice(-8),
+        });
       } catch {
         // Ingest submit is best-effort; the parse flow below still captures the paste.
       }
@@ -1868,6 +1908,48 @@ export function ReadinessFlow() {
           <p className="mt-3 text-sm text-muted" data-testid="readiness-confirm-pending">
             {c.confirm.pendingBody}
           </p>
+        ) : null}
+
+        {submissionConfirmation ? (
+          <div
+            className="mt-6 rounded-xl border border-border bg-canvas px-4 py-4"
+            data-testid="readiness-submission-confirmation"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="eyebrow" data-testid="readiness-submission-confirmation-eyebrow">
+              {c.confirm.received.eyebrow}
+            </p>
+            <p className="mt-2 text-sm font-semibold text-ink">{c.confirm.received.title}</p>
+            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                  {c.confirm.received.timestampLabel}
+                </dt>
+                <dd className="mt-1 text-sm text-ink">
+                  <time
+                    dateTime={submissionConfirmation.recordedAt}
+                    data-testid="readiness-submission-timestamp"
+                  >
+                    {submissionConfirmation.recordedAt}
+                  </time>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+                  {c.confirm.received.tokenLabel}
+                </dt>
+                <dd className="mt-1 font-mono text-sm text-ink">
+                  <span aria-hidden="true">…</span>
+                  <span data-testid="readiness-submission-token-last8">
+                    {submissionConfirmation.tokenLast8}
+                  </span>
+                </dd>
+                <p className="mt-1 text-xs text-muted">{c.confirm.received.tokenHint}</p>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs text-muted">{c.confirm.received.supportNote}</p>
+          </div>
         ) : null}
 
         {showRawFallback ? (

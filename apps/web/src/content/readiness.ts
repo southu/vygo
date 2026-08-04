@@ -212,6 +212,21 @@ export const readinessContent = {
     looksWrong: "Looks wrong? Re-paste results",
     repaste: "Re-paste report",
     editHint: "You can re-paste or tweak key fields below.",
+    /**
+     * Submission-received confirmation (shown once a submission has landed
+     * server-side). The timestamp and last-8 of the submission token are read
+     * back from the server-recorded submission so operators/support can match
+     * this on-page confirmation to the exact server-side record.
+     */
+    received: {
+      eyebrow: "Submission received",
+      title: "We recorded your submission",
+      timestampLabel: "Recorded at",
+      tokenLabel: "Submission reference",
+      tokenHint: "Last 8 characters of your server-side submission token.",
+      supportNote:
+        "Support can match this reference and time to your exact server-side submission record.",
+    },
   },
   gate: {
     progressLabel: "Almost done — results gate",

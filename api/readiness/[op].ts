@@ -1565,11 +1565,21 @@ async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
       };
     }
 
-    // Persist submission
-    await sql`
+    // Persist submission. RETURNING the server-generated received_at gives the
+    // authoritative recorded-at timestamp for this submission (the same value
+    // the status poll reports), so the visible confirmation shows the server's
+    // own timestamp rather than a client-derived one.
+    const insertedRows = await sql<{ received_at: Date | string }[]>`
       INSERT INTO readiness_ingest_submissions (token, payload)
       VALUES (${submissionToken}, ${sql.json(body as never)})
+      RETURNING received_at
     `;
+    const recordedAt =
+      insertedRows[0]?.received_at instanceof Date
+        ? insertedRows[0].received_at.toISOString()
+        : typeof insertedRows[0]?.received_at === "string"
+          ? new Date(insertedRows[0].received_at).toISOString()
+          : new Date().toISOString();
 
     // Durable analyses store (lead follow-up): also persist a NEW row keyed by
     // the real (user, project) with the FULL payload retained verbatim, so
@@ -1606,6 +1616,13 @@ async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
         submission_token: submissionToken,
         token: submissionToken,
         status: "received",
+        // Confirmation fields: the server-recorded timestamp and the last 8
+        // characters of the SAME submission token stored above. The visible
+        // on-page confirmation renders these so operators/support can match it
+        // to the exact server-side submission record.
+        received_at: recordedAt,
+        recorded_at: recordedAt,
+        submission_token_last8: submissionToken.slice(-8),
       },
     };
   } catch (error) {

@@ -147,10 +147,18 @@ export async function emailReadinessPrompt(input: {
  * same storage, same token, same record shape.
  * Never call this with text that failed the client secret scan.
  */
+export type SubmitReadinessResult = {
+  message: string;
+  /** Server-echoed submission token (the value recorded server-side). */
+  submissionToken: string | null;
+  /** Server-recorded timestamp for this submission (ISO 8601), if returned. */
+  recordedAt: string | null;
+};
+
 export async function submitReadinessResults(input: {
   submissionToken: string;
   resultsText: string;
-}): Promise<{ message: string }> {
+}): Promise<SubmitReadinessResult> {
   const res = await fetch(apiUrl("/api/readiness/submit"), {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
@@ -172,11 +180,25 @@ export async function submitReadinessResults(input: {
     err.code = code;
     throw err;
   }
+  const serverToken =
+    typeof body.submission_token === "string" && body.submission_token.trim()
+      ? body.submission_token.trim()
+      : typeof body.token === "string" && body.token.trim()
+        ? body.token.trim()
+        : null;
+  const recordedAt =
+    typeof body.received_at === "string" && body.received_at.trim()
+      ? body.received_at.trim()
+      : typeof body.recorded_at === "string" && body.recorded_at.trim()
+        ? body.recorded_at.trim()
+        : null;
   return {
     message:
       typeof body.message === "string"
         ? body.message
         : "Vygo has successfully received your readiness results.",
+    submissionToken: serverToken,
+    recordedAt,
   };
 }
 
@@ -193,6 +215,8 @@ export type SubmissionStatusResult =
       resultsText: string;
       results: Record<string, unknown> | null;
       receivedAt: string | null;
+      /** Server-echoed submission token for this landed submission. */
+      submissionToken: string | null;
     }
   | { kind: "expired" }
   | { kind: "rate_limited"; retryAfterSeconds: number }
@@ -243,6 +267,12 @@ export async function getReadinessSubmissionStatus(
           ? (body.results as Record<string, unknown>)
           : null,
       receivedAt: typeof body.received_at === "string" ? body.received_at : null,
+      submissionToken:
+        typeof body.submission_token === "string" && body.submission_token.trim()
+          ? body.submission_token.trim()
+          : typeof body.token === "string" && body.token.trim()
+            ? body.token.trim()
+            : null,
     };
   }
   return { kind: "pending" };
