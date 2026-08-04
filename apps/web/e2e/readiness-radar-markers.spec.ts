@@ -41,6 +41,11 @@ for (const axisCount of [3, 5, 8]) {
     await expect(markers.first()).toHaveAttribute("data-radar-score", "0");
     await expect(markers.last()).toHaveAttribute("data-radar-score", "100");
 
+    // The canvas owns the visible points. A second, styled DOM node at a
+    // hotspot would overlap the Chart.js point and recreate the duplicate-dot
+    // regression this spec protects.
+    await expect(chart.locator(".radar-node-marker")).toHaveCount(0);
+
     // Axis identity must remain one-to-one, not merely a coincidental count.
     const uniqueAxisCount = await markers.evaluateAll((nodes) => {
       const axes = nodes.map((node) => node.getAttribute("data-radar-axis"));
