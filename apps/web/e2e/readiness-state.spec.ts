@@ -119,6 +119,23 @@ async function installRoutes(
         receivedAt: "2026-07-29T00:00:00.000Z",
       };
     },
+    /**
+     * Land a real AI ingest submission on the status poll using the SERVER
+     * contract field names (snake_case): status `received`, with `results_text`,
+     * `received_at`, and the echoed `submission_token`. This is what the poll
+     * client (lib/readiness/api.ts) actually reads to advance the waiting screen.
+     */
+    landSubmission(
+      submissionToken: string,
+      resultsText = "VYGO-READINESS-REPORT: auth hardening needed; add rate limiting.",
+    ) {
+      statusState.body = {
+        status: "received",
+        results_text: resultsText,
+        received_at: "2026-07-29T00:00:00.000Z",
+        submission_token: submissionToken,
+      };
+    },
   };
 }
 
@@ -511,6 +528,44 @@ test.describe("readiness state model — resume vs. fresh URL", () => {
     await expect.poll(() => readStoredRunId(page)).toBe("run_resume_keep");
     expect(await page.evaluate(() => document.documentElement.dataset.readinessRunId ?? null)).toBe(
       "run_resume_keep",
+    );
+  });
+
+  test("a resumed prompt-stage session whose draft carries only a submission token shows the waiting screen, polls, and auto-advances with the confirmation when results land", async ({
+    page,
+  }) => {
+    // Reported regression: an AI-driven stage-2 session — persisted at the prompt
+    // stage with a live submission token in its draft but WITHOUT the full stage-1
+    // answers (the client never walked the intake questions) — resumed via
+    // ?token= but never rendered readiness-waiting, so the tab could never poll or
+    // advance when the customer's AI POSTed results back.
+    const RESUMED_SUBMISSION_TOKEN = "resumed-ai-submission-token-abcd1234efgh5678";
+    const routes = await installRoutes(page, {
+      token: SESSION_TOKEN,
+      stage: "prompt",
+      draft: { submissionToken: RESUMED_SUBMISSION_TOKEN },
+    });
+    await installTurnstileStub(page);
+
+    await page.goto(`/readiness?token=${SESSION_TOKEN}`);
+
+    // The waiting/polling screen renders even though the draft has no stage-1
+    // answers (previously this fell through to the intake / generation-error view).
+    await expect(page.getByTestId("readiness-stage2")).toBeVisible();
+    await expect(page.getByTestId("readiness-waiting")).toBeVisible();
+    await expect(page.getByTestId("readiness-waiting-status")).toBeVisible();
+    await expect(page.getByTestId("readiness-stage2-generation-error")).toHaveCount(0);
+
+    // The customer's AI POSTs results back → the status poll flips to `received`.
+    routes.landSubmission(RESUMED_SUBMISSION_TOKEN);
+
+    // Within one poll interval the waiting screen auto-advances to the paste step
+    // and shows the server-recorded confirmation: the received_at timestamp and
+    // the last 8 characters of the submitted token.
+    await expect(page.getByTestId("readiness-submission-confirmation")).toBeVisible();
+    await expect(page.getByTestId("readiness-submission-timestamp")).toContainText("2026-07-29");
+    await expect(page.getByTestId("readiness-submission-token-last8")).toHaveText(
+      RESUMED_SUBMISSION_TOKEN.slice(-8),
     );
   });
 

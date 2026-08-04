@@ -751,10 +751,16 @@ export function ReadinessFlow() {
           updatedAt: new Date().toISOString(),
         });
 
-        // Resume stage 2 if intake complete.
+        // Resume the stage-2 waiting/prompt screen when the backend already
+        // records this session at the prompt/stage2 stage, or when the restored
+        // draft carries a complete, non-off-ramp intake. An explicit prompt/
+        // stage2 stage resumes even if the stored draft lacks the full stage-1
+        // answers (e.g. an AI-driven run whose draft holds only the live
+        // submission token): the waiting screen must still render and poll so a
+        // resumed tab can auto-advance when the customer's AI POSTs results back.
+        const stageIsPromptOrStage2 = restoredStage === "prompt" || restoredStage === "stage2";
         if (
-          restoredStage === "prompt" ||
-          restoredStage === "stage2" ||
+          stageIsPromptOrStage2 ||
           (restoredStage1.productDescription &&
             restoredStage1.whoUses &&
             restoredStage1.builtWith &&
@@ -763,14 +769,16 @@ export function ReadinessFlow() {
             !isNotBuiltYet(restoredStage1.builtWith) &&
             !isFeaturesOnlySoftOffRamp(restoredStage1.blockers ?? []))
         ) {
-          if (
+          const intakeComplete = Boolean(
             restoredStage1.builtWith &&
             !isNotBuiltYet(restoredStage1.builtWith) &&
             restoredStage1.productDescription &&
             restoredStage1.whoUses &&
-            restoredStage1.deadline
-          ) {
+            restoredStage1.deadline,
+          );
+          if (intakeComplete || stageIsPromptOrStage2) {
             if (
+              intakeComplete &&
               isFeaturesOnlySoftOffRamp(restoredStage1.blockers ?? []) &&
               restoredStage !== "prompt" &&
               restoredStage !== "stage2" &&
@@ -2802,6 +2810,109 @@ export function ReadinessFlow() {
   // error shown. Distinct, actionable copy — never the generic bootstrap error
   // nor the Stage 3 paste-parse-failure message.
   if (view === "stage2") {
+    // Prompt bundle unavailable (a resumed prompt/stage2 session whose stored
+    // draft lacks the full stage-1 answers — e.g. an AI-driven run whose draft
+    // holds only the live submission token). When a submission token is present
+    // we still owe the operator the waiting/polling screen: the status poll
+    // (keyed on view === "stage2" && submissionToken) is already running and
+    // will auto-advance to the paste step — carrying the timestamp + last-8
+    // confirmation — the moment the customer's AI POSTs results back. Only fall
+    // back to the regenerate-prompt error when there is no token to wait on.
+    if (submissionToken) {
+      return (
+        <div
+          className="readiness-assessment mt-8"
+          data-testid="readiness-stage2"
+          data-readiness-state={readinessState}
+          data-readiness-stage="prompt-running"
+        >
+          {newAnalysisControl}
+          <AssessmentProgress
+            current={FLOW_STEP_STAGE2}
+            total={FLOW_TOTAL_STEPS}
+            label="Diagnostic prompt"
+          />
+          <p className="eyebrow mt-4">{c.stage2.progressLabel}</p>
+          <p
+            className="mt-3 inline-flex items-center gap-2 rounded-full border border-purple/30 bg-purple-soft/30 px-3 py-1 text-xs font-semibold text-purple"
+            data-testid="readiness-prompt-running-marker"
+            data-readiness-stage="prompt-running"
+          >
+            {c.stage2.runningMarker}
+          </p>
+
+          <div
+            className="readiness-step-panel mt-6"
+            data-testid="readiness-waiting"
+            aria-live="polite"
+          >
+            {submissionExpired ? (
+              <div data-testid="readiness-waiting-expired">
+                <h3 className="font-display text-lg font-semibold text-ink">
+                  {c.waiting.expiredTitle}
+                </h3>
+                <p className="mt-1 text-sm text-muted">{c.waiting.expiredBody}</p>
+                <button
+                  type="button"
+                  className="btn-primary mt-4"
+                  onClick={() => void onStartOver()}
+                  data-testid="readiness-start-over"
+                >
+                  {c.waiting.startOver}
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p
+                  className="text-sm font-medium text-ink"
+                  data-testid="readiness-waiting-status"
+                  role="status"
+                >
+                  {c.waiting.status}
+                </p>
+                <p className="mt-1 text-sm text-muted">{c.waiting.helper}</p>
+              </div>
+            )}
+          </div>
+
+          {backgroundResultsReceived ? (
+            <div
+              className="readiness-step-panel mt-6 border-green/30"
+              role="status"
+              aria-live="polite"
+              data-testid="readiness-background-results"
+            >
+              <h3 className="font-display text-lg font-semibold text-ink">
+                Your analysis finished
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                Your tool signalled that it finished. Head to the paste step and paste its full
+                report to review it — we never fill it in or confirm findings for you automatically.
+              </p>
+              <button
+                type="button"
+                className="btn-primary mt-4"
+                onClick={() => void goToStage3()}
+                data-testid="readiness-background-results-review"
+              >
+                Go to paste step
+              </button>
+            </div>
+          ) : null}
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => void goToStage3()}
+              data-testid="readiness-go-paste"
+            >
+              {c.stage2.pasteResults}
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="readiness-assessment mt-8" data-testid="readiness-stage2-generation-error">
         {newAnalysisControl}
