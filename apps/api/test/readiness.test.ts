@@ -833,7 +833,7 @@ describe("readiness ingest flow with database", () => {
     assert.ok(/malformed or unknown/i.test(body.error?.message ?? ""));
   });
 
-  it("reports pending before ingest, ready after, and redacts secrets on read-back", async () => {
+  it("reports pending before ingest, completed after, and redacts secrets on read-back", async () => {
     rateLimitStore.clear();
     const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
     assert.equal(tokenRes.statusCode, 200);
@@ -868,16 +868,69 @@ describe("readiness ingest flow with database", () => {
     assert.equal(ready.statusCode, 200);
     const readyBody = ready.json() as {
       status?: string;
+      state?: string;
+      submission_token?: string;
       received_at?: string;
       results?: Record<string, unknown> | null;
       results_text?: string | null;
     };
-    assert.equal(readyBody.status, "ready");
+    // A landed submission reports the lifecycle as `completed`, mirrored in
+    // `state`, and echoes the submission token it was recorded under.
+    assert.equal(readyBody.status, "completed");
+    assert.equal(readyBody.state, "completed");
+    assert.equal(readyBody.submission_token, token);
     assert.ok(readyBody.received_at);
     assert.deepEqual(readyBody.results, { overall: 82, bucket: "Launch" });
     assert.ok(typeof readyBody.results_text === "string" && readyBody.results_text.length > 0);
     // Planted secret must never echo back to the waiting page.
     assert.ok(!readyBody.results_text!.includes(secret));
+  });
+
+  it("links a started run to its token's session and reports 'received' on the status poll", async () => {
+    rateLimitStore.clear();
+    const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+    assert.equal(tokenRes.statusCode, 200);
+    const { token } = tokenRes.json() as { token: string };
+
+    // Start a run using the token as the session credential.
+    const start = await ctx.app.inject({
+      method: "POST",
+      url: "/v1/readiness/start",
+      headers: { "content-type": "application/json" },
+      payload: { submission_token: token, project: "StatusReceivedProj" },
+    });
+    assert.equal(start.statusCode, 201);
+    const startBody = start.json() as { run_id?: string };
+    assert.ok(startBody.run_id);
+
+    // The poll for the SAME token must observe the linked, still-processing run
+    // as `received` (not `pending`/`not found`) and echo the submission token.
+    const status = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
+    });
+    assert.equal(status.statusCode, 200);
+    const statusBody = status.json() as {
+      status?: string;
+      state?: string;
+      submission_token?: string;
+      run_id?: string;
+    };
+    assert.equal(statusBody.status, "received");
+    assert.equal(statusBody.state, "received");
+    assert.equal(statusBody.submission_token, token);
+    assert.equal(statusBody.run_id, startBody.run_id);
+
+    // A second, distinct session must not leak or duplicate the first token's run.
+    const secondTokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
+    const { token: secondToken } = secondTokenRes.json() as { token: string };
+    const secondStatus = await ctx.app.inject({
+      method: "GET",
+      url: `/v1/readiness/status?token=${encodeURIComponent(secondToken)}`,
+    });
+    const secondBody = secondStatus.json() as { status?: string; run_id?: string };
+    assert.equal(secondBody.status, "pending");
+    assert.notEqual(secondBody.run_id, startBody.run_id);
   });
 
   it("distinguishes unknown and expired tokens on the status endpoint", async () => {

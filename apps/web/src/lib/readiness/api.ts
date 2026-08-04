@@ -228,7 +228,10 @@ export async function getReadinessSubmissionStatus(
     };
   }
   if (!res.ok) return { kind: "unavailable" };
-  if (status === "ready") {
+  // Terminal states carrying viewable results. `completed` is the current poll
+  // vocabulary; `ready` is accepted for backward/rollout compatibility. The
+  // interim `received` state (a linked run still processing) polls on as pending.
+  if (status === "completed" || status === "ready") {
     return {
       kind: "ready",
       resultsText: typeof body.results_text === "string" ? body.results_text : "",

@@ -4486,6 +4486,12 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
 
       return reply.status(200).send({
         message: "Vygo has successfully received your readiness results.",
+        // Echo the submission token so the caller can poll GET /v1/readiness/status
+        // for the SAME token without having to retain the one it minted. The status
+        // poll now reports this submission as `received` (progressing to `completed`).
+        submission_token: submissionToken,
+        token: submissionToken,
+        status: "received",
       });
     } catch (error) {
       request.log.error(
@@ -4501,11 +4507,14 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
   /**
    * Poll the status of a per-submission ingest token. The waiting readiness
    * page polls this on an interval after the prompt is generated:
-   *   - 200 { status: "pending" }  — token valid, no results landed yet
-   *   - 200 { status: "ready", results, results_text } — results landed (redacted)
-   *   - 404 { status: "expired" }  — unknown token
-   *   - 410 { status: "expired" }  — token past expiry with no landed results
-   * Results that landed before expiry remain readable after it.
+   *   - 200 { status: "pending" }    — token valid, nothing linked yet
+   *   - 200 { status: "received" }   — a started run is linked and still processing
+   *   - 200 { status: "completed", results, results_text } — results landed (redacted)
+   *   - 404 { status: "expired" }    — unknown token
+   *   - 410 { status: "expired" }    — token past expiry with no landed results
+   * Every 200 response also echoes `submission_token` (== token) and mirrors the
+   * lifecycle in `state`. Results that landed before expiry remain readable after
+   * it.
    */
   app.get("/v1/readiness/status", async (request, reply) => {
     if (!(await enforceStatusRateLimit(request, reply, deps))) return;
@@ -4572,7 +4581,11 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
               : String(started.run.updated_at);
           return reply.status(200).send({
             token,
-            status: "ready",
+            submission_token: token,
+            // A started run whose processing has finished: the poll reports the
+            // submission as `completed` (a synonym-compatible terminal state).
+            status: "completed",
+            state: "completed",
             expires_at: expiresAtIso,
             received_at: receivedAt,
             results: started.results,
@@ -4585,10 +4598,20 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         if (started?.state === "pending") {
           return reply.status(200).send({
             token,
-            status: "pending",
+            submission_token: token,
+            // The started run is linked to this token's session and is still
+            // processing: report `received` (progressing to `completed`) rather
+            // than a bare `pending` so the poll reflects the accepted submission.
+            status: "received",
+            state: "received",
             expires_at: expiresAtIso,
+            received_at:
+              started.run.created_at instanceof Date
+                ? started.run.created_at.toISOString()
+                : String(started.run.created_at),
             run_id: started.run.id,
             project: started.run.project_identifier,
+            run_status: started.run.status,
           });
         }
 
@@ -4600,7 +4623,9 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         }
         return reply.status(200).send({
           token,
+          submission_token: token,
           status: "pending",
+          state: "pending",
           expires_at: expiresAtIso,
         });
       }
@@ -4628,7 +4653,11 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
 
       return reply.status(200).send({
         token,
-        status: "ready",
+        submission_token: token,
+        // An AI-ingest submission has landed for this token: its results are
+        // available, so the poll reports `completed`.
+        status: "completed",
+        state: "completed",
         expires_at: expiresAtIso,
         received_at: receivedAt,
         results,

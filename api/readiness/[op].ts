@@ -1601,6 +1601,11 @@ async function handleSubmit(req: EdgeRequest): Promise<ReadinessHandlerResult> {
       status: 200,
       body: {
         message: "Vygo has successfully received your readiness results.",
+        // Echo the submission token so the caller can poll status for the SAME
+        // token; the poll reports this submission as `received`/`completed`.
+        submission_token: submissionToken,
+        token: submissionToken,
+        status: "received",
       },
     };
   } catch (error) {
@@ -1638,11 +1643,14 @@ async function handlePing(_req: EdgeRequest): Promise<ReadinessHandlerResult> {
 
 /**
  * GET /api/readiness/status?token=<submission_token>
- *   - 200 { status: "pending" }                         — valid token, nothing landed yet
- *   - 200 { status: "ready", results, results_text }    — results landed (re-redacted)
- *   - 404 { status: "expired" }                         — unknown token
- *   - 410 { status: "expired" }                         — expired token, nothing landed
- * Results that landed before expiry stay readable after it.
+ *   - 200 { status: "pending" }                            — valid token, nothing landed yet
+ *   - 200 { status: "completed", results, results_text }   — results landed (re-redacted)
+ *   - 404 { status: "expired" }                            — unknown token
+ *   - 410 { status: "expired" }                            — expired token, nothing landed
+ * When proxying to Railway the poll may also surface `status: "received"` for a
+ * linked run that is still processing. Every 200 echoes `submission_token`
+ * (== token) and mirrors the lifecycle in `state`. Results that landed before
+ * expiry stay readable after it.
  */
 async function handleStatusGet(req: EdgeRequest): Promise<ReadinessHandlerResult> {
   const rl = checkStatusRateLimit(req);
@@ -1747,7 +1755,13 @@ async function handleStatusGet(req: EdgeRequest): Promise<ReadinessHandlerResult
       }
       return {
         status: 200,
-        body: { token, status: "pending", expires_at: expiresAtIso },
+        body: {
+          token,
+          submission_token: token,
+          status: "pending",
+          state: "pending",
+          expires_at: expiresAtIso,
+        },
       };
     }
 
@@ -1776,7 +1790,11 @@ async function handleStatusGet(req: EdgeRequest): Promise<ReadinessHandlerResult
       status: 200,
       body: {
         token,
-        status: "ready",
+        submission_token: token,
+        // A landed AI-ingest submission: results are available, so report
+        // `completed` (mirrored in `state`).
+        status: "completed",
+        state: "completed",
         expires_at: expiresAtIso,
         received_at: receivedAt,
         results,

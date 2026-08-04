@@ -20,10 +20,12 @@ describe("edge readiness token validation", () => {
 
 type MockResponseBody = {
   token?: string;
+  submission_token?: string;
   expires_at?: string;
   ttl?: number;
   message?: string;
   status?: string;
+  state?: string;
   received_at?: string;
   results?: Record<string, unknown> | null;
   results_text?: string | null;
@@ -248,7 +250,9 @@ describe("edge readiness ingest flow integration via proxy", () => {
         return new Response(
           JSON.stringify({
             token: subToken,
-            status: "ready",
+            submission_token: subToken,
+            status: "completed",
+            state: "completed",
             expires_at: new Date(expiry).toISOString(),
             received_at: new Date().toISOString(),
             results: payload.results ?? null,
@@ -448,7 +452,7 @@ describe("edge readiness ingest flow integration via proxy", () => {
     }
   });
 
-  it("GET /api/readiness/status returns ready with the ingested payload after submit", async () => {
+  it("GET /api/readiness/status returns completed with the ingested payload after submit", async () => {
     setupMock();
     try {
       const tokenRes = mockResponse();
@@ -469,7 +473,8 @@ describe("edge readiness ingest flow integration via proxy", () => {
 
       assert.equal(res.getStatusCode(), 200);
       const body = res.getBody();
-      assert.equal(body.status, "ready");
+      assert.equal(body.status, "completed");
+      assert.equal(body.submission_token, token);
       assert.equal(body.results_text, "No backups configured.");
       assert.deepEqual(body.results, { overall: 82 });
       assert.ok(body.received_at);
