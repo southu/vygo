@@ -83,6 +83,22 @@ export function clearReadinessLocal(): void {
 }
 
 /**
+ * The signed-in user's identity as already captured by the app: the email the
+ * visitor supplied during the readiness flow, persisted in the main readiness
+ * state (and mirrored in the Step-8 resume snapshot). Returns a trimmed,
+ * lower-cased address, or null when no identity has been established yet. This
+ * is the same identity the readiness/analysis views key their history by, so
+ * downstream views can name the real signed-in user rather than any fixture.
+ */
+export function loadSignedInEmail(): string | null {
+  if (typeof window === "undefined") return null;
+  const fromMain = loadReadinessLocal()?.email;
+  const fromResume = loadReadinessResume()?.email;
+  const raw = (fromMain || fromResume || "").trim().toLowerCase();
+  return raw ? raw : null;
+}
+
+/**
  * Stages that represent a VALID Step-8 in-progress session worth preserving for
  * resume: the report has been pasted and parsed into structured findings
  * (`confirm`). This is exactly the state a plain `/readiness` must restore after

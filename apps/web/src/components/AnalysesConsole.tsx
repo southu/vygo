@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiUrl } from "@/lib/api";
 import { EmailText } from "@/components/EmailText";
+import { loadSignedInEmail } from "@/lib/readiness/storage";
 
 /**
  * Analysis history view.
@@ -16,16 +17,17 @@ import { EmailText } from "@/components/EmailText";
  * result.
  *
  * Identity is scoped: the view always names the exact identity whose history it
- * shows (no cross-user listing). It defaults to the seeded multi-run demo user
- * so the whole model is verifiable in a browser after a deploy. Any other
- * `?user=<id>` is fetched scope-required from the public list API.
+ * shows (no cross-user listing). It resolves the identity from the real signed-in
+ * user — the email captured by the readiness flow and persisted in session
+ * storage — so the page names whoever is actually signed in. An explicit
+ * `?user=<id>` overrides it (scope-required from the public list API); when no
+ * identity is established yet the view prompts the visitor to start a readiness
+ * check rather than showing anyone else's history.
  *
  * Each completed entry links to the EXISTING analysis-detail/results component
  * (SnapshotView) at /readiness/snapshot?id=<snapshotId> — the same UI/route a
  * fresh run lands on. It never renders a parallel results view.
  */
-
-const DEMO_USER = "demo@vygo.ai";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -79,23 +81,32 @@ type HistoryResponse = {
   verify?: Record<string, string>;
 };
 
-/** Which identity's history is on screen, and how it is fetched. */
+/** Which identity's history is on screen. Always the real signed-in user (or an
+ * explicit `?user=` override); fetched scope-required from the public list API. */
 type ViewSource = {
   user: string;
   label: string;
-  /** The demo fixture seeds-on-read via the demo op; scoped users use the list API. */
-  via: "demo" | "scoped";
+  via: "scoped";
 };
 
-function resolveSource(search: string): ViewSource {
+/**
+ * Resolve whose history to show: an explicit `?user=<id>` wins; otherwise the
+ * real signed-in user's email pulled from the app's session/auth context. The
+ * label mirrors the email (the identity elsewhere in the app), never a fixture.
+ * Returns null when no identity is established yet so the caller can prompt the
+ * visitor to start a readiness check instead of naming anyone else.
+ */
+function resolveSource(search: string): ViewSource | null {
   const params = new URLSearchParams(search);
   const rawUser = (params.get("user") || "").trim();
-  const user = rawUser.toLowerCase();
-
-  if (rawUser && user !== DEMO_USER) {
+  if (rawUser) {
     return { user: rawUser, label: rawUser, via: "scoped" };
   }
-  return { user: DEMO_USER, label: "Demo user", via: "demo" };
+  const signedIn = loadSignedInEmail();
+  if (signedIn) {
+    return { user: signedIn, label: signedIn, via: "scoped" };
+  }
+  return null;
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -317,17 +328,16 @@ function ProjectSection({ group }: { group: ProjectGroup }) {
 }
 
 export function AnalysesConsole() {
-  const [source, setSource] = useState<ViewSource>({
-    user: DEMO_USER,
-    label: "Demo user",
-    via: "demo",
-  });
-  const [loading, setLoading] = useState(true);
+  // `undefined` = identity not resolved yet (SSR / pre-mount); `null` = resolved
+  // but no signed-in user. Starting undefined keeps the server-rendered HTML free
+  // of any placeholder identity until the client reads the real session.
+  const [source, setSource] = useState<ViewSource | null | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<HistoryResponse | null>(null);
 
-  // Resolve the identity from the URL on mount (client-only; keeps this a plain
-  // client component with no Suspense boundary).
+  // Resolve the identity on mount (client-only; keeps this a plain client
+  // component with no Suspense boundary).
   useEffect(() => {
     setSource(resolveSource(window.location.search));
   }, []);
@@ -336,11 +346,9 @@ export function AnalysesConsole() {
     setLoading(true);
     setError(null);
     try {
-      const path =
-        src.via === "demo"
-          ? `/api/analyses/demo?user=${encodeURIComponent(src.user)}`
-          : `/api/analyses?user=${encodeURIComponent(src.user)}`;
-      const body = await getJson<HistoryResponse>(path);
+      const body = await getJson<HistoryResponse>(
+        `/api/analyses?user=${encodeURIComponent(src.user)}`,
+      );
       setData(body);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load analyses.");
@@ -350,7 +358,7 @@ export function AnalysesConsole() {
   }, []);
 
   useEffect(() => {
-    void load(source);
+    if (source) void load(source);
   }, [load, source]);
 
   const groups = useMemo<ProjectGroup[]>(() => {
@@ -371,21 +379,34 @@ export function AnalysesConsole() {
     });
   }, [data]);
 
+  const resolving = source === undefined;
+  const signedOut = source === null;
+
   return (
     <main id="main-content" className="section-pad">
       <div className="container-page max-w-4xl">
         <p className="eyebrow">Analysis history</p>
         <h1 className="mt-4 font-display text-4xl font-bold">Your analyses</h1>
-        <p className="mt-4 text-muted">
-          Every past readiness run, grouped by project. Within each project the most recent
-          completed run is marked <strong>current</strong>; older runs stay listed and openable.
-          Opening any completed run renders the same readiness report a fresh run produces. History
-          is scoped to a single identity — no cross-user listing — shown here for{" "}
-          <code className="font-mono" data-testid="analysis-view-user">
-            <EmailText address={source.user} />
-          </code>{" "}
-          (<span data-testid="analysis-view-label">{source.label}</span>).
-        </p>
+        {source ? (
+          <p className="mt-4 text-muted">
+            Every past readiness run, grouped by project. Within each project the most recent
+            completed run is marked <strong>current</strong>; older runs stay listed and openable.
+            Opening any completed run renders the same readiness report a fresh run produces.
+            History is scoped to a single identity — no cross-user listing — shown here for{" "}
+            <code className="font-mono" data-testid="analysis-view-user">
+              <EmailText address={source.user} />
+            </code>
+            .
+          </p>
+        ) : (
+          <p className="mt-4 text-muted">
+            Every past readiness run, grouped by project — the most recent completed run per project
+            is marked <strong>current</strong>, and older runs stay openable.
+            {resolving
+              ? " Resolving your session…"
+              : " Start a readiness check to establish your identity and your history appears here, scoped to you."}
+          </p>
+        )}
 
         <div className="mt-6 flex flex-wrap gap-3">
           {/*
@@ -408,33 +429,36 @@ export function AnalysesConsole() {
           >
             Readiness check
           </a>
-          {source.via === "scoped" ? (
-            <a
-              href="/analyses"
+          {source ? (
+            <button
+              type="button"
+              onClick={() => void load(source)}
               className="btn inline-flex border border-border"
-              data-testid="analyses-demo-link"
             >
-              Demo user history
-            </a>
+              Refresh
+            </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => void load(source)}
-            className="btn inline-flex border border-border"
-          >
-            Refresh
-          </button>
         </div>
 
-        {loading && <p className="mt-8 text-muted">Loading analyses…</p>}
-        {error && (
+        {signedOut && (
+          <div className="card mt-8" data-testid="analyses-signed-out">
+            <p className="font-semibold">No signed-in identity yet</p>
+            <p className="mt-2 text-sm text-muted">
+              Your analyses are scoped to whoever is signed in. Start a readiness check — the email
+              you provide there becomes your identity, and your past runs will list here.
+            </p>
+          </div>
+        )}
+
+        {source && loading && <p className="mt-8 text-muted">Loading analyses…</p>}
+        {source && error && (
           <div className="card mt-8 border-red">
             <p className="font-semibold text-red">Could not load analyses</p>
             <p className="mt-2 text-sm text-muted">{error}</p>
           </div>
         )}
 
-        {!loading && !error && data && (
+        {source && !loading && !error && data && (
           <div className="mt-8 space-y-8" data-testid="analysis-history">
             {groups.length === 0 ? (
               <p className="text-sm text-muted">No analyses yet.</p>
