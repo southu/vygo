@@ -254,10 +254,11 @@ export async function getReadinessSubmissionStatus(
   if (!res.ok) return { kind: "unavailable" };
   // Landed states: the customer's AI has POSTed its results back, so the waiting
   // page must advance off the "waiting for your AI to send results" screen.
-  // `completed` is the current poll vocabulary; `received` marks a linked run
-  // whose results have LANDED (it may still be scoring server-side); `ready` is
-  // accepted for backward/rollout compatibility. All three are terminal for the
-  // wait. Anything else (`pending` / `processing`) keeps polling — see below.
+  // `received` is the current poll vocabulary for "results have landed"; the
+  // status flips `waiting` -> `received` once the AI submission is recorded.
+  // `completed`/`ready` are accepted for backward/rollout compatibility. All
+  // three are terminal for the wait. Anything else (`waiting` / `pending` /
+  // `processing`) keeps polling — see below.
   if (status === "completed" || status === "received" || status === "ready") {
     return {
       kind: "ready",

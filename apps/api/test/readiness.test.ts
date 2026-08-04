@@ -779,7 +779,7 @@ describe("readiness ingest flow with database", () => {
     });
     assert.equal(status.statusCode, 200);
     const statusBody = status.json() as { status?: string };
-    assert.equal(statusBody.status, "pending");
+    assert.equal(statusBody.status, "waiting");
   });
 
   it("rejects an empty results object and a blank results_text string", async () => {
@@ -816,7 +816,7 @@ describe("readiness ingest flow with database", () => {
       method: "GET",
       url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
     });
-    assert.equal((status.json() as { status?: string }).status, "pending");
+    assert.equal((status.json() as { status?: string }).status, "waiting");
   });
 
   it("rejects an unknown submission token with a 4xx JSON error", async () => {
@@ -833,7 +833,7 @@ describe("readiness ingest flow with database", () => {
     assert.ok(/malformed or unknown/i.test(body.error?.message ?? ""));
   });
 
-  it("reports pending before ingest, completed after, and redacts secrets on read-back", async () => {
+  it("reports waiting before ingest, received after, and redacts secrets on read-back", async () => {
     rateLimitStore.clear();
     const tokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
     assert.equal(tokenRes.statusCode, 200);
@@ -845,7 +845,7 @@ describe("readiness ingest flow with database", () => {
     });
     assert.equal(pending.statusCode, 200);
     const pendingBody = pending.json() as { status?: string; results_text?: unknown };
-    assert.equal(pendingBody.status, "pending");
+    assert.equal(pendingBody.status, "waiting");
     assert.equal(pendingBody.results_text, undefined);
 
     const secret = "sk-live-abcdefghijklmnopqrstuvwxyz";
@@ -874,10 +874,10 @@ describe("readiness ingest flow with database", () => {
       results?: Record<string, unknown> | null;
       results_text?: string | null;
     };
-    // A landed submission reports the lifecycle as `completed`, mirrored in
-    // `state`, and echoes the submission token it was recorded under.
-    assert.equal(readyBody.status, "completed");
-    assert.equal(readyBody.state, "completed");
+    // A landed submission flips the poll out of `waiting` to `received`,
+    // mirrored in `state`, and echoes the submission token it was recorded under.
+    assert.equal(readyBody.status, "received");
+    assert.equal(readyBody.state, "received");
     assert.equal(readyBody.submission_token, token);
     assert.ok(readyBody.received_at);
     assert.deepEqual(readyBody.results, { overall: 82, bucket: "Launch" });
@@ -929,7 +929,7 @@ describe("readiness ingest flow with database", () => {
       url: `/v1/readiness/status?token=${encodeURIComponent(secondToken)}`,
     });
     const secondBody = secondStatus.json() as { status?: string; run_id?: string };
-    assert.equal(secondBody.status, "pending");
+    assert.equal(secondBody.status, "waiting");
     assert.notEqual(secondBody.run_id, startBody.run_id);
   });
 
@@ -984,7 +984,7 @@ describe("readiness ingest flow with database", () => {
       submission_token?: string;
       results?: Record<string, unknown> | null;
     };
-    assert.notEqual(body.status, "pending");
+    assert.notEqual(body.status, "waiting");
     assert.ok(
       body.status === "received" || body.status === "completed",
       `expected received/completed on the first poll after an early submission, got "${body.status}"`,
@@ -1017,7 +1017,7 @@ describe("readiness ingest flow with database", () => {
     });
     assert.equal(status.statusCode, 200);
     const body = status.json() as { status?: string; results?: Record<string, unknown> | null };
-    assert.equal(body.status, "completed");
+    assert.equal(body.status, "received");
     assert.deepEqual(body.results, { overall: 55, bucket: "Fix" });
   });
 
@@ -1059,7 +1059,7 @@ describe("readiness ingest flow with database", () => {
     });
     assert.equal(status.statusCode, 200);
     const body = status.json() as { status?: string; submission_token?: string };
-    assert.notEqual(body.status, "pending");
+    assert.notEqual(body.status, "waiting");
     assert.ok(body.status === "received" || body.status === "completed");
     assert.equal(body.submission_token, token);
   });
@@ -1099,7 +1099,7 @@ describe("readiness ingest flow with database", () => {
     });
     const bodyA = pollA.json() as { status?: string; results?: Record<string, unknown> | null };
     const bodyB = pollB.json() as { status?: string };
-    assert.notEqual(bodyA.status, "pending");
+    assert.notEqual(bodyA.status, "waiting");
     assert.ok(bodyA.status === "received" || bodyA.status === "completed");
     assert.equal(bodyA.status, bodyB.status);
     assert.deepEqual(bodyA.results, results);

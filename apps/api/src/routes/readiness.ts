@@ -17,7 +17,7 @@
  * POST   /v1/readiness/snapshot/:id/email — enqueue snapshot email copy
  * POST   /v1/readiness/token            — mint a per-submission ingest token (24h, limited resubmits)
  * POST   /v1/readiness/submit           — AI ingest: store results for a submission token
- * GET    /v1/readiness/status           — poll submission-token status (pending/ready/expired)
+ * GET    /v1/readiness/status           — poll submission-token status (waiting/received/expired)
  *
  * All Postgres writes go through these server endpoints. Rate-limited by IP.
  * Never returns connection strings, DATABASE_URL, stack traces, or secrets.
@@ -4488,7 +4488,8 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         message: "Vygo has successfully received your readiness results.",
         // Echo the submission token so the caller can poll GET /v1/readiness/status
         // for the SAME token without having to retain the one it minted. The status
-        // poll now reports this submission as `received` (progressing to `completed`).
+        // poll now reports this submission as `received`, flipping the waiting page
+        // out of its `waiting` state.
         submission_token: submissionToken,
         token: submissionToken,
         status: "received",
@@ -4506,12 +4507,14 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
 
   /**
    * Poll the status of a per-submission ingest token. The waiting readiness
-   * page polls this on an interval after the prompt is generated:
-   *   - 200 { status: "pending" }    — token valid, nothing linked yet
-   *   - 200 { status: "received" }   — a started run is linked and still processing
-   *   - 200 { status: "completed", results, results_text } — results landed (redacted)
+   * page polls this on an interval (INGEST_POLL_INTERVAL_MS = 4000ms, see
+   * apps/web ReadinessFlow) after the prompt is generated:
+   *   - 200 { status: "waiting" }    — token valid, nothing landed/linked yet
+   *   - 200 { status: "received", results, results_text } — results have landed
+   *     (a submitted AI ingest payload or a completed linked run); redacted
    *   - 404 { status: "expired" }    — unknown token
    *   - 410 { status: "expired" }    — token past expiry with no landed results
+   * The contract is a simple `waiting` -> `received` flip once results land.
    * Every 200 response also echoes `submission_token` (== token) and mirrors the
    * lifecycle in `state`. Results that landed before expiry remain readable after
    * it.
@@ -4598,10 +4601,13 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         return reply.status(200).send({
           token,
           submission_token: token,
-          // An AI-ingest submission has landed for this token: its results are
-          // available, so the poll reports `completed`.
-          status: "completed",
-          state: "completed",
+          // An AI-ingest submission has LANDED for this token: the waiting page
+          // (and the acceptance harness) must observe the poll flip out of
+          // `waiting` to `received`. `received` is the contract's terminal
+          // "results are here" signal; the web poll client treats it as
+          // results-available.
+          status: "received",
+          state: "received",
           expires_at: expiresAtIso,
           received_at: receivedAt,
           results,
@@ -4633,10 +4639,12 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         return reply.status(200).send({
           token,
           submission_token: token,
-          // A started run whose processing has finished: the poll reports the
-          // submission as `completed` (a synonym-compatible terminal state).
-          status: "completed",
-          state: "completed",
+          // A started run whose processing has finished: results are available,
+          // so the poll reports `received` — the same terminal signal a landed
+          // AI-ingest submission carries. The web poll client treats it as
+          // results-available and advances off the waiting screen.
+          status: "received",
+          state: "received",
           expires_at: expiresAtIso,
           received_at: receivedAt,
           results: started.results,
@@ -4675,8 +4683,12 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       return reply.status(200).send({
         token,
         submission_token: token,
-        status: "pending",
-        state: "pending",
+        // Valid token, but no AI-ingest submission has landed and no run is
+        // linked yet: the poll stays in the `waiting` state. This is the
+        // no-false-positive guarantee — a token that has genuinely received
+        // nothing must never report `received`.
+        status: "waiting",
+        state: "waiting",
         expires_at: expiresAtIso,
       });
     } catch (error) {

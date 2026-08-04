@@ -238,7 +238,7 @@ describe("edge readiness ingest flow integration via proxy", () => {
           return new Response(
             JSON.stringify({
               token: subToken,
-              status: "pending",
+              status: "waiting",
               expires_at: new Date(expiry).toISOString(),
             }),
             {
@@ -251,8 +251,8 @@ describe("edge readiness ingest flow integration via proxy", () => {
           JSON.stringify({
             token: subToken,
             submission_token: subToken,
-            status: "completed",
-            state: "completed",
+            status: "received",
+            state: "received",
             expires_at: new Date(expiry).toISOString(),
             received_at: new Date().toISOString(),
             results: payload.results ?? null,
@@ -377,7 +377,7 @@ describe("edge readiness ingest flow integration via proxy", () => {
 
       const statusRes = mockResponse();
       await handler(mockStatusRequest(token), statusRes);
-      assert.equal(statusRes.getBody().status, "pending");
+      assert.equal(statusRes.getBody().status, "waiting");
     } finally {
       teardownMock();
     }
@@ -402,7 +402,7 @@ describe("edge readiness ingest flow integration via proxy", () => {
 
       const statusRes = mockResponse();
       await handler(mockStatusRequest(token), statusRes);
-      assert.equal(statusRes.getBody().status, "pending");
+      assert.equal(statusRes.getBody().status, "waiting");
     } finally {
       teardownMock();
     }
@@ -427,13 +427,13 @@ describe("edge readiness ingest flow integration via proxy", () => {
 
       const statusRes = mockResponse();
       await handler(mockStatusRequest(token), statusRes);
-      assert.equal(statusRes.getBody().status, "pending");
+      assert.equal(statusRes.getBody().status, "waiting");
     } finally {
       teardownMock();
     }
   });
 
-  it("GET /api/readiness/status returns pending for a freshly minted token", async () => {
+  it("GET /api/readiness/status returns waiting for a freshly minted token", async () => {
     setupMock();
     try {
       const tokenRes = mockResponse();
@@ -445,14 +445,14 @@ describe("edge readiness ingest flow integration via proxy", () => {
 
       assert.equal(res.getStatusCode(), 200);
       const body = res.getBody();
-      assert.equal(body.status, "pending");
+      assert.equal(body.status, "waiting");
       assert.equal(body.results_text, undefined);
     } finally {
       teardownMock();
     }
   });
 
-  it("GET /api/readiness/status returns completed with the ingested payload after submit", async () => {
+  it("GET /api/readiness/status returns received with the ingested payload after submit", async () => {
     setupMock();
     try {
       const tokenRes = mockResponse();
@@ -473,7 +473,7 @@ describe("edge readiness ingest flow integration via proxy", () => {
 
       assert.equal(res.getStatusCode(), 200);
       const body = res.getBody();
-      assert.equal(body.status, "completed");
+      assert.equal(body.status, "received");
       assert.equal(body.submission_token, token);
       assert.equal(body.results_text, "No backups configured.");
       assert.deepEqual(body.results, { overall: 82 });
