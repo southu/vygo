@@ -259,6 +259,75 @@ export function guardMissionCallback(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Received-report ingest signal — the single decision for what the Stage 2
+// waiting screen does when the customer's AI POSTs its report back, and whether
+// the manual copy-paste prompt is shown. These are the authoritative rules
+// behind the "received but stuck on the paste prompt" fix: nothing in the flow
+// is allowed to re-derive them inline. The web ReadinessFlow reads BOTH the poll
+// branch and the waiting-screen paste visibility from here, so a report that has
+// been received (and persisted) can never leave the flow stranded on the paste
+// prompt.
+// ---------------------------------------------------------------------------
+
+/**
+ * What an observed ingest status ("readiness report received") signal should do
+ * to the waiting flow:
+ *  - "keep_waiting": nothing actionable landed yet (an accepted-but-empty
+ *    receipt with no results bytes) — keep polling, do NOT leave the waiting
+ *    screen.
+ *  - "auto_confirm": a durably PERSISTED/validated report landed — auto-advance
+ *    straight to the Confirm-findings step by running the same parse+confirm the
+ *    manual paste runs, with NO manual paste required.
+ *  - "open_paste_step": results landed but were not reported as persisted (older
+ *    rollout / a status-string-only fixture) — leave the waiting screen and open
+ *    the paste step so the user pastes their own report; do not fabricate a
+ *    confirmed parse from an unpersisted receipt.
+ */
+export type ReceivedSignalOutcome = "keep_waiting" | "auto_confirm" | "open_paste_step";
+
+/**
+ * Decide what a landed ingest "received" signal does to the waiting flow. This
+ * is the fix for the stuck-on-paste bug: a signal that carries actual results
+ * NEVER stays on the waiting/paste prompt — a persisted report auto-advances to
+ * confirm with no manual paste, and even an unpersisted receipt at least opens
+ * the paste step automatically. Only a genuinely empty receipt keeps waiting.
+ */
+export function receivedSignalOutcome(input: {
+  /** True when the poll carried actual report bytes (results_text/results). */
+  hasResults: boolean;
+  /** The endpoint's machine-readable "received AND persisted" confirmation. */
+  persisted: boolean;
+}): ReceivedSignalOutcome {
+  if (!input.hasResults) return "keep_waiting";
+  return input.persisted ? "auto_confirm" : "open_paste_step";
+}
+
+/**
+ * Whether the manual copy-paste prompt should be revealed on the Stage 2 waiting
+ * screen. The prompt stays HIDDEN while auto-detection is genuinely waiting; it
+ * is revealed only as a fallback — when there is no submission token to poll (so
+ * auto-detection cannot run and pasting is the only way forward) or the bounded
+ * fallback timeout elapsed / detection reported a failure (`fallbackRevealed`).
+ *
+ * The load-bearing rule for the bug: a confirmed receipt (`resultsReceived`)
+ * ALWAYS hides the prompt. Once a readiness report has been received, the paste
+ * prompt must not persist or reappear — the flow has already left the waiting
+ * screen (auto-advancing to confirm or the paste step), so re-showing the prompt
+ * here would strand the user on it.
+ */
+export function shouldRevealManualPastePrompt(input: {
+  /** True when a live submission token is being polled for auto-detection. */
+  hasSubmissionToken: boolean;
+  /** True once the bounded fallback timeout elapsed or detection failed. */
+  fallbackRevealed: boolean;
+  /** True once a readiness report has been received for this run. */
+  resultsReceived: boolean;
+}): boolean {
+  if (input.resultsReceived) return false;
+  return !input.hasSubmissionToken || input.fallbackRevealed;
+}
+
+// ---------------------------------------------------------------------------
 // Hydration / resume — rebuild the state from persisted data.
 // ---------------------------------------------------------------------------
 

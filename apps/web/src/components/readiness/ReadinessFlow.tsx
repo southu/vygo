@@ -27,6 +27,8 @@ import {
   structuredReadinessFromReport,
   validateReadinessReportPaste,
   guardMissionCallback,
+  receivedSignalOutcome,
+  shouldRevealManualPastePrompt,
   canTransition,
   parseReachesReportParsed,
   persistedStageForState,
@@ -1499,7 +1501,16 @@ export function ReadinessFlow() {
           // as still-waiting and keep polling until real results land.
           const landedText =
             status.resultsText.trim() || (status.results ? JSON.stringify(status.results) : "");
-          if (!landedText) {
+          // Single authoritative decision for what a landed "received" signal
+          // does — an empty receipt keeps waiting, a persisted report auto-
+          // advances to confirm with no manual paste, an unpersisted receipt
+          // opens the paste step. This is the fix for "received but stuck on the
+          // paste prompt": a signal carrying results never strands the flow.
+          const outcome = receivedSignalOutcome({
+            hasResults: Boolean(landedText),
+            persisted: status.persisted,
+          });
+          if (outcome === "keep_waiting") {
             schedule(INGEST_POLL_INTERVAL_MS);
             return;
           }
@@ -1538,7 +1549,7 @@ export function ReadinessFlow() {
             clearTimeout(timer);
             timer = null;
           }
-          if (status.persisted) {
+          if (outcome === "auto_confirm") {
             // PERSISTED/VALIDATED confirmation (the endpoint's machine-readable
             // received=true, not a mere in-flight/optimistic receipt). The report
             // is durably persisted server-side, so run the SAME parse+confirm the
@@ -2772,8 +2783,11 @@ export function ReadinessFlow() {
     // elapsed or detection reported a failure (pasteFallbackRevealed), and also
     // when there is no submission token to poll (auto-detection cannot run, so
     // the paste path is the only way forward). A confirmed receipt hides it.
-    const showPromptRunningPaste =
-      (!submissionToken || pasteFallbackRevealed) && !backgroundResultsReceived;
+    const showPromptRunningPaste = shouldRevealManualPastePrompt({
+      hasSubmissionToken: Boolean(submissionToken),
+      fallbackRevealed: pasteFallbackRevealed,
+      resultsReceived: backgroundResultsReceived,
+    });
     return (
       <div
         className="readiness-assessment mt-8"

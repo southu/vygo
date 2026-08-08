@@ -61,6 +61,8 @@ export {
   applyBackgroundCompletion,
   missionCallbackMatchesRun,
   guardMissionCallback,
+  receivedSignalOutcome,
+  shouldRevealManualPastePrompt,
   hydrateReadinessState,
   persistedStageForState,
   entryReadinessState,
@@ -71,6 +73,7 @@ export {
   type HydrationInput,
   type FreshReadinessRun,
   type MissionCallbackDecision,
+  type ReceivedSignalOutcome,
 } from "./readiness-state.js";
 
 export {
