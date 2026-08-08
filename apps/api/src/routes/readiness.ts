@@ -418,6 +418,21 @@ function ingestTokenLogId(token: string): string {
 }
 
 /**
+ * Normalize a Postgres timestamp to a strict ISO-8601 string. The postgres.js
+ * driver hands back timestamptz columns as raw strings like
+ * `2026-08-08 14:16:14.173511+00` (space separator, `+00` offset) — NOT valid
+ * ISO-8601 — while an in-process Date path yields a real Date. The status
+ * poll's machine-readable `received_at` contract requires ISO-8601, so route
+ * every timestamp through this rather than a bare String() that would leak the
+ * driver's wire format to callers. Falls back to the original stringification
+ * only if the value is somehow unparseable (never for a real column value).
+ */
+function toIsoTimestamp(value: Date | string): string {
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toISOString();
+}
+
+/**
  * Bridge the per-submission status poll (GET /v1/readiness/status?token=…) to a
  * run created by POST /v1/readiness/start.
  *
@@ -4587,10 +4602,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           payload.results && typeof payload.results === "object" && !Array.isArray(payload.results)
             ? (payload.results as Record<string, unknown>)
             : null;
-        const receivedAt =
-          submission.received_at instanceof Date
-            ? submission.received_at.toISOString()
-            : String(submission.received_at);
+        const receivedAt = toIsoTimestamp(submission.received_at);
         // Prefer the token's real expiry; if the short-lived token row is already
         // gone, derive a best-effort expiry from when the submission landed so the
         // response shape stays stable.
@@ -4608,6 +4620,12 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           // results-available.
           status: "received",
           state: "received",
+          // Explicit machine-readable signal layered on top of status/state: the
+          // ingest payload is durably persisted in readiness_ingest_submissions,
+          // so `received` is the literal boolean true and `received_at` carries
+          // the persist timestamp. Never eagerly true — only a landed row hits
+          // this branch.
+          received: true,
           expires_at: expiresAtIso,
           received_at: receivedAt,
           results,
@@ -4632,10 +4650,7 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
       // /start run to a viewable "ready" for the waiting page / acceptance poll.
       const started = await resolveStartedRunStatus(dbHandle.sql, token);
       if (started?.state === "ready") {
-        const receivedAt =
-          started.run.updated_at instanceof Date
-            ? started.run.updated_at.toISOString()
-            : String(started.run.updated_at);
+        const receivedAt = toIsoTimestamp(started.run.updated_at);
         return reply.status(200).send({
           token,
           submission_token: token,
@@ -4645,6 +4660,10 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           // results-available and advances off the waiting screen.
           status: "received",
           state: "received",
+          // The linked run is durably persisted in the analyses store and has
+          // matured to completion — the mission's "equivalent matured/linked
+          // run". Surface the same explicit boolean signal the ingest path does.
+          received: true,
           expires_at: expiresAtIso,
           received_at: receivedAt,
           results: started.results,
@@ -4663,11 +4682,13 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
           // than a bare `pending` so the poll reflects the accepted submission.
           status: "received",
           state: "received",
+          // The run row is durably persisted (analyses store) and linked to this
+          // token's session — the existing status/state already report
+          // "received" here, so the new boolean tracks it. `received_at` is the
+          // run's persist (created_at) timestamp.
+          received: true,
           expires_at: expiresAtIso,
-          received_at:
-            started.run.created_at instanceof Date
-              ? started.run.created_at.toISOString()
-              : String(started.run.created_at),
+          received_at: toIsoTimestamp(started.run.created_at),
           run_id: started.run.id,
           project: started.run.project_identifier,
           run_status: started.run.status,
@@ -4689,6 +4710,11 @@ export function registerReadinessRoutes(app: FastifyInstance, deps: ReadinessRou
         // nothing must never report `received`.
         status: "waiting",
         state: "waiting",
+        // No-false-positive guarantee: a valid-but-still-waiting token has had
+        // nothing durably persisted, so the explicit boolean is literally false
+        // and no `received_at` is emitted. Consumers can rely on `received` alone
+        // to distinguish "results are here" from "still waiting".
+        received: false,
         expires_at: expiresAtIso,
       });
     } catch (error) {

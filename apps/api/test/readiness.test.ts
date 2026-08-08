@@ -778,8 +778,9 @@ describe("readiness ingest flow with database", () => {
       url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
     });
     assert.equal(status.statusCode, 200);
-    const statusBody = status.json() as { status?: string };
+    const statusBody = status.json() as { status?: string; received?: unknown };
     assert.equal(statusBody.status, "waiting");
+    assert.strictEqual(statusBody.received, false);
   });
 
   it("rejects an empty results object and a blank results_text string", async () => {
@@ -816,7 +817,11 @@ describe("readiness ingest flow with database", () => {
       method: "GET",
       url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
     });
-    assert.equal((status.json() as { status?: string }).status, "waiting");
+    const rejectedBody = status.json() as { status?: string; received?: unknown };
+    assert.equal(rejectedBody.status, "waiting");
+    // No-false-positive: a token whose submissions were rejected before
+    // persistence must still report received=false.
+    assert.strictEqual(rejectedBody.received, false);
   });
 
   it("rejects an unknown submission token with a 4xx JSON error", async () => {
@@ -844,9 +849,18 @@ describe("readiness ingest flow with database", () => {
       url: `/v1/readiness/status?token=${encodeURIComponent(token)}`,
     });
     assert.equal(pending.statusCode, 200);
-    const pendingBody = pending.json() as { status?: string; results_text?: unknown };
+    const pendingBody = pending.json() as {
+      status?: string;
+      results_text?: unknown;
+      received?: unknown;
+      received_at?: unknown;
+    };
     assert.equal(pendingBody.status, "waiting");
     assert.equal(pendingBody.results_text, undefined);
+    // Explicit machine-readable signal: nothing persisted yet → literal false,
+    // and no truthy timestamp.
+    assert.strictEqual(pendingBody.received, false);
+    assert.ok(!pendingBody.received_at);
 
     const secret = "sk-live-abcdefghijklmnopqrstuvwxyz";
     const submit = await ctx.app.inject({
@@ -870,6 +884,7 @@ describe("readiness ingest flow with database", () => {
       status?: string;
       state?: string;
       submission_token?: string;
+      received?: unknown;
       received_at?: string;
       results?: Record<string, unknown> | null;
       results_text?: string | null;
@@ -879,7 +894,12 @@ describe("readiness ingest flow with database", () => {
     assert.equal(readyBody.status, "received");
     assert.equal(readyBody.state, "received");
     assert.equal(readyBody.submission_token, token);
+    // Explicit machine-readable signal: durably persisted → literal boolean true
+    // with a valid ISO-8601 timestamp.
+    assert.strictEqual(readyBody.received, true);
     assert.ok(readyBody.received_at);
+    assert.ok(!Number.isNaN(new Date(readyBody.received_at!).getTime()));
+    assert.equal(new Date(readyBody.received_at!).toISOString(), readyBody.received_at);
     assert.deepEqual(readyBody.results, { overall: 82, bucket: "Launch" });
     assert.ok(typeof readyBody.results_text === "string" && readyBody.results_text.length > 0);
     // Planted secret must never echo back to the waiting page.
@@ -915,11 +935,17 @@ describe("readiness ingest flow with database", () => {
       state?: string;
       submission_token?: string;
       run_id?: string;
+      received?: unknown;
+      received_at?: string;
     };
     assert.equal(statusBody.status, "received");
     assert.equal(statusBody.state, "received");
     assert.equal(statusBody.submission_token, token);
     assert.equal(statusBody.run_id, startBody.run_id);
+    // A linked, durably-persisted run carries the explicit boolean signal too.
+    assert.strictEqual(statusBody.received, true);
+    assert.ok(statusBody.received_at);
+    assert.ok(!Number.isNaN(new Date(statusBody.received_at!).getTime()));
 
     // A second, distinct session must not leak or duplicate the first token's run.
     const secondTokenRes = await ctx.app.inject({ method: "POST", url: "/v1/readiness/token" });
@@ -928,8 +954,13 @@ describe("readiness ingest flow with database", () => {
       method: "GET",
       url: `/v1/readiness/status?token=${encodeURIComponent(secondToken)}`,
     });
-    const secondBody = secondStatus.json() as { status?: string; run_id?: string };
+    const secondBody = secondStatus.json() as {
+      status?: string;
+      run_id?: string;
+      received?: unknown;
+    };
     assert.equal(secondBody.status, "waiting");
+    assert.strictEqual(secondBody.received, false);
     assert.notEqual(secondBody.run_id, startBody.run_id);
   });
 
