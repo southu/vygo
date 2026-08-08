@@ -1538,6 +1538,20 @@ export function ReadinessFlow() {
             tokenLast8: (status.submissionToken ?? submissionToken ?? "").slice(-8),
           });
           trackAnalytics("ingest_landed", { source: "api", persisted: status.persisted });
+          // Emit an explicit, correlatable console signal for the received
+          // readiness report and the DOM step it is about to drive. The ingest
+          // signal is already observable in the network panel (the real GET
+          // /api/readiness/status still fires every tick) and via trackAnalytics,
+          // but logging it here lets an automated check tie the received-report
+          // signal to the resulting auto-advance transition from the browser
+          // console alone — the request/response and the DOM state change share
+          // one correlatable log line. Purely observational: it changes no state.
+          console.info("[readiness] report received via ingest signal — auto-advancing", {
+            persisted: status.persisted,
+            advancingTo: outcome === "auto_confirm" ? "confirm" : "stage3",
+            receivedAt: status.receivedAt ?? null,
+            tokenLast8: (status.submissionToken ?? submissionToken ?? "").slice(-8),
+          });
           // Record the landing so a Back to the prompt screen still shows the
           // "results are ready" notice, then AUTO-ADVANCE off the waiting screen.
           setBackgroundResultsReceived(true);
