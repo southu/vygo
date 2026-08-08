@@ -28,6 +28,27 @@ The advance therefore fires **only** on the persisted/validated confirmation,
 never on an in-flight or optimistic receipt. It happens within one poll interval
 (≈4s, well under 15s).
 
+## Manual paste prompt: hidden while waiting, revealed only as a fallback
+
+While the Stage 2 screen is genuinely waiting on auto-detection (a live
+submission token, no confirmed receipt yet) the **manual paste prompt is not
+rendered** — only the waiting/detection indicator (`readiness-waiting`) shows.
+The `readiness-prompt-running-submit-panel` (and its
+`readiness-prompt-running-paste` textarea) is revealed **only** when:
+
+- the bounded fallback timeout (`PASTE_FALLBACK_REVEAL_MS`, ≈8s — a couple of
+  poll intervals past the auto-advance window) elapses with no confirmed
+  receipt, or
+- detection **explicitly reports a failure** (a real token expiry, or the
+  injected `failed` signal) — revealed immediately, without the full timeout.
+
+If a persisted receipt lands within the timeout, the flow auto-advances and the
+paste prompt never renders. Once revealed, the paste input and its
+submit/advance behaviour are exactly as before — this is a
+conditional-visibility/timing change only; no DOM/classes/handlers changed.
+Auto-detection keeps polling after a timeout reveal, so a receipt that lands
+afterwards still auto-advances exactly as before.
+
 ## Triggering it on the live app
 
 The tester only has browser/HTTP access and cannot make a real external AI POST a
@@ -50,10 +71,11 @@ Steps:
 
 ### Param values
 
-| `e2e_readiness_sim=`                                    | Simulated signal                                               | Expected result                                   |
-| ------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------- |
-| `persisted` (aliases: `received`, `persisted_received`) | status ready + valid `VYGO-READINESS-REPORT` + `received=true` | Auto-advance to Confirm findings, no manual paste |
-| `inflight` (aliases: `in_flight`, `unpersisted`)        | bytes received but not persisted                               | **No advance** — stays on the waiting screen      |
+| `e2e_readiness_sim=`                                    | Simulated signal                                               | Expected result                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `persisted` (aliases: `received`, `persisted_received`) | status ready + valid `VYGO-READINESS-REPORT` + `received=true` | Auto-advance to Confirm findings, no manual paste                                    |
+| `inflight` (aliases: `in_flight`, `unpersisted`)        | bytes received but not persisted                               | **No advance** — waiting screen only; paste prompt appears after the bounded timeout |
+| `failed` (aliases: `failure`, `detection_failed`)       | detection explicitly reports a failure (status `failed`)       | **No advance** — paste prompt revealed immediately as a fallback                     |
 
 Anything else (or no param) → the real poll result is used unchanged.
 
@@ -66,3 +88,8 @@ Anything else (or no param) → the real poll result is used unchanged.
   repeated `GET /api/readiness/status` request.
 - **Manual paste fallback** — still works for reports that require it (the paste
   step and its parse/confirm path are unchanged).
+- **Paste prompt hidden while waiting** — no param (or `inflight`): the waiting
+  screen shows only `readiness-waiting`; `readiness-prompt-running-paste`
+  appears after `PASTE_FALLBACK_REVEAL_MS`.
+- **Paste prompt revealed on detection failure** — `e2e_readiness_sim=failed`:
+  `readiness-prompt-running-paste` appears immediately.

@@ -231,7 +231,15 @@ export type SubmissionStatusResult =
     }
   | { kind: "expired" }
   | { kind: "rate_limited"; retryAfterSeconds: number }
-  | { kind: "unavailable" };
+  | { kind: "unavailable" }
+  /**
+   * Detection explicitly reported a failure — auto-detection cannot confirm
+   * receipt and there is nothing more to wait for. The real fetcher never
+   * returns this (a transport/5xx maps to "unavailable" and keeps waiting); it
+   * exists so the dev/test simulation hook can inject an explicit detection
+   * failure that reveals the manual paste fallback immediately.
+   */
+  | { kind: "failed" };
 
 export async function getReadinessSubmissionStatus(
   submissionToken: string,

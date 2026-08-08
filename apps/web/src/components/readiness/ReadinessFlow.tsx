@@ -124,6 +124,19 @@ const FLOW_STEP_GATE = STAGE1_STEPS.length + 4;
 const INGEST_POLL_INTERVAL_MS = 4000;
 
 /**
+ * Bounded window the waiting/detection screen gives auto-detection before it
+ * reveals the manual paste prompt as a fallback. While waiting, only the
+ * waiting/detection indicator shows; if this timeout elapses with no confirmed
+ * receipt (and detection has not reported a failure, which reveals it sooner),
+ * the paste prompt appears so the user can paste their report by hand. Chosen a
+ * couple of poll intervals past the ≈4s auto-advance window (well under the
+ * documented 15s) so a genuine persisted receipt always advances the flow
+ * first; auto-detection keeps polling either way, so a receipt that lands after
+ * the reveal still auto-advances exactly as before.
+ */
+const PASTE_FALLBACK_REVEAL_MS = 8000;
+
+/**
  * A complete, schema-valid marker-delimited v1 readiness report used only by the
  * dev/test simulation hook below. It is a canned stand-in for the report a
  * customer's AI would POST back, so an automated check can exercise the persisted
@@ -182,14 +195,22 @@ const SIMULATED_PERSISTED_REPORT = [
  *     mid-upload and nothing is persisted yet. The poll treats this as still
  *     waiting (kind "pending"), so the listener IGNORES it and the step must NOT
  *     advance — proving the transition fires only on the persisted signal, never
- *     on optimistic/in-flight state.
+ *     on optimistic/in-flight state. The waiting screen keeps showing only the
+ *     waiting/detection indicator until the bounded fallback timeout elapses,
+ *     then reveals the manual paste prompt.
+ *
+ *   ?e2e_readiness_sim=failed
+ *     Simulate detection EXPLICITLY reporting a failure (kind "failed"): auto-
+ *     detection cannot confirm receipt. The waiting screen reveals the manual
+ *     paste prompt immediately as a fallback — without waiting out the full
+ *     bounded timeout — and the paste path stays fully functional.
  *
  * The poll still issues its real GET /api/readiness/status request every tick
  * (so the same-source wiring stays observable in the network panel); this hook
  * only substitutes the result the flow reacts to when the param is present.
  * Documented in docs/readiness/auto-advance-test-hook.md.
  */
-type ReadinessSimMode = "persisted" | "inflight" | null;
+type ReadinessSimMode = "persisted" | "inflight" | "failed" | null;
 
 function readReadinessSimMode(): ReadinessSimMode {
   if (typeof window === "undefined") return null;
@@ -201,6 +222,9 @@ function readReadinessSimMode(): ReadinessSimMode {
     }
     if (mode === "inflight" || mode === "in_flight" || mode === "unpersisted") {
       return "inflight";
+    }
+    if (mode === "failed" || mode === "failure" || mode === "detection_failed") {
+      return "failed";
     }
     return null;
   } catch {
@@ -231,6 +255,11 @@ function simulatedSubmissionStatus(submissionToken: string): SubmissionStatusRes
     // token as waiting, so map it to "pending": the listener keeps waiting and
     // never advances the step.
     return { kind: "pending" };
+  }
+  if (mode === "failed") {
+    // Detection explicitly reports a failure → the listener stops waiting and
+    // reveals the manual paste fallback immediately (no full timeout).
+    return { kind: "failed" };
   }
   return null;
 }
@@ -483,6 +512,14 @@ export function ReadinessFlow() {
    * report_parsed / findings_confirmed — the user pastes and confirms explicitly.
    */
   const [backgroundResultsReceived, setBackgroundResultsReceived] = useState(false);
+  /**
+   * Reveals the manual paste prompt on the waiting/detection screen. False while
+   * genuinely waiting on auto-detection (only the waiting indicator shows); set
+   * true when the bounded fallback timeout elapses with no confirmed receipt, or
+   * immediately when detection explicitly reports a failure. Once revealed the
+   * paste input and its submit/advance behaviour are exactly as before.
+   */
+  const [pasteFallbackRevealed, setPasteFallbackRevealed] = useState(false);
   /** received_at of the ingest record already rendered (consume-once). */
   const ingestedRef = useRef<string | null>(null);
   /**
@@ -618,6 +655,7 @@ export function ReadinessFlow() {
           setSecretLines([]);
           setSecretMessage("");
           setBackgroundResultsReceived(false);
+          setPasteFallbackRevealed(false);
           setSubmissionExpired(false);
           setSubmissionConfirmation(null);
           setSubmissionToken(null);
@@ -1437,6 +1475,13 @@ export function ReadinessFlow() {
           }
           schedule(INGEST_POLL_INTERVAL_MS * 2);
           return;
+        case "failed":
+          // Detection explicitly reported a failure — there is nothing more to
+          // wait for. Stop polling and reveal the manual paste fallback right
+          // away (no full timeout). The paste path stays fully functional.
+          sawValidStatusRef.current = true;
+          setPasteFallbackRevealed(true);
+          return;
         case "ready": {
           sawValidStatusRef.current = true;
           // Consume-once: never act on the same landed record twice.
@@ -1526,6 +1571,34 @@ export function ReadinessFlow() {
       if (timer) clearTimeout(timer);
     };
   }, [view, submissionToken, submissionExpired]);
+
+  /**
+   * Bounded fallback reveal. While genuinely waiting on auto-detection (prompt
+   * screen up, a live submission token, not expired, nothing received yet) the
+   * manual paste prompt stays hidden and only the waiting/detection indicator
+   * shows. If the bounded timeout elapses with no confirmed receipt, reveal the
+   * paste prompt as a fallback. The ingest poll above keeps running regardless,
+   * so a receipt that lands after the reveal still auto-advances exactly as
+   * before. A confirmed receipt (backgroundResultsReceived) tears this timer
+   * down before it can fire, so a within-timeout confirmation never reveals it.
+   */
+  useEffect(() => {
+    if (view !== "stage2" || !submissionToken || submissionExpired || backgroundResultsReceived) {
+      return;
+    }
+    const timer = setTimeout(() => setPasteFallbackRevealed(true), PASTE_FALLBACK_REVEAL_MS);
+    return () => clearTimeout(timer);
+  }, [view, submissionToken, submissionExpired, backgroundResultsReceived]);
+
+  /**
+   * A detection failure — a real token expiry, or the injected failure signal —
+   * reveals the paste fallback immediately, without waiting out the full bounded
+   * timeout. (The poll's "failed" branch reveals it directly; this also covers
+   * the expiry path, which flips submissionExpired.)
+   */
+  useEffect(() => {
+    if (submissionExpired) setPasteFallbackRevealed(true);
+  }, [submissionExpired]);
 
   /**
    * Client-side secret scan MUST run before any network send of paste contents.
@@ -1732,6 +1805,7 @@ export function ReadinessFlow() {
     sawValidStatusRef.current = false;
     setSubmissionExpired(false);
     setBackgroundResultsReceived(false);
+    setPasteFallbackRevealed(false);
     setSubmissionToken(null);
     setStage1(EMPTY_STAGE1);
     setStepIndex(0);
@@ -1837,6 +1911,7 @@ export function ReadinessFlow() {
     sawValidStatusRef.current = false;
     setSubmissionExpired(false);
     setBackgroundResultsReceived(false);
+    setPasteFallbackRevealed(false);
     setStage1(EMPTY_STAGE1);
     setStepIndex(0);
     setPasteText("");
@@ -2691,6 +2766,14 @@ export function ReadinessFlow() {
       id: "stage2-tool",
       text: `Got it — prompt ready for ${howTo.toolName}${stage1.productDescription.trim() ? ` · noted “${stage1.productDescription.trim().slice(0, 80)}${stage1.productDescription.trim().length > 80 ? "…" : ""}”` : ""}.`,
     };
+    // While auto-detection is genuinely waiting (a live submission token, no
+    // confirmed receipt yet) the manual paste prompt stays hidden — only the
+    // waiting/detection indicator shows. Reveal it once the bounded timeout has
+    // elapsed or detection reported a failure (pasteFallbackRevealed), and also
+    // when there is no submission token to poll (auto-detection cannot run, so
+    // the paste path is the only way forward). A confirmed receipt hides it.
+    const showPromptRunningPaste =
+      (!submissionToken || pasteFallbackRevealed) && !backgroundResultsReceived;
     return (
       <div
         className="readiness-assessment mt-8"
@@ -2779,52 +2862,54 @@ export function ReadinessFlow() {
           so the generated prompt is always shown first and nothing advances from
           background completion, polling, or elapsed time.
         */}
-        <div
-          className="readiness-step-panel mt-6"
-          data-testid="readiness-prompt-running-submit-panel"
-        >
-          <h3 className="font-display text-lg font-semibold text-ink">
-            {c.stage2.alreadyRanTitle}
-          </h3>
-          <p className="mt-1 text-sm text-muted">{c.stage2.alreadyRanHelper}</p>
-          <label htmlFor="readiness-prompt-running-paste" className="sr-only">
-            {c.stage3.textareaLabel}
-          </label>
-          <textarea
-            id="readiness-prompt-running-paste"
-            rows={6}
-            value={pasteText}
-            onChange={(ev) => onPasteChange(ev.target.value)}
-            placeholder={c.stage3.textareaPlaceholder}
-            className="mt-3 w-full rounded-xl border border-border bg-canvas px-3 py-3 font-mono text-xs leading-relaxed text-ink sm:text-sm"
-            data-testid="readiness-prompt-running-paste"
-            spellCheck={false}
-            autoComplete="off"
-          />
-          {secretLines.length > 0 ? (
-            <p
-              className="mt-2 text-sm font-semibold text-red"
-              role="alert"
-              data-testid="readiness-prompt-running-secrets"
-            >
-              {secretMessage || PASTE_SECRETS_BLOCK_MESSAGE}
-            </p>
-          ) : null}
-          {renderPasteValidationError({
-            testid: "readiness-prompt-running-validation",
-            onBack: () => setView("stage3"),
-            backLabel: c.stage2.pasteResults,
-          })}
-          <button
-            type="button"
-            className="btn-primary mt-3"
-            disabled={pasteSubmitting || pasteText.trim().length === 0}
-            onClick={() => void onPasteSubmit()}
-            data-testid="readiness-prompt-running-submit"
+        {showPromptRunningPaste ? (
+          <div
+            className="readiness-step-panel mt-6"
+            data-testid="readiness-prompt-running-submit-panel"
           >
-            {pasteSubmitting ? c.stage3.submitting : c.stage3.submit}
-          </button>
-        </div>
+            <h3 className="font-display text-lg font-semibold text-ink">
+              {c.stage2.alreadyRanTitle}
+            </h3>
+            <p className="mt-1 text-sm text-muted">{c.stage2.alreadyRanHelper}</p>
+            <label htmlFor="readiness-prompt-running-paste" className="sr-only">
+              {c.stage3.textareaLabel}
+            </label>
+            <textarea
+              id="readiness-prompt-running-paste"
+              rows={6}
+              value={pasteText}
+              onChange={(ev) => onPasteChange(ev.target.value)}
+              placeholder={c.stage3.textareaPlaceholder}
+              className="mt-3 w-full rounded-xl border border-border bg-canvas px-3 py-3 font-mono text-xs leading-relaxed text-ink sm:text-sm"
+              data-testid="readiness-prompt-running-paste"
+              spellCheck={false}
+              autoComplete="off"
+            />
+            {secretLines.length > 0 ? (
+              <p
+                className="mt-2 text-sm font-semibold text-red"
+                role="alert"
+                data-testid="readiness-prompt-running-secrets"
+              >
+                {secretMessage || PASTE_SECRETS_BLOCK_MESSAGE}
+              </p>
+            ) : null}
+            {renderPasteValidationError({
+              testid: "readiness-prompt-running-validation",
+              onBack: () => setView("stage3"),
+              backLabel: c.stage2.pasteResults,
+            })}
+            <button
+              type="button"
+              className="btn-primary mt-3"
+              disabled={pasteSubmitting || pasteText.trim().length === 0}
+              onClick={() => void onPasteSubmit()}
+              data-testid="readiness-prompt-running-submit"
+            >
+              {pasteSubmitting ? c.stage3.submitting : c.stage3.submit}
+            </button>
+          </div>
+        ) : null}
 
         {submissionToken ? (
           <div
