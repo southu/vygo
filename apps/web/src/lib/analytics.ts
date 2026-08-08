@@ -24,6 +24,7 @@ export const READINESS_ANALYTICS_EVENTS = [
   "cta_clicked",
   "off_ramp_hit",
   "ingest_landed",
+  "ingest_auto_advanced",
   "ingest_expired",
   "start_over",
   "run_start_attempted",

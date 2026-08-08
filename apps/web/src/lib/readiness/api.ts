@@ -217,6 +217,17 @@ export type SubmissionStatusResult =
       receivedAt: string | null;
       /** Server-echoed submission token for this landed submission. */
       submissionToken: string | null;
+      /**
+       * The machine-readable "received AND persisted" signal (the explicit
+       * boolean the status endpoint layers on top of the status/state strings):
+       * true ONLY once the ingest payload is durably persisted/validated in
+       * readiness_ingest_submissions (or an equivalent matured/linked run). It is
+       * NEVER true for a valid-but-waiting token or an in-flight/optimistic
+       * upload. The auto-advance listener keys off THIS flag — not the mere
+       * presence of results bytes — so the flow only moves forward on the
+       * persisted/validated confirmation, never on unpersisted receipt.
+       */
+      persisted: boolean;
     }
   | { kind: "expired" }
   | { kind: "rate_limited"; retryAfterSeconds: number }
@@ -274,6 +285,13 @@ export async function getReadinessSubmissionStatus(
           : typeof body.token === "string" && body.token.trim()
             ? body.token.trim()
             : null,
+      // Explicit persisted/validated signal. Read the machine-readable boolean
+      // the endpoint now emits (received=true only once the payload is durably
+      // persisted). A landed row that predates the boolean (older rollout, or a
+      // test fixture using only the status string) reports persisted=false — the
+      // waiting screen still advances to the paste step on those, but the
+      // auto-confirm listener stays gated on a genuine persisted confirmation.
+      persisted: body.received === true,
     };
   }
   return { kind: "pending" };

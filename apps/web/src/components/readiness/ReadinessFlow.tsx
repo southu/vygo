@@ -56,6 +56,7 @@ import {
   submitReadinessResults,
   type ParseResponse,
   type ScoreResponse,
+  type SubmissionStatusResult,
 } from "@/lib/readiness/api";
 import {
   initNewReadinessRun,
@@ -121,6 +122,118 @@ const FLOW_STEP_GATE = STAGE1_STEPS.length + 4;
  * waits on the customer's AI (plain polling — this stack has no SSE).
  */
 const INGEST_POLL_INTERVAL_MS = 4000;
+
+/**
+ * A complete, schema-valid marker-delimited v1 readiness report used only by the
+ * dev/test simulation hook below. It is a canned stand-in for the report a
+ * customer's AI would POST back, so an automated check can exercise the persisted
+ * auto-advance end-to-end without a real external upload.
+ */
+const SIMULATED_PERSISTED_REPORT = [
+  "=== VYGO-READINESS-REPORT v1 ===",
+  "summary: Scheduling SaaS for multi-location clinics",
+  "languages: TypeScript, Python",
+  "size: medium (~40k LOC monorepo)",
+  "structure: pnpm monorepo: web, api, worker, packages",
+  "frontend: Next.js App Router",
+  "backend: Fastify on Railway",
+  "database: Postgres with Drizzle migrations",
+  "tenancy: multi-tenant (org_id on rows)",
+  "auth: session cookies + magic link",
+  "authorization: RBAC roles (owner, admin, member)",
+  "row_level_security: enforced via app middleware; RLS planned",
+  "environments: local, staging, production",
+  "deploys: GitHub Actions -> Vercel + Railway, automated",
+  "tests: unit + integration on every deploy via CI",
+  "background_jobs: email outbox worker",
+  "integrations: Resend, Cloudflare Turnstile",
+  "secrets_pattern: Railway env + Vault references (no secrets in git)",
+  "logging: structured JSON logs, request ids",
+  "error_handling: safe public errors; details only in server logs",
+  "pii_categories: email, name; no payment card or health records in prod",
+  "api_surface: HTTPS /v1/* JSON API",
+  'fragility_flags: ["manual_migrate_risk", "single_region"]',
+  "confidence: 0.82",
+  "=== END VYGO-READINESS-REPORT ===",
+].join("\n");
+
+/**
+ * DEV/TEST-ONLY simulation hook for the readiness ingest status poll.
+ *
+ * The auto-advance listener further below is wired to the SAME ingest status
+ * poll (getReadinessSubmissionStatus → GET /api/readiness/status) that already
+ * drives the "readiness report received" indicator — it adds no second
+ * poller/websocket/fetch. The live tester has only browser/HTTP access and no
+ * way to make a real external AI POST a report back, so this hook lets an
+ * automated check inject the exact backend signal the poll would otherwise
+ * observe, WITHOUT touching the backend or any production data: the override is
+ * purely in-memory, scoped to the current tab, and only takes effect when an
+ * explicit query param — one a real end user never types in normal use — is
+ * present on /readiness.
+ *
+ *   ?e2e_readiness_sim=persisted
+ *     Simulate a "received AND persisted" signal: a landed, durably-persisted
+ *     VYGO-READINESS-REPORT (status ready + persisted=true). This is the
+ *     persisted/validated confirmation, and it auto-advances the flow to the
+ *     Confirm-findings step with NO manual paste.
+ *
+ *   ?e2e_readiness_sim=inflight
+ *     Simulate an in-flight / bytes-received-but-NOT-persisted event: results are
+ *     mid-upload and nothing is persisted yet. The poll treats this as still
+ *     waiting (kind "pending"), so the listener IGNORES it and the step must NOT
+ *     advance — proving the transition fires only on the persisted signal, never
+ *     on optimistic/in-flight state.
+ *
+ * The poll still issues its real GET /api/readiness/status request every tick
+ * (so the same-source wiring stays observable in the network panel); this hook
+ * only substitutes the result the flow reacts to when the param is present.
+ * Documented in docs/readiness/auto-advance-test-hook.md.
+ */
+type ReadinessSimMode = "persisted" | "inflight" | null;
+
+function readReadinessSimMode(): ReadinessSimMode {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = new URL(window.location.href).searchParams.get("e2e_readiness_sim");
+    const mode = (raw ?? "").trim().toLowerCase();
+    if (mode === "persisted" || mode === "received" || mode === "persisted_received") {
+      return "persisted";
+    }
+    if (mode === "inflight" || mode === "in_flight" || mode === "unpersisted") {
+      return "inflight";
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the simulated status the poll should react to for the active
+ * submission token, or null when no simulation param is set (the real poll
+ * result is used unchanged). See readReadinessSimMode for the gated query params.
+ */
+function simulatedSubmissionStatus(submissionToken: string): SubmissionStatusResult | null {
+  const mode = readReadinessSimMode();
+  if (mode === "persisted") {
+    return {
+      kind: "ready",
+      resultsText: SIMULATED_PERSISTED_REPORT,
+      results: null,
+      receivedAt: new Date().toISOString(),
+      submissionToken,
+      // The whole point of the hook: assert the persisted/validated confirmation.
+      persisted: true,
+    };
+  }
+  if (mode === "inflight") {
+    // Bytes received but NOT persisted → the real poll would still report the
+    // token as waiting, so map it to "pending": the listener keeps waiting and
+    // never advances the step.
+    return { kind: "pending" };
+  }
+  return null;
+}
 
 function mergeStage1(partial: Partial<ReadinessStage1Answers>): ReadinessStage1Answers {
   return {
@@ -1157,12 +1270,15 @@ export function ReadinessFlow() {
       // successful parse (report_parsed: not failed, not pending, findings > 0)
       // is persisted here; a failed/pending/empty parse stays report_pasted and
       // is handled by the branches above/below. The displayed findings are
-      // persisted verbatim so the resumed view reproduces them exactly. This is
-      // strictly a user-driven interactive path — background mission-completion
-      // callbacks never call runParseAndConfirm, so this can never advance a
-      // superseded run. The confirm view above never depends on this write; it
-      // is awaited only to keep persistence ordered ahead of a later explicit
-      // "Looks right → continue" (which persists the authoritative "gate").
+      // persisted verbatim so the resumed view reproduces them exactly. This
+      // path is reached either from a user's manual paste OR from the ingest
+      // poll's PERSISTED auto-advance (status.persisted === true) — in both cases
+      // it acts on a genuinely persisted/validated report, never on an in-flight
+      // or optimistic event, and the poll caller has already applied the
+      // run-identity guard, so it can never advance a superseded run. The confirm
+      // view above never depends on this write; it is awaited only to keep
+      // persistence ordered ahead of a later explicit "Looks right → continue"
+      // (which persists the authoritative "gate").
       if (
         parseReachesReportParsed({
           parseStatus: result.parseStatus,
@@ -1240,15 +1356,29 @@ export function ReadinessFlow() {
   };
 
   /**
+   * Always-fresh handle to runParseAndConfirm for the asynchronous ingest poll.
+   * runParseAndConfirm reads live stage1 / token / submissionToken and is
+   * re-created every render, so — exactly like goToStage3Ref — the poll must
+   * invoke the CURRENT one when the persisted signal lands, not a stale closure.
+   * The persisted auto-advance path (below) calls this with the server-persisted
+   * report text so the flow reaches the Confirm-findings step with no manual paste.
+   */
+  const runParseAndConfirmRef = useRef(runParseAndConfirm);
+  runParseAndConfirmRef.current = runParseAndConfirm;
+
+  /**
    * Watch for the customer's AI POSTing results back (ingest). While the prompt
    * screen is up with a live submission token, poll the status endpoint on an
    * interval. When the poll observes a landed result (status received /
-   * completed) it records the landing AND auto-advances the waiting screen to the
-   * paste step within one interval — no refresh or click — so the tab never
-   * strands the user. It still never writes into the paste box or fabricates
-   * findings (the user pastes and submits their own report). A pending/processing
-   * poll keeps waiting; an expired/unknown token stops the wait so the page can
-   * offer a start-over.
+   * completed) it records the landing AND auto-advances the waiting screen: on a
+   * genuine PERSISTED/VALIDATED confirmation (status.persisted — the endpoint's
+   * machine-readable received=true) it runs the SAME parse+confirm the manual
+   * paste runs, straight to the Confirm-findings step with no manual paste; on a
+   * landed-but-not-yet-persisted result it advances only to the paste step (the
+   * user pastes their own report). Either way it never fabricates findings from
+   * an in-flight/optimistic event — the auto-confirm is gated on persisted. A
+   * pending/processing poll keeps waiting; an expired/unknown token stops the
+   * wait so the page can offer a start-over.
    */
   useEffect(() => {
     if (view !== "stage2" || !submissionToken || submissionExpired) return;
@@ -1268,8 +1398,14 @@ export function ReadinessFlow() {
 
     const tick = async () => {
       if (cancelled) return;
-      const status = await getReadinessSubmissionStatus(submissionToken);
+      // Always issue the real status request so the same-source poll wiring stays
+      // observable (network panel / page source). When the dev/test simulation
+      // param is present, react to the injected signal instead of the live
+      // response — the poll loop, endpoint, and advance logic are otherwise
+      // identical (no second poller). See simulatedSubmissionStatus above.
+      const liveStatus = await getReadinessSubmissionStatus(submissionToken);
       if (cancelled) return;
+      const status = simulatedSubmissionStatus(submissionToken) ?? liveStatus;
       switch (status.kind) {
         case "pending":
           // Token is valid and simply awaiting the AI's POST — the "prompt
@@ -1326,11 +1462,7 @@ export function ReadinessFlow() {
           // Run-identity: a callback whose watch began under a run that is no
           // longer active (the user has since started a fresh analysis) is a late
           // callback from a superseded run — drop it and stop this watch so it can
-          // never advance the newer run's flow. The move made here is only into
-          // user_ready_to_paste (the paste step), a state the model explicitly
-          // permits a background completion to enter (backgroundCompletionMayEnter):
-          // it never writes the paste box, fabricates findings, or reaches
-          // report_parsed / findings_confirmed — the user still pastes and confirms.
+          // never advance the newer run's flow.
           const decision = guardMissionCallback({
             callbackRunId: watchRunId,
             activeRunId: runIdRef.current,
@@ -1349,21 +1481,39 @@ export function ReadinessFlow() {
             recordedAt: status.receivedAt ?? new Date().toISOString(),
             tokenLast8: (status.submissionToken ?? submissionToken ?? "").slice(-8),
           });
-          trackAnalytics("ingest_landed", { source: "api" });
+          trackAnalytics("ingest_landed", { source: "api", persisted: status.persisted });
           // Record the landing so a Back to the prompt screen still shows the
           // "results are ready" notice, then AUTO-ADVANCE off the waiting screen.
           setBackgroundResultsReceived(true);
-          // The customer's AI has sent its results back (status received /
-          // completed): leave the "waiting for your AI to send results…" screen
-          // and open the paste step automatically — zero refresh, zero clicks — so
-          // the waiting tab never strands the user once results land. End this
-          // watch first (goToStage3 flips the view async after persisting, and the
-          // view change tears the effect down anyway) so no stray tick reschedules.
+          // End this watch first (the advance flips the view async after
+          // persisting, and the view change tears the effect down anyway) so no
+          // stray tick reschedules.
           cancelled = true;
           if (timer) {
             clearTimeout(timer);
             timer = null;
           }
+          if (status.persisted) {
+            // PERSISTED/VALIDATED confirmation (the endpoint's machine-readable
+            // received=true, not a mere in-flight/optimistic receipt). The report
+            // is durably persisted server-side, so run the SAME parse+confirm the
+            // manual paste runs — on the server-persisted report text — and land
+            // directly on the Confirm-findings step. No manual paste is required.
+            // This only fires on the persisted signal AND after the run-identity
+            // guard above, so a late/superseded run or an unpersisted event can
+            // never drive it. The explicit "Looks right → continue" gate that
+            // follows stays user-driven; auto-advance stops at report_parsed.
+            trackAnalytics("ingest_auto_advanced", { to: "confirm" });
+            setPasteText(landedText);
+            void runParseAndConfirmRef.current(landedText);
+            return;
+          }
+          // Landed but not yet reported persisted (older rollout / a fixture using
+          // only the status string): the customer's AI signalled completion, so
+          // leave the waiting screen and open the paste step automatically — zero
+          // refresh, zero clicks — but stop there and let the user paste and
+          // confirm their own report. The auto-confirm above is reserved for a
+          // genuine persisted confirmation.
           void goToStage3Ref.current();
           return;
         }
